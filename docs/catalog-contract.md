@@ -1,9 +1,8 @@
 # Catalog contract v1
 
-This is a schema contract for subsequent stages, not a populated catalog or an
-implemented database migration. SQLite with FTS5 and NumPy remain the selected
-approach. Step 2 creates the database and keyword index. Do not interpret unknown
-fields or pending stages as successful inspection.
+Step 2 implements the inventory and keyword portion of this contract in SQLite
+schema version 1. SQLite FTS5 and NumPy remain the selected approach. Downstream
+fields are nullable/pending; do not interpret them as successful inspection.
 
 One record represents one logical asset, with alternate files grouped only when
 evidence supports equivalence. Identity is `(source_id, pack_id, source_relative_identity)`;
@@ -37,13 +36,52 @@ or false. Technical metadata includes its extraction method; visual observations
 are separate from technical facts and suggested uses. Failed image inspection
 never falls back to a filename-generated caption.
 
-Planned SQLite representation: assets keyed by asset ID with uniqueness on the
-identity tuple; source files/dependencies/previews as child rows; versioned structured
-payloads for technical/description/provenance/owner overlay; contracts and stage
-states retain explicit fingerprints. FTS5 contains searchable names and approved
-factual descriptions linked to asset IDs. Vector arrays live in ignored `data/`
-with an asset/view mapping and embedding contract fingerprint. This representation
-is a proposal until step 2 implements and tests its migration.
+Implemented SQLite representation: `assets` is keyed by asset ID with uniqueness
+on `(source_id, pack_id, identity)` and holds the versioned JSON record. `files`
+contains source-file child rows. `inventory` contains every discovered path,
+classification/status, hash and archive evidence; `metadata` holds source binding,
+fingerprints, scanner version and the scan UTC timestamp. Dependencies, supplied
+previews, grouping evidence, license evidence, variant suggestions and future
+fields live in each asset's JSON record. `asset_fts` indexes filenames, split
+camel-case names, pack names and source-relative identities/paths, linked to IDs.
+No generated descriptions or vectors are indexed. `PRAGMA user_version=1`;
+unknown versions are rejected. The actual Python build must pass an FTS5
+CREATE/INSERT/MATCH probe; no replacement index is silently used.
+
+Asset ID algorithm v1: `asset_` plus the first 32 hexadecimal characters of
+SHA-256 over UTF-8 compact JSON `["playful-lowpoly-v1", pack_id, identity]`.
+Pack ID is the exact top-level pack directory name. Identity is pack-relative:
+the full source path including extension when separate, or
+`<export anchor>/@exports/<remaining relative stem>` when sibling-export evidence
+permits grouping. Source binding is verified against the configured root when
+opening the database. Content changes do not change IDs; path renames or changes
+to grouping policy require explicit identity migration, not filename guesses.
+
+Grouping method `sibling-export-manifest-v1` recognizes exact format-folder names,
+requires at least two sibling folders with identical complete relative stem sets
+and no duplicate keys, and records folders, anchor, matching count and name-set
+hash. It removes only the evidenced format-directory segment; deeper namespaces
+remain in identity. Other files remain independent, even in the same directory.
+Matching names across independent identities are visible review cases. Filename
+variant links are explicitly unreviewed suggestions and never merged.
+
+Supplied previews use `source_path` plus source hash, view label and association
+evidence; rendered project-relative previews remain pending. Exact names under
+matching `Previews`/`Side`/`Isometric` layouts are associated. Isometric
+`_NE/_NW/_SE/_SW` suffixes retain directional view labels. Pack contact sheets,
+samples and textures are separate inventory roles, not individual asset renders.
+
+Dependency references are parsed from OBJ/MTL, glTF/GLB JSON and DAE images, with
+recursive MTL traversal and per-file parser status/issues. Legitimate parent
+references must resolve within the configured source root. Absolute, remote,
+reserved-name or escaping references are rejected and never fetched. Binary
+FBX/Blend dependency inspection remains pending; parsed references do not imply
+complete material/geometry validation. Physical units/scale remain unknown.
+
+`scan` publishes inventory rows and the logical FTS index in one transaction after
+two matching complete source fingerprints. It refuses to overwrite owner overlays
+or populated later-stage fields. Incremental updates and downstream migrations
+remain step 8 work. Vector arrays and their modality/contracts remain step 5 work.
 
 Embedding contract from the plan is provisional until step 5 verifies official
 documentation and real inference: full 768 dimensions, finite normalized values,
