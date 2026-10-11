@@ -5,6 +5,11 @@ It serves only the approved forty-asset pilot. It has no HTTP listener, export
 tool, arbitrary-path input, copy operation, or source-writing API. Stop before
 step 8; pilot approval is not full-library approval.
 
+Bruno's current client decision is **Codex for now**. OpenCode completion is not
+required for current use, and further OpenCode work is on hold pending his
+explicit request. Existing failure evidence remains valid. See
+`client-decision.json` and the later decision entry in `../progress.md`.
+
 ## Install and start
 
 From the project root, install the isolated transport environment:

@@ -1024,3 +1024,16 @@ No push. The next stage is **step 8 only after a new explicit request**. A retry
 or repair of the faulty local workflow/junction fixture also requires Bruno's
 explicit request under the root fault policy; no repair is implied by this
 handoff.
+
+### Bruno's client decision — October 11, 2026
+
+Bruno explicitly chose to **use the verified Codex integration for now** and
+asked to register that decision. OpenCode completion is **not required for
+current use**; further OpenCode work is on hold until Bruno explicitly requests
+it. Its existing timeout, partial results and unverified local image/selection
+status remain recorded. This decision authorizes no retry, repair, configuration
+change, full-library processing or game import.
+
+Trusted session evidence: "For now I don't care if the OpenCode integration
+isn't working, I'll use it with codex for now." Then: "Please register this
+decision." The decision is also recorded in `docs/mcp/client-decision.json`.
