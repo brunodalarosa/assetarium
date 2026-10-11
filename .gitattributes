@@ -1,0 +1,2 @@
+# Preserve approved owner artifacts and hash-bound step 7 evidence byte-for-byte.
+docs/mcp/*.json -text

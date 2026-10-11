@@ -1,14 +1,15 @@
 # Local Asset Library
 
-Steps 2–5 provide a read-only inventory, SQLite/FTS5 search, a reproducible
+Steps 2–7 provide a read-only inventory, SQLite/FTS5 search, a reproducible
 40-asset pilot, technical inspection, multi-view Blender renders and local
 vision descriptions and verified text/image embedding search of the pilot.
-MCP integration and benchmark approval remain later steps.
+The bounded pilot is approved and local MCP agent access is implemented; real
+client results and remaining verification faults are recorded below and in progress.
 
 The source collection is read only:
 `C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs`.
-Generated files stay in this repository. Play Shapes and existing local agent
-installations are independent and unchanged.
+Generated files stay in this repository. Play Shapes remains independent.
+Local agent clients have additive, backed-up MCP registration.
 
 From this repository in PowerShell:
 
@@ -198,3 +199,11 @@ Queries never fall back after inference failure. Changed contracts require
 capability verification and reindexing. Generated indexes, views, weights and
 reports remain ignored; no export, full indexing, MCP integration or benchmark
 approval is part of this step.
+
+## Agent access (step 7)
+
+Local STDIO MCP tools, setup snippets, restoration instructions and real client
+evidence are documented in [docs/mcp/README.md](docs/mcp/README.md).
+Codex completed the real prop-selection workflow. OpenCode connected and
+received the preview, but its local Qwen workflow timed out and remains
+unverified. See [progress](docs/progress.md) for faults and evidence boundaries.

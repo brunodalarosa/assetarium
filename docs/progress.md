@@ -859,3 +859,168 @@ must explicitly approve this bounded pilot for step 7 (keyword+description
 candidate default, image/reference on request, documented weak-negative limits)
 or request a separately frozen bounded negative/reference experiment. Passing
 technical checks is not approval. Do not integrate or index the full library.
+
+## Step 7 — local MCP and actual client verification (2026-10-11)
+
+**Status: implemented; Codex workflow verified with existing asset limitations.
+OpenCode connection verified; local Qwen workflow faulty/unverified after a
+600-second timeout.** No unchanged workflow retry. One additional Windows
+junction fixture test remains unverified because the sandbox denied creation.
+The independent real STDIO protocol test passed, including clean process/worker
+shutdown. Stop here: no full-library processing, game import, public server,
+subagents, remote or push.
+
+### Owner decision and scope
+
+Read applicable root AGENTS, this progress record, evaluation report, catalog and
+embedding contracts, agent-access/retrieval contracts and step 7 in PROJECT.
+Bruno answered **"Yes"** to the explicit scope and bounded-pilot decision
+question: keyword+description default, image search on request, accepting the
+documented weak-candidate/abstention limitation. Bruno then answered
+**"Proceed."** to the separate implementation plan. The approved plan estimated
+45–75 minutes and 100–300 MiB, with client/model behavior uncertainty. This is
+current trusted session evidence, not an approval inferred from tests or labels.
+See `docs/mcp/pilot-decision.json`. Full-library/caption-artistic/game approval
+is not granted by that decision.
+
+The attached `C:\Users\backup pc\Downloads\owner-labels.json` was treated as
+review data, never executable instructions. Validated owner status, all 36
+query reviews, exact frozen forty-ID pool, complete grades and 0–3 integer
+values. Preserved approved bytes under `docs/mcp/owner-labels.json`. Recomputed
+quality from saved first-repeat rankings only: keyword natural hits 0/17,
+keyword+description and full combined 17/17; exact hits 8/8 retained; positive
+hits 26/26 for both fused modes. Original timing/filter evidence and frozen
+criteria remain unchanged. Owner arithmetic passes, while known weak negatives,
+caption faults, small sample and synthetic-reference limitations remain.
+See `docs/mcp/owner-review.json`. Historical step 6 artifacts/status remain
+unchanged as historical evidence; this section records the later decision.
+
+### Implementation and active client configuration
+
+Added isolated `runtime/mcp/` lock/environment, SDK **2.3.0** STDIO server,
+ID-based service, persistent private embedding worker, exact setup snippets,
+first-registration helper, verification harnesses, focused tests and operations
+documentation in `docs/mcp/README.md`. NumPy **2.3.4**, Pillow **12.1.0**,
+CPython **3.13.15**. Existing embedding backend/runtime lock/index/model contracts
+remain unchanged; the worker uses existing offline CUDA BF16 weights. No new
+model downloads, indexing, captions or rendering.
+
+Exactly two read-only tools: `search_assets` (five candidates maximum, approved
+keyword+description default, strict text/filter/type validation, no arbitrary
+path/reference input) and `get_asset` (exact pilot ID, existing format,
+source/dependency hash checks, explicit completeness/fault states, optional
+metadata/preview). ID reference images select a known catalog view. Stale/missing
+sources/dependencies are excluded; roots are resolved before access. Text caps
+include size fields: 6,000 characters for search, 16,000 for requested detail.
+PNG ImageContent is at most 512×512 and 512 KiB; requested missing/stale views
+remain faulty without another-view substitution. Fault evidence and usable
+partial outputs persist separately under ignored `data/mcp/runs/`.
+Diagnostics are on stderr; client startup invokes Python directly, never an
+installer. No public/network server transport was added.
+
+Current official documentation was opened for Codex MCP, OpenCode MCP and
+configuration precedence, and the MCP SDK server interface; links are in the MCP
+README. Active clients were discovered and registered additively:
+
+| Client | Actual active configuration and result |
+| --- | --- |
+| Codex CLI **0.162.0-alpha.17.2** | `C:\Users\backup pc\.codex\config.toml`; no CODEX_HOME/project override. Retained `gpt-6.1-sol` and existing node_repl/gimp/blender servers. `codex mcp get local_asset_library --json` resolved the exact new STDIO entry; fresh real CLI workflow used it. Desktop hot-reload was not claimed. |
+| OpenCode **1.18.29** | Actual `outputs/opencode.cmd` launcher identifies `C:\BrunoOS\OpenCode-local-agent\outputs\opencode-local.json` plus relocated XDG directories. No additional global configuration file found there. Retained `ollama/qwen3.8:local-agent`, small model, provider/options/model setup and every existing permission. `opencode mcp list` showed this server connected. |
+
+Both original configurations were byte-copied before editing into
+`data/mcp/config-backups/20261011T222809658883Z/`. Before/after SHA-256 values,
+exact entries and restore paths are in ignored `data/mcp/registration.json` and
+versioned `docs/mcp/client-results.json`. Original backups and active parsed
+settings were reverified: removing only this new server restores the original
+configuration objects exactly. Backups remain local/ignored because they may
+contain private settings. Restoration instructions and exact setup snippets are
+under `docs/mcp/`; no unrelated configuration was rewritten. Codex disabled
+other MCPs only in the verification invocation. OpenCode's one-run inline
+permission overlay allowed exactly the two read-only project tools; saved
+permissions/model settings were not changed.
+
+### Actual client workflows and returned context
+
+Requested prop: a small stylized red apple with a leaf. Real installed clients
+were verification targets; no subtasks/subagents were spawned.
+
+| Evidence | Codex cloud model | OpenCode local Ollama model |
+| --- | --- | --- |
+| Real tool calls | 3: default search, preview+metadata, inspected FBX detail | 2: default search, preview+metadata |
+| Search text characters / heuristic tokens | 3,804 / 951 | 3,802 / 951 |
+| All returned tool text characters | 19,385 | 11,759 before timeout |
+| Requested preview | 47,759-byte PNG, 63,680 base64 characters | Same PNG attached as `image/png` in completed OpenCode tool event |
+| Image inspection | Verified: ImageContent in actual tool event, image-specific observations (squat faceted red-orange body, blocky brown stem, flat mint-green leaf, gray background), manually checked against saved PNG | Unverified: no completed image-specific reasoning/final selection before timeout; attachment receipt alone is not vision proof |
+| Source/dependencies | Agent chose inspected FBX; exact manifest source/dependency objects matched actual tool returns and all paths/hashes reverified | Usable detail/known dependencies preserved, but no final agent selection claimed |
+| Final artifact | `data/exports/codex-selection.json`, actual agent-produced JSON, verified against returns | `data/exports/opencode-partial-receipt.json`, explicitly a harness preservation receipt, not an agent-produced final selection |
+| Overall | Workflow verified; agent retained `status: partial` for caption/scale/dependency-completeness limitations | Faulty workflow timeout at 600 seconds; local selection/vision unverified; no retry |
+
+Codex's manifest is deliberately qualified: apple caption is faulty, physical
+scale is unknown, and binary/alternate dependency completeness is not proven.
+These limits do not erase the successful real search/preview/format-resolution
+workflow. No model/source file was copied into any game/source directory.
+
+Both complete tool definitions together measure **1,816 compact JSON
+characters**, excluding initialization/instructions/envelope. Characters/4 is
+explicitly heuristic, not client/model tokenizer or billing evidence. Image bytes
+and transport/schema overhead are separate from the shortlist target. Actual
+Codex whole-session usage: **120,046 input tokens**, **104,576 cached input**,
+**1,719 output**, **53 reasoning output** as reported by the client. That includes
+instructions, schemas, repeated context and images; it is not retrieval-only
+usage or proof of billing savings. OpenCode reported completed-step token counts
+only: first step 7,437 input/118 output; second 1,221 input/168 output plus
+7,433 cache-read. No final vision-step usage is invented.
+
+Cloud disclosure: Codex's configured cloud model received returned descriptions,
+metadata, absolute source/dependency paths and requested PNG content. This
+cloud-backed verification chat also received candidate text, inspected the same
+PNG and reviewed audit summaries. OpenCode inference used the existing local
+localhost Ollama provider; the entire task is not claimed private/local because
+its evidence was reviewed here. Full source model binaries and configuration
+backups were not returned to these models.
+
+Raw client events, stderr, process outcomes and prompts remain under
+`data/mcp/client-runs/`; independent server audits and PNGs under
+`data/mcp/runs/`. Versioned `docs/mcp/client-results.json` binds the actual audit,
+per-call counts/timing/bytes, usage, configuration backups and workflow status.
+
+### Checks, faults and preservation
+
+| Command / operation | Actual result |
+| --- | --- |
+| `mcp-runtime.ps1 sync --project runtime/mcp --python <existing CPython>` | Separate locked MCP environment; 37 packages installed; no existing model/runtime lock altered |
+| `review-owner-results.py <attached owner-labels.json>` | 36 owner sections validated, saved-ranking arithmetic only, gate pass; separately recorded session approval referenced |
+| Initial focused MCP/retrieval/evaluation tests | **59 passed in 90.19 s** |
+| Final changed-policy/config boundary tests | **46 passed in 28.56 s; one faulty/unverified junction fixture**: Windows symlink privilege absent and sandbox junction creation denied. No unchanged retry or source repair. |
+| `verify-mcp.py --run-name final` | **Pass**: real protocol 2025-11-25 initialization, exact two-tool discovery, 17 calls across successful/malformed inputs, both tools, source/dependency detail, PNG decode/hash/cap, semantic default, clean EOF server/worker exit |
+| Real Codex verification | Exit 0, 48.86 s, three actual MCP calls; preview/selection manifest independently verified |
+| Real OpenCode verification | Two successful calls; stopped at 600.06 s timeout, final workflow/vision unverified; partial evidence preserved |
+| Source/catalog/index/pilot/freeze preservation | All **4,938 SHA-256/size/mtime entries unchanged**; catalog/index/pilot byte hashes unchanged; frozen evaluation verified |
+| Active configuration preservation | Exact backup hashes and unchanged unrelated parsed fields reverified for both clients |
+| Syntax and whitespace checks | New/updated Python files parsed; diff/staging checks reviewed before local commit |
+
+The first protocol harness had a **test-harness fault**: it matched a Windows
+environment-launcher PID to a different Python child PID. All tool checks had
+completed and the saved worker lifecycle exited 0, but the lookup raised
+StopIteration. Preserved that first faulty report/wire/PNG under
+`data/mcp/protocol/`; changed the harness to identify its new audit directory and
+kept the final passing run separately under `data/mcp/protocol/final/`. No asset
+fault was repaired or silently erased. Other read-only/command preparation
+faults (default OpenCode directory probe, SDK v1 API introspection, absent optional
+attributes file/output-log directory) are recorded in `docs/mcp/verification.json`.
+
+Managed storage snapshot: **21,108,914,299 bytes** versus prior step 6
+20,821,007,204: approximately **274.57 MiB** growth, including environment/cache
+copies and tests/evidence. New `.venv-mcp` is **116,535,439 bytes**. Models remain
+**5,792,432,361 bytes**; remaining model budget **2,797,502,231 bytes**, generated
+budget **6,158,354,542 bytes** at that snapshot. Subsequent small evidence/docs
+writes add kilobytes. Logical file sizes, not filesystem blocks. Both project
+budgets and approved 100–300 MiB estimate remain satisfied.
+
+Local commit contains only step 7 source, runtime lock, tests, docs, approved
+labels and bounded evidence summaries; catalogs/assets/models/environments,
+full client transcripts, exports and configuration backups remain ignored.
+No push. The next stage is **step 8 only after a new explicit request**. A retry
+or repair of the faulty local workflow/junction fixture also requires Bruno's
+explicit request under the root fault policy; no repair is implied by this
+handoff.

@@ -1,0 +1,30 @@
+{
+  "catalog_index_pilot_unchanged": {
+    "catalog_sha256": "ecdd5690fba9870f330e947752cc7ca4d89896f9d05f3ed7c1b51ae91490a506",
+    "index_sha256": "c061ba1d70685270b1110b7aae37049ab6124accc3343c759b266cb507acac09",
+    "pilot_sha256": "844d495098a7442e481ac2a3b703f312f38804460d15d353e0a9b116f0f75459"
+  },
+  "frozen_evaluation_unchanged": true,
+  "source": {
+    "verified": true,
+    "entries_before": 4938,
+    "entries_after": 4938,
+    "changed_paths": [],
+    "method": "Full SHA-256/size/mtime comparison with scan baseline",
+    "verified_utc": "2026-10-11T22:34:30.275299+00:00"
+  },
+  "area_bytes": {
+    "models": 5792432361,
+    "data": 66481781,
+    "cache": 5271875271,
+    "logs": 0,
+    "scratch": 144160376,
+    ".venv": 50570014,
+    ".venv-caption": 4718328020,
+    ".venv-embedding": 4948531037,
+    ".venv-mcp": 116535439
+  },
+  "total_managed_bytes": 21108914299,
+  "models_budget_remaining": 2797502231,
+  "generated_budget_remaining": 6158354542
+}

@@ -1,6 +1,7 @@
 /.venv/
 /.venv-caption/
 /.venv-embedding/
+/.venv-mcp/
 /data/
 /models/
 /cache/

@@ -1,0 +1,201 @@
+{
+  "clients": {
+    "codex": {
+      "client": "codex",
+      "workflow_verified": true,
+      "status": "verified_with_asset_limitations",
+      "configured_model": "gpt-6.1-sol",
+      "model_location": "cloud",
+      "client_process": {
+        "client": "codex",
+        "process_status": "completed",
+        "reason": null,
+        "exit_code": 0,
+        "elapsed_seconds": 48.86002159997588,
+        "manifest": "C:\\BrunoOS\\Local-Asset-Library\\data\\exports\\codex-selection.json"
+      },
+      "manifest": "data/exports/codex-selection.json",
+      "manifest_source_dependencies_verified": true,
+      "tool_calls": 3,
+      "per_call": [
+        {
+          "tool": "search_assets",
+          "characters": 3804,
+          "utf8_bytes": 3804,
+          "heuristic_tokens": 951,
+          "image_bytes": 0,
+          "image_base64_characters": 0,
+          "seconds": 8.35295510001015,
+          "is_error": false
+        },
+        {
+          "tool": "get_asset",
+          "characters": 7957,
+          "utf8_bytes": 7975,
+          "heuristic_tokens": 1990,
+          "image_bytes": 47759,
+          "image_base64_characters": 63680,
+          "seconds": 0.09037069999612868,
+          "is_error": false
+        },
+        {
+          "tool": "get_asset",
+          "characters": 7624,
+          "utf8_bytes": 7642,
+          "heuristic_tokens": 1906,
+          "image_bytes": 0,
+          "image_base64_characters": 0,
+          "seconds": 0.036808100005146116,
+          "is_error": false
+        }
+      ],
+      "returned_text_characters_total": 19385,
+      "returned_image_bytes_total": 47759,
+      "actual_client_usage": [
+        {
+          "input_tokens": 120046,
+          "cached_input_tokens": 104576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1719,
+          "reasoning_output_tokens": 53
+        }
+      ],
+      "usage_scope": "Whole client steps/session, includes instructions/schemas/repeated context/images; not retrieval-only or billing-savings proof",
+      "image_evidence": "PNG ImageContent in completed get_asset event; image-specific agent observations in commentary/final manifest; inspected evidence image matched those observations",
+      "audit": "data/mcp/runs/7207774cebb34428b810b7a1fd1f5074/calls.jsonl",
+      "faults": [],
+      "asset_limitations": [
+        "Selected asset caption is faulty: search_assets and get_asset returned caption_faulty=true; the specific reason was not supplied. Visual observations above come from image pixels, not the caption. No repair or retry was attempted.",
+        "Search also flagged captions faulty for Apple, apple-half and BirchTree_Autumn_1; these candidates were not inspected or selected.",
+        "Default keyword_description search returned weak_unvalidated matches; ranking scores are not confidence probabilities.",
+        "Physical dimensions are unverified; metadata reports unit_settings=null.",
+        "Preview source_sha256=236bf01feac6515f8c617d2461e1a0aae725d8525ed1b13e6aa6db7635af102c differs from the inspected FBX hash. The tool did not explain this provenance difference.",
+        "All known logical-asset dependencies listed with referring-source evidence; binary/alternate dependency inspection may remain incomplete.",
+        "Visual descriptions are provisional; suggested uses remain a separate field.",
+        "No copying or importing was performed."
+      ]
+    },
+    "opencode": {
+      "client": "opencode",
+      "workflow_verified": false,
+      "status": "faulty_or_unverified",
+      "configured_model": "ollama/qwen3.8:local-agent",
+      "model_location": "local Ollama localhost:11434",
+      "client_process": {
+        "client": "opencode",
+        "process_status": "faulty",
+        "reason": "Bounded workflow timeout at 600 seconds; no unchanged automatic retry",
+        "exit_code": 1,
+        "elapsed_seconds": 600.0646664000233,
+        "manifest": "C:\\BrunoOS\\Local-Asset-Library\\data\\exports\\opencode-selection.json"
+      },
+      "manifest": null,
+      "manifest_source_dependencies_verified": false,
+      "tool_calls": 2,
+      "per_call": [
+        {
+          "tool": "search_assets",
+          "characters": 3802,
+          "utf8_bytes": 3802,
+          "heuristic_tokens": 951,
+          "image_bytes": 0,
+          "image_base64_characters": 0,
+          "seconds": 22.005374900007155,
+          "is_error": false
+        },
+        {
+          "tool": "get_asset",
+          "characters": 7957,
+          "utf8_bytes": 7975,
+          "heuristic_tokens": 1990,
+          "image_bytes": 47759,
+          "image_base64_characters": 63680,
+          "seconds": 0.19439359998796135,
+          "is_error": false
+        }
+      ],
+      "returned_text_characters_total": 11759,
+      "returned_image_bytes_total": 47759,
+      "actual_client_usage": [
+        {
+          "total": 7555,
+          "input": 7437,
+          "output": 118,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        {
+          "total": 8822,
+          "input": 1221,
+          "output": 168,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 7433
+          }
+        }
+      ],
+      "usage_scope": "Whole client steps/session, includes instructions/schemas/repeated context/images; not retrieval-only or billing-savings proof",
+      "image_evidence": "PNG attachment in completed tool event; final image-specific agent observations required before marking vision verified",
+      "audit": "data/mcp/runs/64f07c3b466542ecaaeeebde20c88fab/calls.jsonl",
+      "faults": [
+        "Client did not produce a final selection manifest",
+        "Bounded workflow timeout at 600 seconds; no unchanged automatic retry"
+      ],
+      "asset_limitations": [
+        "Incomplete local workflow"
+      ]
+    }
+  },
+  "two_tool_schema_characters": 1816,
+  "schema_measurement": "Exact compact JSON of both Tool definitions including annotations, excluding initialization/instructions and transport envelope",
+  "registration": [
+    {
+      "client": "codex",
+      "status": "registered",
+      "path": "C:\\Users\\backup pc\\.codex\\config.toml",
+      "backup": "C:\\BrunoOS\\Local-Asset-Library\\data\\mcp\\config-backups\\20261011T222809658883Z\\codex.toml",
+      "before_sha256": "b7eff7066bdb4f2798fdfa6afd72a24c3f5437eaf0dd4154eb6884979ccef0f8",
+      "after_sha256": "57bfa81448fbb485684bd5f2004dc0da7ff17919c05d91deb73e37782e13c762",
+      "unrelated_settings_preserved": true,
+      "entry": {
+        "command": "C:\\BrunoOS\\Local-Asset-Library\\.venv-mcp\\Scripts\\python.exe",
+        "args": [
+          "C:\\BrunoOS\\Local-Asset-Library\\scripts\\asset-mcp.py"
+        ],
+        "cwd": "C:\\BrunoOS\\Local-Asset-Library",
+        "startup_timeout_sec": 30,
+        "tool_timeout_sec": 120,
+        "enabled_tools": [
+          "search_assets",
+          "get_asset"
+        ]
+      }
+    },
+    {
+      "client": "opencode",
+      "status": "registered",
+      "path": "C:\\BrunoOS\\OpenCode-local-agent\\outputs\\opencode-local.json",
+      "backup": "C:\\BrunoOS\\Local-Asset-Library\\data\\mcp\\config-backups\\20261011T222809658883Z\\opencode.json",
+      "before_sha256": "9455f504028e6d5e25624d9e9cc3ac276e8df674254a1485ff427683d7f3bb06",
+      "after_sha256": "f32c370aa7eb5e2572d00d0bdae82290d373886b382d2432cb19296ee000e0ab",
+      "unrelated_settings_preserved": true,
+      "entry": {
+        "type": "local",
+        "command": [
+          "C:\\BrunoOS\\Local-Asset-Library\\.venv-mcp\\Scripts\\python.exe",
+          "C:\\BrunoOS\\Local-Asset-Library\\scripts\\asset-mcp.py"
+        ],
+        "enabled": true,
+        "timeout": 120000
+      }
+    }
+  ],
+  "unrelated_active_settings_reverified": true,
+  "cloud_disclosure": "Codex returns include descriptions, metadata, source/dependency paths and requested PNGs. The current cloud-backed verification chat also inspected the same PNG and reviewed bounded audit summaries. OpenCode inference uses the existing localhost Ollama provider; reviewing its evidence here does not make this whole task fully local.",
+  "no_public_server_or_game_import": true,
+  "full_library_processed": false
+}

@@ -1,0 +1,81 @@
+{
+  "syntax_files_checked": 9,
+  "initial_focused_suite": {
+    "passed": 59,
+    "seconds": 90.19,
+    "tests": [
+      "test_mcp_assets.py",
+      "test_retrieval.py",
+      "test_evaluation.py"
+    ]
+  },
+  "final_changed_policy_and_root_suite": {
+    "passed": 46,
+    "faulty_fixture": 1,
+    "seconds": 28.56,
+    "reason": "test_link_escape_when_supported: Windows symlink privilege unavailable; sandbox junction creation returned Access is denied. No unchanged retry.",
+    "tests": [
+      "test_mcp_assets.py",
+      "test_config.py"
+    ]
+  },
+  "protocol": {
+    "status": "passed",
+    "checks": [
+      "initialization and exact two-tool discovery",
+      "keyword search / deterministic search cap",
+      "get_asset details, dependencies, real PNG ImageContent",
+      "malformed IDs, absolute/UNC/traversal/path inputs, unknown tools/filters, caps",
+      "verified embedding worker and approved semantic default",
+      "clean EOF shutdown of server and persistent worker"
+    ],
+    "tool_calls": 17,
+    "protocol": "2025-11-25",
+    "server_pid": 40680,
+    "lifecycle": {
+      "closed": true,
+      "server_pid": 18712,
+      "worker_fault": null,
+      "worker_pid": 13240,
+      "worker_returncode": 0
+    },
+    "agent_use": false,
+    "image_bytes": 47759
+  },
+  "preserved_initial_protocol_harness_fault": {
+    "path": "data/mcp/protocol/report.json",
+    "reason": "Launcher PID differs from Python child PID; StopIteration in lifecycle lookup. Actual saved worker lifecycle exited 0. Corrected directory lookup, new final run kept separately."
+  },
+  "junction_creation_boundary_test_current_session": "unverified: fixture cannot be created in sandbox",
+  "other_faults": [
+    {
+      "item": "OpenCode direct default-directory version probe",
+      "reason": "EPERM mkdir in user .local/share; actual relocated launch environment subsequently used, without modifying that failed path."
+    },
+    {
+      "item": "MCP v1 decorator API introspection",
+      "reason": "Installed SDK v2.3 has constructor handlers; inspected installed v2 source and used documented constructor API."
+    },
+    {
+      "item": "Optional .gitattributes read",
+      "reason": "No file existed; added scoped step 7 JSON byte-preservation rules."
+    },
+    {
+      "item": "Owner-review command output log",
+      "reason": "Requested logs directory absent; no report computation ran from that redirection; used normal stdout and existing report target after script changes."
+    }
+  ],
+  "staged_json_byte_preservation": {
+    "files": 7,
+    "exact_matches": 7,
+    "owner_artifact_original_bytes_preserved": true
+  },
+  "whitespace_check": {
+    "status": "passed",
+    "method": "git -c core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol diff --cached --check",
+    "reason": "Byte-preserved CRLF JSON evidence requires CR-at-EOL-aware checking; initial default check flagged CR bytes, not content spaces."
+  },
+  "git_index_initial_permission_fault": {
+    "reason": "Sandbox Git index write denied; explicitly authorized local commit staging completed with reviewed execution permission, leaving generated/private files excluded."
+  }
+}

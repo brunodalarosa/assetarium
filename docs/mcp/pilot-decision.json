@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-11",
+  "owner": "Bruno",
+  "status": "approved",
+  "scope": "Step 7 bounded 40-asset pilot only",
+  "default_search": "keyword_description",
+  "image_search": "on_request",
+  "weak_candidate_abstention_limitation": "accepted",
+  "trusted_session_evidence": [
+    {
+      "assistant_question": "Do you approve the bounded pilot with keyword + description as the default and image search on request, accepting the documented weak-candidate limitation, or request another bounded experiment? Does this scope match what you want?",
+      "user_answer": "Yes"
+    },
+    {
+      "assistant_question": "Is this implementation plan clear, and do you approve proceeding?",
+      "user_answer": "Proceed."
+    }
+  ],
+  "full_library_expansion_approved": false,
+  "caption_artistic_or_game_import_approval": false
+}
