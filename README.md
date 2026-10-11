@@ -1,8 +1,9 @@
 # Local Asset Library
 
-Steps 2–4 provide a read-only inventory, SQLite/FTS5 search, a reproducible
+Steps 2–5 provide a read-only inventory, SQLite/FTS5 search, a reproducible
 40-asset pilot, technical inspection, multi-view Blender renders and local
-vision descriptions. Embeddings and MCP integration belong to later steps.
+vision descriptions and verified text/image embedding search of the pilot.
+MCP integration and benchmark approval remain later steps.
 
 The source collection is read only:
 `C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs`.
@@ -162,3 +163,38 @@ AI review is separate technical evidence. Invalid responses, uncertain identity,
 review faults and original inspector faults remain visible. Step 4 ends before
 [step 5: embeddings](docs/plan/prompts/05-embeddings-and-search.md) and full-library
 processing.
+
+## Step 5: pilot embedding search
+
+The original `search 'apple'` command remains the full-catalog filename baseline.
+Explicit modes use only the existing 40-asset pilot. See
+[embedding contract](docs/embedding-contract.md), [measurement evidence](docs/embedding-evidence.json)
+and [progress](docs/progress.md) for versions, faults and limitations.
+
+```powershell
+# Install the separately locked environment; all paths/caches remain project-local.
+.\scripts\embedding-runtime.ps1 sync --locked --project runtime/embedding
+# One pinned download, CUDA probe and byte-budget check; use --verify-only once downloaded.
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python scripts/prepare_embedding_model.py
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python scripts/embedding_capability.py
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli embed-index
+
+# Keyword needs only the base environment; the three semantic modes need the embedding runtime.
+.\scripts\uv.ps1 run --locked python -m local_asset_library.cli search 'apple' --mode keyword
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a boxy orange-red car with wheels' --mode description --rankings-output embeddings/car-description.json
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a red apple with a green leaf' --mode image --rankings-output embeddings/apple-image.json
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a chair with a curved back and flat seat' --mode combined --rankings-output embeddings/chair-combined.json
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search --mode reference --reference 'data/inspection/asset_24e2752dbb26ecd19677091f78243709/fbx/a30ceb622a88a274/three_quarter.png' --rankings-output embeddings/reference-apple.json
+.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a car with wheels' --mode combined --pack kenney_car-kit --format glb --max-triangles 3000 --rigged no
+.\scripts\uv.ps1 run --locked python -m local_asset_library.cli detail asset_24e2752dbb26ecd19677091f78243709 --format fbx
+```
+
+Each standard shortlist is capped at five logical assets and 6,000 characters.
+Semantic candidates are labeled weak/unvalidated; similarity is not probability.
+An optional `--min-similarity` supports explicit negative-query evaluation and
+retains unthresholded rankings. It is not a confidence threshold. Full rankings
+are saved separately; the default path contains only the last successful search.
+Queries never fall back after inference failure. Changed contracts require
+capability verification and reindexing. Generated indexes, views, weights and
+reports remain ignored; no export, full indexing, MCP integration or benchmark
+approval is part of this step.

@@ -510,3 +510,205 @@ model or broader quality evaluation needs a separately authorized scope/budget.
 Next numbered stage is [step 5](plan/prompts/05-embeddings-and-search.md), requiring
 its own scope/plan approval and actual embedding-model capability checks. No
 embedding, full-library processing, remote, push or publication occurred here.
+
+## Step 5 — technical implementation completed; relevance unapproved
+
+Date: October 11, 2026. Bruno approved the separate scope and implementation-plan
+checkpoints before edits. Only step 5 implemented. Estimated 60–100 minutes and
+7–9 GiB additional storage; measured additional managed files **6.34 GiB** against
+the step 4 final snapshot. No subagents, fine-tuning, source edits, caption repair,
+neighboring installation changes, benchmark verdict, full indexing or publication.
+
+### Official selection and isolated runtime
+
+Verified current Google [model card](https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2),
+[text guide](https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers),
+[image guide](https://ai.google.dev/gemma/docs/embeddinggemma/multimodal-embeddinggemma-with-sentence-transformers)
+and [publisher model](https://huggingface.co/google/embeddinggemma-2) before download.
+Google pages were updated October 6, 2026. Publisher metadata: Apache-2.0, ungated,
+exact revision **914f7f89142e33e77833254d9c9b90c3cef7303b**. Selected original
+checkpoint; no alternative backend/model speculation. One download: **1,525,787,092
+bytes**, thirteen required files, **10.488 s** including verification. Publisher
+LFS SHA-256 values and sizes matched; all other runtime files also hash-recorded.
+Checkpoint includes audio weights, but only text/vision are loaded. Actual loaded
+parameters **438,760,448**, audio config absent and vision present.
+
+Separate `.venv-embedding/` and `runtime/embedding/uv.lock`, CPython **3.13.15**,
+SentenceTransformers **6.1.0**, Transformers **5.19.0**, PyTorch **2.10.0+cu128**,
+torchvision **0.25.0+cu128**, Pillow **12.1.0**, NumPy **2.3.4**, huggingface-hub
+**1.33.0**, psutil **7.2.2**. Base/caption environments and locks unchanged.
+Reused only project-local dependency downloads in `cache/uv-caption`; packages
+installed into the new environment. A real RTX 5070 CUDA **12.8**, capability
+**12.0**, BF16 multiplication passed before weights were transferred. No competing
+heavy GPU process was listed before installation or at final verification; none
+needed unloading. Models leave GPU memory when their command process exits.
+
+Inference: CUDA BF16, SDPA, TF32 disabled, 768 dimensions, full FP32 normalized
+stored vectors; no FP16 or silent hardware/precision fallback. Explicit documented
+search/document prefixes and unprefixed image dictionaries. Actual input token
+counts/pixel tensor shapes recorded. Local offline files only, no remote model
+code/cloud inference. Complete semantic/persistence/filter contract is in
+[embedding-contract.md](embedding-contract.md); pinned selection in
+[embedding-model.json](embedding-model.json), small versioned actual measurement
+summary in [embedding-evidence.json](embedding-evidence.json).
+
+### Actual inference, indexing and retrieval
+
+Capability check consumed real car/apple three-quarter PNGs and real search and
+document text. Every output finite, nonzero, normalized and 768-dimensional.
+Pixel tensors `[1,2520,768]`, 260 actual processed image input tokens. Text/image
+similarity matrix (car/apple queries against car/apple images):
+`[[0.796632,0.649857],[0.595636,0.759136]]`; image self-similarities approximately
+one, distinct image/text vectors. This proves functioning modalities, not a
+benchmark verdict. Standalone runtime checks prove RGB/grayscale/RGBA compositing,
+different actual pixels producing different vectors, corrupt image rejection,
+over-context text rejection before silent truncation and audio-disabled loading.
+
+Pilot index: **208 finite normalized vectors** for **40 logical assets**:
+**39 observation-description documents** and **169 individual supplied/rendered
+views**. Norm range **0.9999999404–1.0000001192**. Suggested uses, names/pack text
+and technical metadata excluded from description embeddings. Thirty caption visual
+faults and all pending owner reviews retained. Road-crossroad's failed caption
+remains a visible failed description job, with no invented vector; usable views
+remain indexed. No new caption inference or automatic repair/retry performed.
+
+Initial indexing took **22.813 s**, with 204 successes and five precondition
+failures. Read-only evidence showed BirchTree_1's missing texture was an inspected
+inactive datablock (`required_for_render: false`), so the availability rule was
+corrected to preserve usable partial assets while exposing that source fault.
+Four new jobs then completed during a **2.225 s** publication; other vectors reused.
+The original conservative exclusion report is retained locally. Final unchanged
+reindex **1.296 s**, 208 reused successes, one retained failed caption, **no inference**.
+Missing/stale required dependencies or recorded source alternates still exclude
+the logical asset; inactive missing dependency remains unresolved in detail.
+
+Vectors/jobs publish atomically to separate `data/embeddings/index.sqlite`;
+catalog schema/records and original FTS baseline untouched. Every vector binds
+model/runtime/prompt/precision/preprocessing/dimension/normalization fingerprints,
+input/source hashes, modality/role and vector checksum. Search validates compatible
+contracts, current inputs and source/dependency bytes. Corrupt persisted output
+or query inference failure is an error; no fallback list or fabricated vectors.
+Unchanged failed inference jobs are retained; changed inputs/contracts are explicit
+new jobs. Failure statuses/evidence stay separate from usable vector rows.
+
+Separate pilot filename/keyword, observation-semantic, text-to-image and combined
+modes plus proven reference-image mode. Normalized exact dot products, maximum
+view score per logical asset and reciprocal rank fusion (`k=60`); duplicate views
+or formats never take multiple shortlist positions. Pack/format filters use catalog
+facts. Triangle/armature filters require the inspected export and exclude unknown
+or alternate-format claims. Complete channel rankings, scores, eligible rankings,
+stale exclusions and timings are saved separately from compact responses.
+Legacy no-mode search and raw `get` remain unchanged; new `detail` resolves selected
+source plus all known dependency paths, with unresolved optional faults retained.
+
+### Real query demonstrations and measurements
+
+Standard default five-result responses contain 180-character observation excerpts,
+formats, preview reference, availability, channel contributions and fault/review
+flags. Hard cap 6,000 serialized characters; token estimates use ceil(characters/4),
+not measured model tokenization. Image payloads/transport/schema overhead excluded.
+
+| Actual demonstration | First result / behavior | Warm s | Characters | Estimated tokens |
+| --- | --- | ---: | ---: | ---: |
+| keyword `apple` | four separate apple/half/Apple/green IDs | 0.573 | 2,825 | 707 |
+| description `a boxy orange-red car with wheels` | sedan | 1.060 | 3,353 | 839 |
+| image `a red apple with a green leaf` | apple | 1.121 | 3,441 | 861 |
+| combined `a chair with a curved back and flat seat` | chairRounded | 1.464 | 3,585 | 897 |
+| reference: existing apple three-quarter view | apple, then other distinct assets | 1.122 | 3,510 | 878 |
+| combined car, pack/GLB/<=3000 triangles/no armature | four filter-valid assets | 0.336 | 2,838 | 710 |
+| keyword `spaceship laser submarine` | no_match, empty | 0.564 | 459 | 115 |
+| combined `a realistic purple dragon breathing fire` | five **weak_unvalidated** candidates | 1.456 | 3,395 | 849 |
+| same dragon, image mode, explicit evaluation floor 0.95 | no_match, empty; original channel ranking retained | 1.053 | 499 | 125 |
+
+The 0.95 floor only demonstrates an explicit evaluation control, not a chosen
+universal threshold. BM25, cosine and RRF scores are not probabilities. Reference
+demonstration is self-retrieval of an indexed view, not a held-out quality test.
+Candidate ordering above is observational evidence, not human relevance judgment.
+No Hit@5/p95 verdict, held-out benchmark or expansion gate evaluated.
+
+Separate five fresh Python processes measured model-cold searches, then one warm
+repeat per process. OS filesystem cache was not purged. Model initialization
+includes imports/hash verification/loading; first query is timed separately.
+Whole-process times include **both** queries and are not single-query latencies.
+
+| Mode | Model init s | First query s | Warm query s | Warm characters |
+| --- | ---: | ---: | ---: | ---: |
+| keyword | 0 | 0.576 | 0.565 | 2,825 |
+| description | 11.549 | 1.790 | 1.082 | 3,540 |
+| image | 12.500 | 1.703 | 1.233 | 3,441 |
+| combined | 12.943 | 2.090 | 1.635 | 3,574 |
+| reference | 12.804 | 1.832 | 1.294 | 3,510 |
+
+The initial post-install capability process took **41.063 s** to initialize; the
+final repeated capability process took **13.308 s**. Startup varies; sampled
+timings are not guarantees. Peak CUDA allocated about **0.91 GiB**, reserved about
+**0.95 GiB**, process RSS about **2.13 GiB**. These are process snapshots/allocator
+peaks, not total machine memory or a sampled OS peak RSS measurement.
+
+### Commands, checks and preserved evidence
+
+Commands ran in `C:\BrunoOS\Local-Asset-Library`. Embedding commands use
+`.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python`;
+base commands use `.\scripts\uv.ps1 run --locked python`.
+
+| Operation | Actual outcome / evidence |
+| --- | --- |
+| isolated runtime sync with existing managed CPython | locked 45 installed packages; no shared runtime upgrade |
+| `scripts/prepare_embedding_model.py` | CUDA kernel, exact revision/license/byte-budget preflight and thirteen verified files; `data/embeddings/model-preflight.json`, `model-download.json` |
+| `scripts/embedding_capability.py` | real text, document and image vectors/tensors; `data/embeddings/capability.json` |
+| `scripts/embedding_demo.py` | all channels, reference/filter/negative queries, exact sizes/timings and reindex reuse; `demonstrations.json`, `demos/*.json`, `demo-detail.json` |
+| `scripts/measure_embedding_search.py` | five fresh processes and warm repeats; `cold-warm-timings.json`, `cold/*.json` |
+| `python -m pytest --basetemp scratch/pytest-step5-all` | **106 passed**, two existing Windows junction fixtures denied by sandbox, 70.43 s |
+| permitted focused rerun of both existing junction boundary tests | **2 passed in 0.07 s**, no skipped failures |
+| final `pytest tests/test_retrieval.py` after live overlay-status fix | **25 passed in 54.37 s** |
+| `tests/embedding_runtime_checks.py` in pinned embedding environment | actual PIL/model/context/pixel checks passed; `runtime-checks.json` |
+| `scripts/check_captions.py` | 883 records and all noncaption fields preserved, 39/one captions, 124 canonical image hashes, 843 untouched nonpilot records, SQLite/FK/FTS valid |
+| `scripts/check_embeddings.py` | all 208 stored vectors/contracts/checksums/unit norms valid, all demo rankings unique/pilot-only, shortlisted sources/dependencies resolve, size/budgets pass; `verification.json` |
+| baseline keyword CLI, explicit keyword/combined CLI and `detail --format fbx` | actual outputs and independent ranking files under `data/embeddings/cli-*` |
+| `local_asset_library.cli verify-source` | all **4,938** source SHA-256/size/mtime entries unchanged; `data/evidence/step5-full-source-verification.json` |
+| `scripts/publish_embedding_evidence.py` | small versioned summary, full generated evidence/weights excluded |
+| diff/staged whitespace and file review; local commit | code, locks, tests and documentation only; no remote or push |
+
+New tests cover finite/zero/NaN/Inf/dimension normalization; five incompatible
+contract cases; corruption/unit-norm rejection; channel separation, fusion and
+duplicate-view aggregation; source/content/preview/owner-correction staleness;
+verified filters and alternate-format scope; required versus inactive dependencies;
+reference capability/path boundary; compact cap; weak/empty negatives; query error
+propagation; failed replacement removing old vectors and no unchanged fault retry.
+Synthetic vectors exist only in explicitly named test doubles, never production.
+
+Two development fixture issues (models outside pack layout, then legacy empty
+overlay validation) were corrected before the passing tests. The deprecated
+SentenceTransformers dimension/tokenize methods were replaced with the current
+methods and capability proof rerun with the resulting new contract before indexing.
+A byte-exact step 2 response comparison differed because step 3 added preview
+paths/root labels; the subsequent comparison excluding those fields confirmed
+identical keyword IDs/order/names/formats/source paths. Two documentation patches
+missed their context and changed nothing before the correct patch applied.
+These failed attempts are not passing checks. The existing managed-Python path
+warning remains nonfatal. The step 4 preservation checker says `embeddings:
+not_started` about its untouched catalog vector field; step 5 embeddings reside
+in the separate verified index, so that legacy label is not a step 5 status.
+
+Final measured model directory **5,792,432,361 bytes**, all managed project areas
+**20,773,085,969 bytes**; remaining conservative model budget **2,797,502,231 bytes**
+and generated-data/runtime/cache allowance **6,494,182,872 bytes**. Counts include
+regular-file logical sizes/cache copies and model metadata, not filesystem blocks.
+Model downloads themselves total **5,792,427,398 bytes**, inside the 8 GiB limit;
+nonmodel generated storage remains inside 20 GiB. No oversized download approved.
+
+### Remaining limitations and stop boundary
+
+Thirty provisional visual descriptions have recorded faults; one caption failed.
+Unknown author axes/physical scale, uninspected alternate formats/dependencies,
+grouping/license ambiguities and the unused BirchTree texture fault remain.
+Semantic candidates can be unrelated for absent queries even with high cosine;
+owner relevance labels and threshold calibration do not exist. Reference images
+outside source/project boundaries and CPU/FP32 contracts are unverified here.
+Fresh CLI invocations reload the model; same-process API is used for warm timings.
+No long-lived server/client integration or automatic incremental scheduler added.
+
+Step 5 technical work is complete. Next numbered stage is step 6 evaluation, with
+human judgments and an explicit owner expansion decision. **Stop here:** no
+benchmark verdict, full-library embedding, MCP registration, game import, export,
+remote, push or publication. Owner caption/artistic/retrieval approval remains pending.

@@ -1,5 +1,6 @@
 /.venv/
 /.venv-caption/
+/.venv-embedding/
 /data/
 /models/
 /cache/

@@ -1,0 +1,835 @@
+{
+  "date": "2026-10-11",
+  "status": "step5 technical evidence; no benchmark verdict or owner relevance approval",
+  "verification": {
+    "contract_fingerprint": "9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504",
+    "contract": {
+      "active_modalities": [
+        "text",
+        "image"
+      ],
+      "adapter_sha256": "1c9b88c6fd7051cde3c31865d88a9c0c056b4717f5769d64323654c42ffad1e8",
+      "attention": "sdpa",
+      "audio_config": null,
+      "backend": "sentence-transformers",
+      "context_limit": 8192,
+      "device": "cuda:0",
+      "dimensions": 768,
+      "document_prompt": "title: none | text: ",
+      "dtype": "bfloat16",
+      "image_prompt": "",
+      "max_soft_tokens": 280,
+      "model_files": [
+        {
+          "name": "1_Pooling/config.json",
+          "sha256": "8759bdf7c77efc7df7723f64856a593c8943b71ee38baf2a88771fbaf78438f9",
+          "size": 90
+        },
+        {
+          "name": "2_Normalize/config.json",
+          "sha256": "cdb09dfca347a56aa2d691744e38d5ad3c7cbc2834e7181272b9a15328b82524",
+          "size": 97
+        },
+        {
+          "name": "chat_template.jinja",
+          "sha256": "4b852efc0b9960283e735363331e6f325b33bc74bdbaa076f595bc4e9b94d85e",
+          "size": 1016
+        },
+        {
+          "name": "config.json",
+          "sha256": "b8f1e9931b57fbc054acdb445c41765d55b0074c58d145fa82839941ad1b5bb3",
+          "size": 4455
+        },
+        {
+          "name": "config_sentence_transformers.json",
+          "sha256": "031e56a498d33c349ab489a21885bcfe25b4fcba841149dc99e1e90d4a7c28f5",
+          "size": 1565
+        },
+        {
+          "name": "model.safetensors",
+          "sha256": "197a32965d4b1105faf060417baa899e193fb73cd401f42ec9295234d5553d79",
+          "size": 1488915288
+        },
+        {
+          "name": "modules.json",
+          "sha256": "3d02572a0455b832de67fb8e63a54981bc7e8b46e337c95e917bd8122a533bfd",
+          "size": 413
+        },
+        {
+          "name": "preprocessor_config.json",
+          "sha256": "ea2ae257e901064abdd98dceb19f2b0da06af600bed15e0f99f5c85c37ee9d78",
+          "size": 511
+        },
+        {
+          "name": "processor_config.json",
+          "sha256": "168f6a08522f3ce5dea596d94d003af2fd691742d4f41fe1f9d8cce76bfbf69c",
+          "size": 1788
+        },
+        {
+          "name": "sentence_bert_config.json",
+          "sha256": "b1bcd9f2dce3ae863b359e87d0710b5dbc3314a59ecb4e2f97c7778fc8e4b228",
+          "size": 747
+        },
+        {
+          "name": "tokenizer.json",
+          "sha256": "4d777ef5bdc1aa36227abdfb77c3e49e7b9c892d16e1b6bda41c393504828be4",
+          "size": 32170510
+        },
+        {
+          "name": "tokenizer.model",
+          "sha256": "e594c8a90eb08d8bda498ff4747977dc827ae0c3c56b5c0d41a605a22d02ef03",
+          "size": 4689013
+        },
+        {
+          "name": "tokenizer_config.json",
+          "sha256": "17bd5d6e9364ca49a534e1502076593317c298d4a663623091ed45388f004874",
+          "size": 1599
+        }
+      ],
+      "model_id": "google/embeddinggemma-2",
+      "normalization": "finite-nonzero-float32-l2-v1",
+      "preprocessing": "exif-transpose-rgba-gray82-composite-rgb-native-size-v1",
+      "query_prompt": "task: search result | query: ",
+      "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+      "runtime_lock_sha256": "6c91623581517ffeacd4a6e434c41602256c382d0f09e3d326cd32534d2dc900",
+      "versions": {
+        "huggingface-hub": "1.33.0",
+        "numpy": "2.3.4",
+        "pillow": "12.1.0",
+        "sentence-transformers": "6.1.0",
+        "torch": "2.10.0+cu128",
+        "torchvision": "0.25.0+cu128",
+        "transformers": "5.19.0"
+      }
+    },
+    "finite_normalized_vectors": 208,
+    "dimensions": 768,
+    "norm_min_max": [
+      0.9999999403953552,
+      1.0000001192092896
+    ],
+    "description_vectors": 39,
+    "image_vectors": 169,
+    "logical_assets_indexed": 40,
+    "faults": [
+      {
+        "asset_id": "asset_061e14a040e5f441bdf031ddbdd4e795",
+        "channel": "description",
+        "evidence": {
+          "error": "Caption absent/failed; no description embedding",
+          "reused": false,
+          "type": "ConfigError"
+        }
+      }
+    ],
+    "catalog_records": 883,
+    "fts_rows": 883,
+    "pilot_manifest_sha256": "844d495098a7442e481ac2a3b703f312f38804460d15d353e0a9b116f0f75459",
+    "area_bytes": {
+      "models": 5792432361,
+      "data": 56375804,
+      "cache": 5207489178,
+      "logs": 0,
+      "scratch": 70924025,
+      ".venv": 50570014,
+      ".venv-caption": 4718328020,
+      ".venv-embedding": 4876966567
+    },
+    "total_managed_bytes": 20773085969,
+    "model_budget_remaining_bytes": 2797502231,
+    "generated_budget_remaining_bytes": 6494182872,
+    "method": "Regular-file logical sizes, counting cache/runtime copies conservatively; not disk blocks or compressed usage."
+  },
+  "capability": {
+    "contract_fingerprint": "9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504",
+    "inputs": [
+      {
+        "asset_id": "asset_bb8f82724d7856f4fa86b9f0759f2791",
+        "path": "data/inspection/asset_bb8f82724d7856f4fa86b9f0759f2791/glb/f78ac045781137c6/three_quarter.png",
+        "sha256": "9cd2d80abf364c277dd07d1b5744d3f4732acd8ae6100148956fa6d0869cdf9b",
+        "query": "a boxy orange-red car with wheels"
+      },
+      {
+        "asset_id": "asset_24e2752dbb26ecd19677091f78243709",
+        "path": "data/inspection/asset_24e2752dbb26ecd19677091f78243709/fbx/a30ceb622a88a274/three_quarter.png",
+        "sha256": "236bf01feac6515f8c617d2461e1a0aae725d8525ed1b13e6aa6db7635af102c",
+        "query": "a red apple with a green leaf"
+      }
+    ],
+    "actual_text_and_image_inference": true,
+    "reference_image_query_support": true,
+    "text_image_similarities": [
+      [
+        0.7966324687004089,
+        0.6498569250106812
+      ],
+      [
+        0.5956358313560486,
+        0.759136438369751
+      ]
+    ],
+    "image_image_similarities": [
+      [
+        1.000000238418579,
+        0.8059253692626953
+      ],
+      [
+        0.8059253692626953,
+        0.9999997615814209
+      ]
+    ],
+    "document_norm": 0.9999999403953552,
+    "metrics": [
+      {
+        "modality": "image",
+        "seconds": 0.6960407000151463,
+        "input_tokens": 260,
+        "pixel_tensor_shapes": {
+          "pixel_values": [
+            1,
+            2520,
+            768
+          ]
+        },
+        "dimensions": 768,
+        "norm": 1.0,
+        "finite": true
+      },
+      {
+        "modality": "text",
+        "seconds": 0.05926240002736449,
+        "input_tokens": 18,
+        "pixel_tensor_shapes": {},
+        "dimensions": 768,
+        "norm": 1.0,
+        "finite": true
+      },
+      {
+        "modality": "image",
+        "seconds": 0.09027930005686358,
+        "input_tokens": 260,
+        "pixel_tensor_shapes": {
+          "pixel_values": [
+            1,
+            2520,
+            768
+          ]
+        },
+        "dimensions": 768,
+        "norm": 0.9999999403953552,
+        "finite": true
+      },
+      {
+        "modality": "text",
+        "seconds": 0.04237819998525083,
+        "input_tokens": 16,
+        "pixel_tensor_shapes": {},
+        "dimensions": 768,
+        "norm": 1.0,
+        "finite": true
+      },
+      {
+        "modality": "text",
+        "seconds": 0.03745770000386983,
+        "input_tokens": 19,
+        "pixel_tensor_shapes": {},
+        "dimensions": 768,
+        "norm": 0.9999999403953552,
+        "finite": true
+      }
+    ],
+    "resources": {
+      "load_seconds": 13.308032800036017,
+      "rss_bytes": 2262245376,
+      "cuda_peak_allocated_bytes": 977068544,
+      "cuda_peak_reserved_bytes": 1017118720
+    },
+    "limitation": "Capability proof using two real assets; no human relevance or benchmark verdict."
+  },
+  "runtime_checks": {
+    "contract_fingerprint": "9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504",
+    "actual_parameters": 438760448,
+    "audio_disabled": true,
+    "vision_enabled": true,
+    "rgba_composite_rgb_gray_checks": "passed",
+    "corrupt_image_rejected": true,
+    "over_context_input_rejected": true,
+    "different_pixels_different_vectors": true,
+    "resources": {
+      "load_seconds": 11.460493199992925,
+      "rss_bytes": 2227941376,
+      "cuda_peak_allocated_bytes": 977062912,
+      "cuda_peak_reserved_bytes": 1023410176
+    }
+  },
+  "download": {
+    "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "download_bytes": 1525787092,
+    "elapsed_seconds": 10.487550600024406,
+    "cuda_probe": {
+      "torch": "2.10.0+cu128",
+      "cuda": "12.8",
+      "device": "NVIDIA GeForce RTX 5070",
+      "capability": [
+        12,
+        0
+      ],
+      "bf16_kernel": "passed",
+      "free_total_cuda_bytes": [
+        11497635840,
+        12792037376
+      ]
+    }
+  },
+  "demonstrations": {
+    "contract_fingerprint": "9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504",
+    "resources": {
+      "load_seconds": 11.497506399988197,
+      "rss_bytes": 2286829568,
+      "cuda_peak_allocated_bytes": 977068544,
+      "cuda_peak_reserved_bytes": 1019215872
+    },
+    "first_index": {
+      "contract_fingerprint": "9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504",
+      "pilot_assets": 40,
+      "vector_count": 208,
+      "complete": 208,
+      "failed": 1,
+      "elapsed_seconds": 2.2251719999476336
+    },
+    "unchanged_reindex": {
+      "contract_fingerprint": "9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504",
+      "pilot_assets": 40,
+      "vector_count": 208,
+      "complete": 208,
+      "failed": 1,
+      "elapsed_seconds": 1.2959712999872863
+    },
+    "demonstrations": [
+      {
+        "mode": "keyword",
+        "query": "apple",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 0.5686910999938846,
+            "serialized_characters": 2825,
+            "estimated_tokens": 707,
+            "status": "candidates",
+            "names": [
+              "apple",
+              "apple-half",
+              "Apple",
+              "Apple_Green"
+            ],
+            "result_asset_ids": [
+              "asset_24e2752dbb26ecd19677091f78243709",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_179bed122930b57bd7a1f575376397f4",
+              "asset_f501133cf46b1b5b0a1a614b4f09c166"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 0.572647999972105,
+            "serialized_characters": 2825,
+            "estimated_tokens": 707,
+            "status": "candidates",
+            "names": [
+              "apple",
+              "apple-half",
+              "Apple",
+              "Apple_Green"
+            ],
+            "result_asset_ids": [
+              "asset_24e2752dbb26ecd19677091f78243709",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_179bed122930b57bd7a1f575376397f4",
+              "asset_f501133cf46b1b5b0a1a614b4f09c166"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "description",
+        "query": "a boxy orange-red car with wheels",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 1.0542991999536753,
+            "serialized_characters": 3353,
+            "estimated_tokens": 839,
+            "status": "candidates",
+            "names": [
+              "sedan",
+              "sedan-sports",
+              "apple-half",
+              "ambulance",
+              "tractor"
+            ],
+            "result_asset_ids": [
+              "asset_bb8f82724d7856f4fa86b9f0759f2791",
+              "asset_18db4ca35f9737b123a769899bfc288e",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_98cb9d2095606e4e850dcb72823a778f",
+              "asset_5148b2cb0b99c0f6014f00362bc66b80"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 1.059800599992741,
+            "serialized_characters": 3353,
+            "estimated_tokens": 839,
+            "status": "candidates",
+            "names": [
+              "sedan",
+              "sedan-sports",
+              "apple-half",
+              "ambulance",
+              "tractor"
+            ],
+            "result_asset_ids": [
+              "asset_bb8f82724d7856f4fa86b9f0759f2791",
+              "asset_18db4ca35f9737b123a769899bfc288e",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_98cb9d2095606e4e850dcb72823a778f",
+              "asset_5148b2cb0b99c0f6014f00362bc66b80"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "image",
+        "query": "a red apple with a green leaf",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 1.1168415999854915,
+            "serialized_characters": 3441,
+            "estimated_tokens": 861,
+            "status": "candidates",
+            "names": [
+              "apple",
+              "Apple",
+              "apple-half",
+              "Apple_Green",
+              "mushroom"
+            ],
+            "result_asset_ids": [
+              "asset_24e2752dbb26ecd19677091f78243709",
+              "asset_179bed122930b57bd7a1f575376397f4",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_f501133cf46b1b5b0a1a614b4f09c166",
+              "asset_ae0ecb0785c8a290c0ad88db419ade2e"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 1.1212573000229895,
+            "serialized_characters": 3441,
+            "estimated_tokens": 861,
+            "status": "candidates",
+            "names": [
+              "apple",
+              "Apple",
+              "apple-half",
+              "Apple_Green",
+              "mushroom"
+            ],
+            "result_asset_ids": [
+              "asset_24e2752dbb26ecd19677091f78243709",
+              "asset_179bed122930b57bd7a1f575376397f4",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_f501133cf46b1b5b0a1a614b4f09c166",
+              "asset_ae0ecb0785c8a290c0ad88db419ade2e"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "combined",
+        "query": "a chair with a curved back and flat seat",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 1.4328281999914907,
+            "serialized_characters": 3585,
+            "estimated_tokens": 897,
+            "status": "candidates",
+            "names": [
+              "chairRounded",
+              "Chair_1",
+              "chair",
+              "Chair_2",
+              "bridge"
+            ],
+            "result_asset_ids": [
+              "asset_e21f35d1b80bc6b08cf9d7dffbc85006",
+              "asset_f4c01ecffff8071ec986e29d5cc69a1c",
+              "asset_3bd10e61e57a9face42b8eee053cde92",
+              "asset_b61ec88d53e61f0cd9ce3abffbf35ad7",
+              "asset_e4ebc981f0c97f2be5bbb0b1f997e88f"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 1.464288300019689,
+            "serialized_characters": 3585,
+            "estimated_tokens": 897,
+            "status": "candidates",
+            "names": [
+              "chairRounded",
+              "Chair_1",
+              "chair",
+              "Chair_2",
+              "bridge"
+            ],
+            "result_asset_ids": [
+              "asset_e21f35d1b80bc6b08cf9d7dffbc85006",
+              "asset_f4c01ecffff8071ec986e29d5cc69a1c",
+              "asset_3bd10e61e57a9face42b8eee053cde92",
+              "asset_b61ec88d53e61f0cd9ce3abffbf35ad7",
+              "asset_e4ebc981f0c97f2be5bbb0b1f997e88f"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "reference",
+        "query": "data/inspection/asset_24e2752dbb26ecd19677091f78243709/fbx/a30ceb622a88a274/three_quarter.png",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 1.2358276000013575,
+            "serialized_characters": 3510,
+            "estimated_tokens": 878,
+            "status": "candidates",
+            "names": [
+              "apple",
+              "Apple",
+              "apple-half",
+              "Apple_Green",
+              "mushroom"
+            ],
+            "result_asset_ids": [
+              "asset_24e2752dbb26ecd19677091f78243709",
+              "asset_179bed122930b57bd7a1f575376397f4",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_f501133cf46b1b5b0a1a614b4f09c166",
+              "asset_ae0ecb0785c8a290c0ad88db419ade2e"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 1.1223889000248164,
+            "serialized_characters": 3510,
+            "estimated_tokens": 878,
+            "status": "candidates",
+            "names": [
+              "apple",
+              "Apple",
+              "apple-half",
+              "Apple_Green",
+              "mushroom"
+            ],
+            "result_asset_ids": [
+              "asset_24e2752dbb26ecd19677091f78243709",
+              "asset_179bed122930b57bd7a1f575376397f4",
+              "asset_e06205888e91302badebe08dc7197c9b",
+              "asset_f501133cf46b1b5b0a1a614b4f09c166",
+              "asset_ae0ecb0785c8a290c0ad88db419ade2e"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "combined",
+        "query": "a car with wheels",
+        "filters": {
+          "pack": "kenney_car-kit",
+          "format": "glb",
+          "max_triangles": 3000,
+          "rigged": false
+        },
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 0.3309929000097327,
+            "serialized_characters": 2838,
+            "estimated_tokens": 710,
+            "status": "candidates",
+            "names": [
+              "sedan",
+              "wheel-default",
+              "tractor",
+              "ambulance"
+            ],
+            "result_asset_ids": [
+              "asset_bb8f82724d7856f4fa86b9f0759f2791",
+              "asset_34db2b054e4c4425fa36b0b7b9e00612",
+              "asset_5148b2cb0b99c0f6014f00362bc66b80",
+              "asset_98cb9d2095606e4e850dcb72823a778f"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 0.3355881000170484,
+            "serialized_characters": 2838,
+            "estimated_tokens": 710,
+            "status": "candidates",
+            "names": [
+              "sedan",
+              "wheel-default",
+              "tractor",
+              "ambulance"
+            ],
+            "result_asset_ids": [
+              "asset_bb8f82724d7856f4fa86b9f0759f2791",
+              "asset_34db2b054e4c4425fa36b0b7b9e00612",
+              "asset_5148b2cb0b99c0f6014f00362bc66b80",
+              "asset_98cb9d2095606e4e850dcb72823a778f"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "keyword",
+        "query": "spaceship laser submarine",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 0.5490389000042342,
+            "serialized_characters": 459,
+            "estimated_tokens": 115,
+            "status": "no_match",
+            "names": [],
+            "result_asset_ids": []
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 0.5637215000460856,
+            "serialized_characters": 459,
+            "estimated_tokens": 115,
+            "status": "no_match",
+            "names": [],
+            "result_asset_ids": []
+          }
+        ]
+      },
+      {
+        "mode": "combined",
+        "query": "a realistic purple dragon breathing fire",
+        "filters": {},
+        "evaluation_floor": null,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 1.4459827999817207,
+            "serialized_characters": 3395,
+            "estimated_tokens": 849,
+            "status": "candidates",
+            "names": [
+              "rocks-high",
+              "plant",
+              "wheel-default",
+              "mushroom",
+              "apple"
+            ],
+            "result_asset_ids": [
+              "asset_32f538e8713841a3e776a17e1b7bdba1",
+              "asset_1fc6244aab6074afee39946e955288b9",
+              "asset_34db2b054e4c4425fa36b0b7b9e00612",
+              "asset_ae0ecb0785c8a290c0ad88db419ade2e",
+              "asset_24e2752dbb26ecd19677091f78243709"
+            ]
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 1.4558555000112392,
+            "serialized_characters": 3395,
+            "estimated_tokens": 849,
+            "status": "candidates",
+            "names": [
+              "rocks-high",
+              "plant",
+              "wheel-default",
+              "mushroom",
+              "apple"
+            ],
+            "result_asset_ids": [
+              "asset_32f538e8713841a3e776a17e1b7bdba1",
+              "asset_1fc6244aab6074afee39946e955288b9",
+              "asset_34db2b054e4c4425fa36b0b7b9e00612",
+              "asset_ae0ecb0785c8a290c0ad88db419ade2e",
+              "asset_24e2752dbb26ecd19677091f78243709"
+            ]
+          }
+        ]
+      },
+      {
+        "mode": "image",
+        "query": "a realistic purple dragon breathing fire",
+        "filters": {},
+        "evaluation_floor": 0.95,
+        "runs": [
+          {
+            "state": "first_query_after_index",
+            "seconds": 1.0547519999672659,
+            "serialized_characters": 499,
+            "estimated_tokens": 125,
+            "status": "no_match",
+            "names": [],
+            "result_asset_ids": []
+          },
+          {
+            "state": "warm_repeat",
+            "seconds": 1.0534623000421561,
+            "serialized_characters": 499,
+            "estimated_tokens": 125,
+            "status": "no_match",
+            "names": [],
+            "result_asset_ids": []
+          }
+        ]
+      }
+    ],
+    "total_seconds": 32.6572769000195,
+    "limitations": [
+      "First queries follow indexing, so are not process/model-cold; separate CLI cold measurements required.",
+      "No benchmark verdict, human judgments or full indexing.",
+      "Token sizes are character-based estimates."
+    ]
+  },
+  "cold_warm": {
+    "definitions": {
+      "cold": "Fresh Python process, no resident model; weights hashed and loaded, then first query. OS disk cache not purged.",
+      "warm": "Second query using the same model/process; file hashes still checked.",
+      "process_wall": "Includes process startup, model load, both queries and evidence serialization; not a single-query latency."
+    },
+    "measurements": [
+      {
+        "mode": "keyword",
+        "load_seconds": 0,
+        "runs": [
+          {
+            "state": "model_cold_first_query",
+            "search_seconds": 0.576087599969469,
+            "characters": 2825,
+            "estimated_tokens": 707,
+            "first_name": "apple"
+          },
+          {
+            "state": "warm_repeat",
+            "search_seconds": 0.5647075000451878,
+            "characters": 2825,
+            "estimated_tokens": 707,
+            "first_name": "apple"
+          }
+        ],
+        "child_elapsed_seconds": 1.1455087999929674,
+        "process_wall_seconds_including_two_queries": 1.4163941000006162
+      },
+      {
+        "mode": "description",
+        "load_seconds": 11.54906360001769,
+        "runs": [
+          {
+            "state": "model_cold_first_query",
+            "search_seconds": 1.790092499984894,
+            "characters": 3540,
+            "estimated_tokens": 885,
+            "first_name": "apple"
+          },
+          {
+            "state": "warm_repeat",
+            "search_seconds": 1.0822971000452526,
+            "characters": 3540,
+            "estimated_tokens": 885,
+            "first_name": "apple"
+          }
+        ],
+        "child_elapsed_seconds": 14.427970899967477,
+        "process_wall_seconds_including_two_queries": 15.432930800016038
+      },
+      {
+        "mode": "image",
+        "load_seconds": 12.500293100019917,
+        "runs": [
+          {
+            "state": "model_cold_first_query",
+            "search_seconds": 1.7025049999938346,
+            "characters": 3441,
+            "estimated_tokens": 861,
+            "first_name": "apple"
+          },
+          {
+            "state": "warm_repeat",
+            "search_seconds": 1.2332834999542683,
+            "characters": 3441,
+            "estimated_tokens": 861,
+            "first_name": "apple"
+          }
+        ],
+        "child_elapsed_seconds": 15.443569499999285,
+        "process_wall_seconds_including_two_queries": 16.472246999968775
+      },
+      {
+        "mode": "combined",
+        "load_seconds": 12.943135500012431,
+        "runs": [
+          {
+            "state": "model_cold_first_query",
+            "search_seconds": 2.090315100038424,
+            "characters": 3574,
+            "estimated_tokens": 894,
+            "first_name": "apple"
+          },
+          {
+            "state": "warm_repeat",
+            "search_seconds": 1.6354448999627493,
+            "characters": 3574,
+            "estimated_tokens": 894,
+            "first_name": "apple"
+          }
+        ],
+        "child_elapsed_seconds": 16.675990099960472,
+        "process_wall_seconds_including_two_queries": 17.75146840000525
+      },
+      {
+        "mode": "reference",
+        "load_seconds": 12.803974999987986,
+        "runs": [
+          {
+            "state": "model_cold_first_query",
+            "search_seconds": 1.8317130000214092,
+            "characters": 3510,
+            "estimated_tokens": 878,
+            "first_name": "apple"
+          },
+          {
+            "state": "warm_repeat",
+            "search_seconds": 1.294073400029447,
+            "characters": 3510,
+            "estimated_tokens": 878,
+            "first_name": "apple"
+          }
+        ],
+        "child_elapsed_seconds": 15.937631600012537,
+        "process_wall_seconds_including_two_queries": 16.97481370001333
+      }
+    ]
+  }
+}

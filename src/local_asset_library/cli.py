@@ -16,7 +16,7 @@ def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Read-only source inventory and local asset search")
     parser.add_argument("--config", type=Path, default=root / "config.example.toml")
-    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet"])
+    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet", "embed-index", "detail"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--selection", type=Path, default=root / "docs/pilot-selection.json")
@@ -24,9 +24,41 @@ def main() -> int:
     parser.add_argument("--resolution", type=int, default=640)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--retry-faults", action="store_true", help="Explicitly retry unchanged faulty inspection results")
+    parser.add_argument("--mode", choices=["keyword", "description", "image", "combined", "reference"], help="Pilot retrieval channel; omit to preserve full-catalog keyword baseline")
+    parser.add_argument("--reference", help="Reference image under data/, scratch/, or source/")
+    parser.add_argument("--pack")
+    parser.add_argument("--format", dest="source_format")
+    parser.add_argument("--max-triangles", type=int)
+    parser.add_argument("--rigged", choices=["yes", "no"])
+    parser.add_argument("--min-similarity", type=float, help="Explicit evaluation cosine floor, not a confidence threshold")
+    parser.add_argument("--rankings-output", help="Save complete channel rankings under data/; excluded from compact default response")
     args = parser.parse_args()
     try:
         config = load_config(args.config, root)
+        if args.command in {"embed-index", "detail"} or (args.command == "search" and args.mode):
+            from .retrieval import SearchEngine, index_pilot, resolved_detail
+            if args.command == "detail":
+                result = resolved_detail(config, args.value or "", args.source_format)
+            elif args.command == "embed-index":
+                from .embedding_backend import EmbeddingBackend
+                report = index_pilot(config, EmbeddingBackend(config))
+                result = {k: v for k, v in report.items() if k != "outcomes"}
+            else:
+                backend = None
+                if args.mode != "keyword":
+                    from .embedding_backend import EmbeddingBackend
+                    backend = EmbeddingBackend(config)
+                filters = {k: v for k, v in {"pack": args.pack, "format": args.source_format,
+                           "max_triangles": args.max_triangles,
+                           "rigged": None if args.rigged is None else args.rigged == "yes"}.items() if v is not None}
+                result, evidence = SearchEngine(config, backend).search(args.value or "", args.mode,
+                                  args.reference, filters, args.limit, args.min_similarity)
+                from .catalog import save_json
+                save_json(config.output_path("data", args.rankings_output or "embeddings/last-search.json"), evidence)
+            print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+            return 0
+        if args.command == "search" and (args.reference or args.pack or args.source_format or args.max_triangles is not None or args.rigged or args.min_similarity is not None or args.rankings_output):
+            raise ConfigError("Pilot options require an explicit --mode")
         if args.command == "review-sheet":
             print(json.dumps(review_sheet(config, args.phase)))
             return 0
@@ -62,7 +94,7 @@ def main() -> int:
                           blender_executable_exists=bool(config.blender and config.blender.is_file()))
         print(json.dumps(result, indent=2))
         return 0
-    except (ConfigError, sqlite3.Error, OSError, ValueError) as exc:
+    except (ConfigError, sqlite3.Error, OSError, ValueError, RuntimeError) as exc:
         parser.exit(2, f"Error: {exc}\n")
 
 
