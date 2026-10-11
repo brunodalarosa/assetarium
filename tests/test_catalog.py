@@ -277,3 +277,20 @@ def test_stale_status_and_missing_id(catalog_config):
     assert not query(catalog_config, "chair")
     with pytest.raises(ConfigError, match="Unknown"):
         detail(catalog_config, "absent")
+
+
+def test_search_handles_generated_views_and_missing_view_paths(catalog_config):
+    put(catalog_config, "pack/chair.obj")
+    scan(catalog_config)
+    image = catalog_config.output_path("data", "inspection/chair/front.png")
+    image.parent.mkdir(parents=True)
+    image.write_bytes(b"synthetic preview fixture")
+    with closing(sqlite3.connect(catalog_config.output_path("data", "catalog.sqlite"))) as db, db:
+        record = json.loads(db.execute("SELECT record FROM assets").fetchone()[0])
+        record["previews"] = [{"source_path":"pack/missing.png","origin":"supplied"},
+                              {"path":"data/inspection/chair/front.png","origin":"rendered"}]
+        db.execute("UPDATE assets SET record=?", (json.dumps(record),))
+    result = query(catalog_config, "chair")[0]
+    assert result["preview"] == "data/inspection/chair/front.png" and result["preview_root"] == "project"
+    image.unlink()
+    assert query(catalog_config, "chair")[0]["preview"] is None

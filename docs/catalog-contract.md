@@ -66,7 +66,7 @@ Matching names across independent identities are visible review cases. Filename
 variant links are explicitly unreviewed suggestions and never merged.
 
 Supplied previews use `source_path` plus source hash, view label and association
-evidence; rendered project-relative previews remain pending. Exact names under
+evidence; rendered previews use project-relative `path` and recorded settings. Exact names under
 matching `Previews`/`Side`/`Isometric` layouts are associated. Isometric
 `_NE/_NW/_SE/_SW` suffixes retain directional view labels. Pack contact sheets,
 samples and textures are separate inventory roles, not individual asset renders.
@@ -75,8 +75,9 @@ Dependency references are parsed from OBJ/MTL, glTF/GLB JSON and DAE images, wit
 recursive MTL traversal and per-file parser status/issues. Legitimate parent
 references must resolve within the configured source root. Absolute, remote,
 reserved-name or escaping references are rejected and never fetched. Binary
-FBX/Blend dependency inspection remains pending; parsed references do not imply
-complete material/geometry validation. Physical units/scale remain unknown.
+FBX/Blend dependency inspection remains pending for alternate files not chosen
+for step 3; parsed references do not imply complete material/geometry validation.
+Physical units/scale remain unknown.
 
 `scan` publishes inventory rows and the logical FTS index in one transaction after
 two matching complete source fingerprints. It refuses to overwrite owner overlays
@@ -92,3 +93,50 @@ affected vectors. No compatibility or image-support claim is made in step 1.
 Preview/description/vector/export paths must be in the allowed project storage
 areas. Original pack paths are opened for reading only. License unknowns and
 ambiguities remain explicit. No catalog, vector, or third-party asset is committed.
+
+## Step 3 inspection fields
+
+`primary_inspection_path` and `primary_inspection_reason` identify the one measured
+source. `technical` contains original/instance-evaluated geometry counts, object
+and mesh counts, each mesh's local bounds, transforms and world bounds, imported
+unit settings, used materials, image dependencies, armatures, actions and sample
+frame. Facts are scoped to `inspected_path`, `inspected_sha256` and
+`inspected_format`. Alternate formats remain explicitly uninspected. Packed image
+data after import does not prove that an original FBX embeds the image.
+
+`inspection_run` records stage fingerprint, status, errors, timing and result path.
+The fingerprint includes worker/framing code hashes, source and known dependencies,
+runtime version output and resolution. Successful caches require current source,
+dependency and rendered-image hashes. Errors/timeouts/unsupported imports remain
+separate outcomes; processing continues with the next asset. No alternative source
+is silently substituted after failure. Changed settings invalidate representative
+review before the full pilot can proceed.
+
+Rendered `previews` include origin, view label, SHA-256, renderer/settings,
+coordinate convention, alpha-mask foreground/boundary checks and a separate image
+review receipt. Technical review never implies owner artistic approval. The pilot
+review scope is the three-quarter overview plus automated checks for other views;
+all three required views of the four representatives are reviewed with image tools.
+Existing supplied thumbnails retain their source association and provenance.
+Search returns `preview_root` so source and generated preview paths are unambiguous.
+
+Exact duplicate-position faces are counted per evaluated mesh, ignoring winding.
+Affected meshes have shadow rays disabled in the derived render scene, with the
+count and reason in `render_settings.shadow_overrides`; original geometry and
+materials remain untouched. This is a flagged source geometry fault, not a repair
+or a claim that the model is ready for production use. Other faulty assets retain
+explicit error states and are not repeatedly repaired during a batch.
+
+Unknown author-facing axes and real-world size remain explicit. OBJ coordinates
+use negative-Z forward/Y up on import; Blender renders use Z up, canonical front
+at -Y and side at +X, elevated 14 degrees. Actions/armatures are enumerated, not
+played or behaviorally validated. Original step 2 logical fingerprint describes
+the inventory snapshot; later technical fields use their own stage fingerprints.
+Descriptions, embeddings, variants, grouping evidence and owner overlays are preserved.
+
+`inspection_run.source_faults` persists the faulty status, kind, affected object
+or reference, evidence count and any derived-render adjustment separately from
+processing status. Any failed/unsupported outcome or source fault is retained on
+unchanged inputs, without automatic retry. An explicit `--retry-faults` request
+permits another attempt. This fault rule applies to all fault types, including
+new definitions; successful output does not clear source fault flags.

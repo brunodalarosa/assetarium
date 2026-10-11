@@ -212,3 +212,165 @@ GLB, OBJ/MTL, FBX and Blender pilot cases first; disable embedded-script executi
 keep output under project storage, verify materials/framing with image tools and
 retain source/dependency hash evidence. Then process the remaining pilot with
 explicit failure states. Stop before captions. No step 3 work was started here.
+
+## Step 3 — completed
+
+Date: October 11, 2026. Scope and implementation plan were explicitly approved
+before implementation. Read applicable AGENTS.md, progress, the catalog contract,
+visual inspection policy and step 3 plan/prompt; inspected existing code first.
+Reused the existing SQLite catalog and exact 40-asset pilot. No subagents, source
+edits, Play Shapes changes, system installation changes, model downloads,
+descriptions or embeddings. The later user request made fault handling permanent:
+mark every kind of fault with evidence and move on; do not automatically retry
+unchanged faulty items. This is recorded in AGENTS.md and implemented in the runner.
+
+Approved planning estimate: 60–120 minutes and 100–400 MB additional storage,
+assuming an installed Blender. Reused the actual configured Blender executable
+at `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`: **5.2.2 LTS**,
+build hash `d13f752e3b9c`, September 15, 2026. No portable download was needed.
+At the final measurement, inspection outputs plus Blender user/Python cache
+storage occupied 35,991,997 bytes (34.32 MiB), including earlier calibration runs
+and diagnostics. This is a measured subset, not a claim about the entire project;
+fixtures/evidence add a few MB. No model storage was added, within the 20 GiB
+generated-data budget.
+
+### Implementation and measured results
+
+Added background inspector/renderer, deterministic framing, bounded sequential
+jobs, runtime discovery, project-local Blender resources, source/dependency hash
+checks, validated result reuse, technical review receipts, and review sheets.
+The CLI now supports `inspect` and `review-sheet`; search handles both supplied
+and generated preview roots. Catalog/owner overlays and original selection are
+retained. Metadata belongs only to the selected source, never all alternate files.
+
+**40/40 primary files produced metadata and usable derived views; 0 final job
+failures. Seven source assets remain explicitly faulty.** Chosen formats: 23 GLB,
+15 OBJ/MTL, one FBX and one Blender. Rendered 124 images at 640×640: 40 front,
+40 side, 40 three-quarter, four top views for flat roads/Pizza_Burned. Selection
+reasons and fault flags: `data/inspection/processed-manifest.json`. All 883 catalog
+records still exist; only the 40 pilot records have technical measurements.
+Descriptions remain null and embeddings empty for all records.
+
+Real measured examples (evaluated instance vertices / triangles): GLB sedan
+3,184 / 2,032 (five mesh objects); OBJ sedan-sports 1,255 / 2,087 (one); FBX apple
+71 / 130 (one); Blender BirchTree_1 866 / 1,704 (one). Each has local bounds,
+transforms, world bounds, imported units, used materials, texture evidence,
+armature/action counts and format limitations. Real-world size and author front
+remain unknown; actions are enumerated, not behaviorally tested.
+
+CPU Cycles, 128 samples, fixed seed, CPU denoising, neutral three-light setup and
+background, shared orthographic scale and 16% margin. Settings/camera coordinates
+are stored with images. Empty/off-frame alpha checks, missing required textures,
+timeouts and unsupported imports produce explicit failure states. Script autoexec
+is disabled by command flags, preferences and `use_scripts=False` for Blender
+files. A fixture containing executable embedded text did not write its marker.
+Blender resource paths were checked inside the project. No successful exit alone
+is accepted as visual validation.
+
+### Actual commands and timings
+
+Commands below ran from `C:\BrunoOS\Local-Asset-Library`. Python commands use
+`.\scripts\uv.ps1 run --locked python` to keep project environment/cache settings.
+
+| Command / check | Actual result |
+| --- | --- |
+| Installed Blender `--version`, `--help`, import-operator probe | Version/build captured; GLB, OBJ/MTL, FBX and Blender imports usable; offline/autoexec/resource flags verified |
+| `python -m local_asset_library.cli inspect --phase representatives --resolution 640 --timeout 180` | Final code: four cases, 12 views, zero job failures, 22.997 s |
+| `python -m local_asset_library.cli review-sheet --phase representatives` | Sheet and identity grid map saved; all twelve final images opened with image tools |
+| `python scripts/record_image_review.py representatives --observations ...` | Four current stage fingerprints and image hashes recorded as technically reviewed |
+| `python -m local_asset_library.cli inspect --phase pilot --resolution 640 --timeout 180` | Final render batch: 40 complete, four representative caches, 124 views, zero job failures, 202.500 s |
+| Same pilot command for catalog fault flags / cache validation | 40 cached results, no new render jobs, 1.760 s; final render report retained separately |
+| `python -m local_asset_library.cli review-sheet --phase pilot` | Final 40-asset overview opened with image tools; road top and rock diagnostics also viewed |
+| `python scripts/record_image_review.py pilot --observations ...` | Technical receipt saved with actual observations; owner artistic approval pending |
+| `python -m pytest --basetemp scratch/pytest-step3-final-policy` | **60 passed in 11.68 s**, including three real Blender integration tests |
+| `python -m pytest tests/test_inspection.py --basetemp scratch/pytest-step3-fault-policy` | 19 passed in 0.30 s; unchanged faults retained and explicit retry opt-in tested |
+| `python scripts/check_inspection.py` | 40 identities/metadata, 124 hashes/foreground checks, 179 source files, SQLite integrity/FKs, 883 FTS rows, unchanged selection, empty descriptions/vectors verified |
+| `python -m local_asset_library.cli verify-source` | Full 4,938-file SHA-256/size/mtime comparison: zero changed paths |
+| `git diff --check`; staged diff/check; checked local commit | Required before committing; no source packs or generated artifacts staged; no push |
+
+The staged whitespace check found one extra blank line at the end of the new
+framing file. It was removed; the source fingerprint changed, so representatives
+and the pilot were regenerated and re-reviewed with the final code. The final
+cached run retained all 40 results and seven fault flags without rendering again.
+
+Initial focused fixtures and earlier full suites passed before the last fault-rule
+change; the 60-test final suite supersedes those results. Existing Windows junction
+fixtures require the permitted elevated test invocation; a sandbox run failed to
+create its fixture junction, then passed with the required permissions. After the
+usage interruption, the console-script invocation reported `uv trampoline failed
+to canonicalize script path`; invoking `python -m pytest` passed. The known managed
+Python path warning did not stop module commands. Neither issue altered sources.
+A checker initially assumed before/after lists had the same number of paths;
+the extra FBX texture was accounted for using its original inventory hash, and
+the corrected check passed. Failed attempts are not counted as passing checks.
+
+### Faults, image evidence and boundaries
+
+Initial EEVEE jobs crashed in NVIDIA/OpenGL with exit `3221225480`; switching to
+CPU Cycles solved the actual local problem without driver/system changes. Initial
+bright/noisy calibration images were replaced with corrected neutral lighting,
+128 samples and denoising. All four representative formats were re-viewed before
+the remaining pilot. Blender extension/cache writes were redirected into project
+storage; no neighboring installation was modified.
+
+Flagged overlapping-face counts: ambulance 58, traffic-light 22, burger 78,
+burger-cheese-double 156, kitchenFridge 30, rocks-high 156. The rock discrepancy
+against its supplied preview was checked with an emission/material diagnostic and
+a shadow-disabled diagnostic. Derived renders record disabling shadow rays only
+for exact duplicate-face meshes; geometry/materials were not repaired. BirchTree_1
+has an unused missing historical `Texture.png`; its active four color materials
+do not depend on it. These **seven fault flags remain visible even when a preview
+is usable**. No further individual repair is needed. Every fault type follows the
+same rule: retain evidence and partial results, move on, and require an explicit
+retry request (`--retry-faults`) for unchanged faulty items.
+
+The twelve representative views were inspected individually through their sheet.
+The pilot review covers all 40 three-quarter images plus automated checks for
+other views, not a claim that every pixel of all 124 views was human-reviewed.
+Supplied thumbnails remain baseline evidence. Owner artistic approval remains
+pending. Review paths:
+
+- `data/inspection/review/representatives.png` and `representatives-review.json`;
+- `data/inspection/review/pilot.png`, `pilot-grid-map.json`, `pilot-review.json`;
+- `data/inspection/review/rocks-diagnostic/probe.log`;
+- `data/inspection/pilot-final-render-report.json` (202.500-second render batch),
+  `pilot-report.json` (latest validated results) and `processed-manifest.json`;
+- `data/evidence/step3-catalog-check.json` (actual metadata/searches/faults).
+
+Before/after evidence is saved as `step3-representatives-before/after.json` and
+`step3-pilot-before/after.json` under `data/evidence/`. The 178 initially known
+pilot source/dependency files match; one additional FBX colormap is verified
+against the original catalog inventory, for 179 total. Every imported source and
+loaded source texture has per-job before/after hashes. Full independent evidence:
+`data/evidence/step3-full-source-verification.json`. No source byte/size/mtime
+changes among all 4,938 source files; access times/directory metadata are not
+covered. Original pilot hash remains
+`844d495098a7442e481ac2a3b703f312f38804460d15d353e0a9b116f0f75459`.
+Source fingerprint remains
+`4dbf39d53556d225c9aac13330a9cd91a522dbd1ceae8e195e86184389a9095c`.
+
+Actual keyword checks after inspection: `Apple Green` retrieves Apple_Green with
+three available formats and a generated project preview; `BirchTree Snow`
+retrieves five separate variants, of which only the selected Snow_1 has generated
+views; `chair rounded` retains its five available formats and supplied baseline
+preview. Search stays compact and never treats the views as separate assets.
+
+### Remaining limitations and next step
+
+DAE alternates are unsupported by this verified runtime and uninspected. Formats
+not selected for an asset retain unknown features; packed Blender image state
+does not prove original FBX embedding. Physical size, author axes, animation
+behavior, alternate equivalence, grouping ambiguities and license unknowns remain
+explicit. The 843 non-pilot logical assets are still uninspected. The permanent
+fault rule and step 3 completion do not authorize production asset repairs.
+
+Pilot manifest: `C:\BrunoOS\Local-Asset-Library\data\pilot\selection-manifest.json`.
+Actual inspection choices/faults:
+`C:\BrunoOS\Local-Asset-Library\data\inspection\processed-manifest.json`.
+See [inspection report](inspection-report.md) for images and actual measurements.
+Next: [step 4 — local visual descriptions](plan/prompts/04-local-visual-descriptions.md).
+Confirm its scope/plan with duration and disk estimates; verify one small local
+vision model's official license, exact revision, image input, device support and
+remaining budget before download. Calibrate on approximately ten varied pilot
+assets with actual images before the 40-asset caption batch. No description
+generation, embedding or full-library processing was started here.

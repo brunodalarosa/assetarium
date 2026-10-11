@@ -496,8 +496,23 @@ def query(config, text, limit=5):
                 except (ConfigError, OSError):
                     pass
             if paths:
+                preview_reference = None
+                preview_root = None
+                for preview in asset["previews"]:
+                    try:
+                        if preview.get("source_path"):
+                            config.source_file(preview["source_path"])
+                            preview_reference, preview_root = preview["source_path"], "source"
+                        elif preview.get("path", "").startswith("data/"):
+                            actual_preview = config.output_path("data", preview["path"].removeprefix("data/"))
+                            if actual_preview.is_file():
+                                preview_reference, preview_root = preview["path"], "project"
+                        if preview_reference:
+                            break
+                    except (ConfigError, OSError):
+                        continue
                 result.append({"asset_id": asset["asset_id"], "name": asset["display_name"], "pack": asset["pack_id"],
-                               "files": paths, "preview": asset["previews"][0]["source_path"] if asset["previews"] else None,
+                               "files": paths, "preview": preview_reference, "preview_root": preview_root,
                                "availability": "available", "matching_channels": ["filename_keyword"]})
             if len(result) == limit:
                 break

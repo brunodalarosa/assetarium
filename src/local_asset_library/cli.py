@@ -9,19 +9,31 @@ import numpy as np
 
 from .config import ConfigError, load_config
 from .catalog import compact_search_result, detail, pilot, query, scan, verify_source
+from .inspection import inspect_pilot, review_sheet
 
 
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Read-only source inventory and local asset search")
     parser.add_argument("--config", type=Path, default=root / "config.example.toml")
-    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source"])
+    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet"])
     parser.add_argument("value", nargs="?")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--selection", type=Path, default=root / "docs/pilot-selection.json")
+    parser.add_argument("--phase", choices=["representatives", "pilot"], default="representatives")
+    parser.add_argument("--resolution", type=int, default=640)
+    parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--retry-faults", action="store_true", help="Explicitly retry unchanged faulty inspection results")
     args = parser.parse_args()
     try:
         config = load_config(args.config, root)
+        if args.command == "review-sheet":
+            print(json.dumps(review_sheet(config, args.phase)))
+            return 0
+        if args.command == "inspect":
+            result = inspect_pilot(config, args.phase, args.resolution, args.timeout, args.retry_faults)
+            print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
+            return 0 if not result["failed"] else 1
         if args.command in {"scan", "search", "get", "pilot", "verify-source"}:
             if args.command == "scan":
                 result = scan(config)
