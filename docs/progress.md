@@ -1037,3 +1037,48 @@ change, full-library processing or game import.
 Trusted session evidence: "For now I don't care if the OpenCode integration
 isn't working, I'll use it with codex for now." Then: "Please register this
 decision." The decision is also recorded in `docs/mcp/client-decision.json`.
+
+## Shared model relocation — completed October 11, 2026
+
+Bruno approved moving this project's AI weights directly into
+`C:\BrunoOS\Local-models`, with no project-specific parent folder, so other
+projects can reuse them. Both scope and the revised implementation plan were
+approved before implementation.
+
+Moved `qwen3-vl-2b` and `embeddinggemma-2`, retaining revision subfolders.
+All 50 files, including download metadata, match before/after SHA-256 and size;
+total 5,792,432,361 bytes. No model files remain in the old project `models/`.
+No compatibility links, downloads, source edits, index rebuilds, client config
+changes, commits or pushes were needed.
+
+The configuration explicitly selects the shared absolute model root. Only model
+storage may be external; source overlap, repository overlap, missing roots,
+unsafe child paths and resolved link escapes remain rejected. Runtime wrappers
+and the MCP worker keep Hugging Face caches in project `cache/`. Model budget
+accounting now includes only this project's two pinned revisions, excluding
+other projects and revisions in the shared folder. Backend source files and
+inference fingerprints were preserved, so the existing embedding index remains
+usable. Documentation describes exact paths and shared usage.
+
+Verification: 76 focused configuration/MCP/retrieval tests passed in 117.36 s;
+the previously faulty Windows junction fixture was deliberately excluded and
+was not retried. Both models loaded offline from the new location. Embedding
+search returned existing apple candidates and retrieved real PNG/source detail;
+Qwen consumed a real car image and generated a short description. A fresh MCP
+protocol session passed 17 calls, including semantic search, previews, malformed
+input checks and clean worker shutdown. Config/doctor checks passed; 47 Python
+source/script files parsed and the whitespace check passed.
+
+New evidence: `data/model-relocation/move.json`, `embedding.json`, `caption.json`,
+`verification.json`, and `data/mcp/protocol/model-relocation/report.json`.
+Original caption, embedding, evaluation and fault evidence was not overwritten.
+
+Preserved faults/limitations: read-only CIM process inventory was denied, so
+active process enumeration was unavailable; no locks blocked the actual move.
+The initial test command used the base environment without Pillow and failed
+collection. A separate verification in the existing MCP environment passed;
+no dependency installation or unchanged faulty-environment retry occurred.
+The existing managed-Python location warning remained nonfatal. New checks are
+technical evidence, not caption quality, game-import or full-library approval.
+
+Usage and exact directories: [shared model storage](model-storage.md).

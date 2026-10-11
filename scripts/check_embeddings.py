@@ -9,6 +9,7 @@ import numpy as np
 from local_asset_library.catalog import digest, encoded, save_json
 from local_asset_library.captions import file_hash
 from local_asset_library.config import load_config
+from local_asset_library.model_storage import project_model_bytes
 from local_asset_library.retrieval import checked_vector, index_database, pilot_records, resolved_detail
 
 root = Path(__file__).resolve().parents[1]
@@ -39,6 +40,7 @@ for path in config.output_path("data", "embeddings/demos").glob("*.json"):
         resolved_detail(config, candidate["asset_id"])
 area_bytes = {area: sum(p.stat().st_size for p in (root / area).rglob("*") if p.is_file())
               for area in ("models", "data", "cache", "logs", "scratch", ".venv", ".venv-caption", ".venv-embedding")}
+area_bytes["models"] = project_model_bytes(config)
 model_budget = 8 * 1024**3
 generated_budget = 20 * 1024**3
 generated = sum(v for k, v in area_bytes.items() if k != "models")

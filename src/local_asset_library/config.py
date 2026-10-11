@@ -43,6 +43,20 @@ class Config:
     project_root: Path
     source_root: Path
     blender: Path | None
+    models_root: Path | None = None
+
+    def storage_root(self, area: str) -> Path:
+        if area not in STORAGE_NAMES:
+            raise ConfigError("Unknown output area")
+        if area == "models" and self.models_root is not None:
+            storage = self.models_root.resolve()
+            if storage != self.models_root or not storage.is_dir():
+                raise ConfigError("Shared model root changed or is missing")
+        else:
+            storage = (self.project_root / STORAGE_NAMES[area]).resolve()
+            if not storage.is_relative_to(self.project_root) or storage == self.project_root:
+                raise ConfigError("Storage escapes the repository")
+        return storage
 
     def source_file(self, relative: str) -> Path:
         """Resolve an existing source file for reading only."""
@@ -56,11 +70,7 @@ class Config:
         return self.source_file(relative).open("rb")
 
     def output_path(self, area: str, relative: str) -> Path:
-        if area not in STORAGE_NAMES:
-            raise ConfigError("Unknown output area")
-        storage = (self.project_root / STORAGE_NAMES[area]).resolve()
-        if not storage.is_relative_to(self.project_root) or storage == self.project_root:
-            raise ConfigError("Storage escapes the repository")
+        storage = self.storage_root(area)
         target = _inside(storage, relative)
         if target.is_relative_to(self.source_root):
             raise ConfigError("Cannot write into the source collection")
@@ -87,10 +97,30 @@ def load_config(path: Path, project_root: Path) -> Config:
             raise ConfigError("Source directory is missing")
         if source_root.is_relative_to(root) or root.is_relative_to(source_root):
             raise ConfigError("Source and repository roots must not overlap")
-        if raw["storage"] != STORAGE_NAMES:
+        storage_settings = dict(raw["storage"])
+        model_setting = storage_settings.get("models")
+        models_root = None
+        if model_setting != "models":
+            if not isinstance(model_setting, str):
+                raise ConfigError("Model root must be an absolute directory")
+            candidate = Path(model_setting)
+            windows = PureWindowsPath(model_setting)
+            if (not candidate.is_absolute() or ".." in windows.parts or ".." in candidate.parts
+                    or windows.drive.startswith("\\\\") or model_setting.startswith("\\\\")
+                    or any(os.path.isreserved(p) or ":" in p or p.endswith((".", " "))
+                           for p in windows.parts[1:])):
+                raise ConfigError("Invalid shared model root")
+            models_root = candidate.resolve()
+            if not models_root.is_dir():
+                raise ConfigError("Shared model directory is missing")
+            if any(models_root.is_relative_to(other) or other.is_relative_to(models_root)
+                   for other in (root, source_root)):
+                raise ConfigError("Shared model root must not overlap source or repository")
+            storage_settings["models"] = "models"
+        if storage_settings != STORAGE_NAMES:
             raise ConfigError("Storage must use the fixed ignored project directories")
         blender = raw.get("tools", {}).get("blender")
-        config = Config(root, source_root, Path(blender) if blender else None)
+        config = Config(root, source_root, Path(blender) if blender else None, models_root)
         for area in STORAGE_NAMES:
             config.output_path(area, "boundary-check")
         return config

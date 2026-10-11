@@ -10,6 +10,7 @@ from huggingface_hub import snapshot_download
 from local_asset_library.catalog import save_json
 from local_asset_library.captions import file_hash
 from local_asset_library.config import load_config
+from local_asset_library.model_storage import project_model_bytes
 
 root = Path(__file__).resolve().parents[1]
 config = load_config(root / "config.example.toml", root)
@@ -24,7 +25,7 @@ with urllib.request.urlopen(url, timeout=30) as response:
 assert metadata["sha"] == contract["revision"] and metadata["cardData"]["license"] == contract["license"]
 files = [f for f in metadata["siblings"] if f["rfilename"] not in {".gitattributes", "README.md"}]
 expected = sum(f["size"] for f in files)
-model_bytes = sum(p.stat().st_size for p in (root / "models").rglob("*") if p.is_file())
+model_bytes = project_model_bytes(config)
 generated = sum(p.stat().st_size for area in ("data", "cache", "scratch", "logs", ".venv", ".venv-caption", ".venv-embedding")
                 for p in (root / area).rglob("*") if p.is_file())
 assert generated < contract["generated_budget_bytes"]

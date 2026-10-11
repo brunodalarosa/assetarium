@@ -8,7 +8,7 @@ $env:UV_LINK_MODE = 'copy'
 $env:TEMP = Join-Path $projectRoot 'scratch\tmp'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
-$env:HF_HOME = Join-Path $projectRoot 'models\huggingface'
+$env:HF_HOME = Join-Path $projectRoot 'cache\huggingface'
 $env:TORCH_HOME = Join-Path $projectRoot 'cache\torch'
 $env:XDG_CACHE_HOME = Join-Path $projectRoot 'cache'
 $env:PYTHONPYCACHEPREFIX = Join-Path $projectRoot 'cache\pycache'

@@ -1,5 +1,9 @@
 # Local visual captions — step 4
 
+Weights now resolve through `[storage].models` at `C:\BrunoOS\Local-models`.
+Runtime caches remain under project `cache/`; original inference receipts and
+model revisions are unchanged. See `model-storage.md` for exact shared paths.
+
 The schema is enforced by `validate_caption` before publication. An inference
 response contains exactly `identity`, `description`, `shape`, `colors`, `parts`,
 `style`, `distinguishing_features`, `uncertainties` and `suggested_uses`.

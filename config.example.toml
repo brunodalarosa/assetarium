@@ -6,7 +6,7 @@ read_only = true
 
 [storage]
 data = "data"
-models = "models"
+models = 'C:\BrunoOS\Local-models'
 cache = "cache"
 logs = "logs"
 scratch = "scratch"

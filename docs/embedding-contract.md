@@ -9,6 +9,10 @@ Apache-2.0 and no access gate. No alternative model/runtime or fine-tuning used.
 
 ## Inference
 
+Weights now resolve through `[storage].models` at `C:\BrunoOS\Local-models`.
+Runtime caches remain under project `cache/`. Relocation changes storage only;
+the adapter, model revision, runtime lock and inference fingerprint are unchanged.
+
 `docs/embedding-model.json` pins `google/embeddinggemma-2` revision
 `914f7f89142e33e77833254d9c9b90c3cef7303b`. Download the original checkpoint;
 disable audio at load via `config_kwargs={"audio_config": None}`. Actual loaded

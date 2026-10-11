@@ -81,6 +81,8 @@ assert len(parser.images)==1444 and all((review.parent/p).is_file() for p in par
 source=verify_source(config)
 area_bytes={area:sum(p.stat().st_size for p in (root/area).rglob('*') if p.is_file())
             for area in ('models','data','cache','logs','scratch','.venv','.venv-caption','.venv-embedding')}
+from local_asset_library.model_storage import project_model_bytes
+area_bytes['models']=project_model_bytes(config)
 generated=sum(v for k,v in area_bytes.items() if k!='models')
 assert area_bytes['models']<8*1024**3 and generated<20*1024**3
 verification={'status':'pass','complete_searches':328,'channel_rankings_checked':rankings,

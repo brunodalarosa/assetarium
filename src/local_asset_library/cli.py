@@ -82,7 +82,8 @@ def main() -> int:
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
             return 0
         result = {"source_root": str(config.source_root), "source_read_only": True,
-                  "project_root": str(root), "storage_valid": True}
+                  "project_root": str(root), "models_root": str(config.storage_root("models")),
+                  "storage_valid": True}
         if args.command == "doctor":
             with sqlite3.connect(":memory:") as connection:
                 connection.execute("CREATE VIRTUAL TABLE probe USING fts5(text)")

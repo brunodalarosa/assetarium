@@ -61,7 +61,7 @@ class Gateway:
                 env = os.environ.copy()
                 env.update(PYTHONPATH=str(self.config.project_root / 'src'), PYTHONIOENCODING='utf-8',
                     HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1',
-                    HF_HOME=str(self.config.project_root / 'models/embedding-hf'),
+                    HF_HOME=str(self.config.output_path('cache', 'embedding-hf')),
                     TORCH_HOME=str(self.config.project_root / 'cache/torch-embedding'),
                     CUDA_CACHE_PATH=str(self.config.project_root / 'cache/cuda-embedding'),
                     TEMP=str(self.config.project_root / 'scratch/tmp-embedding'),

@@ -8,7 +8,8 @@ client results and remaining verification faults are recorded below and in progr
 
 The source collection is read only:
 `C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs`.
-Generated files stay in this repository. Play Shapes remains independent.
+Generated asset data and runtime caches stay in this repository. Model weights
+are shared at `C:\BrunoOS\Local-models`. Play Shapes remains independent.
 Local agent clients have additive, backed-up MCP registration.
 
 From this repository in PowerShell:
@@ -21,7 +22,7 @@ From this repository in PowerShell:
 ```
 
 Python 3.13 is required. The wrapper keeps uv cache, virtual environment, temporary
-build files, and future Hugging Face/Torch caches inside ignored project folders.
+build files, and Hugging Face/Torch runtime caches inside ignored project folders.
 It changes environment variables only in its process. Use it for project commands;
 calling a third-party runtime directly can bypass these settings.
 
@@ -35,15 +36,25 @@ Copy `config.example.toml` to ignored `config.local.toml` for local overrides:
 .\scripts\uv.ps1 run --locked local-assets --config config.local.toml check-config
 ```
 
-Storage names are fixed to ignored `data/`, `models/`, `cache/`, `logs/`, `scratch/`,
-and `.venv/`. Absolute paths, parent traversal, overlapping source/output roots,
-Windows device/stream paths, and resolved links escaping a root are rejected.
+Storage names are fixed to ignored `data/`, `cache/`, `logs/`, `scratch/`, and
+`.venv/`. `[storage].models` explicitly selects the shared absolute directory
+`C:\BrunoOS\Local-models`; `"models"` still supports isolated local fixtures.
+Paths inside every storage root must be relative. Parent traversal, overlapping
+source/output roots, Windows device/stream paths, and resolved links escaping
+a root are rejected.
 Future stages must use the boundary API in `config.py`; it is application policy,
 not an operating-system sandbox, and does not defend against concurrent link swaps.
 
 SQLite/FTS5 will store records and exact keyword retrieval; NumPy will provide exact
 vector similarity. Dependencies are pinned in `pyproject.toml` and `uv.lock`.
-No model inference dependencies or weights are installed by step 1.
+No model inference dependencies or weights were installed by step 1.
+
+The shared model folders are `qwen3-vl-2b/89644892e4d85e24eaac8bacfd4f463576704203`
+and `embeddinggemma-2/914f7f89142e33e77833254d9c9b90c3cef7303b` directly
+under `C:\BrunoOS\Local-models`. Other projects may load these same folders.
+This project does not own the shared root or count unrelated models against its
+budget. Hugging Face inference caches remain under project `cache/`.
+See [model relocation](docs/model-storage.md) for verification and usage.
 
 Continue from [progress](docs/progress.md), [environment evidence](docs/environment.md),
 [catalog contract](docs/catalog-contract.md), and the versioned
@@ -123,8 +134,8 @@ source geometry. Physical size, author front, animation behavior, and alternate
 format equivalence remain unknown or unverified.
 
 Local vision uses a separate `.venv-caption/` environment and dependency lock
-in `runtime/caption/`. Its wrapper directs all caches, weights and temporary
-files into this project; existing Ollama/OpenCode stays independent.
+in `runtime/caption/`. Its wrapper directs caches and temporary files into this
+project; weights use shared model storage. Existing Ollama/OpenCode stays independent.
 See [caption contract](docs/caption-contract.md) and
 [model evidence](docs/caption-model.json).
 
@@ -173,7 +184,7 @@ Explicit modes use only the existing 40-asset pilot. See
 and [progress](docs/progress.md) for versions, faults and limitations.
 
 ```powershell
-# Install the separately locked environment; all paths/caches remain project-local.
+# Install the separately locked environment; runtime caches remain project-local.
 .\scripts\embedding-runtime.ps1 sync --locked --project runtime/embedding
 # One pinned download, CUDA probe and byte-budget check; use --verify-only once downloaded.
 .\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python scripts/prepare_embedding_model.py
@@ -196,8 +207,8 @@ An optional `--min-similarity` supports explicit negative-query evaluation and
 retains unthresholded rankings. It is not a confidence threshold. Full rankings
 are saved separately; the default path contains only the last successful search.
 Queries never fall back after inference failure. Changed contracts require
-capability verification and reindexing. Generated indexes, views, weights and
-reports remain ignored; no export, full indexing, MCP integration or benchmark
+capability verification and reindexing. Generated indexes, views and reports
+remain project-local; weights use shared storage. No export, full indexing, MCP integration or benchmark
 approval is part of this step.
 
 ## Agent access (step 7)
