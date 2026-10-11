@@ -1,0 +1,16 @@
+schema_version = 1
+
+[source]
+root = 'C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs'
+read_only = true
+
+[storage]
+data = "data"
+models = "models"
+cache = "cache"
+logs = "logs"
+scratch = "scratch"
+environment = ".venv"
+
+[tools]
+blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'

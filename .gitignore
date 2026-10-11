@@ -1,0 +1,13 @@
+/.venv/
+/data/
+/models/
+/cache/
+/logs/
+/scratch/
+/config.local.toml
+__pycache__/
+*.py[cod]
+*.egg-info/
+/.pytest_cache/
+/dist/
+/build/
