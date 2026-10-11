@@ -140,3 +140,22 @@ processing status. Any failed/unsupported outcome or source fault is retained on
 unchanged inputs, without automatic retry. An explicit `--retry-faults` request
 permits another attempt. This fault rule applies to all fault types, including
 new definitions; successful output does not clear source fault flags.
+
+## Step 4 caption fields
+
+`description` stores validated visual identity, prose, shape, colors, parts,
+style, distinguishing features and uncertainty. `suggested_uses` is a separate
+interpretation list. No technical fields are derived from model text.
+`caption_provenance` records exact model revision/file hashes, backend/device,
+runtime versions/lock hash, prompt version/hash, original input view hashes,
+preprocessing, generation settings, raw attempts/errors/timing, measured token
+and resource counts, stage fingerprint and AI/owner review states.
+
+`owner_overlay` mirrors the separate editable JSON file under ignored project
+data. `effective_caption` merges it into generated observations without changing
+the raw `description`. Corrections cannot replace measured metadata. Existing
+overlay files survive regeneration byte-for-byte. Only Bruno can approve final
+caption review and artistic suitability. See [caption contract](caption-contract.md).
+
+The SQLite schema version and keyword index remain unchanged. The other 843
+logical records retain pending captions; embedding arrays remain empty.

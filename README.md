@@ -1,8 +1,8 @@
 # Local Asset Library
 
-Steps 2–3 provide a read-only inventory, SQLite/FTS5 search, a reproducible
-40-asset pilot, technical inspection, and multi-view Blender renders.
-Descriptions, embeddings, GUI, and MCP integration belong to later steps.
+Steps 2–4 provide a read-only inventory, SQLite/FTS5 search, a reproducible
+40-asset pilot, technical inspection, multi-view Blender renders and local
+vision descriptions. Embeddings and MCP integration belong to later steps.
 
 The source collection is read only:
 `C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs`.
@@ -120,6 +120,45 @@ a recorded shadow-ray override to avoid self-shadow artifacts, without changing
 source geometry. Physical size, author front, animation behavior, and alternate
 format equivalence remain unknown or unverified.
 
-Next is [step 4: local visual descriptions](docs/plan/prompts/04-local-visual-descriptions.md).
-Read progress and approve its scope and plan, including duration and disk estimates,
-before choosing or downloading a local vision model.
+Local vision uses a separate `.venv-caption/` environment and dependency lock
+in `runtime/caption/`. Its wrapper directs all caches, weights and temporary
+files into this project; existing Ollama/OpenCode stays independent.
+See [caption contract](docs/caption-contract.md) and
+[model evidence](docs/caption-model.json).
+
+```powershell
+.\scripts\caption-runtime.ps1 sync --locked --project runtime/caption
+.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/prepare_caption_model.py
+.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_pilot.py smoke
+.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_pilot.py calibration --prompt-version v2
+.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_review_images.py calibration-v2
+```
+
+Use `prepare_caption_model.py --verify-only` for existing weights. The download
+script checks current exact-revision official metadata, license, remaining
+model budget and a real CUDA BF16 kernel before transfer. Inference is offline.
+The ten calibration outputs must be viewed with image tools alongside their
+text, then recorded with `record_caption_review.py` before running the pilot.
+Do not create a receipt just because the process exited successfully.
+
+```powershell
+# After actual image/text review; supplied notes document this run's review:
+.\scripts\uv.ps1 run --locked python scripts/record_caption_review.py calibration-v2 --notes docs/caption-calibration-v2-review.json --approve-prompt v2
+.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_pilot.py pilot --prompt-version v2
+.\scripts\uv.ps1 run --locked python scripts/check_captions.py
+```
+
+Review [the pilot captions and real input images](data/captions/review/pilot-v2.html).
+Each asset links to its editable owner correction JSON. Change desired visual
+fields inside `description`, or replace `suggested_uses`; leave other fields
+untouched. Bruno's caption and artistic approval remain pending until his review.
+Apply corrections and refresh the sheet without loading the model:
+
+```powershell
+.\scripts\uv.ps1 run --locked python scripts/caption_pilot.py review --prompt-version v2
+```
+
+AI review is separate technical evidence. Invalid responses, uncertain identity,
+review faults and original inspector faults remain visible. Step 4 ends before
+[step 5: embeddings](docs/plan/prompts/05-embeddings-and-search.md) and full-library
+processing.

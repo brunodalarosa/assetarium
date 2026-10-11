@@ -374,3 +374,139 @@ vision model's official license, exact revision, image input, device support and
 remaining budget before download. Calibrate on approximately ten varied pilot
 assets with actual images before the 40-asset caption batch. No description
 generation, embedding or full-library processing was started here.
+
+## Step 4 — technical implementation completed; caption quality limited
+
+Date: October 11, 2026. Scope and implementation plan were explicitly approved
+before implementation under AGENTS.md. The approved estimate was 60–100 minutes
+and 10–14 GiB additional disk. Only the existing 40-asset pilot was processed.
+No subagents, cloud caption API, source/Play Shapes edits, shared runtime upgrade,
+embedding work or full-library processing. Owner artistic suitability and final
+caption approval remain **pending**.
+
+Read the required model roles, visual inspection policy, catalog contract, step 4
+and progress. Selected one model through current official Qwen, Hugging Face
+Transformers and PyTorch documentation: **Qwen3-VL-2B-Instruct**, Apache-2.0,
+revision `89644892e4d85e24eaac8bacfd4f463576704203`. Verified image/multi-image
+support, exact-revision file metadata and device compatibility before transfer.
+Before download: no model weights, generated data 49,432,673 bytes, 94.02 GiB
+free on C:. A real CUDA BF16 matrix multiplication passed with PyTorch's sm_120
+support on the RTX 5070. The one model download totaled **4,266,640,306 bytes**
+(3.97 GiB), inside the 8 GiB model budget. No speculative model alternatives
+were downloaded. Details and primary links: [caption report](caption-report.md),
+[pre-download selection](caption-model.json).
+
+Installed a separate `.venv-caption/` with its own pinned dependency lock:
+PyTorch 2.10.0+cu128, torchvision 0.25.0+cu128, Transformers 4.57.6,
+Pillow 12.1.0 and isolated caches/model directory. CPython remains 3.13.15.
+The base package environment/lock and Ollama/OpenCode were not upgraded.
+Inference is offline, local-files-only and disables remote model code. Exact
+model file SHA-256 values are verified before loading.
+
+### Implementation and real result
+
+Added a local caption backend, schema validator, one changed corrective retry,
+explicit failures, provenance, ten-asset calibration gate and pilot-only runner.
+Real generated front/side/three-quarter views are required; all existing top
+views are also passed. No filenames, pack names or measured metadata enter the
+model prompt. PIL decodes and composites actual image pixels; the processor
+must produce finite pixel tensors, image tokens and one grid per input.
+Suggested uses are separate. Inspector facts, grouping, license and source
+faults are preserved. UTF-8 canonical raw output is retained.
+
+Each caption records revision/file hashes, backend/device, versions/lock hash,
+prompt version/hash, view hashes, preprocessing, generation parameters, timing,
+tokens, resource measurements, raw attempts and AI/owner review states. Owner
+correction files are separate, editable overlays that regeneration preserves
+byte-for-byte; effective captions merge them without overwriting raw observations.
+Review refresh loads no model. Invalid corrections remain visible rather than
+silently replacing measured facts or creating an AI success from failure.
+
+Smoke test distinguished the red-orange car from the red apple with leaf/stem
+using six real images, with 588 image tokens each. Responses took 2.127/0.873 s
+after 2.808 s loading. AI viewed all 32 calibration input views alongside text.
+v1 took 95.155 s; evidence justified v2. Greedy v2 took 107.658 s and remained
+repetitive. Preserved it, then used final v2 with seed 0, sampling temperature
+0.7/top-p 0.8/top-k 20 and repetition penalty 1.1. Final calibration took
+140.767 s, producing ten schema-valid captions with two corrective generations.
+No additional caption model was installed. Raw earlier results are retained.
+
+The 40-asset batch took **416.469 s**, reusing ten calibration outputs and making
+thirty new jobs. **39 schema-valid captions; one explicit failure** on
+road-crossroad after two invalid responses. No fallback caption was invented.
+All **124 real input views** were consumed and hash-verified. Final forty assets
+include 53 inference attempts totaling **552.784 s** including calibration;
+13 assets needed the bounded corrective response. Per-attempt median/p95:
+**10.416/12.905 s**. Captions are 60–103 words; input tokens 1,016–1,254 and image
+tokens 588–784. Generation settings/token grids are recorded, not estimated.
+
+AI reviewed all 124 input views in ten mosaics alongside the structured text.
+**30 of the 39 valid captions have faulty visual claims** recorded separately
+from processing success, including wrong bridge identities and unsupported part
+counts/material interpretations. These captions are provisional; the model is
+technically runnable but unreliable as an authoritative captioner of this pilot.
+No source geometry or caption fault was silently repaired. Bruno's final caption
+review and artistic suitability are unapproved for every asset. Review artifacts:
+
+- `data/captions/review/pilot-v2.html`: full-size real-view links, captions,
+  structured attributes, suggestions, prominent fault flags, correction links,
+  measured facts and provenance;
+- `docs/caption-calibration-v1-review.json`, `caption-calibration-v2-review.json`,
+  `caption-pilot-review.json`: versioned AI review observations;
+- `data/captions/calibration-review.json`, `pilot-v2-review.json`: bound technical
+  receipts; `data/captions/corrections/`: forty editable pending owner overlays;
+- `data/captions/pilot-v2-report.json`, `pilot-v2-resources.json`, `measurements.json`.
+
+### Commands and checks
+
+All commands ran in this repository. Vision commands use
+`.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python`;
+base checks use `.\scripts\uv.ps1 run --locked python`.
+
+| Operation | Actual result |
+| --- | --- |
+| `caption-runtime.ps1 sync --project runtime/caption --python <existing managed Python 3.13>` | Separate pinned runtime installed; no shared installation changes |
+| Official exact-revision metadata + `scripts/prepare_caption_model.py` | License/size/budget/kernel checked before download; ten files transferred; initial hash helper failed after transfer |
+| `scripts/prepare_caption_model.py --verify-only` | Already downloaded files verified by size/SHA-256, including publisher LFS weight hash; 2.294 s; no second model download |
+| `scripts/caption_pilot.py smoke` | Actual car/apple image comprehension, response/grid/token/resource evidence |
+| `scripts/check_captions.py --before` | Original 883-record noncaption-field baseline saved before generation |
+| Calibration v1, greedy v2, final sampled v2 | Actual timings above; same selected model, revised prompt; preceding outputs preserved |
+| `scripts/caption_review_images.py`; image tools; `scripts/record_caption_review.py ... --notes ...` | Actual calibration and pilot images/text viewed; hash-bound AI receipts, owner pending |
+| `scripts/caption_pilot.py pilot --prompt-version v2` | 39 complete, one failed, ten caches, 124 actual input views |
+| `scripts/caption_pilot.py review --prompt-version v2` | Model-free owner overlay publication and review refresh; 30 fault banners |
+| `python -m pytest tests/test_captions.py --basetemp scratch/pytest-caption-final-review` | **23 passed in 0.14 s**; malformed/duplicate JSON, wrong types, technical/use leakage, uncertainty contradiction, bounded changed retry, no retry on runtime faults, input hashes/boundaries, measured facts/correction preservation, stale calibration, Unicode and visible/escaped review faults |
+| `python tests/caption_runtime_checks.py` in isolated runtime | Real PIL RGBA/gray/RGB/resize verified; empty, escape, mismatch and corrupt image rejected |
+| Full test run `python -m pytest --basetemp scratch/pytest-step4-all` before final two review tests | 79 passed, two existing fixture junctions denied by sandbox, 20.89 s |
+| Permitted focused Windows boundary-test rerun | Both previously blocked junction tests passed in 0.08 s; final new caption tests separately pass. All 60 preexisting tests and 23 new tests validated across these runs |
+| `scripts/check_captions.py` | 883 noncaption records preserved, 39 complete/one failed, 124 hashes/tensors, canonical UTF-8 text, 843 nonpilot pending, SQLite `ok`, zero FK errors, 883 FTS rows and no embeddings |
+| `local_asset_library.cli verify-source` after pilot | All 4,938 source files: zero changed SHA-256/size/mtime paths; `data/evidence/step4-full-source-verification.json` |
+| `scripts/measure_captions.py` | Actual timing/token/RSS/CUDA/file-byte report, budgets remain positive |
+| Whitespace/staged file review and local commit | Only code, runtime lock, prompts, tests and documentation; no generated data/weights/assets or push |
+
+Initial test code used the catalog's stream hash helper with a path; fixed the
+adapter helper and verified the downloaded model without downloading again.
+Windows-default text decoding caused a review-helper failure and mojibake in a
+cached record; helpers now explicitly read UTF-8, restore canonical original
+responses, and the checker verifies exact preservation. An initial documentation
+patch failed its context check and was reapplied correctly. These attempts are
+not counted as passing checks. A one-off review-link check failed from shell
+quoting and was replaced by a saved checker; it verified 124 images, 288 existing
+local references and 30 visible fault banners. The existing managed-Python path warning remains
+nonfatal; no shared interpreter was changed to suppress it.
+
+### Actual resources and remaining work
+
+Pilot peak CUDA allocated/reserved: **4.42/4.84 GiB**; sampled process peak RSS:
+**4.54 GiB**, 0.25-second sampling. These are process measurements, not total
+machine memory. Final managed file snapshot: **13.00 GiB** including weights,
+runtime/cache copies and data, about **12.83 GiB additional**. Remaining model
+download budget **4.03 GiB**; remaining conservative generated project allowance
+**10.97 GiB**. Exact bytes and accounting limitations are in the caption report.
+
+Step 4 code/technical pilot is complete with visible schema and visual failures.
+No further automatic retry or model download is needed. Bruno owns corrections,
+final caption review and artistic approval. A later choice of a better caption
+model or broader quality evaluation needs a separately authorized scope/budget.
+Next numbered stage is [step 5](plan/prompts/05-embeddings-and-search.md), requiring
+its own scope/plan approval and actual embedding-model capability checks. No
+embedding, full-library processing, remote, push or publication occurred here.
