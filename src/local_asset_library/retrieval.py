@@ -15,7 +15,7 @@ from .config import ConfigError
 from .embedding_backend import normalize
 
 VERSION = "pilot-retrieval-v1"
-MODES = {"keyword", "description", "image", "combined", "reference"}
+MODES = {"keyword", "description", "image", "keyword_description", "combined", "reference"}
 
 
 def pilot_records(config):
@@ -299,9 +299,13 @@ class SearchEngine:
         self.config, self.backend = config, backend
         self.contract = contract if contract is not None else (backend.contract if backend else None)
 
-    def search(self, text="", mode="combined", reference=None, filters=None, limit=5, min_similarity=None):
+    def search(self, text="", mode="combined", reference=None, filters=None, limit=5, min_similarity=None,
+               exclude_image_hashes=None):
         started = time.perf_counter()
         filters = filters or {}
+        exclude_image_hashes = set(exclude_image_hashes or ())
+        if exclude_image_hashes and mode != "reference":
+            raise ConfigError("Image exclusions are only accepted for reference evaluation")
         validate_filters(filters)
         if mode not in MODES or type(limit) is not int or not 1 <= limit <= 20:
             raise ConfigError("Invalid search mode/limit")
@@ -325,7 +329,7 @@ class SearchEngine:
             except (OSError, ValueError) as exc:
                 excluded.append({"asset_id": record["asset_id"], "channel": "all", "reason": str(exc)})
         rankings = {}
-        if mode in {"keyword", "combined"}:
+        if mode in {"keyword", "combined", "keyword_description"}:
             rankings["keyword"] = keyword_ranking(self.config, text, records)
         if mode != "keyword":
             if self.backend is None or self.contract is None:
@@ -337,7 +341,9 @@ class SearchEngine:
                     raise ConfigError("Query/index embedding contract mismatch; reindex explicitly")
                 if set(metadata["pilot_ids"]) != {r["asset_id"] for r in pilot_records(self.config)}:
                     raise ConfigError("Pilot query/index scope mismatch")
-                channels = ["description", "image"] if mode == "combined" else ["image" if mode == "reference" else mode]
+                channels = (["description", "image"] if mode == "combined" else
+                            ["description"] if mode == "keyword_description" else
+                            ["image" if mode == "reference" else mode])
                 rows = db.execute("SELECT * FROM vectors ORDER BY job_id").fetchall()
             if mode == "reference":
                 capability = json.loads(self.config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))
@@ -363,6 +369,10 @@ class SearchEngine:
                                 raise ConfigError("Description/index input fingerprint mismatch")
                         else:
                             ref = json.loads(row[11])
+                            if ref["sha256"] in exclude_image_hashes:
+                                excluded.append({"asset_id": row[1], "channel": channel,
+                                                 "reason": "Reference evaluation parent image excluded", "sha256": ref["sha256"]})
+                                continue
                             preview = next((p for p in record["previews"] if p.get("path") == ref.get("path") and p.get("source_path") == ref.get("source_path")), None)
                             if preview is None or digest(preview) != row[3]:
                                 raise ConfigError("Preview/index input fingerprint mismatch")
@@ -377,7 +387,7 @@ class SearchEngine:
                 rankings[channel] = ranking
         eligible = {channel: [r for r in ranking if channel == "keyword" or min_similarity is None or r["score"] >= min_similarity]
                     for channel, ranking in rankings.items()}
-        ranked = fuse(eligible) if mode == "combined" else next(iter(eligible.values()), [])
+        ranked = fuse(eligible) if mode in {"combined", "keyword_description"} else next(iter(eligible.values()), [])
         results = []
         for candidate in ranked[:limit]:
             record = records[candidate["asset_id"]]
@@ -406,7 +416,7 @@ class SearchEngine:
                             "caption_owner_review": owner_review})
         response = {"query": text if mode != "reference" else str(reference), "mode": mode, "filters": filters,
                     "results": results, "status": "candidates" if results else "no_match",
-                    "score_meaning": "RRF rank score" if mode == "combined" else ("FTS5 BM25" if mode == "keyword" else "cosine similarity; not a probability"),
+                    "score_meaning": "RRF rank score" if mode in {"combined", "keyword_description"} else ("FTS5 BM25" if mode == "keyword" else "cosine similarity; not a probability"),
                     "evaluation_cosine_floor": min_similarity,
                     "match_policy": "Semantic candidates are weak/unvalidated; an optional evaluation cosine floor is not a universal confidence threshold.",
                     "character_cap": 6000, "truncated": False, "serialized_characters": 0, "estimated_tokens": 0,

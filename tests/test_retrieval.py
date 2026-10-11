@@ -264,3 +264,29 @@ def test_measured_filter_does_not_apply_to_alternate_format(indexed):
     assert response["status"] == "no_match"
     response, _ = SearchEngine(config, backend).search("item00", "keyword", filters={"format": "fbx"})
     assert response["results"][0]["name"] == "item00"
+
+
+def test_keyword_description_uses_both_rankings_without_image_inference(indexed):
+    from local_asset_library.retrieval import fuse
+    config, backend, records = indexed
+    backend.calls.clear()
+    response, evidence = SearchEngine(config, backend).search("item00", "keyword_description")
+    assert set(evidence["channel_rankings"]) == {"keyword", "description"}
+    assert [r['asset_id'] for r in response['results']] == [r['asset_id'] for r in fuse(evidence['channel_rankings'])[:5]]
+    assert response['results'][0]['asset_id'] == records[0]['asset_id']
+    assert all(role == 'query' for role, _ in backend.calls)
+
+
+def test_reference_excludes_parent_before_view_aggregation(indexed):
+    config, backend, records = indexed
+    parent = records[0]['previews'][0]
+    response, evidence = SearchEngine(config, backend).search(mode='reference', reference=parent['path'],
+                                                           exclude_image_hashes={parent['sha256']})
+    result = next(r for r in evidence['channel_rankings']['image'] if r['asset_id'] == records[0]['asset_id'])
+    assert result['input']['sha256'] == records[0]['previews'][1]['sha256']
+    assert any(e.get('sha256') == parent['sha256'] for e in evidence['excluded'])
+    _, evidence = SearchEngine(config, backend).search(mode='reference', reference=parent['path'],
+        exclude_image_hashes={p['sha256'] for p in records[0]['previews']})
+    assert all(r['asset_id'] != records[0]['asset_id'] for r in evidence['channel_rankings']['image'])
+    with pytest.raises(ConfigError, match='only accepted'):
+        SearchEngine(config, backend).search('object','combined',exclude_image_hashes={parent['sha256']})

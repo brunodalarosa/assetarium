@@ -712,3 +712,150 @@ Step 5 technical work is complete. Next numbered stage is step 6 evaluation, wit
 human judgments and an explicit owner expansion decision. **Stop here:** no
 benchmark verdict, full-library embedding, MCP registration, game import, export,
 remote, push or publication. Owner caption/artistic/retrieval approval remains pending.
+
+## Step 6 — frozen pilot evaluation (2026-10-11)
+
+**Status: provisional.** Technical evaluation and local artifacts are complete;
+the fixed expansion arithmetic passes on model-generated labels. Bruno's
+relevance review and explicit pilot decision remain pending. No step 7/client
+integration, full indexing, source editing, subagents, new models/dependencies or
+push. Scope and implementation-plan checkpoints were explicitly approved.
+
+Read project AGENTS, this progress record, step 6 and retrieval/acceptance rules
+in `docs/plan/PROJECT.md`. Prepared **32 text queries** (8 exact, 8 descriptions,
+6 style/color/shape/variant, 4 verified formats, 6 negatives), **8 held out**;
+**4 reference crops**, two held out. Defined the 17-query natural-language gate
+before comparisons. No tuning. Query/criteria/model-label freeze at
+**16:17:33 UTC**, before comparative rankings. Prior step 5 demonstrations are
+disclosed; holdout is a query split, not unseen assets/training data.
+
+No existing explicit owner relevance judgments found. Inspected actual preview
+sheets/source identity/verified formats for all forty assets, excluding evaluated
+captions as labeling inputs. Complete graded pool (0–3) is versioned as
+`docs/evaluation/labels-provisional.json`; uncertain gray/brown mossy-rock and
+white/green snow-tree matches are qualified and explicitly await owner review.
+Rank-blind local `data/evaluation/relevance-review.html` was prepared before
+rankings; asked Bruno to review its 36 manageable query sections. Every section
+has actual images, grade controls, deliberate distractors in pilot order, and
+an option to inspect all forty assets. Exporting labels does not approve step 7.
+
+Added `keyword_description` mode via the existing equal-weight RRF k=60. Added
+reference evaluation parent-hash exclusions before view aggregation; every crop
+differs bytewise from indexed inputs, with all parent-image rows removed. Exact
+normalized similarity, source/contract checks, separate full channel rankings,
+original full-catalog keyword baseline and existing pilot/index remain intact.
+
+### Measured comparison, provisional quality labels
+
+| Mode | Positive Hit@5 | Natural Hit@5 | Exact successes | Positive nDCG@5 | Negative requests returning candidates | Warm p95 s |
+| --- | --- | --- | --- | --- | --- | --- |
+| Filename/keyword | 9/26 | 0/17 | 8/8 | 0.3320 | 0/6 | 0.699 |
+| Description | 25/26 | 17/17 | 7/8 | 0.9320 | 6/6 | 1.279 |
+| Text-to-image | 26/26 | 17/17 | 8/8 | 0.9461 | 6/6 | 1.280 |
+| Keyword + description | 26/26 | 17/17 | 8/8 | 0.9704 | 6/6 | 1.327 |
+| Full combined | 26/26 | 17/17 | 8/8 | 0.9687 | 6/6 | 1.692 |
+
+**328 successful searches, zero inference failures**: 32 queries × five modes ×
+two repeats, plus four references × two repeats. Quality uses the first repeat;
+64 warm timing samples per text mode, nearest-rank p95. Held-out natural hits:
+keyword 0/4, every semantic comparison 4/4; held-out positive hits 2/6 versus 6/6.
+Description-only lacks road-crossroad's failed caption; keyword fusion recovers
+that exact request without an invented description. Full fusion adds no natural
+or positive Hit@5 over keyword+description in this easy-pilot ceiling sample.
+
+All semantic modes returned **30 weak candidate slots / six negatives**, zero
+strong match claims. Weak is counted as false positive, not abstention. Threshold
+stayed null; no cutoff calibrated on the held-out set. Verified format/pack
+violations: **zero** for all modes and complete channel lists. Filter result
+slots checked on first repeat: keyword 1, description 19, image 20,
+keyword+description 19, combined 20. No within-shortlist duplicate assets.
+Across all text queries (including negatives), unique assets/slots: 10/10,
+38/159, 40/160, 39/159, 40/160 respectively; coverage is not useful diversity.
+
+Reference same-asset cross-view recovery: **4/4**, all first-ranked, parent
+images excluded. Different useful assets: **3/3 evaluable references hit**,
+**4/5** labeled useful different assets returned. Tractor has no useful different
+target. Snow-tree crop misses one other birch; crops are correlated synthetic
+render evidence, not general photographic similarity proof. Reference warm
+median/p95 **1.281/1.352 s**, eight samples.
+
+Fresh-process first-query wall times (one sample/mode, OS disk cache retained):
+keyword **0.926 s**, description **13.420 s**, image **13.733 s**,
+keyword+description **13.589 s**, combined **14.132 s**, reference **13.441 s**.
+Include startup/verified load/first query/token measurement, exclude second query
+and shutdown. Warm times include inference, source/preview hashing, ranking and
+compact serialization; exclude token measurement/evidence writes. No server or
+concurrency performance claim. Text ranking repeats were identical.
+
+Maximum standard shortlist: **3,798 exact characters**, **950** with the named
+ceil(characters/4) estimator, **1,252 actual tokens with the pinned EmbeddingGemma
+tokenizer**. Tokenizer counts are an explicit surrogate, not Codex/OpenCode
+billing/context tokens. Images and transport/tool-schema overhead excluded;
+agent integration and actual billing/context savings unmeasured.
+
+Fixed gate applied unchanged: +100 natural Hit@5 percentage points versus the
+required +10, zero exact-name successes lost (allowed <=1), zero verified-filter
+violations, combined warm p95 **1.691895 s <2 s**. **Conditional arithmetic pass;
+overall provisional pending owner labels/decision.** Every natural hit is 5.88
+points, held-out natural hit 25 points; queries are curated, not random. Small
+sample, partial caption faults and reference correlation limit generalization.
+
+### Runtime, costs and checks
+
+No runtime/model change. CPython **3.13.15**, SentenceTransformers **6.1.0**,
+Transformers **5.19.0**, torch **2.10.0+cu128**, torchvision **0.25.0+cu128**,
+Pillow **12.1.0**, NumPy **2.3.4**, huggingface-hub **1.33.0**. Model
+`google/embeddinggemma-2`, revision
+`914f7f89142e33e77833254d9c9b90c3cef7303b`; BF16 CUDA, 768-dimensional finite
+FP32 L2-normalized vectors, original prompts/preprocessing/contract unchanged.
+Contract fingerprint:
+`9ce34abf58dfec06638bc7c221ba74b09f39dfeba7acf90a76dccc4eba2de504`.
+Warm benchmark process load **12.635 s**, RSS snapshot **2,275,569,664 bytes**,
+CUDA peak allocated/reserved **977,068,544 / 1,017,118,720 bytes**. No competing
+heavy-model unload was necessary; no inference fallback or model fine-tuning.
+
+Prior measured costs explicitly retained: captions **53 attempts / 552.784 s**
+including calibration; batch **416.469 s**, 39 valid/one failed/30 visual faults.
+Embedding initial publication **22.813 s** (204/five precondition failures),
+four corrected/reused additions **2.225 s**, 208-vector unchanged reuse **1.296 s**.
+No captioning/reindexing in this stage; no invented full-library cost estimate.
+
+| Operation | Verified evidence |
+| --- | --- |
+| `prepare_evaluation.py`, `label_evaluation.py` | actual image sheets, deterministic crops, complete provisional grades, rank-blind HTML, pre-ranking freeze |
+| `benchmark_evaluation.py`, then `--cold` | 328 successful searches plus six fresh processes; both repeats/raw channel rankings hash-bound locally |
+| `report_evaluation.py` | saved-ranking arithmetic only; raw counts, nDCG/MRR, split/negative/filter/diversity/context/cost metrics; no inference rerun |
+| focused `pytest tests/test_retrieval.py tests/test_evaluation.py --basetemp scratch/pytest-step6` | **32 passed** (27 retrieval, five evaluation); no unrelated suite repetition |
+| `verify_evaluation.py` | 328 outputs, **520 channel lists**, all **208** finite normalized vectors/contracts, parent exclusion, **1,444** review image links, source/dependency resolution |
+| preservation checks | catalog/index/pilot SHA-256 unchanged; all **4,938 source SHA-256/size/mtime entries unchanged** |
+| original no-mode keyword CLI `search apple` | same working four-result baseline; no semantic runtime needed |
+| diff/staged checks and local commit | evaluation code, tests, report and frozen artifacts only; no push |
+
+One development test used nonexistent `preview` instead of existing ranking
+`input`; corrected before benchmarking, affected test then final focused suite
+passed. No production inference failures or affected benchmark reruns. Existing
+managed-Python location warning remains nonfatal. Frozen versioned JSON/JSONL
+use scoped byte-preserving attributes so future Git checkout conversion cannot invalidate
+their byte fingerprints. Staging exposed Windows newline conversion; scoped
+CRLF-aware whitespace checks and a staged-blob hash comparison confirm all three
+frozen versioned input files retain their exact original bytes.
+
+Managed storage snapshot **20,821,007,204 bytes**, models **5,792,432,361 bytes**;
+remaining generated/runtime/cache budget **6,446,261,637 bytes**, model budget
+**2,797,502,231 bytes**. Managed growth versus step 5 **45.70 MiB**, plus about
+2.90 MiB of versioned benchmark artifacts, within the estimated <100 MiB.
+Logical regular-file sizes/cache copies, not filesystem blocks. No installation
+outside the project modified.
+
+Full report/reproduction instructions: `docs/evaluation/report.md`, `README.md`.
+Versioned `results.json` contains raw counts/per-query metrics; `rankings.jsonl`
+contains every first-repeat complete channel list/response. Both repeats,
+freeze-bound review/reference artifacts and cold receipts remain under
+`data/evaluation/`. `verification.json` records preservation and budgets.
+
+**Recommendation:** keep expansion on hold until Bruno reviews all 36 relevance
+sections and exports owner labels for saved-ranking recomputation. Then Bruno
+must explicitly approve this bounded pilot for step 7 (keyword+description
+candidate default, image/reference on request, documented weak-negative limits)
+or request a separately frozen bounded negative/reference experiment. Passing
+technical checks is not approval. Do not integrate or index the full library.

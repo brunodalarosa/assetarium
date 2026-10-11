@@ -24,7 +24,7 @@ def main() -> int:
     parser.add_argument("--resolution", type=int, default=640)
     parser.add_argument("--timeout", type=int, default=180)
     parser.add_argument("--retry-faults", action="store_true", help="Explicitly retry unchanged faulty inspection results")
-    parser.add_argument("--mode", choices=["keyword", "description", "image", "combined", "reference"], help="Pilot retrieval channel; omit to preserve full-catalog keyword baseline")
+    parser.add_argument("--mode", choices=["keyword", "description", "image", "keyword_description", "combined", "reference"], help="Pilot retrieval channel; omit to preserve full-catalog keyword baseline")
     parser.add_argument("--reference", help="Reference image under data/, scratch/, or source/")
     parser.add_argument("--pack")
     parser.add_argument("--format", dest="source_format")

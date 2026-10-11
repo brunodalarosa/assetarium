@@ -1,0 +1,14 @@
+{
+  "version": "pilot-evaluation-v1",
+  "frozen_at": "2026-10-11T16:17:33.755416+00:00",
+  "before_competing_rankings": true,
+  "owner_review": "pending",
+  "files": {
+    "docs/evaluation/protocol.json": "e980ebe1acfd71dd7f72fa57c43a00887be14c283c853c02466b9ff6a36cdca4",
+    "docs/evaluation/queries.json": "ec09522443b86eea4b38b9f0192ac1e8ddd75f746b86b3f70f194bbd67d38627",
+    "docs/evaluation/labels-provisional.json": "534cf4f9bc856a16dd0c45d548aa85ec959c388fa5f3857878754503a3a244e4",
+    "data/evaluation/prelabel/image-evidence.json": "8965ef1209193c2d82c4a413af36cb46236773d6120addd06b23588ee6efccd6",
+    "data/evaluation/references/manifest.json": "2012bb6464f68f323372e82e530fc5c19ee575e324d69391a4fa0634bcc0b865",
+    "data/evaluation/relevance-review.html": "03aefc32d5c01074eff70ddfa2768d4390555a9e75bb70706aa158b1d7a4a623"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "version": "pilot-evaluation-v1",
+  "text_queries": 32,
+  "held_out_text_queries": 8,
+  "negative_text_queries": 6,
+  "reference_queries": 4,
+  "held_out_reference_queries": 2,
+  "modes": [
+    "keyword",
+    "description",
+    "image",
+    "keyword_description",
+    "combined"
+  ],
+  "warm_repeats": 2,
+  "rrf_k": 60,
+  "minimum_relevant_grade": 2,
+  "gains": "2**grade - 1",
+  "acceptance": {
+    "natural_language_hit5_improvement_percentage_points": 10,
+    "maximum_exact_name_successes_lost": 1,
+    "verified_filter_violations_allowed": 0,
+    "warm_combined_p95_seconds_strictly_below": 2,
+    "standard_shortlist_token_target": 1500
+  },
+  "policy": {
+    "threshold": null,
+    "tuning": "None. Freeze query definitions, model-generated labels and criteria before comparative rankings; held-out queries run last.",
+    "ground_truth": "Actual pilot preview inspection plus source identity and verified metadata; captions excluded from labeling inputs. Model-generated labels remain provisional until explicit owner review.",
+    "reference": "Deterministic central crop with original background/pixels; verify no byte-identical indexed input and remove parent-image hashes before aggregation. Report same-asset cross-view and other-asset relevance separately; not an independent photo domain test.",
+    "negative": "Count any returned candidate as an operational false positive; separately count explicit strong claims. Weak labeling does not count as abstention.",
+    "tokens": "Exact serialized characters and ceil(characters/4) estimator; additionally count with the pinned EmbeddingGemma tokenizer, explicitly a surrogate rather than Codex billing/context tokens.",
+    "human_gate": "No final quality pass or step 7 without owner relevance review and explicit pilot approval.",
+    "latency": "Warm queries include inference, source/preview hash checks, ranking and compact serialization; tokenizer measurement/evidence writes excluded. P95 uses nearest-rank. Cold includes fresh process initialization; OS disk cache not purged."
+  },
+  "natural_language_gate_ids": [
+    "N01",
+    "N02",
+    "N03",
+    "N04",
+    "N05",
+    "N06",
+    "N07",
+    "N08",
+    "S01",
+    "S02",
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "F02",
+    "F03",
+    "F04"
+  ]
+}
