@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from local_asset_library.config import load_config
 from local_asset_library.catalog import detail, encoded, save_json
 from local_asset_library.captions import file_hash, publish
+from local_asset_library.caption_quality import review_findings
 
 parser = argparse.ArgumentParser()
 parser.add_argument("phase", choices=["calibration-v1", "calibration-v2", "pilot-v2"])
@@ -33,11 +34,10 @@ for outcome in report["outcomes"]:
                      "input_views": result["provenance"]["input_views"], "observations": notes["assets"][outcome["asset_id"]]})
     if record["caption_provenance"]["fingerprint"] == result["provenance"]["fingerprint"]:
         note = notes["assets"][outcome["asset_id"]]
-        faults = note.get("faults", []) if isinstance(note, dict) else []
+        findings = review_findings(note)
         provenance = {**record["caption_provenance"], "ai_review": "technically_reviewed",
                       "ai_review_observations": notes["assets"][outcome["asset_id"]],
-                      "visual_faults": [{"status": "faulty", "kind": "caption_visual_claim", "evidence": fault,
-                                         "repair": "not_performed", "owner_review": "pending"} for fault in faults],
+                      "visual_faults": findings,
                       "ai_review_scope": notes["scope"]}
         # Original UTF-8 model result is canonical, including cached phase results.
         publish(config, outcome["asset_id"], result, provenance)

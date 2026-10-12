@@ -19,7 +19,10 @@ from local_asset_library.desktop import DesktopBridge, create_window, profile_pa
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', default='actual-window')
 parser.add_argument('--render-only', action='store_true', help='Focused UI presentation check; no embedding worker or duplicate semantic benchmark')
+parser.add_argument('--caption-classification', action='store_true', help='Check caption severity badges, detail separation and actual MCP transport')
 args = parser.parse_args()
+if args.caption_classification and not args.render_only:
+    parser.error('--caption-classification requires --render-only')
 if not args.run_name.replace('-', '').isalnum():
     parser.error('Invalid run name')
 OUT = ROOT / 'data/gui' / args.run_name
@@ -161,6 +164,45 @@ def verify():
         report['checks'].append('Pilot membership/counts, all existing three-quarter thumbnails, WebView2, no browse model load')
         screenshot('browse.png')
         if args.render_only:
+            if args.caption_classification:
+                records = bridge.browse()['items']
+                expected = {level: sum(r['caption_status'] == level for r in records)
+                            for level in ('warning', 'fault', 'review_note', 'clear')}
+                actual_badges = window.evaluate_js("({warning:document.querySelectorAll('.card .caption-quality-badge.warning').length,fault:document.querySelectorAll('.card .caption-quality-badge.fault').length})")
+                assert actual_badges == {k: expected[k] for k in ('warning', 'fault')}, actual_badges
+                report['caption_counts'] = expected
+                wire = Wire()
+                for level in ('review_note', 'warning', 'fault'):
+                    item = next(r for r in records if r['caption_status'] == level)
+                    identifier = item['asset_id']
+                    js('selectAsset(' + json.dumps(identifier) + ')')
+                    arguments = {'asset_id': identifier, 'include_metadata': True}
+                    mcp = wire.send('tools/call', {'name': 'get_asset', 'arguments': arguments})['result']
+                    assert not mcp.get('isError'), mcp
+                    mcp_payload = json.loads(mcp['content'][0]['text'])
+                    detail = bridge.asset(identifier)['payload']
+                    quality = detail['presentation']['caption_quality']
+                    assert quality == mcp_payload['metadata']['caption_quality']
+                    assert detail['caption_status'] == mcp_payload['caption_status'] == level
+                    rendered = window.evaluate_js("(()=>{const sections=[...$('detail').querySelectorAll('.evidence')];const find=name=>sections.find(s=>s.querySelector('h3').textContent===name);const notes=find('Caption warnings and notes'),faults=find('Recorded faults');return {notes:[...notes.querySelectorAll(':scope > ul > li')].map(li=>li.textContent),faults:[...faults.querySelectorAll('.fault-list li')].map(li=>li.textContent),evidence:notes.querySelector('pre').textContent};})()")
+                    assert rendered['notes'] == [('Warning: ' if i['severity'] == 'warning' else 'Note: ') + i['reason']
+                                                 for i in quality['issues'] if i['severity'] != 'fault']
+                    for issue in quality['issues']:
+                        if issue['severity'] == 'fault': assert issue['evidence'] in rendered['faults']
+                        else: assert issue['evidence'] not in rendered['faults']
+                        assert issue['evidence'] in rendered['evidence']
+                    window.evaluate_js("(()=>{const section=[...$('detail').querySelectorAll('.evidence')].find(s=>s.querySelector('h3').textContent==='Caption warnings and notes');$('detail').scrollTop=section.offsetTop-$('detail').offsetTop-20;})()")
+                    screenshot('caption-' + level + '.png')
+                    search_args = {'query': item['name'], 'mode': 'keyword', 'filters': {}, 'limit': 5}
+                    gui = js(search_script(search_args))
+                    mcp_search, _ = wire.search(search_args)
+                    assert not gui['error'] and gui['captured']['payload'] == mcp_search
+                    report['searches'].append({'arguments': search_args, 'asset_ids': gui['ids'], 'caption_level': level})
+                    js('browse()')
+                    wait_js("document.querySelectorAll('.thumb img').length===state.context.pilot_count")
+                wire.close()
+                wire = None
+                report['checks'].append('Actual severity badges and rendered note/warning/fault separation; three real STDIO detail/search payloads agree; original evidence retained')
             gui = js(search_script({'query': 'apple', 'mode': 'keyword', 'filters': {}, 'limit': 5}))
             assert not gui['error'] and gui['ids']
             wait_js("document.querySelectorAll('.thumb img').length===state.items.length")

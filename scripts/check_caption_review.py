@@ -1,11 +1,17 @@
 """Validate all local review links and visible faults against the real pilot."""
 from html.parser import HTMLParser
 from pathlib import Path
+import uuid
 from local_asset_library.catalog import save_json
 from local_asset_library.captions import file_hash
+from local_asset_library.config import load_config
+from local_asset_library.retrieval import pilot_records
+from local_asset_library.caption_review import check_severity_banners
 
 root = Path(__file__).resolve().parents[1]
 path = root / "data/captions/review/pilot-v2.html"
+config = load_config(root / "config.example.toml", root)
+records = pilot_records(config)
 refs = []
 images = []
 class ReviewParser(HTMLParser):
@@ -17,13 +23,14 @@ class ReviewParser(HTMLParser):
                 images.append(value)
 page = path.read_text(encoding="utf-8")
 ReviewParser().feed(page)
-assert len(images) == 124 and len(set(images)) == 124
-assert len(refs) == 288
+expected_images = sum(len((r.get("caption_provenance") or {}).get("input_views", [])) for r in records)
+assert len(images) == expected_images and len(set(images)) == expected_images
+assert len(refs) == 2 * expected_images + len(records)
 for reference in refs:
     resolved = (path.parent / reference).resolve()
     assert resolved.is_relative_to(root / "data") and resolved.is_file()
-assert page.count("Caption visual claims: faulty") == 30
 result = {"html_sha256": file_hash(path), "input_images": len(images),
-          "local_references": len(refs), "visible_fault_banners": 30, "all_links_valid": True}
-save_json(root / "data/evidence/step4-review-check.json", result)
+          "local_references": len(refs), "all_links_valid": True,
+          **check_severity_banners(config, page, records)}
+save_json(root / "data/evidence" / ("caption-review-check-" + uuid.uuid4().hex + ".json"), result)
 print(result)

@@ -6,6 +6,7 @@ import json
 import re
 
 from .catalog import detail, encoded
+from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detail, validate_filters
 
@@ -185,7 +186,7 @@ class AssetService:
                    "selected_source": result["selected_source"], "dependencies": deps,
                    "dependency_completeness": "Known references verified; uninspected binary/alternate dependencies remain unknown",
                    "source_faults": (record.get("inspection_run") or {}).get("source_faults", []),
-                   "caption_faulty": bool((record.get("caption_provenance") or {}).get("visual_faults")),
+                   **caption_summary(self.config, record),
                    "limitations": result["limitations"], "preview": {"status": "not_requested"}}
         if args.get("include_metadata", False):
             technical = record.get("technical") or {}
@@ -193,6 +194,7 @@ class AssetService:
                 "technical": {k: technical.get(k) for k in ("inspected_path", "inspected_sha256", "inspected_format", "evaluated_instance_totals", "unit_settings")},
                 "description": record.get("description"), "suggested_uses": record.get("suggested_uses"),
                 "processing": record["processing"], "license_evidence": record.get("license_evidence"),
+                "caption_quality": caption_quality(self.config, record),
                 "caption_fault_evidence": (record.get("caption_provenance") or {}).get("visual_faults", [])}
         image = None
         faults = []

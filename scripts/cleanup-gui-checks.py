@@ -9,7 +9,10 @@ SCRATCH = (ROOT / 'scratch').resolve(strict=True)
 targets = ['pytest-gui-policy', 'pytest-gui-approved', 'pytest-gui-unit-fixed', 'pytest-gui-unit-final', 'pytest-gui-strict-inputs']
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', default='fixture-cleanup')
+parser.add_argument('--caption-classification', action='store_true', help='Only the synthetic fixture directory for caption severity verification')
 args = parser.parse_args()
+if args.caption_classification:
+    targets = ['pytest-caption-classification', 'pytest-caption-rules', 'pytest-caption-rules-final', 'pytest-caption-rules-banner']
 if not args.run_name.replace('-', '').isalnum():
     parser.error('Invalid run name')
 OUT = ROOT / 'data/gui' / args.run_name
@@ -33,7 +36,7 @@ for name in targets:
         item['logical_fixture_bytes'] = sum(p.stat().st_size for p in paths if p.is_file())
         preserved = []
         for data in [p for p in paths if p.is_dir() and p.name == 'data']:
-            for relative in ('gui', 'mcp', 'reports', 'evidence'):
+            for relative in ('gui', 'mcp', 'reports', 'evidence', *(('captions',) if args.caption_classification else ())):
                 source = data / relative
                 if source.is_dir():
                     destination = OUT / 'preserved' / name / data.relative_to(path) / relative

@@ -9,6 +9,30 @@ Do not edit implementation files until the user has explicitly approved both che
 
 ## Fault handling
 
+This policy applies to asset investigation, import/export and processing.
+Application and test-harness defects may be diagnosed, fixed and verified normally.
+
+### Caption review severity
+
+Apply `docs/caption-quality.md` when processing or reviewing new assets. Do not
+mark a usable caption or asset faulty solely because a visual detail is uncertain,
+an exact count is unsupported, a material is inferred, or owner review is pending.
+Record minor precision/appearance uncertainty as `review_note`; record meaningful
+identity, color or structural errors that could mislead selection as `warning`.
+When severity is unclear, retain a warning with the evidence and reason.
+Reserve `caption_faulty` for failed/incomplete caption generation or a missing or
+unusable description. Successful retrieval does not prove every caption claim,
+and notes/warnings do not exclude an otherwise usable source.
+
+New AI review inputs use `findings` entries with `severity` (`review_note` or
+`warning`), `evidence`, and `reason`; `scripts/record_caption_review.py` stores
+these directly. Legacy unclassified visual findings default to warnings. Retain
+original evidence and owner approval states. Do not rerun models, rewrite source
+assets, retry failed processing or manufacture a caption to resolve review notes.
+Actual source, dependency, geometry, preview and runtime failures still follow
+the fault policy below. Caption-specific severity takes precedence over the
+general treatment of ambiguity or minor metadata details.
+
 For every kind of fault, mark the affected asset/item as faulty, record the reason
 and available evidence, preserve usable partial results, and move on. This applies
 to geometry, materials, textures, previews, imports, metadata, dependencies,

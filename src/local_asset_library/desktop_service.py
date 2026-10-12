@@ -4,6 +4,7 @@ import hashlib
 import time
 
 from .catalog import read_database
+from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .mcp_assets import AssetService, FORMATS, MODES, VIEWS, error_payload, validate
 from .retrieval import current_overlay, matches, observations, pilot_records, source_check
@@ -44,7 +45,6 @@ class DesktopService(AssetService):
                 continue
             identifier = record['asset_id']
             faults = list((record.get('inspection_run') or {}).get('source_faults', []))
-            caption_faults = (record.get('caption_provenance') or {}).get('visual_faults', [])
             available = True
             try:
                 if (identifier, 'source') in self.item_faults:
@@ -63,7 +63,7 @@ class DesktopService(AssetService):
                 'formats': sorted({f['format'] for f in record['files']}),
                 'views': [v for v in VIEWS if any(p.get('view_label') == v for p in record['previews'])],
                 'availability': 'available' if available else 'faulty', 'faults': faults,
-                'source_faulty': bool(faults), 'caption_faulty': bool(caption_faults) or record['processing']['caption'] != 'complete',
+                'source_faulty': bool(faults), **caption_summary(self.config, record),
                 'caption_owner_review': owner_review})
         return {'status': 'browse', 'pilot_count': len(records), 'shown_count': len(items), 'items': items,
                 'faults': list(self.item_faults.values()), 'model_loaded': False}
@@ -105,7 +105,8 @@ class DesktopService(AssetService):
             'suggested_uses': owner.get('suggested_uses') if owner.get('suggested_uses') is not None else record.get('suggested_uses'),
             'owner_review': owner.get('caption_review', 'pending'),
             'owner_artistic_approval': owner.get('artistic_suitability', 'pending'),
-            'caption_faulty': bool((record.get('caption_provenance') or {}).get('visual_faults')) or record['processing']['caption'] != 'complete',
+            **caption_summary(self.config, record),
+            'caption_quality': caption_quality(self.config, record),
             'technical': {k: technical.get(k) for k in ('inspected_path', 'inspected_format', 'inspected_sha256',
                 'original_geometry_totals', 'evaluated_instance_totals', 'unit_settings', 'armatures', 'actions',
                 'world_bounds', 'objects', 'meshes', 'materials')},

@@ -10,6 +10,7 @@ import time
 import numpy as np
 
 from .catalog import detail, digest, encoded, read_database, save_json
+from .caption_quality import caption_summary
 from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
@@ -411,7 +412,7 @@ class SearchEngine:
                             "excerpt": excerpt, "formats": sorted({f["format"] for f in record["files"]}),
                             "preview": preview, "availability": "available", "matching_channels": matching,
                             "score": candidate["score"], "match_status": "keyword_match" if "keyword" in matching else "weak_unvalidated",
-                            "caption_faulty": bool((record.get("caption_provenance") or {}).get("visual_faults")),
+                            **caption_summary(self.config, record),
                             "source_faulty": bool((record.get("inspection_run") or {}).get("source_faults")),
                             "caption_owner_review": owner_review})
         response = {"query": text if mode != "reference" else str(reference), "mode": mode, "filters": filters,

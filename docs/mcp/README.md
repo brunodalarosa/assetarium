@@ -61,6 +61,13 @@ lowest-ranked results deterministically to enforce the cap. The
 Semantic results remain weak/unvalidated even after approval of this bounded
 pilot; rank scores are not probabilities or an absence detector.
 
+Caption summaries now expose `caption_status`: `clear`, `review_note`, `warning`
+or `fault`. `caption_faulty` is true only for an unusable caption; minor notes and
+meaningful descriptive warnings do not make a source unusable. Metadata details
+include `caption_quality` alongside original historical findings. See
+[`../caption-quality.md`](../caption-quality.md) for classification and evidence
+rules; owner approval and source faults remain separate.
+
 `get_asset` accepts an exact `asset_` + 32 lowercase hexadecimal ID. Optional
 `source_format` selects an existing export; the inspected source is preferred
 otherwise. It returns the actual source path/hash, all known logical-asset

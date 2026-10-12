@@ -118,6 +118,13 @@ and `logs/gui.log`. Per-call evidence, timing and lifecycle are under
 
 ## Verification and remaining scope
 
+Caption review now distinguishes minor notes, descriptive warnings and actual
+failed/unusable captions. Notes appear in asset detail; warnings and faults have
+distinct card badges. Original review evidence remains expandable, and source or
+preview faults retain their existing presentation. See
+[`../caption-quality.md`](../caption-quality.md) for the shared desktop/agent
+classification and verification evidence.
+
 Actual results, timings, storage and fault receipts are summarized in
 `verification.json` and `../progress.md`. Modest actual WebView2 captures are under
 `data/gui/final-window/`. Focused checks use synthetic fixtures; no real asset is
@@ -131,7 +138,7 @@ overwrite prior runs; select a fresh `--run-name` for a deliberately requested c
 ```
 
 This stage does not import, edit, refresh, watch, process or expand assets. It does
-not add classification, game integration, agent registrations, hosting or cloud
+not add full-library classification, game integration, agent registrations, hosting or cloud
 inference. Step 8 remains necessary for reliable incremental updates and full-library
 processing, under separate authorization. Bruno's usability, artistic suitability
 and comprehensive accessibility review remain separate owner decisions.

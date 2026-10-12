@@ -1194,3 +1194,66 @@ separately from prior storage edits. No push or publication. Full-library
 processing, incremental updates, imports, game integration, public hosting,
 classification and standalone distribution remain outside this stage. Step 8
 still needs separate authorization.
+
+## Caption severity cleanup and future processing rules — October 12, 2026
+
+Bruno approved the caption cleanup scope and implementation plan, then requested
+that new asset imports use the same practical caption-processing rules.
+
+The current 40-asset pilot now has **1 actual caption fault, 14 caption warnings,
+16 assets with minor review notes and 9 with no recorded findings**. All 32
+historical visual findings remain intact. New classification is separately bound
+to original caption/provenance/evidence hashes. Minor notes appear in detail;
+meaningful errors show warning badges; failed/unusable captions retain faults.
+Desktop and agent search/detail use the same classification. Source, preview,
+dependency and runtime faults retain their original treatment and evidence.
+
+Updated AGENTS.md and the review writer for future processing: structured
+`findings` contain review_note/warning severity, evidence and rationale. Legacy
+unclassified findings default to warnings rather than faulty. Future provenance
+carries explicit severity, independent of the old pilot classification. New
+review pages show the same distinctions. Failed or missing captions cannot be
+downgraded by a review note. App/test-harness fixes are outside the asset
+investigation/export no-retry rule, reflecting Bruno's earlier clarification.
+No actual import, recaptioning, model run, owner approval, ranking change or
+full-library expansion was performed. Existing model/schema/runtime pins remain.
+
+Verification: 80 shared desktop/MCP/retrieval/severity tests passed in 111.66 s.
+After the future-rules update, 51 focused severity/caption tests passed in 8.80 s,
+including an actual review-writer publication on synthetic catalog data; these
+counts overlap. The real pilot preserves 990 protected input hashes and all 40
+keyword-query rankings. Native WebView2 checks confirmed 40 thumbnails, warning
+and fault badges, note/fault detail separation, narrow layout, three representative
+real STDIO detail/search payload agreements, and clean closure without a model
+worker. Actual browse and note-detail captures were visually inspected.
+
+Evidence and current rules: docs/caption-quality.md,
+docs/caption-review-classification.json and
+docs/caption-classification-verification.json. Detailed receipts are under
+data/caption-classification/ and data/gui/caption-classification/. Original
+historical static caption review pages keep their recorded wording.
+
+Storage receipts: data/storage/caption-classification-before.json,
+caption-classification-after-checks.json and caption-classification-final.json.
+Unique allocated storage: 5,979,705,784 bytes before; 6,015,785,440 bytes with
+synthetic checks; 5,982,177,224 bytes after reviewed fixture cleanup (about
+5.571 GiB, +2.36 MiB retained). Temporary fixture growth of 34.41 MiB exceeded
+the initial 20 MiB estimate; retained growth is below it. Cleanup preserved test
+reports, faults and synthetic caption publication evidence. No packages, model
+weights, originals, historical evidence or general caches were removed.
+Preparation errors and their resolutions are recorded separately in the new
+verification receipt. Step 8 expansion and owner usability/artistic decisions
+remain separate. Reopen the app and restart existing agent server connections
+to load the updated code.
+
+Final processing-rule follow-up also updated summary metrics and the review-page
+checker, replacing the assumption that every finding is a faulty caption. New
+pages validate severity counts; old pages validate explicitly as historical
+without being rewritten. The preserved historical page passed all 124 image and
+288 local-reference checks. A fresh UUID receipt was saved under data/evidence;
+the original Step 4 check receipt was preserved. Final focused checks: 51 passed
+in 8.07 s (data/caption-classification/rules-tests-banner.log), including current
+note/warning banner checks. Delivery storage receipt:
+data/storage/caption-classification-delivery.json, 5,982,236,432 unique allocated
+bytes (+2.41 MiB versus before), still below 6 GiB. These are overlapping focused
+rechecks, not additional distinct tests or owner approval.

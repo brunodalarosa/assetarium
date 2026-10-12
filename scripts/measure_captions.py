@@ -3,11 +3,13 @@ from pathlib import Path
 import json
 import statistics
 import math
+from collections import Counter
 
 from local_asset_library.catalog import save_json
 from local_asset_library.catalog import detail
 from local_asset_library.config import load_config
 from local_asset_library.model_storage import project_model_bytes
+from local_asset_library.caption_quality import caption_quality
 
 root = Path(__file__).resolve().parents[1]
 config = load_config(root / "config.example.toml", root)
@@ -30,7 +32,8 @@ summary = {"pilot_complete": report["complete"], "pilot_failed": report["failed"
     "inference_p50_seconds": statistics.median(times),
     "inference_p95_seconds_nearest_rank": sorted(times)[math.ceil(0.95*len(times))-1],
     "schema_valid_description_words_range": [min(len(r["description"]["description"].split()) for r in records if r["description"]), max(len(r["description"]["description"].split()) for r in records if r["description"])],
-    "visual_review_faulty_assets": sum(bool(r["caption_provenance"].get("visual_faults")) for r in records),
+    "caption_quality_counts": dict(Counter(caption_quality(config, r)["status"] for r in records)),
+    "visual_review_findings_assets": sum(bool(r["caption_provenance"].get("visual_faults")) for r in records),
     "input_tokens_range": [min(a["metrics"]["input_tokens"] for a in attempts), max(a["metrics"]["input_tokens"] for a in attempts)],
     "image_tokens_range": [min(a["metrics"]["image_tokens"] for a in attempts), max(a["metrics"]["image_tokens"] for a in attempts)],
     "resources_pilot_process": resources, "area_bytes": sizes,

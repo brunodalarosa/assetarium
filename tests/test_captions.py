@@ -188,9 +188,11 @@ def test_visual_faults_visible_and_escaped_in_review(tmp_path, monkeypatch):
     from local_asset_library import caption_review
     path = tmp_path / "review.html"
     path.write_text('<p>asset_fixture — complete </p><details>provenance</details>', encoding="utf-8")
-    monkeypatch.setattr(caption_review, "detail", lambda *_: {"caption_provenance": {
-        "visual_faults": [{"evidence": "Unsupported <script> count"}]}})
-    caption_review.highlight_faults(None, path, [{"asset_id": "asset_fixture"}])
+    monkeypatch.setattr(caption_review, "detail", lambda *_: {"asset_id": "asset_fixture",
+        "processing": {"caption": "complete"}, "description": {"description": "Useful description"},
+        "caption_provenance": {"visual_faults": [{"evidence": "Unsupported <script> count"}]}})
+    from local_asset_library.config import Config
+    caption_review.highlight_faults(Config(tmp_path, tmp_path / "source", None), path, [{"asset_id": "asset_fixture"}])
     result = path.read_text(encoding="utf-8")
-    assert "faulty — owner review pending" in result
+    assert "Caption warning — owner review pending" in result
     assert "&lt;script&gt;" in result and "<script>" not in result
