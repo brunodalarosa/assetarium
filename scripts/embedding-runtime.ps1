@@ -1,10 +1,10 @@
 # Reuse project-local dependency downloads; isolate all installed packages.
 $ErrorActionPreference = 'Stop'
 $embeddingRoot = Split-Path -Parent $PSScriptRoot
-$env:UV_CACHE_DIR = Join-Path $embeddingRoot 'cache\uv-caption'
+$env:UV_CACHE_DIR = Join-Path $embeddingRoot 'cache\uv'
 $env:UV_PYTHON_INSTALL_DIR = Join-Path $embeddingRoot 'cache\python'
 $env:UV_PROJECT_ENVIRONMENT = Join-Path $embeddingRoot '.venv-embedding'
-$env:UV_LINK_MODE = 'copy'
+$env:UV_LINK_MODE = 'hardlink'
 $env:TEMP = Join-Path $embeddingRoot 'scratch\tmp-embedding'
 $env:TMP = $env:TEMP
 $env:HF_HOME = Join-Path $embeddingRoot 'cache\embedding-hf'

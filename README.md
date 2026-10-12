@@ -18,13 +18,17 @@ From this repository in PowerShell:
 .\scripts\uv.ps1 sync --locked
 .\scripts\uv.ps1 run --locked local-assets check-config
 .\scripts\uv.ps1 run --locked local-assets doctor
-.\scripts\uv.ps1 run --locked pytest --basetemp scratch/pytest
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest-current
 ```
 
 Python 3.13 is required. The wrapper keeps uv cache, virtual environment, temporary
 build files, and Hugging Face/Torch runtime caches inside ignored project folders.
 It changes environment variables only in its process. Use it for project commands;
 calling a third-party runtime directly can bypass these settings.
+
+Runtime installations share one project-local uv cache and use hard links for
+identical immutable dependencies. See [storage guidelines](docs/storage.md) for
+accurate disk accounting, cache cleanup and the pilot's storage planning target.
 
 `local-assets` is the consistent CLI entry point. The two checks are read only;
 `doctor` checks SQLite FTS5 and NumPy with synthetic in-memory data and checks the

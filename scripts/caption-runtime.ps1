@@ -1,10 +1,10 @@
 # Runtime caches and dependencies stay in this project; model weights use configured shared storage.
 $ErrorActionPreference = 'Stop'
 $captionRoot = Split-Path -Parent $PSScriptRoot
-$env:UV_CACHE_DIR = Join-Path $captionRoot 'cache\uv-caption'
+$env:UV_CACHE_DIR = Join-Path $captionRoot 'cache\uv'
 $env:UV_PYTHON_INSTALL_DIR = Join-Path $captionRoot 'cache\python'
 $env:UV_PROJECT_ENVIRONMENT = Join-Path $captionRoot '.venv-caption'
-$env:UV_LINK_MODE = 'copy'
+$env:UV_LINK_MODE = 'hardlink'
 $env:TEMP = Join-Path $captionRoot 'scratch\tmp-caption'
 $env:TMP = $env:TEMP
 $env:HF_HOME = Join-Path $captionRoot 'cache\caption-hf'

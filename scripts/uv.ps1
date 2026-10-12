@@ -4,7 +4,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $env:UV_CACHE_DIR = Join-Path $projectRoot 'cache\uv'
 $env:UV_PYTHON_INSTALL_DIR = Join-Path $projectRoot 'cache\python'
 $env:UV_PROJECT_ENVIRONMENT = Join-Path $projectRoot '.venv'
-$env:UV_LINK_MODE = 'copy'
+$env:UV_LINK_MODE = 'hardlink'
 $env:TEMP = Join-Path $projectRoot 'scratch\tmp'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
