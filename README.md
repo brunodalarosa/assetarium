@@ -218,3 +218,17 @@ evidence are documented in [docs/mcp/README.md](docs/mcp/README.md).
 Codex completed the real prop-selection workflow. OpenCode connected and
 received the preview, but its local Qwen workflow timed out and remains
 unverified. See [progress](docs/progress.md) for faults and evidence boundaries.
+
+## Windows desktop app
+
+Double-click `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs` to browse
+the approved pilot and search through the same backend as MCP in a normal,
+resizable Windows window. No terminal, installer, model download or processing
+step is part of startup. Enter submits; Clear restores browsing. Asset detail
+includes explicit views/formats, source-path copying and existing fault/evidence
+records. Search settings can be copied as exact MCP argument JSON.
+
+See [desktop usage and runtime ownership](docs/gui/README.md) and
+[verification summary](docs/gui/verification.json). This is an additional stage
+between steps 7 and 8. Full-library processing and incremental updates remain
+separately authorized step 8 work; owner usability approval remains pending.

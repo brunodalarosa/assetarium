@@ -1,0 +1,418 @@
+{
+  "stage": "Desktop GUI between steps 7 and 8",
+  "date": "2026-10-11",
+  "status": "implemented_and_verified",
+  "approval": {
+    "scope": "Bruno: Yes",
+    "plan": "Bruno: Proceed",
+    "estimate_minutes": [
+      90,
+      150
+    ],
+    "estimate_additional_mib": [
+      30,
+      150
+    ],
+    "app_fault_repairs": "Bruno clarified the no-retry rule applies only to asset investigation/export"
+  },
+  "launcher": "Local Asset Library.vbs",
+  "scope": {
+    "pilot_count": 40,
+    "inventory_context_count": 883,
+    "step_8_executed": false,
+    "assets_processed": false,
+    "neighboring_projects_or_agent_registrations_changed": false
+  },
+  "dependencies": {
+    "environment": "existing .venv-mcp",
+    "new_runtime": false,
+    "added_windows_packages": {
+      "pywebview": "6.2.1",
+      "pythonnet": "3.2.1",
+      "clr-loader": "0.3.1",
+      "bottle": "0.13.4",
+      "proxy-tools": "0.1.0"
+    },
+    "existing_dependency_versions_preserved": true,
+    "models_copied_or_downloaded": false,
+    "preserved_pinned_package_count": 39
+  },
+  "checks": {
+    "focused_tests": {
+      "passed": 61,
+      "seconds": 28.426095300004818,
+      "receipt": "data/gui/unit-final/report.json"
+    },
+    "actual_gui_stdio_parity": {
+      "queries": 10,
+      "whole_payloads_equal": true,
+      "all_existing_modes": true,
+      "receipt": "data/gui/final-window/report.json"
+    },
+    "actual_transport_truncation": {
+      "synthetic_only": true,
+      "limit": 5,
+      "returned_candidates": 1,
+      "characters": 3470,
+      "whole_payloads_equal": true,
+      "receipt": "data/gui/cap-verified/report.json"
+    },
+    "stale_results_loading_errors_and_partial_results": {
+      "latest": true,
+      "truncated": true,
+      "visible": true,
+      "partial": true
+    },
+    "actual_rendering": {
+      "renderer": "WebView2",
+      "browse_thumbnails": 40,
+      "native_resize_checked": true,
+      "captures": [
+        "data/gui/delivery-images/browse.png",
+        "data/gui/delivery-images/detail.png",
+        "data/gui/delivery-images/narrow.png"
+      ]
+    },
+    "native_keyboard_and_launcher": {
+      "launcher_starting_directory": "C:/BrunoOS",
+      "normally_visible_window": true,
+      "extra_terminal": false,
+      "verified": [
+        "Ctrl+F/search focus",
+        "literal query text entry",
+        "Enter submits search",
+        "Clear restores 40-asset browse",
+        "Escape closes detail and restores grid focus",
+        "Right arrow moves to next card",
+        "Enter opens keyboard-selected asset",
+        "Alt+F4 closes window"
+      ],
+      "visual_evidence": "Actual Windows window inspected with computer-use; captures separately use actual WebView2 CapturePreview",
+      "audit_directory": "data/gui/runs/7c1cc48ff6754a09ab24b387ad63bb44",
+      "first_semantic_seconds": 7.997895900043659,
+      "worker_exit_code": 0
+    },
+    "close_during_pending_model_load": {
+      "seconds": 5.28132240002742,
+      "private_process_tree_terminated": true,
+      "receipt": "data/gui/close-pending.json"
+    },
+    "preservation": {
+      "source_entries": 4938,
+      "changed_source_entries": 0,
+      "protected_generated_and_contract_files": 989,
+      "changed_protected_files": 0,
+      "receipt": "data/gui/preservation-after.json"
+    },
+    "final_desktop_refinement": {
+      "passed": 7,
+      "seconds": 6.01,
+      "receipt": "data/gui/strict-inputs/report.json",
+      "includes_new_malformed_object_and_source_format_case": true
+    }
+  },
+  "gui_search_measurements": [
+    {
+      "arguments": {
+        "mode": "keyword_description",
+        "filters": {},
+        "limit": 5,
+        "query": "a small round red apple fruit with a leaf"
+      },
+      "asset_ids": [
+        "asset_24e2752dbb26ecd19677091f78243709",
+        "asset_179bed122930b57bd7a1f575376397f4",
+        "asset_f501133cf46b1b5b0a1a614b4f09c166",
+        "asset_e06205888e91302badebe08dc7197c9b",
+        "asset_18db4ca35f9737b123a769899bfc288e"
+      ],
+      "truncated": false,
+      "gui_seconds": 27.18588110001292,
+      "mcp_seconds": 32.11954839999089,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "keyword_description",
+        "filters": {},
+        "limit": 5,
+        "query": "a boxy orange-red car with wheels"
+      },
+      "asset_ids": [
+        "asset_bb8f82724d7856f4fa86b9f0759f2791",
+        "asset_18db4ca35f9737b123a769899bfc288e",
+        "asset_e06205888e91302badebe08dc7197c9b",
+        "asset_98cb9d2095606e4e850dcb72823a778f",
+        "asset_5148b2cb0b99c0f6014f00362bc66b80"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.46610010002041236,
+      "mcp_seconds": 0.4900876999599859,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "keyword_description",
+        "filters": {},
+        "limit": 5,
+        "query": "a chair with a curved back and flat seat"
+      },
+      "asset_ids": [
+        "asset_e21f35d1b80bc6b08cf9d7dffbc85006",
+        "asset_f4c01ecffff8071ec986e29d5cc69a1c",
+        "asset_b61ec88d53e61f0cd9ce3abffbf35ad7",
+        "asset_3bd10e61e57a9face42b8eee053cde92",
+        "asset_e4ebc981f0c97f2be5bbb0b1f997e88f"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.5093789999955334,
+      "mcp_seconds": 0.5304109000135213,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "keyword",
+        "filters": {},
+        "limit": 5,
+        "query": "sedan sports"
+      },
+      "asset_ids": [
+        "asset_18db4ca35f9737b123a769899bfc288e"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.19137509999563918,
+      "mcp_seconds": 0.20035520003875718,
+      "match_status": [
+        "keyword_match"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "keyword_description",
+        "filters": {
+          "pack": "kenney_car-kit",
+          "format": "glb",
+          "max_triangles": 3000,
+          "rigged": false
+        },
+        "limit": 5,
+        "query": "a car with wheels"
+      },
+      "asset_ids": [
+        "asset_bb8f82724d7856f4fa86b9f0759f2791",
+        "asset_34db2b054e4c4425fa36b0b7b9e00612",
+        "asset_5148b2cb0b99c0f6014f00362bc66b80",
+        "asset_98cb9d2095606e4e850dcb72823a778f"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.3020939999842085,
+      "mcp_seconds": 0.3081637000432238,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "keyword_description",
+        "filters": {},
+        "limit": 5,
+        "query": "spaceship laser submarine"
+      },
+      "asset_ids": [
+        "asset_98cb9d2095606e4e850dcb72823a778f",
+        "asset_5148b2cb0b99c0f6014f00362bc66b80",
+        "asset_bb8f82724d7856f4fa86b9f0759f2791",
+        "asset_d1fe6328ee90ef8149fcd50d6a1674f0",
+        "asset_408546ca53f7971de1dadb2a61d0ba3a"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.4734292999492027,
+      "mcp_seconds": 0.5279192000161856,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "image",
+        "filters": {},
+        "limit": 5,
+        "query": "a red apple with a green leaf"
+      },
+      "asset_ids": [
+        "asset_24e2752dbb26ecd19677091f78243709",
+        "asset_179bed122930b57bd7a1f575376397f4",
+        "asset_e06205888e91302badebe08dc7197c9b",
+        "asset_f501133cf46b1b5b0a1a614b4f09c166",
+        "asset_ae0ecb0785c8a290c0ad88db419ade2e"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.501017700007651,
+      "mcp_seconds": 0.5539991999976337,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "combined",
+        "filters": {},
+        "limit": 5,
+        "query": "a red apple with a green leaf"
+      },
+      "asset_ids": [
+        "asset_24e2752dbb26ecd19677091f78243709",
+        "asset_179bed122930b57bd7a1f575376397f4",
+        "asset_e06205888e91302badebe08dc7197c9b",
+        "asset_f501133cf46b1b5b0a1a614b4f09c166",
+        "asset_055c798dff9c002a2a32c3ca8da2dd4e"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.64148250001017,
+      "mcp_seconds": 0.6359219999867491,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "description",
+        "filters": {},
+        "limit": 5,
+        "query": "a red apple with a green leaf"
+      },
+      "asset_ids": [
+        "asset_24e2752dbb26ecd19677091f78243709",
+        "asset_179bed122930b57bd7a1f575376397f4",
+        "asset_f501133cf46b1b5b0a1a614b4f09c166",
+        "asset_e06205888e91302badebe08dc7197c9b",
+        "asset_408546ca53f7971de1dadb2a61d0ba3a"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.49559289996977895,
+      "mcp_seconds": 0.5286077999626286,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    },
+    {
+      "arguments": {
+        "mode": "reference",
+        "filters": {},
+        "limit": 5,
+        "reference_asset_id": "asset_24e2752dbb26ecd19677091f78243709",
+        "reference_view": "three_quarter"
+      },
+      "asset_ids": [
+        "asset_24e2752dbb26ecd19677091f78243709",
+        "asset_179bed122930b57bd7a1f575376397f4",
+        "asset_e06205888e91302badebe08dc7197c9b",
+        "asset_f501133cf46b1b5b0a1a614b4f09c166",
+        "asset_ae0ecb0785c8a290c0ad88db419ade2e"
+      ],
+      "truncated": false,
+      "gui_seconds": 0.7477548999595456,
+      "mcp_seconds": 0.7613481000298634,
+      "match_status": [
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated",
+        "weak_unvalidated"
+      ]
+    }
+  ],
+  "storage": {
+    "method": "Unique allocated project bytes; excludes original external sources and shared models",
+    "before_allocated_bytes": 5938483904,
+    "after_allocated_bytes": 5978770592,
+    "after_gib": 5.568164020776749,
+    "additional_allocated_mib": 38.420379638671875,
+    "installation_growth_mib": 17.463539123535156,
+    "below_6_gib_target": true,
+    "receipts": [
+      "data/storage/gui-before.json",
+      "data/storage/gui-after-install.json",
+      "data/storage/gui-delivery.json"
+    ],
+    "snapshot_limit": "Delivery receipt predates subsequent small documentation/commit writes; live browser caches can vary"
+  },
+  "cleanup": {
+    "uv_cache": {
+      "target": "C:/BrunoOS/Local-Asset-Library/cache/uv",
+      "command": "uv cache clean --cache-dir C:/BrunoOS/Local-Asset-Library/cache/uv",
+      "reported_removed_files": 699,
+      "reported_mib": 16.1,
+      "measurement_limit": "uv reports cache-name sizes, not unique allocated savings; installed hard links remain usable",
+      "offline_dependency_imports_after_cleanup": "passed"
+    },
+    "synthetic_fixtures": {
+      "receipt": "data/gui/fixture-cleanup/report.json",
+      "containment_review": "Exact directories inside scratch; every descendant checked; no links or junctions",
+      "evidence_preserved": true,
+      "allocated_project_savings_mib": 119.37451934814453
+    },
+    "browser_profile_warning": {
+      "status": "faulty_cleanup_retained",
+      "reason": "One renderer cleanup logged WinError 32 for a locked browser cache file. Partial cache retained; no automatic retry.",
+      "evidence": "logs/gui.log",
+      "final_native_profile_cleanup": "passed; data/gui/runs/7c1cc48ff6754a09ab24b387ad63bb44/profile-cleanup-outcome.json"
+    },
+    "final_synthetic_fixture_receipt": "data/gui/fixture-cleanup-final/report.json"
+  },
+  "faults": {
+    "preparation_and_corrected_app_harness_faults": "docs/gui/preparation-faults.json",
+    "historical_asset_faults_preserved": true,
+    "unchanged_asset_investigation_or_export_retries": false,
+    "silent_semantic_fallback": false
+  },
+  "owner_approval": {
+    "usability": "pending",
+    "comprehensive_accessibility": "pending",
+    "caption_and_artistic_suitability": "Read current owner overlays; no approvals granted by this verification"
+  },
+  "limitations": [
+    "Approved pilot only; Step 8 is still required for reliable incremental updates/full-library processing.",
+    "Semantic results are suggestions and can include unrelated candidates for absent objects.",
+    "Existing caption/source/dependency/scale/alternate-format limitations remain visible.",
+    "First model loading and simultaneous GUI/MCP workers can contend for GPU resources; no unrelated processes are managed.",
+    "Prepared runtime on this PC; no standalone installer or publishing."
+  ]
+}

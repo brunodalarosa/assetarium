@@ -1082,3 +1082,115 @@ The existing managed-Python location warning remained nonfatal. New checks are
 technical evidence, not caption quality, game-import or full-library approval.
 
 Usage and exact directories: [shared model storage](model-storage.md).
+
+## Windows desktop GUI — added between steps 7 and 8 (October 11, 2026)
+
+**Implemented and verified; Bruno's usability and comprehensive accessibility
+review remain pending. Step 8 was not executed.** Bruno approved scope with
+"Yes" and the separate plan with "Proceed". Estimate: 90–150 minutes and
+30–150 MiB additional unique allocation, assuming the existing WebView2/.NET
+installation and dependency pins remained compatible. No subagents were used.
+Bruno subsequently clarified that the no-retry rule applies to asset
+investigation/export; app and test-harness issues may be corrected and rechecked.
+
+Launcher: `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs`. It invokes
+the existing MCP environment's console-free Python from any starting directory.
+It opens a normal Windows window; startup does not install, download, scan,
+render, caption, re-embed or update any asset data. Usage and ownership:
+[desktop guide](gui/README.md); bounded results: [verification summary](gui/verification.json).
+
+Added local bundled HTML/CSS/JavaScript, adaptive thumbnail grid, text search,
+verified filters, existing secondary modes and pilot-ID/view reference search.
+Details expose explicit views/formats, verified original source path with text
+copying, measured facts scoped to the inspected file, generated observations,
+suggestions, live owner review, license/dependency evidence and recorded faults.
+Physical scale and uninspected alternate capabilities remain unknown. Cards
+retain usable partial assets and concise fault flags. Missing views have an
+accessible reason and no image substitution.
+
+Search uses the same `Gateway.call`/`AssetService`/`SearchEngine` implementation as
+MCP, with explicit `keyword_description` default, five-result maximum and shared
+validation, filters, availability checks, rankings and deterministic truncation.
+Browsing is a separate read-only backend operation; membership/counts come from
+the manifest rather than frontend identities. Exact completed MCP arguments can
+be copied; same catalog/index versions are necessary for reproduction. Semantic
+results can include irrelevant candidates for absent objects; no confidence
+percentage, universal threshold or keyword fallback was added.
+
+The GUI main thread remains free while background source/detail work and one
+private persistent embedding worker operate. Browsing starts no model. Request
+generations suppress obsolete results. Closing releases only GUI-owned resources,
+including the private Windows worker tree if a pending load exceeds the graceful
+five-second window. Per-window browser profiles have containment/link review
+before cleanup; asset evidence is stored outside those profiles.
+
+Dependencies were added to the existing separately locked MCP environment:
+pywebview 6.2.1, pythonnet 3.2.1, clr-loader 0.3.1, bottle 0.13.4 and proxy-tools
+0.1.0. Existing installed versions were preserved; no additional runtime, browser
+bundle, GPU library copy, weights, model contract or agent registration changed.
+This PC's existing WebView2 154.0.4258.62/.NET Framework 4.8.09221 worked. All app
+resources and inference remain local; source text is rendered as text, and CSP
+blocks external resources/connections.
+
+### Verification and actual measurements
+
+| Check | Result and evidence |
+| --- | --- |
+| Focused desktop/MCP/retrieval policy checks | **61 passed in 28.02 s**; small synthetic fixtures; `data/gui/unit-final/report.json` |
+| Final strict-input desktop refinement | **7 passed in 6.01 s**, including a new malformed-object/source-format case and all desktop regression checks; `data/gui/strict-inputs/report.json` |
+| Actual packaged-form → pywebview bridge versus real STDIO MCP | **10 queries, all existing modes**, natural-language/name/filter/absent/reference cases; entire payloads and ordered IDs identical; `data/gui/final-window/report.json` |
+| Actual truncation over both transports | Synthetic limit 5 returned the same **one candidate**, `truncated=true`, 3,470 characters; `data/gui/cap-verified/report.json` |
+| Pilot browsing | **40 existing three-quarter thumbnails**, no model load; counts/context sourced from backend; full inventory remains 883 records |
+| Loading/races/faults | Synthetic older-response suppression, visible runtime errors, explicit truncation, earlier-card retention, no fallback; source/preview partial-fault tests passed |
+| Actual interface inspection | Windows window visually inspected; final WebView2 captures reviewed under `data/gui/delivery-images/`; native resizing and narrow layout have no horizontal overflow |
+| Native launcher/keyboard | Launched from `C:\BrunoOS`; visible window without terminal; Ctrl+F/text entry, Enter search, Clear browse, Escape/detail-focus return, Right-arrow grid movement, Enter-card activation and Alt+F4 checked |
+| Resource lifecycle | GUI and verification-owned MCP idle workers exited **0**; one GUI worker retained across warm queries. Closing a pending first load completed in **5.281 s**, terminating only its private process tree; `data/gui/close-pending.json` |
+| Preservation | **4,938 original SHA-256/size/mtime entries unchanged; 989 protected generated/contract files unchanged**, including catalog/index, captions/corrections, previews, pilot, inference backends and other runtime locks; `data/gui/preservation-after.json` |
+
+First GUI semantic search took **27.186 s** in the final protocol comparison
+(earlier comparison: 29.518 s); the normally launched native session took **7.998 s**.
+These are different local cache/load conditions, not guaranteed cold/warm bounds.
+Subsequent default searches in the final comparison took **0.302–0.509 s**;
+keyword 0.191 s, image 0.501 s, combined 0.641 s, description 0.496 s and reference
+0.748 s. Separate GUI/MCP verification workers both loaded successfully, but
+arbitrary simultaneous GPU workloads remain unverified. Other processes were
+not changed or terminated.
+
+### Storage, cleanup and retained faults
+
+Fresh base-Python receipts: `data/storage/gui-before.json`, `gui-after-install.json`
+and `gui-delivery.json`. Unique allocated project bytes changed from
+**5,938,483,904 to 5,978,770,592**: **38.42 MiB additional; 5.568 GiB total**, below
+the 6 GiB target. External originals/shared models are excluded. Dependencies
+initially added **17.46 MiB**. This delivery snapshot precedes subsequent small
+documentation/commit writes; live browser cache usage varies.
+
+After successful runtime verification, cleaned only the exact project-local
+`cache/uv` with uv's cache command. It reported 699 cache names / 16.1 MiB removed;
+that is not an independently measured unique-allocation saving. Offline desktop
+and MCP dependency imports still passed. Preserved synthetic test audits/fault
+records/reports before removing only this run's four disposable fixture trees,
+after exact containment and link/junction checks. Project allocation decreased
+by **119.37 MiB** across those cleanup receipts; see
+`data/gui/fixture-cleanup/report.json` and `data/storage/gui-before-fixture-cleanup.json`
+/ `gui-after-fixture-cleanup.json`. No historical linked fixtures or generic
+system caches were deleted.
+
+Retained initial app/harness faults separately: restricted pre-install report
+permission, missing evidence-log folder, SDK error-flag attribute mismatch,
+JavaScript `arguments` shadowing, incorrect synthetic truncation keyword,
+optional documentation/source probes, source-edit quoting, and initial Windows
+inspection-helper approval timeout. Successful corrections/partial results are
+recorded in `docs/gui/preparation-faults.json` and distinct `data/gui/` runs.
+One browser cache cleanup logged WinError 32 for a locked file; partial cache and
+log evidence were retained without automatic cleanup retry. Final native profile
+cleanup succeeded. Historical asset/caption/source faults were never repaired,
+retried in investigation/export, cleared or silently declared successful.
+
+Existing uncommitted storage/runtime guidance and scripts were preserved. The
+checked local commit contains only this GUI work, its pinned desktop additions,
+verification helpers/tests and documentation; the README GUI addition is staged
+separately from prior storage edits. No push or publication. Full-library
+processing, incremental updates, imports, game integration, public hosting,
+classification and standalone distribution remain outside this stage. Step 8
+still needs separate authorization.
