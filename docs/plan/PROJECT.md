@@ -1,8 +1,8 @@
 # Local Asset Library
 
-Project proposal and sequential implementation plan, prepared October 11, 2026.
+Project proposal and sequential implementation plan, prepared October 11, 2026; remaining stages revised October 12, 2026.
 
-Status: planning only. The implementation repository, catalog, models, and search service have not been created by this plan.
+Status: the pilot backend, agent access and Windows desktop app are implemented. Steps 8–10 remain future work. Consult `C:\BrunoOS\Local-Asset-Library\docs\progress.md` for current evidence, owner decisions and limitations; this plan does not itself authorize full-library processing.
 
 ## Purpose
 
@@ -52,13 +52,14 @@ The first release includes:
 - Local visual descriptions, with observations separated from technical facts and suggested uses.
 - Filename/keyword, description, image, and combined retrieval.
 - Compact agent-facing search and detail tools, initially using a local command interface and then MCP.
+- A local Windows desktop app for browsing, searching and inspecting the same backend records, previews and evidence.
 - Incremental updates, resumable batch jobs, and stale/deleted-file handling.
 - A benchmark comparing search quality, latency, returned context size, and actual agent behavior.
 - Local operation documentation and reproducible configuration.
 
 Classification and clustering are an optional extension in step 9. They suggest organization; they never move source assets or replace measured facts.
 
-Out of scope: whole-computer indexing, cloud caption generation, public hosting, a graphical website, automatic game imports, asset editing, automatic collision/LOD generation, fine-tuning, and unattended approval of artistic suitability.
+Out of scope: whole-computer indexing, cloud caption generation, public hosting, a hosted website, automatic game imports, asset editing, automatic collision/LOD generation, fine-tuning, and unattended approval of artistic suitability.
 
 ## Proposed implementation choices
 
@@ -68,7 +69,7 @@ Use Blender in background mode for inspecting models and generating previews. Re
 
 Use the documented Python/SentenceTransformers path as the initial candidate for EmbeddingGemma 2 text and image support. An alternative runtime is acceptable only after proving the required modalities and correct embedding output. Serving an embedding endpoint alone does not prove image support.
 
-Pin working dependencies and exact model revisions. Isolate virtual environments, model caches, logs, and data under the new project. Do not install into the existing agent environment or upgrade its Ollama installation as a side effect. A necessary shared-runtime change must be separately explained before execution.
+Pin working dependencies and exact model revisions. Reuse existing project runtime wrappers and separately pinned environments; do not install into the existing agent environment or upgrade Ollama as a side effect. Keep models in configured shared storage, currently `C:\BrunoOS\Local-models`, without duplicate weights. Follow current `AGENTS.md` and `docs/storage.md` for hard-linked dependencies, immutable installed files, receipts and cleanup. Explain any new runtime, pin change or significant storage increase before execution.
 
 Proposed ignored directories: `data/`, `models/`, `cache/`, `logs/`, `scratch/`, `.venv/`. Version source, schemas, configuration examples, prompts, evaluation query definitions, small synthetic fixtures, documentation, and progress records. Do not commit third-party packs, full model weights, or the generated catalog.
 
@@ -103,6 +104,8 @@ Technical statements such as triangle count, rigging, animation availability, an
 
 Separate a reusable asset description from project-specific judgments such as suitability for Play Shapes. Store owner corrections as an overlay that survives regeneration.
 
+Use the current `docs/caption-quality.md` contract: minor precision or uncertain details are `review_note`; meaningful identity/color/structural errors that could mislead selection are `warning`; failed/incomplete generation or an unusable description is a caption `fault`. `clear` means no recorded findings, not owner approval. Preserve evidence and owner states. A note or warning does not exclude a usable source, require reprocessing, or invalidate an embedding; an actual change to embedded description content does invalidate affected vectors. New reviews record explicit severity, evidence and rationale; unclassified findings remain warnings. Successful retrieval does not prove every caption detail.
+
 ### Retrieval behavior
 
 Support keyword/filename retrieval, semantic description retrieval, text-to-image retrieval, and a combined mode. Keep the channels separately measurable. Initially combine ranked lists using reciprocal rank fusion rather than assuming raw scores from different channels are comparable. Combine multiple views into one asset result so duplicate views and formats cannot occupy the shortlist.
@@ -127,7 +130,7 @@ Step 1 must first create the new folder and initialize it as a Git repository. I
 
 Copy this plan and its prompt files into `docs/plan/` during step 1. Subsequent work refers to that versioned copy. Maintain `docs/progress.md` with step status, actual commands, outputs, model/runtime versions, evidence paths, blockers, and the next runnable step. Never claim a step passed from source code alone. Keep implementation changes in local commits after appropriate checks, without a remote, push, or publication unless separately requested. Do not spawn subagents by default.
 
-Dependency installation and downloads required by an executed prompt are allowed within the project-managed environment. Before a model download, verify its license, official runtime support, size, and expected device requirements. Initial budget: at most 8 GiB of model downloads in total and 20 GiB of project-generated data; larger consumption requires revising the budget with Bruno. Do not download several large candidate models speculatively. Implement estimates/dry runs before a full batch. No cloud API keys or paid services are required.
+Dependency installation and downloads required by an approved stage use the existing runtime wrappers and storage rules. Before a model download, verify its license, official runtime support, size and device requirements. The original 8 GiB model/20 GiB generated-data planning allowances are historical estimates, not blanket expansion approval. The current target is below 6 GiB of unique allocated pilot project storage, excluding external assets and shared models. Step 8 must estimate and obtain an approved full-library storage/runtime budget from measured pilot costs; do not treat the pilot target as a full-library cap. A projected increase of 500 MiB or more, another runtime or exceeding the pilot target must be explained at the required plan checkpoint. Save fresh base-Python storage receipts before and after installations or bulk processing; count unique allocated bytes, not summed folder sizes. Reuse shared weights and read-only originals. No cloud API keys or paid services are required.
 
 ### Sequence and deliverables
 
@@ -140,7 +143,8 @@ Dependency installation and downloads required by an executed prompt are allowed
 | 5 | EmbeddingGemma 2 text/image indexing and combined search | 4 |
 | 6 | Retrieval benchmark and owner decision on expansion | 5 |
 | 7 | Local MCP tools and real agent retrieval verification | 6 approved |
-| 8 | Incremental processing and full-library expansion | 7 |
+| GUI milestone | Windows desktop pilot app and shared caption severity, implemented between steps 7 and 8 | 7 |
+| 8 | Reliable updates, full-library backend and responsive GUI expansion | 7 and existing GUI |
 | 9 | Optional category suggestions and clustering | 8 |
 | 10 | Operational handoff and final acceptance report | 8; 9 if selected |
 
@@ -206,29 +210,43 @@ Done when: the intended client has performed the workflow; result size is measur
 
 Prompt: [07-agent-mcp-integration.md](prompts/07-agent-mcp-integration.md).
 
-## Step 8 — Make updates reliable and process the library
+## Implemented GUI milestone — between steps 7 and 8
 
-Implement stage-specific hashes, resumable jobs, failure isolation, deletion/rename handling, owner correction overlays, and transactional search-index publication. Test them with copied/synthetic fixtures, not edits to the real source library. Then estimate costs from the pilot and process the full collection within budget.
+The Windows app launches through `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs` and reuses the existing MCP runtime and shared retrieval backend. It supplies read-only pilot browsing, search, explicit preview/source-format selection, source-path copying and evidence detail. Browse membership/counts come from the backend; the inventory count does not imply full-library availability. Startup does not install, download, scan, process or load inference models. Search shares MCP ranking/filter/cap behavior; backend membership still explicitly enforces forty assets.
 
-Schedule GPU workloads conservatively: unload or pause one heavy model before the next stage rather than assuming the caption model, embedding model, coding agent, and Blender fit simultaneously. Provide manual `scan`, `process`, `refresh`, and `status` operations; an always-on watcher is optional.
+Use repository `docs/gui/README.md`, `docs/gui/verification.json`, `docs/caption-quality.md` and `docs/caption-classification-verification.json` as the current contracts/evidence. Automated/native GUI checks remain separate from Bruno's usability and artistic approval. Preserve the existing app rather than introducing another frontend, runtime or retrieval policy.
 
-Done when: reruns skip unchanged work; changed source/texture/prompt/model contracts invalidate the appropriate stages; interruption resumes; deleted assets stop appearing; every candidate is processed or has a visible actionable status.
+## Step 8 — Make updates reliable and expand the backend and GUI
+
+Implement stage-specific hashes, resumable jobs, failure isolation, deletion/rename handling, persistent owner corrections and transactional catalog/index publication. Generalize the shared forty-asset membership contract to explicitly configured library membership; do not simply remove guards. Preserve source boundaries, measured filters, logical-asset grouping and shared GUI/MCP retrieval semantics. Test with small synthetic fixtures and existing read-only paths; do not copy original assets into test trees or damage the source library.
+
+Add bounded/paged browsing and lazy thumbnails for the larger library, retaining stable selection, filters, keyboard access and responsive detail/search. Publish catalog/index changes consistently so an open GUI or agent connection does not mix incompatible versions; surface changed/stale state and invalidate presentation caches appropriately. Show current processing/coverage status in the app. Keep manual `scan`, `process`, `refresh` and `status` operations with dry runs; an always-on watcher is optional. Opening the app must remain lightweight and must not start batch processing.
+
+Separate completed work, caption notes/warnings, actual stage failures, unsupported formats and owner-review states. Preserve usable partial results and original evidence. Resume unfinished/interrupted work without automatically retrying unchanged faulty items; retries/repairs of actual asset faults need explicit authorization. Review severity alone must not rerender, recaption or re-embed assets. Changing an effective description invalidates only its affected embedding input; owner approval or severity alone does not.
+
+Estimate full-library runtime, peak/retained unique allocated storage and GPU use from measured pilot costs, and confirm the full-batch scope/budget approval before processing. Follow current storage rules and save fresh before/after bulk receipts. Coordinate batch GPU work with GUI/MCP workers: pause/unload or queue competing workloads rather than killing unrelated processes or assuming they all fit. Process in resumable batches within the approved budget. Preserve active search during publication or give a clear bounded unavailable state.
+
+Done when: no-change refresh skips unchanged work; appropriate contract/content changes invalidate only affected stages; interruption resumes without fault retries; deleted assets disappear and renames follow documented identity rules; the expanded library is browseable without eager loading of every preview; GUI/MCP agree on candidates, ordering, filters and truncation against the same version; every candidate has coverage/status with notes and warnings separate from operational failure. Full processing and owner acceptance remain evidence-backed decisions.
 
 Prompt: [08-incremental-full-library.md](prompts/08-incremental-full-library.md).
 
-## Step 9 — Optional classification and clustering
+## Step 9 — Optional classification and clustering in the existing GUI
 
-Add reviewed category suggestions and exploratory groups of similar assets. Use a small owner-readable taxonomy. Separate identity tags, visual attributes, inferred uses, and technical filters. Preserve manually accepted labels and allow unknown/multiple categories. Evaluate task-specific embedding contracts rather than assuming retrieval vectors are optimal for clustering.
+Add reviewed category suggestions and exploratory groups using a small owner-readable taxonomy. Separate identity tags, visible attributes, inferred uses and measured filters. Preserve manually accepted labels and allow unknown/multiple categories. Treat generated captions as provisional observations: meaningful caption warnings must not silently become accepted categories. Use reviewed descriptions and image evidence where needed; keep label evidence and review state explicit.
 
-Done when: suggestions and cluster reports are inspectable, stable/versioned enough to compare, and useful on a reviewed sample; no automatic reorganization of source files occurs. Record this step as skipped if Bruno does not choose it; core search can ship without it.
+Display suggestions and groups in the existing app with member previews, representative assets, outliers and suggested/accepted/unknown states. Keep browsing bounded and the extension independently disableable. Do not alter core search ranking/filter contracts, automatically approve labels, rewrite source descriptions to fit categories or reorganize original files. Evaluate task-specific embedding contracts rather than assuming retrieval vectors are optimal for clustering; explain any additional runtime/model/storage cost in the approved plan.
+
+Done when: suggestions and groups are inspectable in the GUI, versioned enough to compare and useful on a modest reviewed sample; unknown handling, caption-warning effects and preservation of accepted labels are demonstrated; search remains usable with the extension disabled. Record this step as skipped if Bruno does not choose it; Step 10 and core search can proceed without it.
 
 Prompt: [09-classification-and-clustering.md](prompts/09-classification-and-clustering.md).
 
-## Step 10 — Finish operational documentation and handoff
+## Step 10 — Finish desktop/agent operational documentation and handoff
 
-Document installation, local models, startup, scan/process/search workflows, refresh, correction review, recovery, data/model storage, MCP clients, and limitations. Repeat the held-out evaluation after full indexing to detect ranking degradation as the candidate pool grows. Verify the final real-agent workflow again only if integration/index changes justify it.
+Document the exact working installation, local/shared models, Windows launcher/prerequisites, startup/shutdown, GUI browsing/search/detail/source-path copying, processing status, scan/process/refresh operations, corrections, interruption recovery, storage/cleanup, MCP clients and limitations. Explain source faults, caption faults, warnings, minor notes and owner review separately. Cover reopening the app or restarting agent connections after code updates. GUI startup must remain independent of installation and batch processing.
 
-Done when: another fresh Codex chat can operate the tool from repository documents; evidence supports the release claims; unresolved format/model/client failures and human reviews are listed. This is a local handoff, with no publication or game import.
+Repeat held-out retrieval evaluation after full indexing to detect ranking degradation as the pool grows. Verify GUI/MCP agreement on the expanded collection and meaningful GUI behavior: bounded browsing/lazy previews, loading/error states, keyboard controls, resizing, updates/publication and shutdown of owned workers. Repeat real-agent tasks only where index/integration changes justify them. Keep automated checks, actual rendered/native inspection, actual agent use and Bruno's usability/artistic approval distinct.
+
+Done when: another fresh Codex chat can operate both interfaces from repository documents; acceptance requirements map to current evidence; measured coverage, storage and operating costs are reported; unresolved failures, warnings and human reviews remain visible. This is a local handoff, with no publication or game import, and no claim of full-library completion if Step 8 has not passed.
 
 Prompt: [10-handoff-and-final-validation.md](prompts/10-handoff-and-final-validation.md).
 
@@ -237,9 +255,11 @@ Prompt: [10-handoff-and-final-validation.md](prompts/10-handoff-and-final-valida
 - Original packs and Play Shapes remain unchanged.
 - Each asset can be traced from search result through preview/description to existing source files and dependencies.
 - Duplicate export formats do not crowd out distinct candidates.
-- Unsupported/failed assets are visible and never masquerade as inspected assets.
+- Actual failed/unsupported stages remain visible with preserved partial results; caption warnings/notes are not counted as processing failures or used to discard usable sources.
+- The Windows app browses the configured processed library responsively and shares search semantics with MCP; startup never triggers installation or batch work.
 - Real local vision and embedding inference are demonstrated and recorded.
-- Owner corrections survive automated refresh.
+- Owner corrections, accepted labels and caption review evidence survive refresh; severity-only changes do not trigger inference or embedding work.
+- Fresh storage receipts and measured full-library costs satisfy the approved expansion budget.
 - Quality and token/context claims are supported by measurements, with the cost of tool schemas and requested images disclosed where available.
 - At least one intended agent client has completed a real retrieval task; any second client/model remains marked unverified until tested.
 - Pilot and visual-suitability approval remain human decisions.

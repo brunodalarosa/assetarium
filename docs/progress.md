@@ -1257,3 +1257,19 @@ note/warning banner checks. Delivery storage receipt:
 data/storage/caption-classification-delivery.json, 5,982,236,432 unique allocated
 bytes (+2.41 MiB versus before), still below 6 GiB. These are overlapping focused
 rechecks, not additional distinct tests or owner approval.
+
+## Remaining plan and execution-prompt update — October 12, 2026
+
+At Bruno's request, updated PROJECT.md and the Step 8–10 execution prompts in
+C:\BrunoOS\Plans\Local-Asset-Library and the repository docs/plan mirror.
+The plan now records the implemented GUI milestone, responsive full-library
+browsing and shared publication/version behavior in Step 8, optional taxonomy
+and clustering presentation in the existing app in Step 9, and desktop/agent
+handoff and verification in Step 10. Current caption severity, explicit asset
+fault retries, shared runtime/model storage and an approved measured expansion
+budget replace conflicting old assumptions. Stage numbering remains unchanged;
+Steps 8–10 were not executed and full-library processing was not authorized by
+this documentation update. Both copies of all four documents are byte-identical;
+Markdown fences and affected prompt references were checked. Receipt:
+data/plan-updates/gui-caption-remaining-stages.json. No implementation/runtime,
+asset, catalog/index or owner-review data changed.
