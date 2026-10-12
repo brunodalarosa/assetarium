@@ -44,6 +44,7 @@ class Config:
     source_root: Path
     blender: Path | None
     models_root: Path | None = None
+    catalog_generation: str | None = None
 
     def storage_root(self, area: str) -> Path:
         if area not in STORAGE_NAMES:
@@ -70,6 +71,11 @@ class Config:
         return self.source_file(relative).open("rb")
 
     def output_path(self, area: str, relative: str) -> Path:
+        if area == "data" and relative in {"catalog.sqlite", "embeddings/index.sqlite", "library/membership.json"}:
+            from .publication import generation
+            selected = self.catalog_generation or generation(self)
+            if selected != "legacy":
+                relative = "library/generations/" + selected + "/" + relative
         storage = self.storage_root(area)
         target = _inside(storage, relative)
         if target.is_relative_to(self.source_root):

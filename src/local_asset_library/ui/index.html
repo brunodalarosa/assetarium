@@ -11,11 +11,11 @@
   <a class="skip" href="#grid">Skip to assets</a>
   <header>
     <div class="brand"><span class="mark" aria-hidden="true">◈</span><div><h1>Local Asset Library</h1><p>Prepared assets, close at hand.</p></div></div>
-    <div class="scope"><strong id="scope">Loading pilot…</strong><span id="inventory">Local · read only</span></div>
+    <div class="scope"><strong id="scope">Loading library…</strong><span id="inventory">Local · read only</span></div>
   </header>
   <main>
-    <form id="search-form" aria-label="Search pilot assets">
-      <label class="sr" for="query">Search the approved pilot</label>
+    <form id="search-form" aria-label="Search library assets">
+      <label class="sr" for="query">Search the approved library</label>
       <div class="search-row"><input id="query" type="search" placeholder="Describe an asset, or search its name…" maxlength="1024" autocomplete="off"><button class="primary" type="submit" id="submit">Search</button><button type="button" id="clear">Clear</button></div>
       <details id="search-options"><summary>Filters &amp; search options</summary>
         <div class="controls">
@@ -30,16 +30,16 @@
         <p class="hint">Technical filters require measured evidence for the selected format. Enter with an empty query browses the filtered pilot.</p>
       </details>
     </form>
-    <div class="results-bar"><div><h2 id="results-title">Browse the pilot</h2><p id="status" role="status" aria-live="polite">Loading existing records and previews…</p></div><button id="copy-settings" type="button" disabled>Copy search settings</button></div>
+    <div class="results-bar"><div><h2 id="results-title">Browse the library</h2><p id="status" role="status" aria-live="polite">Loading existing records and previews…</p></div><button id="copy-settings" type="button" disabled>Copy search settings</button></div>
     <p class="hint" id="candidate-note" hidden>Ranked suggestions may include unrelated assets—even when the requested object is absent. Review the previews.</p>
     <p class="hint" id="reproduce-note" hidden>Copies the completed search. Agents must submit those settings against the same catalog and index versions to reproduce this shortlist.</p>
     <div id="error" role="alert" hidden></div>
     <div class="workspace">
-      <section class="collection" aria-label="Pilot assets"><div id="grid" class="grid" tabindex="-1" aria-busy="true"></div><p id="empty" hidden>No assets match these settings.</p></section>
+      <section class="collection" aria-label="Library assets"><div id="grid" class="grid" tabindex="-1" aria-busy="true"></div><p id="empty" hidden>No assets match these settings.</p></section>
       <aside id="detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p><p class="hint">Source files stay in their original location.</p></div></aside>
     </div>
   </main>
-  <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Full-library updates remain Step 8.</span></footer>
+  <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Read-only originals · manual updates</span></footer>
   <script>/* BUNDLED_SCRIPT */</script>
 </body>
 </html>

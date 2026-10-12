@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "approved": true,
+  "approval": "Bruno approved Step 8 scope and implementation/runtime/storage plan on October 12, 2026.",
+  "packs": ["kenney_car-kit", "kenney_city-kit-roads", "kenney_food-kit", "kenney_furniture-kit", "kenney_mini-forest", "quaternius_ultimate-food-pack", "quaternius_ultimate-house-interior-pack", "quaternius_ultimate-nature-pack"],
+  "initial_catalog_assets": 883,
+  "maximum_assets": 883,
+  "budget": {"peak_additional_allocated_bytes": 2147483648, "total_allocated_bytes": 8589934592},
+  "no_new_runtime_or_model": true
+}

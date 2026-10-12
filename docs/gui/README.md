@@ -1,4 +1,11 @@
-# Windows desktop app — pilot stage between 7 and 8
+# Windows desktop app — configured library membership
+
+Step 8 extends this same app with bounded pages, lazy thumbnails, manual updates,
+resumable processing and versioned catalog/index publication. Current operations,
+approved membership/storage limits and worker ownership are documented in
+[`../library-updates.md`](../library-updates.md). Historical pilot verification
+below remains evidence for the earlier GUI milestone; it is not full-library
+coverage or owner approval.
 
 Double-click `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs`.
 It opens a normal, resizable Windows window without an extra terminal. The
@@ -8,9 +15,11 @@ installs packages, downloads weights, scans assets or rebuilds data.
 
 ## Using the app
 
-The initial grid contains the approved pilot, with its actual membership and
+The initial grid contains a bounded page of the published approved membership, with its actual membership and
 counts supplied by the backend. The full inventory count is context, not browse
 authorization. Names, packs, thumbnails and fault/review flags remain distinct.
+Previous/Next page browse forty cards at a time; existing previews load only near
+the viewport. The app shows published coverage separately from processing work.
 Select a card for a larger preview and source/evidence detail. Preview selection
 is explicit: a missing or faulty requested view produces a reason, not another
 image. Source-format selection verifies that export and shows its original path;
@@ -18,14 +27,14 @@ image. Source-format selection verifies that export and shows its original path;
 
 Enter a description or filename and press **Enter** or **Search**. The default
 mode is explicitly `keyword_description`. **Clear** resets query, filters and
-mode, restoring full pilot browsing without starting the model. With an empty
+mode, restoring paged library browsing without starting the model. With an empty
 query, Enter browses using the selected filters rather than issuing an empty
 semantic search. Pack, source format, maximum triangles and rigged filters reuse
 the existing verified backend policy. Technical filters require inspected facts
 for the requested format; unknowns do not qualify.
 
 **Filters & search options** exposes the existing keyword, description, image,
-combined and reference modes. Reference search uses an existing pilot asset ID
+combined and reference modes. Reference search uses an existing library asset ID
 and a known view; there is no upload or arbitrary path input. Image-related modes
 are requested explicitly. Searches show the same compact shortlist as MCP, up to
 five candidates with identical order and shared cap/truncation. Suggestions can
@@ -35,7 +44,7 @@ percentages and the app has no universal similarity threshold or semantic fallba
 **Copy search settings** copies the completed search's exact MCP `search_assets`
 argument JSON, including explicit mode, filters and limit. It does not copy later
 unsent edits. An agent must submit that object against the same catalog/index
-version. Full catalog/index/pilot SHA-256 values are available in the footer
+version. Full catalog/index/membership SHA-256 values are available in the footer
 description/tooltip and retained verification receipts. Versions are not added
 as invalid extra fields to the tool argument object.
 
@@ -137,8 +146,8 @@ overwrite prior runs; select a fresh `--run-name` for a deliberately requested c
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/verify-gui-truncation.py --run-name new-cap-run
 ```
 
-This stage does not import, edit, refresh, watch, process or expand assets. It does
-not add full-library classification, game integration, agent registrations, hosting or cloud
-inference. Step 8 remains necessary for reliable incremental updates and full-library
-processing, under separate authorization. Bruno's usability, artistic suitability
-and comprehensive accessibility review remain separate owner decisions.
+The historical GUI milestone did not expand or process assets. Step 8 now adds
+manual scan/process/refresh/status operations under its separate approved contract.
+Classification, game integration, new agent registrations, hosting and cloud
+inference remain outside scope. Bruno's usability, artistic suitability and
+comprehensive accessibility review remain separate owner decisions.

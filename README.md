@@ -1,10 +1,11 @@
 # Local Asset Library
 
-Steps 2–7 provide a read-only inventory, SQLite/FTS5 search, a reproducible
-40-asset pilot, technical inspection, multi-view Blender renders and local
-vision descriptions and verified text/image embedding search of the pilot.
-The bounded pilot is approved and local MCP agent access is implemented; real
-client results and remaining verification faults are recorded below and in progress.
+The library provides read-only inventory, SQLite/FTS5 and semantic search,
+technical inspection, multi-view Blender rendering, local visual descriptions,
+a Windows app and shared MCP access. Step 8 adds explicitly configured membership,
+resumable incremental stages, bounded browsing and atomic catalog/index publication.
+See [current operations](docs/library-updates.md) and [progress](docs/progress.md).
+Earlier forty-asset pilot measurements and real-agent evidence remain preserved.
 
 The source collection is read only:
 `C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs`.
@@ -80,7 +81,8 @@ counterparts, and writes only `data/catalog.sqlite`, `data/reports/` and
 `data/evidence/`. It inventories supplied images and parses dependency references;
 it does not import models, render or execute embedded scripts. `scan` rebuilds the
 step 2 catalog transactionally and refuses to replace later-stage metadata or
-owner corrections. Refresh/migration support is reserved for step 8.
+owner corrections. That historical scanner is retained; Step 8's coordinator
+stages scans and preserves downstream results and owner overlays.
 
 `search` treats input as literal keyword terms joined with AND; it supports camel
 case and punctuation-separated names. Default limit is five logical assets,
@@ -183,7 +185,8 @@ processing.
 ## Step 5: pilot embedding search
 
 The original `search 'apple'` command remains the full-catalog filename baseline.
-Explicit modes use only the existing 40-asset pilot. See
+Explicit modes now use configured published membership; the following measurements
+record the original forty-asset pilot. See
 [embedding contract](docs/embedding-contract.md), [measurement evidence](docs/embedding-evidence.json)
 and [progress](docs/progress.md) for versions, faults and limitations.
 
@@ -234,5 +237,12 @@ records. Search settings can be copied as exact MCP argument JSON.
 
 See [desktop usage and runtime ownership](docs/gui/README.md) and
 [verification summary](docs/gui/verification.json). This is an additional stage
-between steps 7 and 8. Full-library processing and incremental updates remain
-separately authorized step 8 work; owner usability approval remains pending.
+between steps 7 and 8. Step 8's separately approved update/expansion path is now
+documented below; owner usability approval remains pending.
+## Current library operations
+
+Step 8 extends the existing Windows app and shared MCP backend to explicitly
+configured membership, resumable stages, bounded browsing and atomic publication.
+See [library updates](docs/library-updates.md) for manual scan/process/refresh/status,
+approved budgets, identity rules, worker coordination and current evidence paths.
+Earlier forty-asset results above remain historical pilot evidence.

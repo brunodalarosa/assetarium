@@ -61,6 +61,16 @@ growth of 500 MiB or more or exceeding that target at the mandatory plan checkpo
 Store one copy of each model revision in shared storage and reference source assets
 instead of copying them. Preserve useful evidence, including fault evidence.
 
+For Step 8, Bruno approved the existing eight-pack, 883-asset collection with
+up to 2 GiB additional peak unique allocation and an 8 GiB project ceiling,
+excluding external originals and shared weights. This approval is specific to
+the configured membership; editing a plan or membership file is not approval
+for further expansion. Processing uses the existing four runtimes and shared
+models, with fresh base-Python receipts before bulk work, after each bounded
+batch and after publication. Current measured coverage, retained storage and
+runtime evidence are recorded in `docs/step8-verification.json` and
+`docs/progress.md`. Historical 20 GiB estimates are not a current allowance.
+
 The approved one-time `scripts/reduce-storage.py` operation consolidates only
 matching files of at least 1 MiB in the two installed `torch/lib` directories.
 It checks SHA-256 before and after creating each link, uses atomic replacement,

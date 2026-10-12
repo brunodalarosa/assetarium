@@ -95,11 +95,32 @@ class DesktopBridge:
     def context(self):
         return self._wait(self._present(self._service.context))
 
-    def browse(self, filters=None):
-        return self._wait(self._present(self._service.browse, filters))
+    def browse(self, filters=None, offset=0, page_size=40):
+        return self._wait(self._present(self._service.browse, filters, offset, page_size))
 
-    def asset(self, asset_id, source_format=None, preview_view='three_quarter'):
-        return self._wait(self._present(self._service.asset, asset_id, source_format, preview_view))
+    def asset(self, asset_id, source_format=None, preview_view='three_quarter', expected_version=None):
+        return self._wait(self._present(self._service.asset, asset_id, source_format, preview_view, expected_version))
+
+    def thumbnail(self, asset_id, expected_version=None):
+        return self._wait(self._present(self._service.thumbnail, asset_id, expected_version))
+
+    def operation(self, operation, dry_run=True):
+        if operation not in {'scan', 'process', 'refresh', 'status'} or type(dry_run) is not bool:
+            return {'status': 'faulty', 'reason': 'Invalid manual library operation'}
+        if operation=='status':
+            return self.context()
+        command = [str(self._config.project_root / '.venv/Scripts/python.exe'),
+                   str(self._config.project_root / 'scripts/library-batch.py'), operation]
+        if dry_run:
+            command.append('--dry-run')
+        try:
+            process = subprocess.Popen(command, cwd=self._config.project_root,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            return {'status': 'started', 'operation': operation, 'pid': process.pid,
+                    'evidence': 'data/library/operations/; use Status for coverage'}
+        except OSError as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
 
     async def _search(self, arguments):
         validate('search_assets', arguments)

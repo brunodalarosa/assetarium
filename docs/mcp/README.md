@@ -1,9 +1,13 @@
 # Local agent access — step 7
 
 This server exposes exactly `search_assets` and `get_asset`, using local STDIO.
-It serves only the approved forty-asset pilot. It has no HTTP listener, export
-tool, arbitrary-path input, copy operation, or source-writing API. Stop before
-step 8; pilot approval is not full-library approval.
+Step 8 generalizes membership to the explicitly approved configured library and
+pins each request to one published catalog/index generation. It has no HTTP
+listener, export tool, arbitrary-path input, copy operation or source-writing API.
+The historical forty-asset pilot approval remains preserved; current expansion
+authorization and operations are in [`../library-updates.md`](../library-updates.md).
+Restart pre-update server connections to load the new membership/version/lease
+behavior. No client registration or unrelated process is changed.
 
 Bruno's current client decision is **Codex for now**. OpenCode completion is not
 required for current use, and further OpenCode work is on hold pending his
@@ -31,7 +35,7 @@ contracts, offline weights and CUDA BF16. Its output is private JSON IPC; all
 diagnostics use stderr. There is no automatic fallback/restart after a failed
 worker, model initialization, or unchanged failed query.
 
-The server entry point cannot process more assets, scan/update the catalog, load
+The server entry point cannot process assets, scan/update the catalog, load
 remote images, or import into Play Shapes. Existing generated captions and
 relevance labels remain distinct from measured metadata and owner artistic
 approval.
@@ -162,5 +166,6 @@ See `client-results.json`, `owner-review.json`, `preservation.json` and
 `../progress.md` for real outcomes and current limitations. Owner labels were
 validated and quality recomputed only from saved first-repeat rankings; frozen
 step 6 artifacts were preserved. The current session supplies the explicit
-bounded pilot decision. Next step is separate authorization for step 8, not an
-automatic continuation.
+bounded pilot decision recorded in those historical receipts. Step 8 received
+separate scope and runtime/storage approval; its current contract and coverage
+are documented in `../library-updates.md` and `../progress.md`.

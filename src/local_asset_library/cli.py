@@ -4,6 +4,10 @@ import argparse
 import json
 from pathlib import Path
 import sqlite3
+import os
+import subprocess
+import sys
+from contextlib import nullcontext
 
 import numpy as np
 
@@ -16,7 +20,9 @@ def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Read-only source inventory and local asset search")
     parser.add_argument("--config", type=Path, default=root / "config.example.toml")
-    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet", "embed-index", "detail"])
+    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet", "embed-index", "detail", "process", "refresh", "status"])
+    parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'], default='inspection')
     parser.add_argument("value", nargs="?")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--selection", type=Path, default=root / "docs/pilot-selection.json")
@@ -35,6 +41,49 @@ def main() -> int:
     args = parser.parse_args()
     try:
         config = load_config(args.config, root)
+        if args.command=='embed-index' and (root/'docs/library-membership.json').exists():
+            raise ConfigError('Use library-batch.py process for coordinated incremental indexing')
+        if args.command == 'process' and not args.dry_run:
+            runtime = {'inspection':'mcp','caption':'caption','embeddings':'embedding'}[args.stage]
+            expected = root / ('.venv-' + runtime)
+            if os.environ.get('UV_PROJECT_ENVIRONMENT') != str(expected):
+                command = ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
+                    str(root / 'scripts' / (runtime + '-runtime.ps1')), 'run','--locked','--no-sync','--offline',
+                    '--project',str(root / 'runtime' / runtime),'python','-m','local_asset_library.cli',*sys.argv[1:]]
+                return subprocess.run(command,cwd=root,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0).returncode
+        if args.command in {'scan', 'process', 'refresh', 'status'} and (root / 'docs/library-membership.json').exists():
+            from .incremental import refresh, process, coverage, publish, working
+            if args.command == 'scan':
+                result = refresh(config, args.dry_run)
+            elif args.command == 'status':
+                result = coverage(working(config))
+            elif args.command == 'refresh':
+                result = {'dry_run': True, 'coverage': coverage(working(config))} if args.dry_run else publish(config)
+            else:
+                from .gpu_queue import lease
+                if args.dry_run or args.stage == 'inspection':
+                    result = process(config, args.stage, args.limit, dry_run=args.dry_run, resolution=args.resolution)
+                else:
+                    with lease(config, 'batch-' + args.stage):
+                        if args.stage == 'caption':
+                            from .caption_backend import QwenBackend
+                            backend = QwenBackend(config, json.loads((root / 'docs/caption-model.json').read_text(encoding='utf-8')))
+                        else:
+                            from .embedding_backend import EmbeddingBackend
+                            backend = EmbeddingBackend(config)
+                        try:
+                            result = process(config, args.stage, args.limit, backend=backend)
+                        finally:
+                            if args.stage == 'caption':
+                                backend.close()
+                            if hasattr(backend,'model'):
+                                backend.model.to('cpu')
+                                backend.model=None
+                                import gc
+                                gc.collect()
+                                backend.torch.cuda.empty_cache()
+            print(json.dumps({k: v for k, v in result.items() if k != 'outcomes'}, ensure_ascii=False))
+            return 0
         if args.command in {"embed-index", "detail"} or (args.command == "search" and args.mode):
             from .retrieval import SearchEngine, index_pilot, resolved_detail
             if args.command == "detail":
@@ -45,14 +94,31 @@ def main() -> int:
                 result = {k: v for k, v in report.items() if k != "outcomes"}
             else:
                 backend = None
+                from .gpu_queue import lease
+                owned = lease(config,'search-cli',timeout=5) if args.mode!='keyword' else nullcontext()
                 if args.mode != "keyword":
-                    from .embedding_backend import EmbeddingBackend
-                    backend = EmbeddingBackend(config)
+                    owned.__enter__()
+                    try:
+                        from .embedding_backend import EmbeddingBackend
+                        backend = EmbeddingBackend(config)
+                    except BaseException:
+                        owned.__exit__(*sys.exc_info())
+                        raise
                 filters = {k: v for k, v in {"pack": args.pack, "format": args.source_format,
                            "max_triangles": args.max_triangles,
                            "rigged": None if args.rigged is None else args.rigged == "yes"}.items() if v is not None}
-                result, evidence = SearchEngine(config, backend).search(args.value or "", args.mode,
-                                  args.reference, filters, args.limit, args.min_similarity)
+                try:
+                    result, evidence = SearchEngine(config, backend).search(args.value or "", args.mode,
+                                      args.reference, filters, args.limit, args.min_similarity)
+                finally:
+                    if args.mode!='keyword':
+                        if backend is not None:
+                            backend.model.to('cpu')
+                            backend.model=None
+                            import gc
+                            gc.collect()
+                            backend.torch.cuda.empty_cache()
+                        owned.__exit__(None,None,None)
                 from .catalog import save_json
                 save_json(config.output_path("data", args.rankings_output or "embeddings/last-search.json"), evidence)
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))

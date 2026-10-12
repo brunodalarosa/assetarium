@@ -1273,3 +1273,98 @@ this documentation update. Both copies of all four documents are byte-identical;
 Markdown fences and affected prompt references were checked. Receipt:
 data/plan-updates/gui-caption-remaining-stages.json. No implementation/runtime,
 asset, catalog/index or owner-review data changed.
+
+## Step 8 — reliable updates and expanded backend/GUI (October 12, 2026)
+
+Bruno approved the eight-pack, 883-asset scope and implementation/storage plan,
+then approved the corrected 4–6-hour batch estimate and requested completion
+without further confirmation. The earlier 1.5–3-hour batch estimate was an
+arithmetic error; no bulk processing began before its correction/approval.
+No subagents, original-pack/Play Shapes edits, dependency/model installation,
+client-registration changes, optional classification or clustering were performed.
+
+Implemented explicit bounded membership, persistent stage/vector checkpoints,
+input-specific invalidation, isolated faults, deletion/rename identity rules,
+preserved owner overlays and immutable transactional catalog/index generations.
+The original forty-asset pilot results/evidence remain preserved. GUI browsing
+is paged to forty cards, thumbnails load near the viewport with three-request
+concurrency, and selection/filters/keyboard access survive updates. Opening
+remains lightweight. Manual scan/process/refresh/status and dry runs are
+documented in docs/library-updates.md; current contract is
+docs/library-membership.json. GPU leases coordinate owned workers; models unload
+for queued peers/batches, while browse/keyword/detail remain available.
+
+Actual membership: **883 assets, eight packs**. Stage coverage: `{"inventory": {"complete": 883}, "inspection": {"complete": 883}, "previews": {"complete": 883}, "caption": {"complete": 514, "failed": 369}, "embeddings": {"complete": 505, "partial": 378}}`.
+Vectors: `{"description": 514, "image": 3830}`. Caption quality: `{"clear": 484, "fault": 369, "warning": 14, "review_note": 16}`.
+Owner states: `{"pending": 883}`. Per-pack/stage counts, usable partial
+results, source faults, pending AI reviews, caption notes/warnings and failures
+are separately recorded in docs/step8-verification.json. Failed captions retain
+raw canonical attempts and reasons; none were retried or manufactured.
+
+Actual stage batch durations (seconds): `{"caption": 8553.721718200191, "embeddings": 621.7863518999075, "inspection": 5037.390167300124}`. These exclude
+some wrapper/model-load, status, storage and publication overhead. Before/after
+and per-batch fresh base-Python receipts are under data/storage/step8-*.json.
+Peak measured project allocation: **6.397 GiB**;
+latest: **6.397 GiB**, excluding external
+originals/shared weights, below the approved 8 GiB full-library ceiling.
+
+Verification: synthetic source/dependency changes, deletions, renames, metadata
+and vector corruption, interruption/resume, owner overlays, measured-filter
+boundaries and input/contract changes. Native 316-asset fixtures checked lazy
+pages, detail, keyboard handlers, resizing and a live STDIO/GUI publication
+update. Enlarged real GUI and all-mode actual GUI/MCP checks: **passed /
+passed**. Full original SHA-256/size/mtime and protected pilot
+field/image checks: **passed**, 4938
+source entries. No-change processing/publication: **passed**, no
+render/caption/embedding inference. Test receipt counts overlap and are not
+added as distinct tests. Exact receipts and remaining limits are versioned in
+docs/step8-verification.json.
+
+Application/check faults were corrected with their original receipts retained:
+native GUI membership lookup and narrow-header overflow; stable SQLite content
+comparison for no-change publication; Windows native-library initialization
+before the worker input thread; and Windows manifest file-sharing races. These
+were application/test defects, not retries/repairs of faulty original assets.
+No owner caption/artistic/usability/accessibility approval is granted by these
+technical checks. Reopen the app/restart pre-update MCP connections. Checked
+local commit only; no push. Step 9 remains optional and unimplemented.
+
+| Pack | Assets | Inspected | Valid captions | Caption failures | Complete / partial index | Notes / warnings | Source faults | Owner pending |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| kenney_car-kit | 50 | 50 | 17 | 33 | 17 / 33 | 2 / 2 | 5 | 50 |
+| kenney_city-kit-roads | 95 | 95 | 44 | 51 | 44 / 51 | 2 / 2 | 8 | 95 |
+| kenney_food-kit | 200 | 200 | 111 | 89 | 111 / 89 | 3 / 2 | 55 | 200 |
+| kenney_furniture-kit | 140 | 140 | 86 | 54 | 77 / 63 | 2 / 1 | 33 | 140 |
+| kenney_mini-forest | 22 | 22 | 11 | 11 | 11 / 11 | 1 / 3 | 3 | 22 |
+| quaternius_ultimate-food-pack | 103 | 103 | 65 | 38 | 65 / 38 | 3 / 1 | 0 | 103 |
+| quaternius_ultimate-house-interior-pack | 123 | 123 | 72 | 51 | 72 / 51 | 1 / 2 | 1 | 123 |
+| quaternius_ultimate-nature-pack | 150 | 150 | 108 | 42 | 108 / 42 | 2 / 1 | 1 | 150 |
+
+Bulk coordinator elapsed: **4.27 hours**, within the revised
+4–6-hour processing estimate. Measured final query ranges, including startup and
+GPU handoffs: `{"gui": {"minimum_seconds": 2.7506359000108205, "maximum_seconds": 13.873629799985792}, "mcp": {"minimum_seconds": 2.786964699975215, "maximum_seconds": 14.27538479998475}}`. Native next-page time was
+**0.593 seconds**; the window remained available during search.
+The older two-second warm-search target is not met by these enlarged queries.
+Original failed application/test receipts remain retained, including the base
+runtime without Pillow and an incomplete interruption-status fixture. The
+prepared-runtime suite passed 197 tests, and the corrected
+interruption-status subset passed separately.
+
+Caption failures are generation/schema failures, distinct from visual review
+notes and warnings. Retained attempt evidence contains 322 word-length errors,
+46 identity/certainty inconsistencies and two suggested-use errors. Those are
+attempt-reason occurrences, including preserved historical pilot attempts,
+rather than 370 newly failed assets. The index retains 369 failed description
+jobs and 31 failed image jobs separately from its 4,344 successful vectors.
+All 883 assets retain usable partial results. Source-fault flags affect 106
+assets; detailed evidence contains 137 overlapping-face findings and one missing
+texture reference. These faults and their original evidence remain visible.
+
+Measured caption GPU peaks were 4.407 GiB allocated / 4.514 GiB reserved;
+embedding peaks were 0.910 / 0.957 GiB. Caption process peak sampled RSS was
+4.685 GiB. Leases serialized inference; cooperating owned workers unloaded for
+queued peers, and final GUI/MCP verification workers exited cleanly. Final
+unique project allocation was 6,868,475,992 bytes (6.397 GiB), about 0.764 GiB
+above the before-bulk receipt, below both the approved growth and total limits.
+No new runtime, dependency, weight copy, source copy or destructive cleanup
+was needed. No further full-library accuracy/owner approval is inferred.

@@ -1,0 +1,2316 @@
+{
+  "stage": 8,
+  "date": "2026-10-12T18:33:19.150356+00:00",
+  "status": "implemented_and_processed_with_preserved_faults",
+  "scope": {
+    "membership": 883,
+    "packs": 8,
+    "generation": "v_19d9f8ef27e64ed584732f7736011e23",
+    "subagents": false,
+    "source_edits": false,
+    "models_or_dependencies_installed": false,
+    "play_shapes_modified": false,
+    "step9_implemented": false
+  },
+  "approval": {
+    "scope": "Bruno: Yes",
+    "implementation": "Bruno: Approved",
+    "revised_batch_runtime": "Bruno: Yes. Proceed and do not ask more confirmations for this task.",
+    "estimated_total_hours": [
+      6,
+      10
+    ],
+    "revised_bulk_hours": [
+      4,
+      6
+    ],
+    "peak_additional_allocated_bytes": 2147483648,
+    "total_allocated_ceiling_bytes": 8589934592
+  },
+  "coverage": {
+    "membership": 883,
+    "generation": "v_19d9f8ef27e64ed584732f7736011e23",
+    "packs": {
+      "kenney_city-kit-roads": {
+        "assets": 95,
+        "stages": {
+          "inventory": {
+            "complete": 95
+          },
+          "inspection": {
+            "complete": 95
+          },
+          "previews": {
+            "complete": 95
+          },
+          "caption": {
+            "complete": 44,
+            "failed": 51
+          },
+          "embeddings": {
+            "complete": 44,
+            "partial": 51
+          }
+        },
+        "captions": {
+          "clear": 40,
+          "fault": 51,
+          "warning": 2,
+          "review_note": 2
+        },
+        "owner_review": {
+          "pending": 95
+        },
+        "usable_partial_results": 95,
+        "source_faults": 8,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 90,
+          "technically_reviewed": 5
+        }
+      },
+      "quaternius_ultimate-house-interior-pack": {
+        "assets": 123,
+        "stages": {
+          "inventory": {
+            "complete": 123
+          },
+          "inspection": {
+            "complete": 123
+          },
+          "previews": {
+            "complete": 123
+          },
+          "caption": {
+            "complete": 72,
+            "failed": 51
+          },
+          "embeddings": {
+            "complete": 72,
+            "partial": 51
+          }
+        },
+        "captions": {
+          "clear": 69,
+          "fault": 51,
+          "review_note": 1,
+          "warning": 2
+        },
+        "owner_review": {
+          "pending": 123
+        },
+        "usable_partial_results": 123,
+        "source_faults": 1,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 118,
+          "technically_reviewed": 5
+        }
+      },
+      "quaternius_ultimate-food-pack": {
+        "assets": 103,
+        "stages": {
+          "inventory": {
+            "complete": 103
+          },
+          "inspection": {
+            "complete": 103
+          },
+          "previews": {
+            "complete": 103
+          },
+          "caption": {
+            "complete": 65,
+            "failed": 38
+          },
+          "embeddings": {
+            "complete": 65,
+            "partial": 38
+          }
+        },
+        "captions": {
+          "clear": 61,
+          "fault": 38,
+          "review_note": 3,
+          "warning": 1
+        },
+        "owner_review": {
+          "pending": 103
+        },
+        "usable_partial_results": 103,
+        "source_faults": 0,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 98,
+          "technically_reviewed": 5
+        }
+      },
+      "quaternius_ultimate-nature-pack": {
+        "assets": 150,
+        "stages": {
+          "inventory": {
+            "complete": 150
+          },
+          "inspection": {
+            "complete": 150
+          },
+          "previews": {
+            "complete": 150
+          },
+          "caption": {
+            "complete": 108,
+            "failed": 42
+          },
+          "embeddings": {
+            "complete": 108,
+            "partial": 42
+          }
+        },
+        "captions": {
+          "clear": 105,
+          "warning": 1,
+          "fault": 42,
+          "review_note": 2
+        },
+        "owner_review": {
+          "pending": 150
+        },
+        "usable_partial_results": 150,
+        "source_faults": 1,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 145,
+          "technically_reviewed": 5
+        }
+      },
+      "kenney_furniture-kit": {
+        "assets": 140,
+        "stages": {
+          "inventory": {
+            "complete": 140
+          },
+          "inspection": {
+            "complete": 140
+          },
+          "previews": {
+            "complete": 140
+          },
+          "caption": {
+            "complete": 86,
+            "failed": 54
+          },
+          "embeddings": {
+            "complete": 77,
+            "partial": 63
+          }
+        },
+        "captions": {
+          "clear": 83,
+          "fault": 54,
+          "warning": 1,
+          "review_note": 2
+        },
+        "owner_review": {
+          "pending": 140
+        },
+        "usable_partial_results": 140,
+        "source_faults": 33,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 135,
+          "technically_reviewed": 5
+        }
+      },
+      "kenney_food-kit": {
+        "assets": 200,
+        "stages": {
+          "inventory": {
+            "complete": 200
+          },
+          "inspection": {
+            "complete": 200
+          },
+          "previews": {
+            "complete": 200
+          },
+          "caption": {
+            "failed": 89,
+            "complete": 111
+          },
+          "embeddings": {
+            "partial": 89,
+            "complete": 111
+          }
+        },
+        "captions": {
+          "fault": 89,
+          "clear": 106,
+          "warning": 2,
+          "review_note": 3
+        },
+        "owner_review": {
+          "pending": 200
+        },
+        "usable_partial_results": 200,
+        "source_faults": 55,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 195,
+          "technically_reviewed": 5
+        }
+      },
+      "kenney_car-kit": {
+        "assets": 50,
+        "stages": {
+          "inventory": {
+            "complete": 50
+          },
+          "inspection": {
+            "complete": 50
+          },
+          "previews": {
+            "complete": 50
+          },
+          "caption": {
+            "failed": 33,
+            "complete": 17
+          },
+          "embeddings": {
+            "partial": 33,
+            "complete": 17
+          }
+        },
+        "captions": {
+          "fault": 33,
+          "warning": 2,
+          "review_note": 2,
+          "clear": 13
+        },
+        "owner_review": {
+          "pending": 50
+        },
+        "usable_partial_results": 50,
+        "source_faults": 5,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 45,
+          "technically_reviewed": 5
+        }
+      },
+      "kenney_mini-forest": {
+        "assets": 22,
+        "stages": {
+          "inventory": {
+            "complete": 22
+          },
+          "inspection": {
+            "complete": 22
+          },
+          "previews": {
+            "complete": 22
+          },
+          "caption": {
+            "failed": 11,
+            "complete": 11
+          },
+          "embeddings": {
+            "partial": 11,
+            "complete": 11
+          }
+        },
+        "captions": {
+          "fault": 11,
+          "clear": 7,
+          "warning": 3,
+          "review_note": 1
+        },
+        "owner_review": {
+          "pending": 22
+        },
+        "usable_partial_results": 22,
+        "source_faults": 3,
+        "stage_faults": 0,
+        "caption_ai_review": {
+          "pending": 17,
+          "technically_reviewed": 5
+        }
+      }
+    }
+  },
+  "stages": {
+    "inventory": {
+      "complete": 883
+    },
+    "inspection": {
+      "complete": 883
+    },
+    "previews": {
+      "complete": 883
+    },
+    "caption": {
+      "complete": 514,
+      "failed": 369
+    },
+    "embeddings": {
+      "complete": 505,
+      "partial": 378
+    }
+  },
+  "vectors": {
+    "description": 514,
+    "image": 3830
+  },
+  "vector_jobs": [
+    {
+      "channel": "description",
+      "status": "complete",
+      "count": 514
+    },
+    {
+      "channel": "description",
+      "status": "failed",
+      "count": 369
+    },
+    {
+      "channel": "image",
+      "status": "complete",
+      "count": 3830
+    },
+    {
+      "channel": "image",
+      "status": "failed",
+      "count": 31
+    }
+  ],
+  "caption_quality": {
+    "clear": 484,
+    "fault": 369,
+    "warning": 14,
+    "review_note": 16
+  },
+  "owner_reviews": {
+    "pending": 883
+  },
+  "source_fault_kinds": {
+    "overlapping_duplicate_faces": 137,
+    "missing_texture_reference": 1
+  },
+  "caption_failure_reasons": {
+    "Description must have 60-170 words; aim for 80-150": 322,
+    "Unknown identity cannot have probable certainty; use uncertain or unknown and record why": 46,
+    "Suggested use in visual observations": 2
+  },
+  "processing": {
+    "bulk_elapsed_seconds": 15375.670053720474,
+    "bulk_receipt": "data\\library\\operations\\05f20af242f34a5b8a366bda31e1c687\\result.json",
+    "stage_batch_seconds": {
+      "caption": 8553.721718200191,
+      "embeddings": 621.7863518999075,
+      "inspection": 5037.390167300124
+    },
+    "batch_counts": {
+      "caption": 18,
+      "embeddings": 6,
+      "inspection": 18
+    },
+    "resource_peaks": {
+      "caption": {
+        "cuda_peak_allocated_bytes": 4731945984,
+        "cuda_peak_reserved_bytes": 4846518272,
+        "process_peak_rss_bytes_sampled": 5030383616
+      },
+      "embeddings": {
+        "cuda_peak_allocated_bytes": 977121792,
+        "cuda_peak_reserved_bytes": 1027604480,
+        "rss_bytes": 2469363712
+      },
+      "inspection": {}
+    },
+    "method": "Actual job batch durations; wrapper startup/model loads/verification outside stage timers add elapsed time. Allocator/RSS measurements are process-level."
+  },
+  "storage": {
+    "receipts": [
+      {
+        "receipt": "data/storage/step8-before-implementation-verification.json",
+        "allocated_bytes": 6018353696,
+        "mtime": 1791781854.9723754
+      },
+      {
+        "receipt": "data/storage/step8-before-bulk-b92401a439914c4ba90aa32b95327a75.json",
+        "allocated_bytes": 6047950304,
+        "mtime": 1791813714.588634
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-60a3a92bf08646b792d570a174da08bd.json",
+        "allocated_bytes": 6060624064,
+        "mtime": 1791814113.8902688
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-62f0e15bb6c94ecfa4a6d7d142870b42.json",
+        "allocated_bytes": 6149649896,
+        "mtime": 1791814480.3198588
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-ac2a5e632ac944759ab656ab26128604.json",
+        "allocated_bytes": 6171481024,
+        "mtime": 1791814831.9725187
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-531a4ff935444257a146abd6af46169f.json",
+        "allocated_bytes": 6223160872,
+        "mtime": 1791815173.1874485
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-b533670f0b7145f08b40c5237b3d8d79.json",
+        "allocated_bytes": 6236269864,
+        "mtime": 1791815492.1647608
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-3cfbd07cff8f4a8b8e975798fcf6a3b5.json",
+        "allocated_bytes": 6249604120,
+        "mtime": 1791815834.240271
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-5675fd5517d64445aabd3cb2a3a6def8.json",
+        "allocated_bytes": 6277194280,
+        "mtime": 1791816187.68388
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-c3e814c59a7d416b8f16d733f92c3adf.json",
+        "allocated_bytes": 6323227472,
+        "mtime": 1791816533.7424629
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-0e75278dac334a7b85d10ae3b8574dab.json",
+        "allocated_bytes": 6344123168,
+        "mtime": 1791816822.5836563
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-b07fae3187c84621b6c9ff1fccca1c84.json",
+        "allocated_bytes": 6379995784,
+        "mtime": 1791817107.3704233
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-4ed828f5984944e8a5bfb1ad05cc0037.json",
+        "allocated_bytes": 6443089448,
+        "mtime": 1791817396.2982652
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-d265618b16b641b3ba2afea2a3a6a734.json",
+        "allocated_bytes": 6455963176,
+        "mtime": 1791817673.186643
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-da9d437e65d94f168c79ec9146a319ad.json",
+        "allocated_bytes": 6469479216,
+        "mtime": 1791817957.2714942
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-cb077380f0864ca482073b556dd7bdd9.json",
+        "allocated_bytes": 6497135176,
+        "mtime": 1791818238.398646
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-c280f045aa89495693459de0a202cd76.json",
+        "allocated_bytes": 6510253528,
+        "mtime": 1791818516.477553
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-1861b0ae1e1a4df89dfe6dd8f3372248.json",
+        "allocated_bytes": 6537312896,
+        "mtime": 1791818798.7616577
+      },
+      {
+        "receipt": "data/storage/step8-inspection-batch-c4e06fa99cf544be820e6ab38b0c793a.json",
+        "allocated_bytes": 6549411376,
+        "mtime": 1791819050.6455202
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-0b022aec4fae442083a4556b0d681d8e.json",
+        "allocated_bytes": 6609912912,
+        "mtime": 1791819588.8966813
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-731e6026fa234474946a1244897404f9.json",
+        "allocated_bytes": 6674232608,
+        "mtime": 1791820123.2004163
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-7aaf9f291bc8423e83abba01e96857ca.json",
+        "allocated_bytes": 6676096768,
+        "mtime": 1791820643.072602
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-b25fe09beb5644d7b608250209ff489c.json",
+        "allocated_bytes": 6678018600,
+        "mtime": 1791821175.5313811
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-2a81bac3db0649f489279670afad63b5.json",
+        "allocated_bytes": 6679911432,
+        "mtime": 1791821725.6678295
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-e9ad0644592041c3ba2b54dd4be56292.json",
+        "allocated_bytes": 6691996704,
+        "mtime": 1791822262.2338736
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-50f75f366fb5414bbc8cabd9d0ee5d58.json",
+        "allocated_bytes": 6693873344,
+        "mtime": 1791822788.8207085
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-f183cfe130e84db5a8eb9afb8a7013f2.json",
+        "allocated_bytes": 6695770272,
+        "mtime": 1791823314.5155575
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-9756225f18c141b5a66b4c56e0916143.json",
+        "allocated_bytes": 6697675392,
+        "mtime": 1791823848.06656
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-6c9ad60b486444eeb9b6979104746373.json",
+        "allocated_bytes": 6699576416,
+        "mtime": 1791824379.0162926
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-407fd2b67cc1449dbea667fa70f13b13.json",
+        "allocated_bytes": 6701716648,
+        "mtime": 1791824934.5176327
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-4cb44957094743ea8cbcc70dcbe86594.json",
+        "allocated_bytes": 6780106504,
+        "mtime": 1791825480.7225413
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-be2bf433146a407888b838453313fbf1.json",
+        "allocated_bytes": 6782033120,
+        "mtime": 1791826019.672858
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-585c621e4d554618bc9f98c54a7d874d.json",
+        "allocated_bytes": 6783971008,
+        "mtime": 1791826577.0000718
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-f0aec28e44bf4369b1337f4c27a001df.json",
+        "allocated_bytes": 6785851552,
+        "mtime": 1791827152.5448294
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-93ffe547acad40e39a9844d9efc23c2c.json",
+        "allocated_bytes": 6787732096,
+        "mtime": 1791827699.0636609
+      },
+      {
+        "receipt": "data/storage/step8-caption-batch-7a79ebbcbdfe46799a0278897057c152.json",
+        "allocated_bytes": 6789365704,
+        "mtime": 1791828177.316563
+      },
+      {
+        "receipt": "data/storage/step8-embeddings-batch-0bd9e564017d4b04ba415dcc3b723abd.json",
+        "allocated_bytes": 6794322304,
+        "mtime": 1791828381.9447367
+      },
+      {
+        "receipt": "data/storage/step8-embeddings-batch-bb694ac31004430490c86fa9f8e28e04.json",
+        "allocated_bytes": 6799610512,
+        "mtime": 1791828560.7097201
+      },
+      {
+        "receipt": "data/storage/step8-embeddings-batch-f547e170224c4c6cb6a7c267ef20b8b0.json",
+        "allocated_bytes": 6805447584,
+        "mtime": 1791828739.7354367
+      },
+      {
+        "receipt": "data/storage/step8-embeddings-batch-79083a2842ba4f89bd42a83947a072cf.json",
+        "allocated_bytes": 6811767984,
+        "mtime": 1791828918.7784908
+      },
+      {
+        "receipt": "data/storage/step8-embeddings-batch-56261c348e364bc5a2daebea39d86da1.json",
+        "allocated_bytes": 6816277952,
+        "mtime": 1791829048.6718652
+      },
+      {
+        "receipt": "data/storage/step8-after-bulk-8e7f1357c06d4ad6bfcf4835031857d5.json",
+        "allocated_bytes": 6865487728,
+        "mtime": 1791829090.2607532
+      },
+      {
+        "receipt": "data/storage/step8-delivery-20261012.json",
+        "allocated_bytes": 6868475992,
+        "mtime": 1791829974.5081832
+      }
+    ],
+    "peak_allocated_bytes": 6868475992,
+    "latest_allocated_bytes": 6868475992,
+    "bulk": {
+      "before": "step8-before-bulk-b92401a439914c4ba90aa32b95327a75.json",
+      "after": "step8-after-bulk-8e7f1357c06d4ad6bfcf4835031857d5.json",
+      "before_allocated": 6047950304,
+      "after_allocated": 6865487728
+    },
+    "peak_growth_from_bulk_baseline_bytes": 820525688,
+    "method": "Unique allocated project bytes; excludes external originals and shared models"
+  },
+  "verification": {
+    "tests": [
+      {
+        "receipt": "data/step8-tests-cache.xml",
+        "tests": 24,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 23.873
+      },
+      {
+        "receipt": "data/step8-tests-complete.xml",
+        "tests": 188,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 52.248
+      },
+      {
+        "receipt": "data/step8-tests-corruption.xml",
+        "tests": 52,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 46.886
+      },
+      {
+        "receipt": "data/step8-tests-coverage.xml",
+        "tests": 47,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 18.41
+      },
+      {
+        "receipt": "data/step8-tests-delivery.xml",
+        "tests": 109,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 54.931
+      },
+      {
+        "receipt": "data/step8-tests-final-prepared.xml",
+        "tests": 197,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 56.475
+      },
+      {
+        "receipt": "data/step8-tests-final-queue.xml",
+        "tests": 44,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 25.384
+      },
+      {
+        "receipt": "data/step8-tests-final.xml",
+        "tests": 4,
+        "failures": 0,
+        "errors": 4,
+        "seconds": 0.394
+      },
+      {
+        "receipt": "data/step8-tests-input-policy.xml",
+        "tests": 68,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 57.432
+      },
+      {
+        "receipt": "data/step8-tests-interruption-status-fixed.xml",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 24.489
+      },
+      {
+        "receipt": "data/step8-tests-interruption-status.xml",
+        "tests": 27,
+        "failures": 1,
+        "errors": 0,
+        "seconds": 24.247
+      },
+      {
+        "receipt": "data/step8-tests-measured.xml",
+        "tests": 81,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 45.12
+      },
+      {
+        "receipt": "data/step8-tests-queue.xml",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 16.99
+      },
+      {
+        "receipt": "data/step8-tests-review-publication.xml",
+        "tests": 42,
+        "failures": 0,
+        "errors": 0,
+        "seconds": 20.114
+      }
+    ],
+    "native_gui": {
+      "status": "passed",
+      "receipt": "data/gui/step8-enlarged-final/report.json",
+      "checks": [
+        "Bounded 40-card page, visible-only thumbnails, <=3 thumbnail requests, no model load on startup",
+        "Next page, stable selection, arrow keyboard handler, responsive detail",
+        "Actual native resize and narrow layout without horizontal overflow",
+        "Actual GUI bridge agrees with shared service candidate IDs/order/filter/cap/version",
+        "All browsing/keyword/detail operations completed without installing, downloading or loading a model"
+      ]
+    },
+    "actual_gui_mcp_retrieval": {
+      "status": "passed",
+      "generation": "v_19d9f8ef27e64ed584732f7736011e23",
+      "membership": 883,
+      "cases": [
+        {
+          "arguments": {
+            "mode": "keyword",
+            "filters": {},
+            "limit": 5,
+            "query": "apple"
+          },
+          "ids": [
+            "asset_24e2752dbb26ecd19677091f78243709",
+            "asset_e06205888e91302badebe08dc7197c9b",
+            "asset_179bed122930b57bd7a1f575376397f4",
+            "asset_f501133cf46b1b5b0a1a614b4f09c166"
+          ],
+          "gui_seconds": 2.819469799986109,
+          "mcp_seconds": 2.786964699975215,
+          "characters": 3749,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "keyword",
+            "filters": {},
+            "limit": 5,
+            "query": "sedan sports"
+          },
+          "ids": [
+            "asset_18db4ca35f9737b123a769899bfc288e"
+          ],
+          "gui_seconds": 2.7506359000108205,
+          "mcp_seconds": 2.997662300011143,
+          "characters": 1389,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "keyword_description",
+            "filters": {},
+            "limit": 5,
+            "query": "a small red apple fruit with a leaf"
+          },
+          "ids": [
+            "asset_24e2752dbb26ecd19677091f78243709",
+            "asset_179bed122930b57bd7a1f575376397f4",
+            "asset_2ef3b71575c9ae5e9ab421c6fcd768a5",
+            "asset_f501133cf46b1b5b0a1a614b4f09c166",
+            "asset_e06205888e91302badebe08dc7197c9b"
+          ],
+          "gui_seconds": 13.873629799985792,
+          "mcp_seconds": 14.27538479998475,
+          "characters": 4604,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "keyword_description",
+            "filters": {},
+            "limit": 5,
+            "query": "a wooden chair with a curved back"
+          },
+          "ids": [
+            "asset_e21f35d1b80bc6b08cf9d7dffbc85006",
+            "asset_f4c01ecffff8071ec986e29d5cc69a1c",
+            "asset_b61ec88d53e61f0cd9ce3abffbf35ad7",
+            "asset_f3ed35b215043dacab7a58fa67380b92",
+            "asset_71e1b2e21bec512326c55240d9c5676e"
+          ],
+          "gui_seconds": 9.237007400020957,
+          "mcp_seconds": 8.815535100002307,
+          "characters": 4674,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "keyword_description",
+            "filters": {
+              "pack": "quaternius_ultimate-nature-pack",
+              "format": "blend",
+              "max_triangles": 5000,
+              "rigged": false
+            },
+            "limit": 5,
+            "query": "a low-poly green tree"
+          },
+          "ids": [
+            "asset_71e4c417d130dc3da4764c409742305b"
+          ],
+          "gui_seconds": 4.380516500037629,
+          "mcp_seconds": 4.383104599954095,
+          "characters": 1536,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "keyword_description",
+            "filters": {},
+            "limit": 5,
+            "query": "spaceship laser submarine"
+          },
+          "ids": [
+            "asset_2b5f29ae2fb4c6bab43adf6566922b0f",
+            "asset_9e31828c53606b6621dd85cdcb7deeaf",
+            "asset_98cb9d2095606e4e850dcb72823a778f",
+            "asset_4a9ff865a4bd35945838b984b33ce7a1",
+            "asset_4d9134ec5af22955d2bad9289dd789c1"
+          ],
+          "gui_seconds": 9.001061899994966,
+          "mcp_seconds": 9.049578699981794,
+          "characters": 4579,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "image",
+            "filters": {},
+            "limit": 5,
+            "query": "a red apple with a leaf"
+          },
+          "ids": [
+            "asset_24e2752dbb26ecd19677091f78243709",
+            "asset_179bed122930b57bd7a1f575376397f4",
+            "asset_e06205888e91302badebe08dc7197c9b",
+            "asset_40e1cc57e1f41498318ff9c69372d958",
+            "asset_a2decfe42ac5795cf00ad72733f52215"
+          ],
+          "gui_seconds": 10.48783379996894,
+          "mcp_seconds": 10.558667200035416,
+          "characters": 4550,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "combined",
+            "filters": {},
+            "limit": 5,
+            "query": "a red apple with a leaf"
+          },
+          "ids": [
+            "asset_24e2752dbb26ecd19677091f78243709",
+            "asset_179bed122930b57bd7a1f575376397f4",
+            "asset_e06205888e91302badebe08dc7197c9b",
+            "asset_f501133cf46b1b5b0a1a614b4f09c166",
+            "asset_40e1cc57e1f41498318ff9c69372d958"
+          ],
+          "gui_seconds": 11.302213600021787,
+          "mcp_seconds": 11.48488720000023,
+          "characters": 4629,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "description",
+            "filters": {},
+            "limit": 5,
+            "query": "a red apple with a leaf"
+          },
+          "ids": [
+            "asset_24e2752dbb26ecd19677091f78243709",
+            "asset_179bed122930b57bd7a1f575376397f4",
+            "asset_f501133cf46b1b5b0a1a614b4f09c166",
+            "asset_e06205888e91302badebe08dc7197c9b",
+            "asset_2ef3b71575c9ae5e9ab421c6fcd768a5"
+          ],
+          "gui_seconds": 8.797366100014187,
+          "mcp_seconds": 8.816084799997043,
+          "characters": 4609,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        },
+        {
+          "arguments": {
+            "mode": "reference",
+            "filters": {},
+            "limit": 5,
+            "reference_asset_id": "asset_24e2752dbb26ecd19677091f78243709",
+            "reference_view": "three_quarter"
+          },
+          "ids": [
+            "asset_24e2752dbb26ecd19677091f78243709",
+            "asset_179bed122930b57bd7a1f575376397f4",
+            "asset_e3be4cc475b68055507bf4dd8dcad565",
+            "asset_40e1cc57e1f41498318ff9c69372d958",
+            "asset_e06205888e91302badebe08dc7197c9b"
+          ],
+          "gui_seconds": 10.539489299990237,
+          "mcp_seconds": 10.93571890000021,
+          "characters": 4569,
+          "truncated": false,
+          "fault_count": 0,
+          "whole_payload_equal": true
+        }
+      ],
+      "faults": [],
+      "owner_relevance_approval": "separate",
+      "invalid_limit_rejected": true,
+      "actual_png_transport": true,
+      "server_exit": 0,
+      "gui_closed": true
+    },
+    "retrieval_latency": {
+      "gui": {
+        "minimum_seconds": 2.7506359000108205,
+        "maximum_seconds": 13.873629799985792
+      },
+      "mcp": {
+        "minimum_seconds": 2.786964699975215,
+        "maximum_seconds": 14.27538479998475
+      }
+    },
+    "originals_and_pilot": {
+      "status": "passed",
+      "original_source_entries": 4938,
+      "changed_sources": [],
+      "pilot_assets": 40,
+      "changed_pilot_fields": [],
+      "protected_pilot_outputs": [
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb8f82724d7856f4fa86b9f0759f2791\\glb\\f78ac045781137c6\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb8f82724d7856f4fa86b9f0759f2791\\glb\\f78ac045781137c6\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb8f82724d7856f4fa86b9f0759f2791\\glb\\f78ac045781137c6\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb8f82724d7856f4fa86b9f0759f2791\\glb\\f78ac045781137c6\\result.json",
+          "sha256": "523b15d64f415ef258851e857ed7df33d7c0180796c5baf401e1833c60953687",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_bb8f82724d7856f4fa86b9f0759f2791.json",
+          "sha256": "26ada70272e2ec45cc789d098fa38f71dcf39b24b9dd3aa1ddc1db8ca7395665",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_18db4ca35f9737b123a769899bfc288e\\obj\\1929c1fc9551d117\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_18db4ca35f9737b123a769899bfc288e\\obj\\1929c1fc9551d117\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_18db4ca35f9737b123a769899bfc288e\\obj\\1929c1fc9551d117\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_18db4ca35f9737b123a769899bfc288e\\obj\\1929c1fc9551d117\\result.json",
+          "sha256": "7cb5071db87c5336651ddc93a410e8aa8496ed7c28926080aa0925bf9b030a54",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_18db4ca35f9737b123a769899bfc288e.json",
+          "sha256": "6dd99a58ad9b1d9d84b9dd06ac42dc0a171c5d6b4609a5db91fb7a1e08d5a822",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_98cb9d2095606e4e850dcb72823a778f\\glb\\de0d191f6e94d830\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_98cb9d2095606e4e850dcb72823a778f\\glb\\de0d191f6e94d830\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_98cb9d2095606e4e850dcb72823a778f\\glb\\de0d191f6e94d830\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_98cb9d2095606e4e850dcb72823a778f\\glb\\de0d191f6e94d830\\result.json",
+          "sha256": "7301296ef926a868601e9751316a14eeb14f835be63a284057bdae0e0828728f",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_98cb9d2095606e4e850dcb72823a778f.json",
+          "sha256": "1d5a6a9dcf0366ff27609177b0554e61861726158ce87f7ac46a5159074be17a",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_5148b2cb0b99c0f6014f00362bc66b80\\glb\\1559c28404ce781d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_5148b2cb0b99c0f6014f00362bc66b80\\glb\\1559c28404ce781d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_5148b2cb0b99c0f6014f00362bc66b80\\glb\\1559c28404ce781d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_5148b2cb0b99c0f6014f00362bc66b80\\glb\\1559c28404ce781d\\result.json",
+          "sha256": "eb8d7cc40e95c7e4cd86b3e45eb7770680be70f38b6e23dde90c3b1066a5c7de",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_5148b2cb0b99c0f6014f00362bc66b80.json",
+          "sha256": "4243bf201c3aed2ba1914ecbd20f28bef2344eacdafa629be18840ff0467dbd6",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_34db2b054e4c4425fa36b0b7b9e00612\\glb\\bf7b63cdb50cad9d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_34db2b054e4c4425fa36b0b7b9e00612\\glb\\bf7b63cdb50cad9d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_34db2b054e4c4425fa36b0b7b9e00612\\glb\\bf7b63cdb50cad9d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_34db2b054e4c4425fa36b0b7b9e00612\\glb\\bf7b63cdb50cad9d\\result.json",
+          "sha256": "c5aa5c71beb4cdef741f823795f57a20a23e21b0f5b1fa637bd53beb0f5653ea",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_34db2b054e4c4425fa36b0b7b9e00612.json",
+          "sha256": "c1bb82665145b0035d2c4771f070187931e4b44d25a33d61a0208de7433681c8",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_faae28829d570468ee67eafc79be8aea\\glb\\dbf109b4b002967e\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_faae28829d570468ee67eafc79be8aea\\glb\\dbf109b4b002967e\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_faae28829d570468ee67eafc79be8aea\\glb\\dbf109b4b002967e\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_faae28829d570468ee67eafc79be8aea\\glb\\dbf109b4b002967e\\top.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_faae28829d570468ee67eafc79be8aea\\glb\\dbf109b4b002967e\\result.json",
+          "sha256": "9ad67e34f3a02e7f2cb8b3d1ef265b45dec354af6d218488ed8e0245071fbcef",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_faae28829d570468ee67eafc79be8aea.json",
+          "sha256": "66bb47bccd0713267eb5eac4963d33d67337e8abb24ae4362a9d6b97f48145b2",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b53529150c7b3ca331ed9ad0796458e7\\glb\\3d64cce9e9c4f7d2\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b53529150c7b3ca331ed9ad0796458e7\\glb\\3d64cce9e9c4f7d2\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b53529150c7b3ca331ed9ad0796458e7\\glb\\3d64cce9e9c4f7d2\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b53529150c7b3ca331ed9ad0796458e7\\glb\\3d64cce9e9c4f7d2\\top.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b53529150c7b3ca331ed9ad0796458e7\\glb\\3d64cce9e9c4f7d2\\result.json",
+          "sha256": "f91ae7461ccd05b964a2cd9c6f9e6fd4714667546e9dae0209fa4c0c12ebdeb0",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_b53529150c7b3ca331ed9ad0796458e7.json",
+          "sha256": "beafbfac3254eee9fb727b92a841bed3aa5aa9e9fa029d4255ce4e901d8ef241",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_061e14a040e5f441bdf031ddbdd4e795\\glb\\c861405cef40e61c\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_061e14a040e5f441bdf031ddbdd4e795\\glb\\c861405cef40e61c\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_061e14a040e5f441bdf031ddbdd4e795\\glb\\c861405cef40e61c\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_061e14a040e5f441bdf031ddbdd4e795\\glb\\c861405cef40e61c\\top.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_061e14a040e5f441bdf031ddbdd4e795\\glb\\c861405cef40e61c\\result.json",
+          "sha256": "7f20aa3a307ef24e1c09a657130d9b5573931c3df0fb026fe484229c6b06b431",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_061e14a040e5f441bdf031ddbdd4e795.json",
+          "sha256": "f0505b15c9d0c5eea19a6290a583d7c1fe011dff5fa9ad33d8f35293e3cfde05",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_2a3226839e4c059a59f91e4ac75b9b81\\glb\\591384e4b54fef6d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_2a3226839e4c059a59f91e4ac75b9b81\\glb\\591384e4b54fef6d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_2a3226839e4c059a59f91e4ac75b9b81\\glb\\591384e4b54fef6d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_2a3226839e4c059a59f91e4ac75b9b81\\glb\\591384e4b54fef6d\\result.json",
+          "sha256": "abf5f0dd327fcfb64aeba48d15560a565b5c1038ccb4fecfccc600f39dec6d36",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_2a3226839e4c059a59f91e4ac75b9b81.json",
+          "sha256": "d58101b0cd4d9e7e840b24dce5e0cf20101b20ede42abfdd765f386dc784e3ac",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b060467fa5739375588a2b4ee44d2304\\glb\\3356d41bc631cb65\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b060467fa5739375588a2b4ee44d2304\\glb\\3356d41bc631cb65\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b060467fa5739375588a2b4ee44d2304\\glb\\3356d41bc631cb65\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b060467fa5739375588a2b4ee44d2304\\glb\\3356d41bc631cb65\\result.json",
+          "sha256": "a52246340ee56de4ea3e6d5f6e2ecd80d64d07ef486801d62b90f8effd294479",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_b060467fa5739375588a2b4ee44d2304.json",
+          "sha256": "597590535d6c05af0d217dac0b27348713374cb0b088f0e8b1c15c7292b0044a",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_24e2752dbb26ecd19677091f78243709\\fbx\\a30ceb622a88a274\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_24e2752dbb26ecd19677091f78243709\\fbx\\a30ceb622a88a274\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_24e2752dbb26ecd19677091f78243709\\fbx\\a30ceb622a88a274\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_24e2752dbb26ecd19677091f78243709\\fbx\\a30ceb622a88a274\\result.json",
+          "sha256": "4896d14de0a23ec4e315683bdbfd60515331677be8860420b8b9e61ca5f90cf7",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_24e2752dbb26ecd19677091f78243709.json",
+          "sha256": "eecc7406cc58f92e3dea227783f7190b849e01a879427f149727a82eb5ed1a1a",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e06205888e91302badebe08dc7197c9b\\glb\\5863f55b37c06013\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e06205888e91302badebe08dc7197c9b\\glb\\5863f55b37c06013\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e06205888e91302badebe08dc7197c9b\\glb\\5863f55b37c06013\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e06205888e91302badebe08dc7197c9b\\glb\\5863f55b37c06013\\result.json",
+          "sha256": "d250124ec982e75c5bc9ab54516d140ba6e2500cfc4e4a40214510eae458e3f7",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_e06205888e91302badebe08dc7197c9b.json",
+          "sha256": "768178cecda4807da2c557fc07b596ad6aea068261ba4b5668acfa2c6b56193c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_d1fe6328ee90ef8149fcd50d6a1674f0\\glb\\e4111704466def7f\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_d1fe6328ee90ef8149fcd50d6a1674f0\\glb\\e4111704466def7f\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_d1fe6328ee90ef8149fcd50d6a1674f0\\glb\\e4111704466def7f\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_d1fe6328ee90ef8149fcd50d6a1674f0\\glb\\e4111704466def7f\\result.json",
+          "sha256": "8257447031ee8747ef487bbf08884bab0008fcb1aa9d62d99d3e6fd280078a9c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_d1fe6328ee90ef8149fcd50d6a1674f0.json",
+          "sha256": "d69d6cece312f6082fa1e920fe4c210be60a818860db93d19aa048f10122250f",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_13f8c678bc443c5285a0236eb6828f3f\\glb\\9eb1cc5240bd06af\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_13f8c678bc443c5285a0236eb6828f3f\\glb\\9eb1cc5240bd06af\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_13f8c678bc443c5285a0236eb6828f3f\\glb\\9eb1cc5240bd06af\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_13f8c678bc443c5285a0236eb6828f3f\\glb\\9eb1cc5240bd06af\\result.json",
+          "sha256": "237df7b1d69cbc5d7ac6acd1110c3cd7afe4d0b3f0296c981c902ced5909f27c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_13f8c678bc443c5285a0236eb6828f3f.json",
+          "sha256": "fc2e1e04d48bdddc793e8a9323ead2951ab155157b16fb31e075396cfe00b860",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_ae0ecb0785c8a290c0ad88db419ade2e\\glb\\7a1eb61c61de9b03\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_ae0ecb0785c8a290c0ad88db419ade2e\\glb\\7a1eb61c61de9b03\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_ae0ecb0785c8a290c0ad88db419ade2e\\glb\\7a1eb61c61de9b03\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_ae0ecb0785c8a290c0ad88db419ade2e\\glb\\7a1eb61c61de9b03\\result.json",
+          "sha256": "7e25ea684a842c65decd958a039c9912d65bc167d298769fc52f530da4083a37",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_ae0ecb0785c8a290c0ad88db419ade2e.json",
+          "sha256": "5bf00dc03bf0bfd8dfd90b71e63012b7633d56ecfc29806f2dfeb0ce3f580245",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3bd10e61e57a9face42b8eee053cde92\\glb\\4d07b6f3076897ec\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3bd10e61e57a9face42b8eee053cde92\\glb\\4d07b6f3076897ec\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3bd10e61e57a9face42b8eee053cde92\\glb\\4d07b6f3076897ec\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3bd10e61e57a9face42b8eee053cde92\\glb\\4d07b6f3076897ec\\result.json",
+          "sha256": "47693e610e503208f61da02d76f215419bc1a11f29a1cf64d653ca28fc34d693",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_3bd10e61e57a9face42b8eee053cde92.json",
+          "sha256": "b23feefcc4f62c0582d70dfe6b52be191b2caa7dc155fbad367c6c6e77f62aac",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e21f35d1b80bc6b08cf9d7dffbc85006\\glb\\cfc3d9d8b9559c6d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e21f35d1b80bc6b08cf9d7dffbc85006\\glb\\cfc3d9d8b9559c6d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e21f35d1b80bc6b08cf9d7dffbc85006\\glb\\cfc3d9d8b9559c6d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e21f35d1b80bc6b08cf9d7dffbc85006\\glb\\cfc3d9d8b9559c6d\\result.json",
+          "sha256": "cd49a1eeb26b0bfe94931d9b07f7850deed5c7184c3c7bf4786642f054b0fdfa",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_e21f35d1b80bc6b08cf9d7dffbc85006.json",
+          "sha256": "574ea8d5c3ee86aee699da17b82ae79e92243b98203916c7ab96cbe64266f483",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_64488980e4c88beff7761e2ab0246919\\glb\\a6a6ae67d995a5a8\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_64488980e4c88beff7761e2ab0246919\\glb\\a6a6ae67d995a5a8\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_64488980e4c88beff7761e2ab0246919\\glb\\a6a6ae67d995a5a8\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_64488980e4c88beff7761e2ab0246919\\glb\\a6a6ae67d995a5a8\\result.json",
+          "sha256": "e0f7383787ce55d2eef5ca14575f634dca8f422a51ae069e96d13167a08b9970",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_64488980e4c88beff7761e2ab0246919.json",
+          "sha256": "77334bb493b895fcdf4ee58cbedf6b0f5fda41cde12e4b6ccf981f6d6709bf9a",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_8b863f9c1e4819fd167e62485ead09d6\\glb\\ab60d995ed1d741a\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_8b863f9c1e4819fd167e62485ead09d6\\glb\\ab60d995ed1d741a\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_8b863f9c1e4819fd167e62485ead09d6\\glb\\ab60d995ed1d741a\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_8b863f9c1e4819fd167e62485ead09d6\\glb\\ab60d995ed1d741a\\result.json",
+          "sha256": "51c1622f648c1e36df8997b2226e73529b84052a1a19a8860fc1dbf37bda4d22",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_8b863f9c1e4819fd167e62485ead09d6.json",
+          "sha256": "ee87b29167a883c72b557f9de1b25bbd0ffbbcc3b0f50479e487e73be3d5c148",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_7ca797d61bf6f1824539822214686876\\glb\\646036439848d1f3\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_7ca797d61bf6f1824539822214686876\\glb\\646036439848d1f3\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_7ca797d61bf6f1824539822214686876\\glb\\646036439848d1f3\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_7ca797d61bf6f1824539822214686876\\glb\\646036439848d1f3\\result.json",
+          "sha256": "5c7ed8eeeab204695510c02e93aa9faa88b7109780bc7e165aba529681df0e19",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_7ca797d61bf6f1824539822214686876.json",
+          "sha256": "cc43144662260380505fbef929c138637a1dfa161af5c794dccb92f8197adb5a",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_445e4a2cd327c0e6ac1f60271393c4bc\\glb\\64943056d2bc617c\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_445e4a2cd327c0e6ac1f60271393c4bc\\glb\\64943056d2bc617c\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_445e4a2cd327c0e6ac1f60271393c4bc\\glb\\64943056d2bc617c\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_445e4a2cd327c0e6ac1f60271393c4bc\\glb\\64943056d2bc617c\\result.json",
+          "sha256": "25a32a21ec15bc239ea76d4eeafa0b5947780aee532a83fe3e6cf3b9c294feb3",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_445e4a2cd327c0e6ac1f60271393c4bc.json",
+          "sha256": "12cd6209376fb2ec4ec5cef2e38410a2bdae62a18714487ff996f8fd95efaa17",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_c8837d57bde3840055612a0092b965af\\glb\\914f096b18f6ecf6\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_c8837d57bde3840055612a0092b965af\\glb\\914f096b18f6ecf6\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_c8837d57bde3840055612a0092b965af\\glb\\914f096b18f6ecf6\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_c8837d57bde3840055612a0092b965af\\glb\\914f096b18f6ecf6\\result.json",
+          "sha256": "5785df403ae903511cd473b034f90a03698aebb56804bf150531bad18b279f54",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_c8837d57bde3840055612a0092b965af.json",
+          "sha256": "1ecdc26f15c97a593dfbeb4d753961d0411206b91629f8e40ca0d7c98ba241e5",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_32f538e8713841a3e776a17e1b7bdba1\\glb\\b18fd27eb5c9739d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_32f538e8713841a3e776a17e1b7bdba1\\glb\\b18fd27eb5c9739d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_32f538e8713841a3e776a17e1b7bdba1\\glb\\b18fd27eb5c9739d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_32f538e8713841a3e776a17e1b7bdba1\\glb\\b18fd27eb5c9739d\\result.json",
+          "sha256": "0023bb6fae62c11070bf26f36c12607137e4bd5a6af3af4a66b9f74eda6feb2c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_32f538e8713841a3e776a17e1b7bdba1.json",
+          "sha256": "0675c34364c7cced2c874f2e2b5f51c34ad046186b56b07d98ccfcb523a2c31c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_1fc6244aab6074afee39946e955288b9\\glb\\001a3d2d74d5fab4\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_1fc6244aab6074afee39946e955288b9\\glb\\001a3d2d74d5fab4\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_1fc6244aab6074afee39946e955288b9\\glb\\001a3d2d74d5fab4\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_1fc6244aab6074afee39946e955288b9\\glb\\001a3d2d74d5fab4\\result.json",
+          "sha256": "404553200f5d10514949db7c22e355fee1e1011f5b924e35d9ba32b71f933dab",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_1fc6244aab6074afee39946e955288b9.json",
+          "sha256": "8bee28b8a6004003cfb0ba1e52c90025dcdfdb9bf04cdd636f2bb92b98dc5e15",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e4ebc981f0c97f2be5bbb0b1f997e88f\\glb\\25cd6aabfe6abf49\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e4ebc981f0c97f2be5bbb0b1f997e88f\\glb\\25cd6aabfe6abf49\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e4ebc981f0c97f2be5bbb0b1f997e88f\\glb\\25cd6aabfe6abf49\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e4ebc981f0c97f2be5bbb0b1f997e88f\\glb\\25cd6aabfe6abf49\\result.json",
+          "sha256": "f1b6ca80ac4a7735b7c17a17079f3040752f94eff5ca01bc22339ba11a8b3b2f",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_e4ebc981f0c97f2be5bbb0b1f997e88f.json",
+          "sha256": "e152fda1650d871b1dc97aaa3567de9b6b990e55108e02d2897269953cd3c612",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_179bed122930b57bd7a1f575376397f4\\obj\\d18769f98fec857d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_179bed122930b57bd7a1f575376397f4\\obj\\d18769f98fec857d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_179bed122930b57bd7a1f575376397f4\\obj\\d18769f98fec857d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_179bed122930b57bd7a1f575376397f4\\obj\\d18769f98fec857d\\result.json",
+          "sha256": "eaa9a33dfdb56376044c36f818e396b373c7a6882c84877281b9bbd6ce67688b",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_179bed122930b57bd7a1f575376397f4.json",
+          "sha256": "496b291972fa2102f58921c8c7df754642c38c459eb5c6c562807b4f8b35ccb7",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f501133cf46b1b5b0a1a614b4f09c166\\obj\\2ff03b5d9915dcf1\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f501133cf46b1b5b0a1a614b4f09c166\\obj\\2ff03b5d9915dcf1\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f501133cf46b1b5b0a1a614b4f09c166\\obj\\2ff03b5d9915dcf1\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f501133cf46b1b5b0a1a614b4f09c166\\obj\\2ff03b5d9915dcf1\\result.json",
+          "sha256": "63f1eb739700d4316a2e753a120492adaf355ca64e2ecb5b9b2b06c06624c821",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_f501133cf46b1b5b0a1a614b4f09c166.json",
+          "sha256": "9b2e2b1b5e7296455f1c52e4cfa6daa8212297cb91130a175ceb4db9daeb1fcb",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_408546ca53f7971de1dadb2a61d0ba3a\\obj\\404765b5357fa64f\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_408546ca53f7971de1dadb2a61d0ba3a\\obj\\404765b5357fa64f\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_408546ca53f7971de1dadb2a61d0ba3a\\obj\\404765b5357fa64f\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_408546ca53f7971de1dadb2a61d0ba3a\\obj\\404765b5357fa64f\\result.json",
+          "sha256": "2a12fc2cd9ea0c8aa77cc9dd59569bae37eaf41973d685eae27b90ab3b2b75ea",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_408546ca53f7971de1dadb2a61d0ba3a.json",
+          "sha256": "6a1c9cc9cae06b332f6a88594f8f912af857d4106cb6179b9fb14d773a6ccd9d",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_0d97964f4c9980650972ba11ffca49ef\\obj\\b49f4dc71c6fa986\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_0d97964f4c9980650972ba11ffca49ef\\obj\\b49f4dc71c6fa986\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_0d97964f4c9980650972ba11ffca49ef\\obj\\b49f4dc71c6fa986\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_0d97964f4c9980650972ba11ffca49ef\\obj\\b49f4dc71c6fa986\\result.json",
+          "sha256": "750d810209794ec1c40b3ccfe29f704ca6b19ce965490d107c38a84ab21984d9",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_0d97964f4c9980650972ba11ffca49ef.json",
+          "sha256": "a85ba33c4802b6260807d21cca89f3550f53bd2f5d0d5c627adc70421d39ac14",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_de3c6c27f907cbb82bcc661a5b32bf5f\\obj\\04996333459034fe\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_de3c6c27f907cbb82bcc661a5b32bf5f\\obj\\04996333459034fe\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_de3c6c27f907cbb82bcc661a5b32bf5f\\obj\\04996333459034fe\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_de3c6c27f907cbb82bcc661a5b32bf5f\\obj\\04996333459034fe\\top.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_de3c6c27f907cbb82bcc661a5b32bf5f\\obj\\04996333459034fe\\result.json",
+          "sha256": "51c03de1bd2da364c91b626179d76f5966b2c98054daa91e6eaa3450880145aa",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_de3c6c27f907cbb82bcc661a5b32bf5f.json",
+          "sha256": "9f2d7c97402ce5bbd69a75ed899cb158e5e30526b72c69eaa1df6f242759b928",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f4c01ecffff8071ec986e29d5cc69a1c\\obj\\3ff336b7ec2b957d\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f4c01ecffff8071ec986e29d5cc69a1c\\obj\\3ff336b7ec2b957d\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f4c01ecffff8071ec986e29d5cc69a1c\\obj\\3ff336b7ec2b957d\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_f4c01ecffff8071ec986e29d5cc69a1c\\obj\\3ff336b7ec2b957d\\result.json",
+          "sha256": "50dd7f03cb88b9fa2979dfa3ccb68f344ee100ccba3926a8608ffc05f02a8bb2",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_f4c01ecffff8071ec986e29d5cc69a1c.json",
+          "sha256": "360d55ab23bc5c6f93d8923c044a6bc9308e87d95a8c0374311673a2088fd356",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b61ec88d53e61f0cd9ce3abffbf35ad7\\obj\\1cc769df8fc6661f\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b61ec88d53e61f0cd9ce3abffbf35ad7\\obj\\1cc769df8fc6661f\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b61ec88d53e61f0cd9ce3abffbf35ad7\\obj\\1cc769df8fc6661f\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_b61ec88d53e61f0cd9ce3abffbf35ad7\\obj\\1cc769df8fc6661f\\result.json",
+          "sha256": "33bcebd8d722014b875d213bec7eee9aaf5cf9780030615dbee0d354315d353d",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_b61ec88d53e61f0cd9ce3abffbf35ad7.json",
+          "sha256": "8a7979851a80f2de603c8a2bba99eb172a0c8c67944f5a50d19e1b82078d3924",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_cb1db693fa96e3f329263f25f8c92cd6\\obj\\141d0c90f4a2921e\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_cb1db693fa96e3f329263f25f8c92cd6\\obj\\141d0c90f4a2921e\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_cb1db693fa96e3f329263f25f8c92cd6\\obj\\141d0c90f4a2921e\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_cb1db693fa96e3f329263f25f8c92cd6\\obj\\141d0c90f4a2921e\\result.json",
+          "sha256": "5b83884d8480671bec05cb85d94d68cffd8cb23980396a216b98ab2cfb25cb37",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_cb1db693fa96e3f329263f25f8c92cd6.json",
+          "sha256": "460e505857dbda782d9b3880af3202b24e6be5feb73212b9325d3fc9d7e4067c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_28fb2577f62c9ee27d2d382919c33b1f\\obj\\517daec514f64c80\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_28fb2577f62c9ee27d2d382919c33b1f\\obj\\517daec514f64c80\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_28fb2577f62c9ee27d2d382919c33b1f\\obj\\517daec514f64c80\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_28fb2577f62c9ee27d2d382919c33b1f\\obj\\517daec514f64c80\\result.json",
+          "sha256": "425a2d6e8b3cf1ac92ddccc3c45b28bacb1acb6ea9a05fc1497792f5d69ad0cd",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_28fb2577f62c9ee27d2d382919c33b1f.json",
+          "sha256": "53ad23ae82d77d295a5a985b2b52da21483962ff915ae62ab8e9cea79734a748",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3cbc825b96e959382bdb3f5fee587294\\obj\\abfc1ffdd8bd975a\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3cbc825b96e959382bdb3f5fee587294\\obj\\abfc1ffdd8bd975a\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3cbc825b96e959382bdb3f5fee587294\\obj\\abfc1ffdd8bd975a\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_3cbc825b96e959382bdb3f5fee587294\\obj\\abfc1ffdd8bd975a\\result.json",
+          "sha256": "2ae2fd59538ae9134722eb4c1916c61d4e1677b4b722dd9d92d8b216f4498edf",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_3cbc825b96e959382bdb3f5fee587294.json",
+          "sha256": "aa199a601892522d4c328390fbbf8faa48cfa8c229bbd6fde72039c496b1d393",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_71e4c417d130dc3da4764c409742305b\\blend\\fd5bb091f83b9b85\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_71e4c417d130dc3da4764c409742305b\\blend\\fd5bb091f83b9b85\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_71e4c417d130dc3da4764c409742305b\\blend\\fd5bb091f83b9b85\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_71e4c417d130dc3da4764c409742305b\\blend\\fd5bb091f83b9b85\\result.json",
+          "sha256": "1d58e75ed425e3c6d7380b08b4497071ee15d8ce6be9f40ca4716e4052d026be",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_71e4c417d130dc3da4764c409742305b.json",
+          "sha256": "aeaed22089964bffc66a8039eccfd714603904eac917eec9d88487500ab17c56",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_055c798dff9c002a2a32c3ca8da2dd4e\\obj\\ad6b3675ec0ac546\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_055c798dff9c002a2a32c3ca8da2dd4e\\obj\\ad6b3675ec0ac546\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_055c798dff9c002a2a32c3ca8da2dd4e\\obj\\ad6b3675ec0ac546\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_055c798dff9c002a2a32c3ca8da2dd4e\\obj\\ad6b3675ec0ac546\\result.json",
+          "sha256": "6aefe2608d3e2c845448fdd0911678006a0a4c718a1f18f3399232840c4b9655",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_055c798dff9c002a2a32c3ca8da2dd4e.json",
+          "sha256": "36a221389e3dd50f67fb4cc5e830a1361eb96833abc13ad988bf2d40b769edb1",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e5dcccf28941eeb8ccfb70555da8e033\\obj\\072e9b94693d5eea\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e5dcccf28941eeb8ccfb70555da8e033\\obj\\072e9b94693d5eea\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e5dcccf28941eeb8ccfb70555da8e033\\obj\\072e9b94693d5eea\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e5dcccf28941eeb8ccfb70555da8e033\\obj\\072e9b94693d5eea\\result.json",
+          "sha256": "4650294b4cd4e083eeefcbdd16bd7eeff0f4b668707ec46d30058e9710cd066c",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\calibration-v2\\asset_e5dcccf28941eeb8ccfb70555da8e033.json",
+          "sha256": "d0d59fa024920e1c615b4413060b000e9b81eeb974e3fc4c6ebaaea7b1998beb",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e8a3664d3e67682161fa725312a04cd0\\obj\\47e838039879ce99\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e8a3664d3e67682161fa725312a04cd0\\obj\\47e838039879ce99\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e8a3664d3e67682161fa725312a04cd0\\obj\\47e838039879ce99\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_e8a3664d3e67682161fa725312a04cd0\\obj\\47e838039879ce99\\result.json",
+          "sha256": "6b06a9936dc7712be3dccae67ecdf6acae8cddd04972ebae1a3035a918b00f6a",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_e8a3664d3e67682161fa725312a04cd0.json",
+          "sha256": "a74d6b9baa397f2ad9a285aabbb714338ef343b4072d94c3fe4880715f9dcfdf",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb437d007bad6ef4cf3515b9d6a8630e\\obj\\3d3bde552b902a59\\front.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb437d007bad6ef4cf3515b9d6a8630e\\obj\\3d3bde552b902a59\\side.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb437d007bad6ef4cf3515b9d6a8630e\\obj\\3d3bde552b902a59\\three_quarter.png",
+          "valid": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\inspection\\asset_bb437d007bad6ef4cf3515b9d6a8630e\\obj\\3d3bde552b902a59\\result.json",
+          "sha256": "b15b823974ea8f3cd15f99d6acf0af98b4a395275238d592a3ae19bb41d78f6f",
+          "exists": true
+        },
+        {
+          "path": "C:\\BrunoOS\\Local-Asset-Library\\data\\captions\\pilot-v2\\asset_bb437d007bad6ef4cf3515b9d6a8630e.json",
+          "sha256": "177799023446675f59c9302a894feedd7f2b42871ec22b5b2d6a9f0c3e03dbb4",
+          "exists": true
+        }
+      ],
+      "method": "Complete original SHA-256/size/mtime comparison; existing pilot record fields compared to retained legacy catalog; rendered input hashes verified.",
+      "no_sources_copied_or_modified": true
+    },
+    "no_change": {
+      "status": "passed",
+      "before": {
+        "generation": "v_19d9f8ef27e64ed584732f7736011e23",
+        "catalog": "4432fb2a4745aa6cf3a95325c0e921645cb02988faaae6a3114ded922176caf7",
+        "index": "f7bd5b2c555d6731307fcbf71c96d31de299e11b19e7c53a11b2d935dd4a1652"
+      },
+      "after": {
+        "generation": "v_19d9f8ef27e64ed584732f7736011e23",
+        "catalog": "4432fb2a4745aa6cf3a95325c0e921645cb02988faaae6a3114ded922176caf7",
+        "index": "f7bd5b2c555d6731307fcbf71c96d31de299e11b19e7c53a11b2d935dd4a1652"
+      },
+      "scan": {
+        "membership": 883,
+        "packs": [
+          "kenney_car-kit",
+          "kenney_city-kit-roads",
+          "kenney_food-kit",
+          "kenney_furniture-kit",
+          "kenney_mini-forest",
+          "quaternius_ultimate-food-pack",
+          "quaternius_ultimate-house-interior-pack",
+          "quaternius_ultimate-nature-pack"
+        ],
+        "added": [],
+        "deleted": [],
+        "changed": [],
+        "dry_run": false,
+        "identity_rule": "IDs bind pack and relative identity. Rename is deletion plus addition; never transfer owner approval automatically.",
+        "stage_pending": {
+          "inspection": 0,
+          "caption": 0,
+          "embeddings": 0
+        },
+        "no_change": true
+      },
+      "publication": {
+        "generation": "v_19d9f8ef27e64ed584732f7736011e23",
+        "membership": 883,
+        "no_change": true,
+        "coverage": {
+          "membership": 883,
+          "generation": "work",
+          "packs": {
+            "kenney_city-kit-roads": {
+              "assets": 95,
+              "stages": {
+                "inventory": {
+                  "complete": 95
+                },
+                "inspection": {
+                  "complete": 95
+                },
+                "previews": {
+                  "complete": 95
+                },
+                "caption": {
+                  "complete": 44,
+                  "failed": 51
+                },
+                "embeddings": {
+                  "complete": 44,
+                  "partial": 51
+                }
+              },
+              "captions": {
+                "clear": 40,
+                "fault": 51,
+                "warning": 2,
+                "review_note": 2
+              },
+              "owner_review": {
+                "pending": 95
+              },
+              "usable_partial_results": 95,
+              "source_faults": 8,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 90,
+                "technically_reviewed": 5
+              }
+            },
+            "quaternius_ultimate-house-interior-pack": {
+              "assets": 123,
+              "stages": {
+                "inventory": {
+                  "complete": 123
+                },
+                "inspection": {
+                  "complete": 123
+                },
+                "previews": {
+                  "complete": 123
+                },
+                "caption": {
+                  "complete": 72,
+                  "failed": 51
+                },
+                "embeddings": {
+                  "complete": 72,
+                  "partial": 51
+                }
+              },
+              "captions": {
+                "clear": 69,
+                "fault": 51,
+                "review_note": 1,
+                "warning": 2
+              },
+              "owner_review": {
+                "pending": 123
+              },
+              "usable_partial_results": 123,
+              "source_faults": 1,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 118,
+                "technically_reviewed": 5
+              }
+            },
+            "quaternius_ultimate-food-pack": {
+              "assets": 103,
+              "stages": {
+                "inventory": {
+                  "complete": 103
+                },
+                "inspection": {
+                  "complete": 103
+                },
+                "previews": {
+                  "complete": 103
+                },
+                "caption": {
+                  "complete": 65,
+                  "failed": 38
+                },
+                "embeddings": {
+                  "complete": 65,
+                  "partial": 38
+                }
+              },
+              "captions": {
+                "clear": 61,
+                "fault": 38,
+                "review_note": 3,
+                "warning": 1
+              },
+              "owner_review": {
+                "pending": 103
+              },
+              "usable_partial_results": 103,
+              "source_faults": 0,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 98,
+                "technically_reviewed": 5
+              }
+            },
+            "quaternius_ultimate-nature-pack": {
+              "assets": 150,
+              "stages": {
+                "inventory": {
+                  "complete": 150
+                },
+                "inspection": {
+                  "complete": 150
+                },
+                "previews": {
+                  "complete": 150
+                },
+                "caption": {
+                  "complete": 108,
+                  "failed": 42
+                },
+                "embeddings": {
+                  "complete": 108,
+                  "partial": 42
+                }
+              },
+              "captions": {
+                "clear": 105,
+                "warning": 1,
+                "fault": 42,
+                "review_note": 2
+              },
+              "owner_review": {
+                "pending": 150
+              },
+              "usable_partial_results": 150,
+              "source_faults": 1,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 145,
+                "technically_reviewed": 5
+              }
+            },
+            "kenney_furniture-kit": {
+              "assets": 140,
+              "stages": {
+                "inventory": {
+                  "complete": 140
+                },
+                "inspection": {
+                  "complete": 140
+                },
+                "previews": {
+                  "complete": 140
+                },
+                "caption": {
+                  "complete": 86,
+                  "failed": 54
+                },
+                "embeddings": {
+                  "complete": 77,
+                  "partial": 63
+                }
+              },
+              "captions": {
+                "clear": 83,
+                "fault": 54,
+                "warning": 1,
+                "review_note": 2
+              },
+              "owner_review": {
+                "pending": 140
+              },
+              "usable_partial_results": 140,
+              "source_faults": 33,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 135,
+                "technically_reviewed": 5
+              }
+            },
+            "kenney_food-kit": {
+              "assets": 200,
+              "stages": {
+                "inventory": {
+                  "complete": 200
+                },
+                "inspection": {
+                  "complete": 200
+                },
+                "previews": {
+                  "complete": 200
+                },
+                "caption": {
+                  "failed": 89,
+                  "complete": 111
+                },
+                "embeddings": {
+                  "partial": 89,
+                  "complete": 111
+                }
+              },
+              "captions": {
+                "fault": 89,
+                "clear": 106,
+                "warning": 2,
+                "review_note": 3
+              },
+              "owner_review": {
+                "pending": 200
+              },
+              "usable_partial_results": 200,
+              "source_faults": 55,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 195,
+                "technically_reviewed": 5
+              }
+            },
+            "kenney_car-kit": {
+              "assets": 50,
+              "stages": {
+                "inventory": {
+                  "complete": 50
+                },
+                "inspection": {
+                  "complete": 50
+                },
+                "previews": {
+                  "complete": 50
+                },
+                "caption": {
+                  "failed": 33,
+                  "complete": 17
+                },
+                "embeddings": {
+                  "partial": 33,
+                  "complete": 17
+                }
+              },
+              "captions": {
+                "fault": 33,
+                "warning": 2,
+                "review_note": 2,
+                "clear": 13
+              },
+              "owner_review": {
+                "pending": 50
+              },
+              "usable_partial_results": 50,
+              "source_faults": 5,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 45,
+                "technically_reviewed": 5
+              }
+            },
+            "kenney_mini-forest": {
+              "assets": 22,
+              "stages": {
+                "inventory": {
+                  "complete": 22
+                },
+                "inspection": {
+                  "complete": 22
+                },
+                "previews": {
+                  "complete": 22
+                },
+                "caption": {
+                  "failed": 11,
+                  "complete": 11
+                },
+                "embeddings": {
+                  "partial": 11,
+                  "complete": 11
+                }
+              },
+              "captions": {
+                "fault": 11,
+                "clear": 7,
+                "warning": 3,
+                "review_note": 1
+              },
+              "owner_review": {
+                "pending": 22
+              },
+              "usable_partial_results": 22,
+              "source_faults": 3,
+              "stage_faults": 0,
+              "caption_ai_review": {
+                "pending": 17,
+                "technically_reviewed": 5
+              }
+            }
+          }
+        }
+      },
+      "stage_summaries": {
+        "inspection": {
+          "stage": "inspection",
+          "pending": 0,
+          "selected": 0,
+          "retained": {
+            "complete": 883
+          },
+          "dry_run": false,
+          "elapsed_seconds": 0.0037379999994300306,
+          "complete": 0,
+          "failed": 0,
+          "unsupported": 0
+        },
+        "caption": {
+          "stage": "caption",
+          "pending": 0,
+          "selected": 0,
+          "retained": {
+            "complete": 514,
+            "failed": 369
+          },
+          "dry_run": false,
+          "elapsed_seconds": 0.003586100006941706,
+          "complete": 0,
+          "failed": 0,
+          "unsupported": 0
+        },
+        "embeddings": {
+          "stage": "embeddings",
+          "pending": 0,
+          "processed": 0,
+          "dry_run": false,
+          "elapsed_seconds": 25.856316499994136,
+          "vectors": 4344
+        }
+      },
+      "render_jobs": 0,
+      "caption_inference_jobs": 0,
+      "embedding_inference_jobs": 0,
+      "models_loaded": false,
+      "method": "Dry-run refusal guard, actual no-change scan/cached process with no backend, stable verified DB contents and publication version."
+    },
+    "synthetic_live_publication": "data/gui/step8-live-publication-parity/report.json"
+  },
+  "faults_and_limitations": [
+    "Caption generation/schema failures were retained with raw attempts; no automatic retry or fabricated caption.",
+    "Usable renders/source evidence survive caption failure; source geometry/texture faults remain visible.",
+    "New captions await AI/owner visual review; notes/warnings apply only where findings are recorded.",
+    "Semantic suggestions can include unrelated candidates; no universal absence detector or ranking fallback.",
+    "Physical scale, alternate-format geometry equivalence and binary dependency completeness remain qualified.",
+    "Owner relevance, usability, artistic suitability and comprehensive accessibility approval remain separate.",
+    "Enlarged keyword queries measured about three seconds; this exceeds the earlier two-second warm-search target. The UI remains available during requests.",
+    "Retained test/check failures include invoking image tests in the base runtime without Pillow and an incomplete new interruption-status fixture; the prepared-runtime suite and corrected fixture passed.",
+    "Pre-update app/MCP connections must restart to use the new membership/publication/worker behavior."
+  ]
+}

@@ -168,6 +168,9 @@ def validate_result(config, job, result):
 
 
 def publish(config, asset, source, reason, result, fingerprint, output_relative):
+    from .publication import generation
+    if config.catalog_generation is None and generation(config)!='legacy':
+        raise ConfigError('Published inspection data is immutable; stage an incremental library update')
     record = detail(config, asset["asset_id"])
     old_reviews = {p["sha256"]: p.get("visual_review", "pending") for p in record["previews"] if p.get("origin") == "rendered"}
     record["primary_inspection_path"] = source["path"]

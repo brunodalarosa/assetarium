@@ -6,3 +6,7 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}@media(forced-colors:active){.card[aria-pressed=true]{outline:3px solid Highlight}.badge{border:1px solid CanvasText}}
 
 .badge.warning{background:#fff4ce;color:#614800}.caption-warning{color:#614800}
+
+.paging,.library-operations{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}.paging span{min-width:120px;text-align:center}
+.scope{min-width:0;max-width:45%;overflow-wrap:anywhere}.scope strong,.scope span{min-width:0;white-space:normal}.brand{min-width:0}
+@media(max-width:760px){.scope{max-width:170px;flex:1}.scope strong{border-radius:10px}}

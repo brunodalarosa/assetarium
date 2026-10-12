@@ -14,17 +14,15 @@ from .caption_quality import caption_summary
 from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
+from .publication import pinned
 
 VERSION = "pilot-retrieval-v1"
 MODES = {"keyword", "description", "image", "keyword_description", "combined", "reference"}
 
 
 def pilot_records(config):
-    manifest = json.loads(config.output_path("data", "pilot/selection-manifest.json").read_text(encoding="utf-8"))
-    ids = [a["asset_id"] for a in manifest["assets"]]
-    if len(ids) != 40 or len(set(ids)) != 40:
-        raise ConfigError("Require the existing 40-asset pilot")
-    return [detail(config, identifier) for identifier in ids]
+    from .membership import records
+    return records(config)
 
 
 def current_overlay(config, record):
@@ -57,8 +55,7 @@ def description_input(config, record):
         path = config.output_path("data", view["path"].removeprefix("data/"))
         if file_hash(path) != view["sha256"]:
             raise ConfigError("Caption input view is stale")
-    return text, digest({"text": text, "caption": (record.get("caption_provenance") or {}).get("fingerprint"),
-                         "input_views": (record.get("caption_provenance") or {}).get("input_views")})
+    return text, digest({"text": text})
 
 
 def preview_file(config, preview):
@@ -76,9 +73,16 @@ def preview_file(config, preview):
     return path
 
 
+def image_input(preview):
+    # Review/approval/provenance labels do not change the consumed pixels.
+    return digest({k:preview[k] for k in ('path','source_path','sha256','view_label','origin') if k in preview})
+
+
 def source_check(config, record):
     """Conservative logical-asset exclusion on missing/stale recorded files/dependencies."""
     checked = []
+    if record.get('metadata_fault'):
+        raise ConfigError('Catalog metadata faulty: '+record['metadata_fault']['error'])
     if record["availability"] != "available":
         raise ConfigError("Catalog marks asset unavailable")
     for item in record["files"]:
@@ -110,6 +114,9 @@ def source_check(config, record):
 
 
 def index_database(config, readonly=False):
+    from .publication import generation
+    if not readonly and config.catalog_generation is None and generation(config)!='legacy':
+        raise ConfigError('Published indexes are immutable; use the incremental library coordinator')
     path = config.output_path("data", "embeddings/index.sqlite")
     if readonly:
         if not path.is_file():
@@ -167,7 +174,7 @@ def index_pilot(config, backend):
                         value, input_fingerprint = description_input(config, record)
                     else:
                         value = preview_file(config, preview)
-                        input_fingerprint = digest(preview)
+                        input_fingerprint = image_input(preview)
                     fingerprint = digest({"contract": common, "source": source_fingerprint, "input": input_fingerprint})
                     old = old_jobs.get(job_id)
                     if old_contract and json.loads(old_contract[0]) == common and old and old[0] == fingerprint:
@@ -256,14 +263,18 @@ def matches(record, filters):
         technical = record.get("technical")
         if not technical or record["processing"]["inspection"] != "complete":
             return False
-        if "format" in filters and filters["format"] != technical["inspected_format"]:
+        inspected=next((f for f in record['files'] if f['path']==technical.get('inspected_path')),None)
+        if not inspected or not technical.get('inspected_sha256') or inspected.get('sha256')!=technical['inspected_sha256']:
+            return False
+        if "format" in filters and filters["format"] != technical.get('inspected_format'):
             return False  # Do not apply one export's measured facts to uninspected alternates.
         if "max_triangles" in filters:
-            count = technical.get("evaluated_instance_totals", {}).get("triangles")
-            if type(count) is not int or count > filters["max_triangles"]:
+            count = (technical.get("evaluated_instance_totals") or {}).get("triangles")
+            if type(count) is not int or count<0 or count > filters["max_triangles"]:
                 return False
-        if "rigged" in filters and bool(technical["armatures"]) != filters["rigged"]:
-            return False
+        if 'rigged' in filters:
+            if not isinstance(technical.get('armatures'),list) or bool(technical['armatures'])!=filters['rigged']:
+                return False
     return True
 
 
@@ -300,6 +311,7 @@ class SearchEngine:
         self.config, self.backend = config, backend
         self.contract = contract if contract is not None else (backend.contract if backend else None)
 
+    @pinned
     def search(self, text="", mode="combined", reference=None, filters=None, limit=5, min_similarity=None,
                exclude_image_hashes=None):
         started = time.perf_counter()
@@ -366,7 +378,9 @@ class SearchEngine:
                         if row[5] != source_fingerprints[row[1]]:
                             raise ConfigError("Source/index fingerprint mismatch")
                         if channel == "description":
-                            if description_input(self.config, record)[1] != row[3]:
+                            text_value, current = description_input(self.config, record)
+                            legacy = digest({"text": text_value, "caption": (record.get("caption_provenance") or {}).get("fingerprint"), "input_views": (record.get("caption_provenance") or {}).get("input_views")})
+                            if row[3] != current and (metadata.get("input_policy") or row[3] != legacy):
                                 raise ConfigError("Description/index input fingerprint mismatch")
                         else:
                             ref = json.loads(row[11])
@@ -375,7 +389,7 @@ class SearchEngine:
                                                  "reason": "Reference evaluation parent image excluded", "sha256": ref["sha256"]})
                                 continue
                             preview = next((p for p in record["previews"] if p.get("path") == ref.get("path") and p.get("source_path") == ref.get("source_path")), None)
-                            if preview is None or digest(preview) != row[3]:
+                            if preview is None or (image_input(preview) != row[3] and (metadata.get('image_input_policy') or digest(preview)!=row[3])):
                                 raise ConfigError("Preview/index input fingerprint mismatch")
                             preview_file(self.config, preview)
                         selected.append(row)
@@ -413,7 +427,9 @@ class SearchEngine:
                             "preview": preview, "availability": "available", "matching_channels": matching,
                             "score": candidate["score"], "match_status": "keyword_match" if "keyword" in matching else "weak_unvalidated",
                             **caption_summary(self.config, record),
-                            "source_faulty": bool((record.get("inspection_run") or {}).get("source_faults")),
+                            "source_faulty": bool((record.get("inspection_run") or {}).get("source_faults") or (record.get('inspection_run') or {}).get('errors')
+                                or any(s in record.get('stage_faults',{}) for s in ('inventory','inspection','previews'))),
+                            'processing':record['processing'],
                             "caption_owner_review": owner_review})
         response = {"query": text if mode != "reference" else str(reference), "mode": mode, "filters": filters,
                     "results": results, "status": "candidates" if results else "no_match",

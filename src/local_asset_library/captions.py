@@ -24,8 +24,8 @@ CALIBRATION_INDICES = (0, 4, 5, 6, 10, 13, 16, 22, 28, 37)
 
 
 def file_hash(path):
-    with path.open("rb") as stream:
-        return stream_hash(stream)
+    from .publication import verified_hash
+    return verified_hash(path)
 
 
 def validate_caption(value):
@@ -228,6 +228,9 @@ def merge_record(record, outcome, provenance, overlay):
 
 
 def publish(config, identifier, outcome, provenance):
+    from .publication import generation
+    if config.catalog_generation is None and generation(config)!='legacy':
+        raise ConfigError('Published captions are immutable; review/update working membership and publish a new generation')
     record = detail(config, identifier)
     overlay, path = overlay_for(config, record)
     provenance = {**provenance, "owner_overlay_path": path.relative_to(config.project_root).as_posix(),

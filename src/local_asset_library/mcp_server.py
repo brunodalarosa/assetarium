@@ -18,7 +18,7 @@ from .catalog import encoded
 from .config import ConfigError, load_config
 from .mcp_assets import AssetService, SCHEMAS, error_payload, validate
 
-INSTRUCTIONS = ('Read-only approved 40-asset pilot. Search compactly, then get_asset for a candidate; '
+INSTRUCTIONS = ('Read-only explicitly configured approved library membership. Search compactly, then get_asset for a candidate; '
     'request include_preview=true to inspect actual image content. Resolve a usable format/dependencies '
     'and write your selection manifest only under this project data/exports. No game imports or source edits. '
     'Semantic candidates remain weak, scores are not probabilities. Cloud models receive returned text/images. '
@@ -68,6 +68,9 @@ class Gateway:
     async def semantic(self, name, args):
         if self.closing:
             raise ConfigError('Gateway is closing; no new worker can start')
+        from .gpu_queue import batch_requested
+        if batch_requested(self.config):
+            raise ConfigError('Inference queue busy with an owned batch; browse/keyword/detail remain available.')
         if self.worker_fault:
             raise ConfigError('Embedding worker fault retained; explicit retry required: ' + self.worker_fault)
         try:
@@ -95,7 +98,7 @@ class Gateway:
                 raise ConfigError('Embedding worker exited without result')
             return json.loads(line)
         except Exception as exc:
-            self.worker_fault = str(exc)
+            self.worker_fault = str(exc) or (type(exc).__name__ + ': private worker did not return within the bounded request window')
             await self.close(permanent=False)
             raise
 
@@ -141,9 +144,9 @@ async def serve(config):
     async def list_tools(ctx, params):
         annotations = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
         return ListToolsResult(tools=[Tool(name=name, inputSchema=schema, annotations=annotations,
-            description=('Search approved pilot; five compact candidates, keyword+description default. Filters use verified metadata; no filesystem paths.'
+            description=('Search configured approved membership; five compact candidates, keyword+description default. Filters use verified metadata; no filesystem paths.'
                          if name=='search_assets' else
-                         'Resolve a pilot asset ID to a source format and all known dependencies. Metadata/actual PNG ImageContent preview are opt-in; no copying.'))
+                         'Resolve an approved member ID to a source format and all known dependencies. Metadata/actual PNG ImageContent preview are opt-in; no copying.'))
             for name,schema in SCHEMAS.items()])
     async def call_tool(ctx, params):
         return await gateway.call(params.name,params.arguments or {})

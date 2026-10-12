@@ -38,6 +38,11 @@ remain separate and are not approved by this change.
 ## Rules for future imports and reviews
 
 The current processing rules in `AGENTS.md` apply this distinction to new assets.
+Step 8 applies the same classification to configured library membership. The
+forty-asset classifications above remain historical evidence; newly generated
+captions await review and do not inherit an approval or a clear visual review.
+Expanded coverage and pending reviews are reported separately in
+`docs/step8-verification.json`.
 Record a caption review using `findings`, for example:
 
 ```json

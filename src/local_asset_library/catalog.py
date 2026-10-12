@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from .config import Config, ConfigError
+from .publication import pinned_config
 
 SOURCE_ID = "playful-lowpoly-v1"
 SCANNER_VERSION = "inventory-v1"
@@ -36,6 +37,33 @@ def encoded(value):
 
 def digest(value):
     return hashlib.sha256(encoded(value).encode("utf-8")).hexdigest()
+
+
+def parse_record(identifier,pack,name,payload):
+    """Quarantine one corrupt record without inventing observations or source success."""
+    raw=payload if isinstance(payload,bytes) else payload.encode('utf-8')
+    try:
+        record=json.loads(raw)
+        if (not isinstance(record,dict) or record.get('asset_id')!=identifier
+                or not isinstance(record.get('display_name'),str) or not isinstance(record.get('pack_id'),str)
+                or not isinstance(record.get('processing'),dict)
+                or any(not isinstance(record.get(k),list) for k in ('files','dependencies','previews'))
+                or any(not isinstance(f,dict) or not {'path','format','sha256','availability'}.issubset(f) for f in record['files'])
+                or any(any(not isinstance(f[k],str) for k in ('path','format','availability')) for f in record['files'])
+                or any(not isinstance(d,dict) for d in record['dependencies'])
+                or any(not isinstance(p,dict) for p in record['previews'])
+                or record.get('technical') is not None and not isinstance(record['technical'],dict)):
+            raise ValueError('Invalid catalog record structure or identity')
+        return record
+    except (ValueError,UnicodeError,TypeError) as exc:
+        fault={'status':'faulty','kind':'catalog_metadata','error':str(exc),'raw_record_sha256':hashlib.sha256(raw).hexdigest(),
+               'evidence':'Original bytes retained in catalog assets.record; no repair performed.'}
+        return {'asset_id':identifier,'source_id':SOURCE_ID,'pack_id':pack,'display_name':name,
+            'availability':'faulty','files':[],'dependencies':[],'previews':[],'technical':None,
+            'description':None,'caption_provenance':None,'owner_overlay':{},'license_evidence':[],
+            'processing':{'inventory':'failed','inspection':'unknown','previews':'unknown','caption':'unknown','embeddings':'unknown'},
+            'metadata_fault':fault,'stage_faults':{'inventory':fault},'inspection_run':{'source_faults':[fault]},
+            'provenance':{},'grouping':{},'variants':[]}
 
 
 def asset_id(pack, identity):
@@ -420,6 +448,9 @@ def search_text(asset):
 
 
 def write_database(config, rows, assets, metadata):
+    from .publication import generation
+    if config.catalog_generation is None and generation(config)!='legacy':
+        raise ConfigError('Published catalogs are immutable; stage updates through the library coordinator')
     path = config.output_path("data", "catalog.sqlite")
     path.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(path)) as db, db:
@@ -472,6 +503,7 @@ def read_database(config):
     return db
 
 
+@pinned_config
 def query(config, text, limit=5):
     if len(text) > 256:
         raise ConfigError("Keyword query must be at most 256 characters")
@@ -483,10 +515,16 @@ def query(config, text, limit=5):
     # Treat input as literal terms, never user-supplied FTS operators.
     match = " AND ".join('"' + term.replace('"', '""') + '"' for term in tokens)
     result = []
+    approved_ids = None
+    if config.output_path('data','library/membership.json').exists():
+        from .membership import membership
+        approved_ids = set(membership(config)['asset_ids'])
     with closing(read_database(config)) as db:
         for (payload,) in db.execute("""SELECT a.record FROM asset_fts f JOIN assets a ON a.asset_id=f.asset_id
             WHERE asset_fts MATCH ? AND a.availability='available' ORDER BY bm25(asset_fts), a.asset_id""", (match,)):
             asset = json.loads(payload)
+            if approved_ids is not None and asset['asset_id'] not in approved_ids:
+                continue
             paths = []
             for file in asset["files"]:
                 try:
@@ -534,12 +572,13 @@ def compact_search_result(text, results):
         result["truncated"] = True
 
 
+@pinned_config
 def detail(config, identifier):
     with closing(read_database(config)) as db:
-        row = db.execute("SELECT record FROM assets WHERE asset_id=?", (identifier,)).fetchone()
+        row = db.execute("SELECT pack_id,name,CAST(record AS BLOB) FROM assets WHERE asset_id=?", (identifier,)).fetchone()
     if row is None:
         raise ConfigError("Unknown asset ID")
-    return json.loads(row[0])
+    return parse_record(identifier,*row)
 
 
 def save_json(path, value):

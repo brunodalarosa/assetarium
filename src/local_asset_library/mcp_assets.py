@@ -97,7 +97,7 @@ def bounded(payload, cap, removable=None):
 
 
 def error_payload(exc, identifier=None):
-    reason = str(exc)
+    reason = str(exc) or type(exc).__name__
     identifier = identifier if isinstance(identifier,str) and re.fullmatch(ID_PATTERN,identifier) else None
     state = "stale" if "stale" in reason.lower() or "fingerprint mismatch" in reason.lower() else (
         "unavailable" if "missing" in reason.lower() or "unavailable" in reason.lower() else "unknown")
@@ -117,8 +117,9 @@ class AssetService:
     def record(self, identifier):
         if not re.fullmatch(ID_PATTERN, identifier):
             raise ConfigError("Malformed asset ID")
-        if identifier not in {r["asset_id"] for r in pilot_records(self.config)}:
-            raise ConfigError("Asset ID unavailable in approved 40-asset pilot")
+        from .membership import membership
+        if identifier not in set(membership(self.config)['asset_ids']):
+            raise ConfigError("Asset ID unavailable in configured approved membership")
         return detail(self.config, identifier)
 
     def preview(self, record, view):
@@ -127,7 +128,15 @@ class AssetService:
             raise ConfigError("Requested preview view unavailable; no substitute")
         return item, preview_file(self.config, item)
 
+    from .publication import pinned
+
+    @pinned
     def execute(self, name, args):
+        from .publication import generation
+        version = generation(self.config)
+        if getattr(self, '_publication_version', None) != version:
+            self.query_faults.clear()
+            self._publication_version = version
         validate(name, args)
         return self.search(args) if name == "search_assets" else self.get(args)
 
@@ -173,6 +182,8 @@ class AssetService:
         response["faults"] = [{"asset_id": f["asset_id"], "status": "faulty", "channel": f["channel"], "reason": f["reason"][:120]} for f in faults[:3]]
         response["fault_count"] = len(faults)
         response["fault_evidence"] = "Recorded separately in this server's local call audit"
+        from .publication import generation
+        response['generation'] = generation(self.config)
         return bounded(response, SEARCH_CAP, "results"), None, {"excluded": faults, "elapsed_seconds": evidence["elapsed_seconds"]}
 
     def get(self, args):
@@ -188,12 +199,15 @@ class AssetService:
                    "source_faults": (record.get("inspection_run") or {}).get("source_faults", []),
                    **caption_summary(self.config, record),
                    "limitations": result["limitations"], "preview": {"status": "not_requested"}}
+        from .publication import generation
+        payload['generation'] = generation(self.config)
         if args.get("include_metadata", False):
             technical = record.get("technical") or {}
             payload["metadata"] = {"formats": sorted({f["format"] for f in record["files"]}),
                 "technical": {k: technical.get(k) for k in ("inspected_path", "inspected_sha256", "inspected_format", "evaluated_instance_totals", "unit_settings")},
                 "description": record.get("description"), "suggested_uses": record.get("suggested_uses"),
                 "processing": record["processing"], "license_evidence": record.get("license_evidence"),
+                'stage_faults':record.get('stage_faults',{}), 'inspection_run':record.get('inspection_run'),
                 "caption_quality": caption_quality(self.config, record),
                 "caption_fault_evidence": (record.get("caption_provenance") or {}).get("visual_faults", [])}
         image = None
