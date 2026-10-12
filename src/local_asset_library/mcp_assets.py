@@ -10,10 +10,12 @@ from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detail, validate_filters
 
+from .search_policy import DEFAULT_MODE, MAX_LIMIT, search_character_cap
+
 ID_PATTERN = r"asset_[0-9a-f]{32}"
 FORMATS = ["blend", "dae", "fbx", "glb", "gltf", "obj", "stl"]
 VIEWS = ["three_quarter", "front", "side"]
-MODES = ["keyword_description", "keyword", "description", "image", "combined", "reference"]
+MODES = [DEFAULT_MODE, "keyword_description", "keyword", "description", "image", "reference"]
 SEARCH_CAP = 6000
 DETAIL_CAP = 16000
 IMAGE_CAP = 512 * 1024
@@ -25,8 +27,8 @@ FILTER_SCHEMA = {"type": "object", "additionalProperties": False, "properties": 
 SCHEMAS = {
     "search_assets": {"type": "object", "additionalProperties": False, "properties": {
         "query": {"type": "string", "maxLength": 1024},
-        "mode": {"type": "string", "enum": MODES, "default": "keyword_description"},
-        "filters": FILTER_SCHEMA, "limit": {"type": "integer", "minimum": 1, "maximum": 5, "default": 5},
+        "mode": {"type": "string", "enum": MODES, "default": DEFAULT_MODE},
+        "filters": FILTER_SCHEMA, "limit": {"type": "integer", "minimum": 1, "maximum": MAX_LIMIT, "default": 5},
         "reference_asset_id": {"type": "string", "pattern": "^" + ID_PATTERN + "$"},
         "reference_view": {"type": "string", "enum": VIEWS, "default": "three_quarter"}}},
     "get_asset": {"type": "object", "required": ["asset_id"], "additionalProperties": False, "properties": {
@@ -69,7 +71,7 @@ def validate(name, arguments):
             if value.get("max_triangles", 0) > 1000000000:
                 raise ConfigError("Triangle filter exceeds cap")
     if name == "search_assets":
-        mode = arguments.get("mode", "keyword_description")
+        mode = arguments.get("mode", DEFAULT_MODE)
         text = arguments.get("query", "")
         if mode == "reference":
             if text or "reference_asset_id" not in arguments:
@@ -141,7 +143,7 @@ class AssetService:
         return self.search(args) if name == "search_assets" else self.get(args)
 
     def search(self, args):
-        mode = args.get("mode", "keyword_description")
+        mode = args.get("mode", DEFAULT_MODE)
         key = encoded(args)
         if key in self.query_faults:
             raise ConfigError("Unchanged faulty query retained: " + self.query_faults[key])
@@ -184,7 +186,7 @@ class AssetService:
         response["fault_evidence"] = "Recorded separately in this server's local call audit"
         from .publication import generation
         response['generation'] = generation(self.config)
-        return bounded(response, SEARCH_CAP, "results"), None, {"excluded": faults, "elapsed_seconds": evidence["elapsed_seconds"]}
+        return bounded(response, search_character_cap(args.get("limit", 5)), "results"), None, {"excluded": faults, "elapsed_seconds": evidence["elapsed_seconds"]}
 
     def get(self, args):
         record = self.record(args["asset_id"])

@@ -23,14 +23,14 @@
           <label>Source format<select id="format"><option value="">Any format</option></select></label>
           <label>Maximum triangles<input id="triangles" type="number" min="0" max="1000000000" step="1" placeholder="No limit"></label>
           <label>Rigged<select id="rigged"><option value="">Any / unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
-          <label>Search mode<select id="mode"><option value="keyword_description">Keyword + description (default)</option><option value="keyword">Exact keywords</option><option value="description">Visual description</option><option value="image">Text → image</option><option value="combined">Keyword + description + image</option><option value="reference">Pilot preview reference</option></select></label>
-          <label>Shortlist limit<select id="limit"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label>
+          <label>Search mode<select id="mode"><option value="keyword_description">Keyword + description</option><option value="keyword">Exact keywords</option><option value="description">Visual description</option><option value="image">Text → image</option><option value="combined" selected>Keyword + description + image (default)</option><option value="reference">Pilot preview reference</option></select></label>
+          <label>Shortlist limit<select id="limit"><option>5</option><option>10</option><option selected>20</option><option>30</option><option>40</option></select></label>
         </div>
         <div class="controls reference" id="reference-controls" hidden><label>Reference pilot asset<select id="reference-asset"></select></label><label>Reference view<select id="reference-view"><option value="three_quarter">Three-quarter</option><option value="front">Front</option><option value="side">Side</option></select></label></div>
         <p class="hint">Technical filters require measured evidence for the selected format. Enter with an empty query browses the filtered pilot.</p>
       </details>
     </form>
-    <div class="results-bar"><div><h2 id="results-title">Browse the library</h2><p id="status" role="status" aria-live="polite">Loading existing records and previews…</p></div><button id="copy-settings" type="button" disabled>Copy search settings</button></div>
+    <div class="results-bar"><div><h2 id="results-title">Browse the library</h2><span id="search-busy" hidden role="status" aria-live="polite"><span class="search-spinner" aria-hidden="true"></span>Searching…</span><p id="status" role="status" aria-live="polite">Loading existing records and previews…</p></div><button id="copy-settings" type="button" disabled>Copy search settings</button></div>
     <p class="hint" id="candidate-note" hidden>Ranked suggestions may include unrelated assets—even when the requested object is absent. Review the previews.</p>
     <p class="hint" id="reproduce-note" hidden>Copies the completed search. Agents must submit those settings against the same catalog and index versions to reproduce this shortlist.</p>
     <div id="error" role="alert" hidden></div>

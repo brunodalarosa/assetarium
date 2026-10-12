@@ -129,7 +129,7 @@ def test_desktop_default_exact_shared_shortlist_and_close(indexed, monkeypatch):
     try:
         response = bridge.search({'query': 'red object'})
         expected, _, _ = AssetService(config, backend=backend).execute('search_assets', response['arguments'])
-        assert response['arguments'] == {'query': 'red object', 'mode': 'keyword_description', 'filters': {}, 'limit': 5}
+        assert response['arguments'] == {'query': 'red object', 'mode': 'combined', 'filters': {}, 'limit': 20}
         assert response['payload'] == expected
         # Endpoint works while a separate slow operation is running; model work is not on GUI main thread.
         async def slow():

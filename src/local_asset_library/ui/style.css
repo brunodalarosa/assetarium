@@ -10,3 +10,5 @@
 .paging,.library-operations{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:12px 0}.paging span{min-width:120px;text-align:center}
 .scope{min-width:0;max-width:45%;overflow-wrap:anywhere}.scope strong,.scope span{min-width:0;white-space:normal}.brand{min-width:0}
 @media(max-width:760px){.scope{max-width:170px;flex:1}.scope strong{border-radius:10px}}
+
+#search-busy{display:inline-flex;align-items:center;gap:8px;font-size:.85rem;color:var(--muted);margin-top:6px}.search-spinner{display:inline-block;width:18px;height:18px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:search-spin .8s linear infinite}@keyframes search-spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.search-spinner{animation:none}}

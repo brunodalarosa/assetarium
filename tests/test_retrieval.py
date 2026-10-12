@@ -114,7 +114,8 @@ def test_channels_duplicate_views_and_compact_size(indexed):
     assert set(evidence["channel_rankings"]) == {"keyword", "description", "image"}
     assert response["serialized_characters"] == len(encoded(response)) <= 6000
     response, _ = SearchEngine(config, backend).search("red", "combined", limit=20)
-    assert response["truncated"] and response["serialized_characters"] <= 6000
+    assert not response["truncated"] and len(response["results"]) == 20
+    assert response["serialized_characters"] == len(encoded(response)) <= 22000
 
 
 def test_verified_filters_and_unknown_rejection(indexed):

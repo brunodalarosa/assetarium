@@ -15,6 +15,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import CallToolResult, ImageContent, ListToolsResult, TextContent, Tool, ToolAnnotations
 
 from .catalog import encoded
+from .search_policy import DEFAULT_MODE
 from .config import ConfigError, load_config
 from .mcp_assets import AssetService, SCHEMAS, error_payload, validate
 
@@ -111,7 +112,7 @@ class Gateway:
                 if self.closing:
                     raise ConfigError('Gateway is closing')
                 validate(name, args)
-                if name == 'search_assets' and args.get('mode','keyword_description') != 'keyword':
+                if name == 'search_assets' and args.get('mode',DEFAULT_MODE) != 'keyword':
                     result = await self.semantic(name,args)
                     payload, image, evidence, error = (result[k] for k in ('payload','image','evidence','is_error'))
                 else:
@@ -144,7 +145,7 @@ async def serve(config):
     async def list_tools(ctx, params):
         annotations = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
         return ListToolsResult(tools=[Tool(name=name, inputSchema=schema, annotations=annotations,
-            description=('Search configured approved membership; five compact candidates, keyword+description default. Filters use verified metadata; no filesystem paths.'
+            description=('Search configured approved membership; image-weighted keyword+description+image default; 1–40 candidates (omitted limit: 5), request-scaled bounded response. Filters use verified metadata; no filesystem paths.'
                          if name=='search_assets' else
                          'Resolve an approved member ID to a source format and all known dependencies. Metadata/actual PNG ImageContent preview are opt-in; no copying.'))
             for name,schema in SCHEMAS.items()])

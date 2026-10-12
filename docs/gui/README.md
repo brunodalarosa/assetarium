@@ -26,8 +26,8 @@ image. Source-format selection verifies that export and shows its original path;
 **Copy source path** copies text only.
 
 Enter a description or filename and press **Enter** or **Search**. The default
-mode is explicitly `keyword_description`. **Clear** resets query, filters and
-mode, restoring paged library browsing without starting the model. With an empty
+mode is explicitly `combined`. **Clear** resets query, filters and
+mode (combined) and shortlist limit (20), restoring paged library browsing without starting the model. With an empty
 query, Enter browses using the selected filters rather than issuing an empty
 semantic search. Pack, source format, maximum triangles and rigged filters reuse
 the existing verified backend policy. Technical filters require inspected facts
@@ -35,9 +35,16 @@ for the requested format; unknowns do not qualify.
 
 **Filters & search options** exposes the existing keyword, description, image,
 combined and reference modes. Reference search uses an existing library asset ID
-and a known view; there is no upload or arbitrary path input. Image-related modes
-are requested explicitly. Searches show the same compact shortlist as MCP, up to
-five candidates with identical order and shared cap/truncation. Suggestions can
+and a known view; there is no upload or arbitrary path input. Keyword + description + image (`combined`) is the default. Its reciprocal rank
+fusion gives image rank weight 3, keyword and description weight 1 each, with
+`k=60`; the explicit Keyword + description mode retains equal weights. Existing
+embeddings are reused without reindexing.
+
+Shortlist choices are exactly **5, 10, 20, 30, 40**, with **20** selected on
+startup and Clear. The Windows bridge explicitly requests 20 by default; MCP
+omitted limits remain 5. Both response layers use the shared request-scaled
+character budget documented in `../mcp/README.md`, with identical order and
+explicit cap/truncation reporting. Suggestions can
 be irrelevant even when the requested object is absent; scores are not confidence
 percentages and the app has no universal similarity threshold or semantic fallback.
 
@@ -47,6 +54,15 @@ unsent edits. An agent must submit that object against the same catalog/index
 version. Full catalog/index/membership SHA-256 values are available in the footer
 description/tooltip and retained verification receipts. Versions are not added
 as invalid extra fields to the tool argument object.
+
+An indeterminate circle and **Searching…** appear immediately, including while
+the existing worker loads its model. Prior cards remain visible until completion.
+The Search button is disabled while active and repeated identical submissions
+are ignored. A different request supersedes the old one; Clear and a published
+view refresh invalidate it. Obsolete completion cannot hide a newer busy state.
+Success, empty results and errors end the current busy state. The indicator has
+a polite live announcement; reduced-motion preferences stop animation while
+keeping the circle and text visible. There are no percentages or automatic retries.
 
 Use Tab/Shift+Tab for controls, arrows/Home/End within the grid, Enter/Space to
 activate a card, Ctrl+F to focus text search, and Escape to close detail. Controls
@@ -151,3 +167,18 @@ manual scan/process/refresh/status operations under its separate approved contra
 Classification, game integration, new agent registrations, hosting and cloud
 inference remain outside scope. Bruno's usability, artistic suitability and
 comprehensive accessibility review remain separate owner decisions.
+
+## Focused search-change verification
+
+Run the packaged Windows lifecycle check using existing tooling:
+
+```powershell
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/verify-search-ui.py --run-name unique-search-ui-run
+```
+
+This uses small synthetic assets, actual WebView2 and controlled delayed/error
+responses. It verifies the packaged UI and shared copied-settings replay without
+loading a real model or rerunning relevance evaluation. It preserves screenshots
+and reports under `data/gui/`. Reduced-motion styling is checked in the renderer;
+it does not change the Windows preference. Owner Windows usability, screen-reader
+behavior and search-relevance approval remain separate and pending.

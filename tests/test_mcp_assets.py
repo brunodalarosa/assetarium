@@ -16,7 +16,7 @@ from local_asset_library.mcp_assets import AssetService, validate, bounded
  ('get_asset',{'asset_id':'asset_'+'a'*32,'path':'../x'}),
  ('get_asset',{'asset_id':'asset_'+'a'*32,'include_preview':'true'}),
  ('search_assets',{'query':''}),('search_assets',{'query':'x'*1025}),
- ('search_assets',{'query':'chair','limit':True}),('search_assets',{'query':'chair','limit':6}),
+ ('search_assets',{'query':'chair','limit':True}),('search_assets',{'query':'chair','limit':41}),
  ('search_assets',{'query':'chair','filters':{'color':'red'}}),
  ('search_assets',{'query':'chair','filters':{'format':'../obj'}}),
  ('search_assets',{'query':'chair','filters':{'pack':'../pack'}}),

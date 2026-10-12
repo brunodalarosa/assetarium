@@ -16,6 +16,7 @@ from .config import ConfigError, load_config
 from .desktop_service import DesktopService
 from .mcp_assets import error_payload, validate
 from .mcp_server import Gateway
+from .search_policy import DEFAULT_MODE
 
 
 class DesktopBridge:
@@ -125,9 +126,9 @@ class DesktopBridge:
     async def _search(self, arguments):
         validate('search_assets', arguments)
         arguments = dict(arguments)
-        arguments.setdefault('mode', 'keyword_description')
+        arguments.setdefault('mode', DEFAULT_MODE)
         arguments.setdefault('filters', {})
-        arguments.setdefault('limit', 5)
+        arguments.setdefault('limit', 20)
         validate('search_assets', arguments)
         started = time.perf_counter()
         result = await self._gateway.call('search_assets', arguments)

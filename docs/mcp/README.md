@@ -43,7 +43,8 @@ approval.
 ## Tool contract
 
 `search_assets` accepts a text `query`, optional `mode`, `filters`, and `limit`.
-The default is `keyword_description`; limit is an integer **1–5**, default 5.
+The default is `combined` (Keyword + description + image); limit is an integer
+**1–40**, default 5. Windows explicitly requests 20 by default.
 Text is bounded to 1,024 characters (256 for keyword), excluding control
 characters. Modes include keyword, description, text-to-image (`image`), combined,
 and reference. Reference search takes `reference_asset_id` plus a known
@@ -56,10 +57,25 @@ requested format. Every source and required dependency is boundary-resolved and
 hash-verified; stale/unavailable inputs are excluded. Index/model/input contract
 mismatches are errors, with no synthetic vectors or ranking fallback.
 
+Query-time ranking policy is centrally defined in
+`src/local_asset_library/search_policy.py`: weighted reciprocal rank fusion
+contributes `weight / (60 + rank)` per channel, with combined image weight **3**
+and keyword/description weight **1** each. Explicit `keyword_description` retains
+equal weights. Raw scores are never averaged; deterministic asset-ID tie-breaking,
+one result per logical asset and image best-view aggregation are retained. The
+existing EmbeddingGemma 2 image/description vectors and published index are reused.
+The legacy CLI omitted-mode keyword baseline is unchanged.
+
 Search returns compact candidate summaries, ID preview references, matching
 channels, caption/source fault flags, counts and a small sample of exclusion
 faults. Full exclusion evidence lives in the local call audit. Its serialized
-text is at most **6,000 characters**, including the size fields. It removes
+text budget is **6,000 characters for limits 1–5**, and
+**2,000 + 1,000 × requested limit characters for limits 6–40**,
+including size fields and fault summaries. Budgets for limits 5, 10, 20, 30 and 40
+are respectively **6,000, 12,000, 22,000, 32,000 and 42,000 characters**.
+Retrieval and the agent service share this policy, so the inner layer cannot
+routinely discard a larger shortlist under a fixed compact cap. Typical compact
+records fit the requested count; unusually large metadata can still truncate. It removes
 lowest-ranked results deterministically to enforce the cap. The
 `ceil(characters/4)` estimate is heuristic, not client billing/model tokens.
 Semantic results remain weak/unvalidated even after approval of this bounded

@@ -75,7 +75,7 @@ try:
                  {'asset_id':'\\\\server\\share\\asset.glb'}, {'asset_id':'asset_'+'a'*32},
                  {'asset_id':candidate,'path':'../outside'}, {'asset_id':candidate,'source_format':'exe'}]:
         call('get_asset',args,error=True)
-    for args in [{'query':'apple','limit':6},{'query':'apple','limit':True},
+    for args in [{'query':'apple','limit':41},{'query':'apple','limit':True},
                  {'query':'apple','filters':{'format':'../obj'}},{'query':'apple','filters':{'color':'red'}},
                  {'query':'apple','filters':{'pack':'../pack'}},{'query':'x'*1025},
                  {'mode':'reference','reference_asset_id':'data/preview.png'}]:
@@ -83,7 +83,7 @@ try:
     call('copy_asset',{},error=True)
     checks.append('malformed IDs, absolute/UNC/traversal/path inputs, unknown tools/filters, caps')
     semantic,_=call('search_assets',{'query':'a small round red apple fruit with a leaf','limit':5})
-    assert semantic['mode']=='keyword_description' and semantic['results']
+    assert semantic['mode']=='combined' and semantic['results']
     checks.append('verified embedding worker and approved semantic default')
     p.stdin.close()
     code=p.wait(timeout=20)

@@ -260,7 +260,7 @@ def verify():
         # Bounded synthetic UI transport faults/races. No real source or backend fault is introduced.
         synthetic = js("""(async()=>{const real=state.api;const item=name=>({asset_id:name,name,pack:'synthetic_fixture',caption_owner_review:'pending'});
           state.api={...real,asset:async()=>({payload:{preview:{status:'faulty',reason:'Synthetic missing preview fixture'}}}),
-            search:args=>new Promise(resolve=>setTimeout(()=>resolve({arguments:args,elapsed_seconds:0.01,payload:{results:[item(args.query)],fault_count:0,truncated:true}}),args.query==='old'?60:10))};
+            search:args=>new Promise(resolve=>setTimeout(()=>resolve({arguments:args,elapsed_seconds:0.01,payload:{generation:state.context.generation,results:[item(args.query)],fault_count:0,truncated:true}}),args.query==='old'?60:10))};
           try {$('mode').value='keyword';$('query').value='old';const first=search();$('query').value='new';const second=search();await Promise.all([first,second]);
             const latest=state.items[0].asset_id==='new';const truncated=$('status').textContent.includes('truncated');
             state.api.search=async()=>({is_error:true,payload:{status:'faulty',reason:'Synthetic embedding runtime failure; no fallback'}});

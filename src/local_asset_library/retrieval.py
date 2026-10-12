@@ -15,6 +15,7 @@ from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
 from .publication import pinned
+from .search_policy import DEFAULT_MODE, MAX_LIMIT, RRF_K, RRF_WEIGHTS, search_character_cap
 
 VERSION = "pilot-retrieval-v1"
 MODES = {"keyword", "description", "image", "keyword_description", "combined", "reference"}
@@ -297,12 +298,12 @@ def aggregate_views(rows, scores):
     return sorted(best.values(), key=lambda r: (-r["score"], r["asset_id"]))
 
 
-def fuse(rankings):
+def fuse(rankings, weights=None):
     scores = {}
-    for ranking in rankings.values():
+    for channel, ranking in rankings.items():
         for rank, candidate in enumerate(ranking, 1):
             identifier = candidate["asset_id"]
-            scores[identifier] = scores.get(identifier, 0) + 1 / (60 + rank)
+            scores[identifier] = scores.get(identifier, 0) + (weights or {}).get(channel, 1) / (RRF_K + rank)
     return [{"asset_id": identifier, "score": score} for identifier, score in sorted(scores.items(), key=lambda r: (-r[1], r[0]))]
 
 
@@ -312,7 +313,7 @@ class SearchEngine:
         self.contract = contract if contract is not None else (backend.contract if backend else None)
 
     @pinned
-    def search(self, text="", mode="combined", reference=None, filters=None, limit=5, min_similarity=None,
+    def search(self, text="", mode=DEFAULT_MODE, reference=None, filters=None, limit=5, min_similarity=None,
                exclude_image_hashes=None):
         started = time.perf_counter()
         filters = filters or {}
@@ -320,7 +321,7 @@ class SearchEngine:
         if exclude_image_hashes and mode != "reference":
             raise ConfigError("Image exclusions are only accepted for reference evaluation")
         validate_filters(filters)
-        if mode not in MODES or type(limit) is not int or not 1 <= limit <= 20:
+        if mode not in MODES or type(limit) is not int or not 1 <= limit <= MAX_LIMIT:
             raise ConfigError("Invalid search mode/limit")
         if not isinstance(text, str) or len(text) > 1024 or (mode != "reference" and not text.strip()):
             raise ConfigError("Search requires text of at most 1024 characters")
@@ -402,7 +403,7 @@ class SearchEngine:
                 rankings[channel] = ranking
         eligible = {channel: [r for r in ranking if channel == "keyword" or min_similarity is None or r["score"] >= min_similarity]
                     for channel, ranking in rankings.items()}
-        ranked = fuse(eligible) if mode in {"combined", "keyword_description"} else next(iter(eligible.values()), [])
+        ranked = fuse(eligible, RRF_WEIGHTS[mode]) if mode in {"combined", "keyword_description"} else next(iter(eligible.values()), [])
         results = []
         for candidate in ranked[:limit]:
             record = records[candidate["asset_id"]]
@@ -436,14 +437,16 @@ class SearchEngine:
                     "score_meaning": "RRF rank score" if mode in {"combined", "keyword_description"} else ("FTS5 BM25" if mode == "keyword" else "cosine similarity; not a probability"),
                     "evaluation_cosine_floor": min_similarity,
                     "match_policy": "Semantic candidates are weak/unvalidated; an optional evaluation cosine floor is not a universal confidence threshold.",
-                    "character_cap": 6000, "truncated": False, "serialized_characters": 0, "estimated_tokens": 0,
+                    "character_cap": search_character_cap(limit), "truncated": False, "serialized_characters": 0, "estimated_tokens": 0,
                     "token_estimate_method": "ceil(characters/4); heuristic, not model tokens"}
         while True:
             for _ in range(8):
                 size = len(encoded(response))
                 response.update(serialized_characters=size, estimated_tokens=(size + 3) // 4)
-            if size <= 6000 or not response["results"]:
+            if len(encoded(response)) <= response["character_cap"]:
                 break
+            if not response["results"]:
+                raise ConfigError("Response exceeds deterministic cap")
             response["results"].pop()
             response["truncated"] = True
         evidence = {"response": response, "channel_rankings": rankings, "eligible_channel_rankings": eligible,
