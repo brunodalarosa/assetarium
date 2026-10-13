@@ -42,8 +42,8 @@ def validate_caption(value):
         raise ValueError("Invalid identity or description")
     if "unknown" in identity["label"].casefold() and identity["certainty"] == "probable":
         raise ValueError("Unknown identity cannot have probable certainty; use uncertain or unknown and record why")
-    if not 60 <= len(value["description"].split()) <= 170:
-        raise ValueError("Description must have 60-170 words; aim for 80-150")
+    if not 10 <= len(value["description"].split()) <= 170:
+        raise ValueError("Description must have 10-170 words; use concise visual observations without padding")
     for key in FIELDS - {"identity", "description"}:
         items = value[key]
         if not isinstance(items, list) or len(items) > 16 or not all(string(v, 300) for v in items):

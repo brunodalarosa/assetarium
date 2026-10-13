@@ -1368,3 +1368,50 @@ unique project allocation was 6,868,475,992 bytes (6.397 GiB), about 0.764 GiB
 above the before-bulk receipt, below both the approved growth and total limits.
 No new runtime, dependency, weight copy, source copy or destructive cleanup
 was needed. No further full-library accuracy/owner approval is inferred.
+
+## City Kit addition — October 12, 2026
+
+The separately approved import added City_Kit_Suburban (40 assets) and
+City_Kit_Commercial (41), publishing **964 assets across ten packs**. All 81 new
+inspection/preview stages completed, producing 252 rendered images and 333
+successful image-search vectors including supplied thumbnails. Description
+generation was explicitly skipped; all 81 captions and their text vectors remain
+eligible for later processing. Existing unchanged caption failures were retained.
+
+The importer now supports `--skip-captions` and a bounded per-run peak reserve.
+Ungenerated captions display as pending, and absent text inputs do not create
+failed vector jobs or prevent publication. Fifty focused tests passed. Desktop
+and actual STDIO MCP access agreed for both new packs; every new asset's detail
+and preview was checked. All original source files and existing downstream
+results/vectors/owner corrections remained intact; the scan refreshed one older
+fence's inventory metadata. Twelve new assets retain overlapping-face source
+fault evidence and usable previews, with no new processing failures or repairs.
+
+Unique allocated storage grew by **133.4 MiB**, to **6.610 GiB**, under the
+500 MiB import allowance and existing 8 GiB total ceiling. Source assets and
+shared models remain external and read only. The complete report, visual review
+and preservation/access/storage receipts are linked from
+[City Kit import](city-kits-import.md). Owner artistic/physical-scale and
+alternate-format equivalence approval remains separate and pending.
+
+## Caption minimum reduced — October 12, 2026
+
+The approved change lowers description validation to **10–170 words**, retaining
+the existing identity, uncertainty, field, visual-attribute and prohibited-claim
+checks. `prompts/caption-v3.txt` is active for future full-library jobs and permits
+concise 10–30-word descriptions for simple assets. Historical v1/v2 prompts and
+generation records remain unchanged. Completed captions retain their recorded
+prompt version for cache checks; jobs needing new generation use v3 and its
+fingerprint. Switching the default prompt does not request regeneration.
+
+All **81 focused tests passed**, including 9/10/59/60/170/171-word boundaries and
+completed-v2 cache preservation. A before/after comparison verified **1,809
+protected files** unchanged, covering historical prompts, caption records,
+corrections, catalog/index files and job ledger. Actual dry-run counts remain
+514 completed captions retained, 369 failed captions retained and 81 pending.
+No model inference, caption recovery/revalidation, asset processing, catalog
+publication or dependency/model installation occurred. Evidence is under
+`data/caption-minimum-10/{before,preservation}.json` and `tests.xml`.
+Focused synthetic test fixtures and receipts used about 11 MiB of file content,
+above the preliminary under-5-MiB estimate; no runtime, model or asset copy was
+introduced.

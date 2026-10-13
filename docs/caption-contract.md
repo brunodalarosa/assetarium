@@ -11,8 +11,15 @@ Identity has a short label and `probable`, `uncertain` or `unknown` certainty.
 Unknown labels cannot be probable. Uncertain/unknown identity needs a stated
 uncertainty. Confidence labels are uncalibrated model heuristics.
 
-Description is bounded to 60–170 words, with 80–150 preferred; short simple
-assets need not be padded. Attributes are bounded lists of short strings.
+Description is bounded to **10–170 words**. The active full-library prompt is
+`prompts/caption-v3.txt`; simple assets may need only 10–30 words and must not be
+padded. Longer descriptions remain available for complex assets. Attributes are
+bounded lists of short strings. Historical v1/v2 prompts and generation receipts
+are preserved. Completed full-library captions are checked against their recorded
+prompt version, so adopting v3 does not itself trigger regeneration. New or
+invalidated jobs use v3 and record that version and its input fingerprint.
+Changing this rule does not recover/revalidate stored failed responses or clear
+their original fault records; that requires a separate explicit operation.
 Duplicate JSON keys, wrong types, extra fields, truncated JSON and specified
 technical/use claims in observation fields are rejected. This validation cannot
 prove the semantic truth of a visually plausible statement. Review can flag

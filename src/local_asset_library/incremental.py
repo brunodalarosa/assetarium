@@ -24,6 +24,7 @@ from .inspection import choose_source, discover_blender, environment, run_proces
 
 STAGES = ("inspection", "caption", "embeddings")
 COVERAGE_STAGES = ('inventory','inspection','previews','caption','embeddings')
+CAPTION_PROMPT_VERSION = 'v3'
 WORK = "work"
 _blender_runtime = {}
 
@@ -101,14 +102,21 @@ def inspection_input(config, record, resolution=640, content_only=False):
         "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None})
 
 
-def caption_input(config, record):
+def caption_input(config, record, prompt_version=None):
     # Model/runtime contracts and prompt affect inference. Severity/owner review do not.
+    # Completed captions retain their generation prompt for cache validation;
+    # adopting a new default is not a request to regenerate existing results.
+    if prompt_version is None:
+        prompt_version = ((record.get('caption_provenance') or {}).get('prompt_version')
+                          if record['processing'].get('caption') == 'complete' else None) or CAPTION_PROMPT_VERSION
+    if prompt_version not in {'v1', 'v2', 'v3'}:
+        raise ConfigError('Unsupported caption prompt version')
     return digest({"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
         "view_label": p.get("view_label"), "actual": s.get("current_sha256", s.get("error"))}
         for s in input_state(config, record) for p in [s["preview"]]],
         "model": {k: v for k,v in json.loads((config.project_root / "docs/caption-model.json").read_text(encoding="utf-8")).items()
                   if k in {'model_id', 'revision'}},
-        "prompt": file_hash(config.project_root / "prompts/caption-v2.txt"),
+        "prompt": file_hash(config.project_root / f"prompts/caption-{prompt_version}.txt"),
         "backend": file_hash(config.project_root / "src/local_asset_library/caption_backend.py"),
         "runtime": file_hash(config.project_root / "runtime/caption/uv.lock"),
         "generation_policy": "single-attempt-no-fault-retry-v1"})
@@ -256,12 +264,13 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180):
 def run_caption(config, record, fingerprint, backend):
     from .captions import publish
     inputs = image_inputs(config, record)
-    prompt = (config.project_root / "prompts/caption-v2.txt").read_text(encoding="utf-8")
+    prompt_path = config.project_root / f'prompts/caption-{CAPTION_PROMPT_VERSION}.txt'
+    prompt = prompt_path.read_text(encoding="utf-8")
     outcome = infer_caption(backend, inputs, prompt, max_attempts=1)
     image_inputs(config, record)
     relative = f"captions/library/{record['asset_id']}/{fingerprint}.json"
     provenance = {"fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
-        "prompt_version": "v2", "prompt_sha256": file_hash(config.project_root/'prompts/caption-v2.txt'), "input_views": inputs,
+        "prompt_version": CAPTION_PROMPT_VERSION, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
         "attempts": outcome["attempts"], "ai_review": "pending", "owner_caption_review": "pending",
         "owner_artistic_suitability": "pending", "result_path": "data/" + relative}
     save_json(config.output_path("data", relative), {"asset_id": record["asset_id"], **outcome, "provenance": provenance})
@@ -316,6 +325,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                         continue
                 retained[old[1]] += 1
                 continue
+            if stage == 'caption':
+                fp = caption_input(work, record, prompt_version=CAPTION_PROMPT_VERSION)
             pending.append((record, fp))
         report = {"stage": stage, "pending": len(pending), "selected": min(limit, len(pending)), "retained": dict(retained), "dry_run": dry_run, "outcomes": []}
         if dry_run:

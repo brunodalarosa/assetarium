@@ -42,6 +42,31 @@ def test_uncertainty_and_uses_remain_separate():
     assert result["suggested_uses"] == ["hypothetical scenery prop"]
 
 
+@pytest.mark.parametrize('words,accepted',[(9,False),(10,True),(59,True),(60,True),(170,True),(171,False)])
+def test_description_word_boundaries(words,accepted):
+    value=caption()
+    value['description']=' '.join(['brown']*words)
+    if accepted:
+        assert parse_caption(json.dumps(value))['description']==value['description']
+    else:
+        with pytest.raises(ValueError,match='10-170 words'):
+            parse_caption(json.dumps(value))
+
+
+def test_short_caption_still_requires_consistent_identity_and_visual_fields():
+    value=caption()
+    value['description']='A brown faceted object has a broad top and narrow stem.'
+    assert validate_caption(value)
+    value['identity']={'label':'unknown object','certainty':'probable'}
+    with pytest.raises(ValueError,match='Unknown identity'):
+        validate_caption(value)
+    value=caption()
+    value['description']='A brown faceted object has a broad top and narrow stem.'
+    value['colors']=[]
+    with pytest.raises(ValueError,match='Core visual attributes'):
+        validate_caption(value)
+
+
 @pytest.mark.parametrize("raw", ["{}", "not json", '{"identity":',
     json.dumps({**caption(), "technical": {"triangles": 12}}),
     json.dumps({**caption(), "uncertainties": []}),

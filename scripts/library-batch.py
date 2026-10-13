@@ -21,7 +21,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('operation', choices=['scan', 'process', 'refresh', 'status'])
 parser.add_argument('--dry-run', action='store_true')
 parser.add_argument('--batch-size', type=int, default=50)
+parser.add_argument('--skip-captions', action='store_true', help='Leave descriptions pending; inspect and index available images only')
+parser.add_argument('--peak-reserve-mib', type=int, default=2048, help='Estimated and enforced additional storage ceiling for this run')
 args = parser.parse_args()
+if not 1 <= args.batch_size <= 1000 or args.peak_reserve_mib <= 0:
+    parser.error('Batch size must be 1–1000 and peak reserve must be positive')
+stages = [('inspection', '.venv-mcp'), ('caption', '.venv-caption'), ('embeddings', '.venv-embedding')]
+if args.skip_captions:
+    stages = [item for item in stages if item[0] != 'caption']
 config = load_config(root / 'config.example.toml', root)
 run = root / 'data/library/operations' / uuid.uuid4().hex
 run.mkdir(parents=True, exist_ok=False)
@@ -45,14 +52,19 @@ try:
     elif args.operation == 'refresh':
         result = {'dry_run': True, 'coverage': coverage(working(config))} if args.dry_run else publish(config)
     elif args.dry_run:
-        result = {s: process(config, s, args.batch_size, dry_run=True) for s in ('inspection', 'caption', 'embeddings')}
+        result = {s: {k: v for k, v in process(config, s, args.batch_size, dry_run=True).items()
+                      if k != 'outcomes'} for s, _ in stages}
+        result['skipped_stages'] = ['caption'] if args.skip_captions else []
     else:
         before, base = storage('before-bulk')
         budgets = policy(config)['budget']
-        save_json(run / 'before.json', {'receipt': before, 'allocated_bytes': base, 'budget': budgets})
-        if base + 2 * 1024**3 > budgets['total_allocated_bytes']:
+        reserve = args.peak_reserve_mib * 1024**2
+        if reserve > budgets['peak_additional_allocated_bytes']:
+            raise RuntimeError('Requested peak reserve exceeds approved additional storage budget')
+        save_json(run / 'before.json', {'receipt': before, 'allocated_bytes': base, 'budget': budgets, 'run_peak_reserve_bytes': reserve, 'skipped_stages': ['caption'] if args.skip_captions else []})
+        if base + reserve > budgets['total_allocated_bytes']:
             raise RuntimeError('Conservative projected peak exceeds approved budget; work preserved')
-        for stage, executable in [('inspection', '.venv-mcp'), ('caption', '.venv-caption'), ('embeddings', '.venv-embedding')]:
+        for stage, executable in stages:
             for batch in range(1000):
                 preview = process(config, stage, args.batch_size if stage != 'embeddings' else 1000, dry_run=True)
                 pending = preview.get('pending', 0)
@@ -70,11 +82,14 @@ try:
                     raise RuntimeError(f'Batch application/runtime failure; resume after explicit repair: {log}')
                 receipt, allocated = storage(stage + '-batch')
                 save_json(run / f'{stage}-{batch:03}-storage.json', {'receipt': receipt, 'allocated_bytes': allocated})
-                if allocated > budgets['total_allocated_bytes'] or allocated - base > budgets['peak_additional_allocated_bytes']:
+                if allocated > budgets['total_allocated_bytes'] or allocated - base > reserve:
                     raise RuntimeError('Approved storage budget exceeded; resumable work preserved')
         result = publish(config)
         after, allocated = storage('after-bulk')
         result['storage'] = {'before': before, 'after': after, 'before_allocated': base, 'after_allocated': allocated}
+        result['skipped_stages'] = ['caption'] if args.skip_captions else []
+        if allocated > budgets['total_allocated_bytes'] or allocated - base > reserve:
+            raise RuntimeError('Approved storage budget exceeded after publication; results preserved')
     save_json(run / 'result.json', result)
     print(json.dumps({k:v for k,v in result.items() if k != 'outcomes'}, ensure_ascii=False))
 except BaseException as exc:

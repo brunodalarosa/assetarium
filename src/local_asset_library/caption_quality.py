@@ -90,6 +90,11 @@ def caption_quality(config, record):
                 issue["reason"] = str(exc)
     processing = (record.get("processing") or {}).get("caption", "missing")
     description = record.get("description")
+    if (processing == 'pending' and description is None
+            and not record.get('caption_provenance') and not issues
+            and not (record.get('stage_faults') or {}).get('caption')):
+        return {'status': 'pending', 'caption_faulty': False,
+                'classification': 'not_processed', 'issues': []}
     usable = (processing == "complete" and isinstance(description, dict)
               and isinstance(description.get("description"), str) and bool(description["description"].strip()))
     if not usable:

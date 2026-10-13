@@ -74,6 +74,16 @@ def test_classification_cannot_downgrade_unusable_captions(tmp_path, processing,
     assert any(i["severity"] == "fault" for i in quality["issues"])
 
 
+def test_ungenerated_description_is_pending_and_recorded_failure_stays_fault(tmp_path):
+    config, item = Config(tmp_path, tmp_path / 'source', None), record()
+    item.update(description=None, caption_provenance=None)
+    item['processing']['caption'] = 'pending'
+    quality = caption_quality(config, item)
+    assert quality['status'] == 'pending' and not quality['caption_faulty']
+    item['stage_faults'] = {'caption': {'error': 'Recorded generation failure'}}
+    assert caption_quality(config, item)['caption_faulty']
+
+
 def test_no_findings_is_not_owner_approval(tmp_path):
     item = record()
     item["caption_provenance"]["visual_faults"] = []

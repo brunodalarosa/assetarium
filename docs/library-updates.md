@@ -2,16 +2,19 @@
 
 The prepared Windows app and MCP server share explicitly configured membership,
 source/dependency checks, measured filters, ranking and response caps. The approved
-contract is `docs/library-membership.json`: eight packs, initially 883 logical
-assets, maximum 883. Changing this file is not owner expansion authorization.
+contract is `docs/library-membership.json`: ten packs, initially 883 logical
+assets, maximum 964 after the separately approved addition of the two City Kit
+packs. Changing this file is not owner expansion authorization.
 Source packs and shared model revisions remain read only. Step 9 is optional;
 no classification or clustering is performed.
 
-The published Step 8 collection contains 883 inspected assets, 514 valid generated
+The original Step 8 publication contained 883 inspected assets, 514 valid generated
 captions and 369 retained caption generation/schema failures. Image retrieval and
 usable previews remain available for partial results; new captions still await
 review. Actual coverage, resource measurements and verification are recorded in
 `docs/step8-verification.json` and `docs/progress.md`.
+The City Kit addition publishes 964 assets, with its 81 new descriptions pending;
+see `docs/city-kits-import.md` for current import and preservation evidence.
 
 Double-click `Local Asset Library.vbs`. Opening the app reads the published
 catalog/index and existing previews; it never installs, downloads, scans,
@@ -34,6 +37,22 @@ Run from this repository, using the existing base interpreter:
 .\.venv\Scripts\python.exe scripts/library-batch.py status
 .\.venv\Scripts\python.exe scripts/library-status.py
 ```
+
+For the approved City Kit import, leave description generation for a later run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/library-batch.py process --skip-captions --batch-size 25 --peak-reserve-mib 500
+```
+
+This runs inspection/renders and available image embeddings, then publishes the
+catalog/index. It never starts the caption runtime. Ungenerated descriptions are
+`pending`, and their text vectors are deferred without failed jobs or an endless
+processing loop. Image embeddings remain usable as partial results. The peak
+reserve is checked before processing and enforced after each batch/publication;
+it cannot exceed the existing approved budget. Normal processing keeps its
+default 2 GiB reserve and includes caption generation. Later explicit caption
+processing makes these text inputs eligible automatically; unchanged actual
+failures still require owner-authorized retries.
 
 The app exposes Check changes, Scan, Process pending, Publish ready work, Status
 and Refresh published view. A started background operation returns immediately;

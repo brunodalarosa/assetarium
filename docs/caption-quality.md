@@ -11,6 +11,7 @@ usable source or alter search ranking.
 | `review_note` | Minor precision or uncertain detail; broad identity remains useful | Note in asset detail; no caption badge |
 | `warning` | Meaningful descriptive error or interpretation that could mislead selection | Caption warning badge and detail explanation |
 | `fault` | Caption processing failed/incomplete, or there is no usable description | Caption fault badge and recorded fault |
+| `pending` | Description generation has not started; no generation provenance or caption fault exists | No fault badge; coverage reports captions pending |
 
 The approved reclassification contains **16 assets with review notes, 14 with
 warnings, 1 failed caption, and 9 with no recorded findings**. All original 32
@@ -43,6 +44,9 @@ forty-asset classifications above remain historical evidence; newly generated
 captions await review and do not inherit an approval or a clear visual review.
 Expanded coverage and pending reviews are reported separately in
 `docs/step8-verification.json`.
+Intentionally ungenerated descriptions have `processing.caption=pending` and
+null description/provenance. They remain eligible for a later generation run;
+this state does not downgrade failed, partially generated, or unusable captions.
 Record a caption review using `findings`, for example:
 
 ```json

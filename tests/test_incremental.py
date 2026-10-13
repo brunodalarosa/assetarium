@@ -32,7 +32,7 @@ def library(tmp_path):
         for i in range(3):
             (source / pack / f'item{i}.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
     for path in ('src/local_asset_library/blender_worker.py', 'src/local_asset_library/render_math.py',
-                 'src/local_asset_library/caption_backend.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt'):
+                 'src/local_asset_library/caption_backend.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt'):
         target = root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_text('synthetic contract')
     save_json(root / 'docs/caption-model.json', {'revision': 'synthetic'})
     save_json(root / 'docs/library-membership.json', {'schema_version': 1, 'approved': True, 'packs': ['one','two'], 'approval': 'synthetic'})
@@ -125,6 +125,34 @@ def test_vector_interruption_and_no_unchanged_fault_retry(library):
     failed=index_library(work,backend)
     assert sum(o['status']=='failed' for o in failed['outcomes'])==4
     assert index_library(work,backend)['processed']==0 and len(backend.calls)==calls
+
+
+def test_deferred_descriptions_publish_images_and_later_index_text(library):
+    config, backend = library
+    work = ready(config)
+    for item in records(work):
+        item.update(description=None, caption_provenance=None)
+        item['processing']['caption'] = 'pending'
+        update_record(work, item)
+    result = index_library(work, backend)
+    assert result['processed'] == 18 and result['deferred_descriptions'] == 6
+    assert len(backend.calls) == 18
+    assert {o['status'] for o in result['outcomes']} == {'complete', 'deferred'}
+    assert index_library(work, backend, dry_run=True)['pending'] == 0
+    assert index_library(work, backend)['processed'] == 0
+    with closing(sqlite3.connect(work.output_path('data', 'embeddings/index.sqlite'))) as db:
+        assert db.execute("SELECT COUNT(*) FROM jobs WHERE channel='description'").fetchone()[0] == 0
+        assert db.execute("SELECT COUNT(*) FROM jobs WHERE status='failed'").fetchone()[0] == 0
+    assert all(r['processing']['embeddings'] == 'partial' for r in records(work))
+    assert publish(config)['membership'] == 6
+    from local_asset_library.caption_quality import caption_summary
+    assert all(caption_summary(config, r)['caption_status'] == 'pending' for r in records(work))
+    ready(config)
+    resumed = index_library(work, backend)
+    assert resumed['processed'] == 6 and resumed['deferred_descriptions'] == 0
+    assert len(backend.calls) == 24
+    assert all(r['processing']['embeddings'] == 'complete' for r in records(work))
+    assert publish(config)['membership'] == 6
 
 
 def test_corruption_isolated_and_not_reinferred(library):
@@ -236,6 +264,29 @@ def test_caption_settings_are_independent_from_owner_and_budget(library):
     assert process(config,'caption',dry_run=True)['pending']==0
     assert process(config,'inspection',dry_run=True)['pending']==6
     value['revision']='new-model-contract';save_json(model,value)
+    assert process(config,'caption',dry_run=True)['pending']==6
+
+
+def test_new_prompt_keeps_completed_v2_captions_and_new_jobs_use_v3(library):
+    config,_=library
+    work=ready(config)
+    from local_asset_library.incremental import caption_input,seed
+    for record in records(work):
+        record['caption_provenance']['prompt_version']='v2'
+        update_record(work,record)
+    seed(work)
+    old={r['asset_id']:caption_input(work,r) for r in records(work)}
+    (config.project_root/'prompts/caption-v3.txt').write_text('Changed future prompt; 10-170 words')
+    assert process(config,'caption',dry_run=True)['retained']=={'complete':6}
+    assert all(caption_input(work,r)==old[r['asset_id']] for r in records(work))
+    record=records(work)[0]
+    record.update(description=None,caption_provenance=None)
+    record['processing']['caption']='pending'
+    assert caption_input(work,record)==caption_input(work,record,prompt_version='v3')
+    assert caption_input(work,record)!=caption_input(work,record,prompt_version='v2')
+    # A changed old input needs generation under the active prompt, with a
+    # fingerprint that matches the version recorded in the new result.
+    (config.project_root/'prompts/caption-v2.txt').write_text('Changed old input')
     assert process(config,'caption',dry_run=True)['pending']==6
 
 
