@@ -102,8 +102,15 @@ def atomic_json(path, value):
 
 def read_json(path):
     """Windows readers permit atomic manifest replacement while holding an old handle."""
+    # Full-library preservation receipts contain several thousand vector hashes.
+    # Four MiB covers the approved membership while retaining a strict bound.
+    limit = 4 * 1024 * 1024
     if os.name!='nt':
-        return json.loads(path.read_text(encoding='utf-8'))
+        with path.open('rb') as stream:
+            data = stream.read(limit + 1)
+        if len(data) > limit:
+            raise ConfigError('Managed manifest exceeds its bounded size')
+        return json.loads(data.decode('utf-8'))
     import ctypes
     from ctypes import wintypes
     import msvcrt
@@ -120,7 +127,7 @@ def read_json(path):
         kernel.CloseHandle(handle)
         raise
     with os.fdopen(descriptor,'rb') as stream:
-        data=stream.read(1024*1024+1)
-    if len(data)>1024*1024:
+        data=stream.read(limit+1)
+    if len(data)>limit:
         raise ConfigError('Managed manifest exceeds its bounded size')
     return json.loads(data.decode('utf-8'))

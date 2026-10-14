@@ -13,7 +13,7 @@ from .membership import records
 from .retrieval import index_database, checked_vector, source_check, description_input, preview_file, image_input, normalize, VERSION
 
 
-def index_library(config, backend=None, limit=1000, dry_run=False):
+def index_library(config, backend=None, limit=1000, dry_run=False, description_only=False):
     from .incremental import update_record
     selected = records(config)
     with closing(index_database(config, readonly=dry_run)) as db:
@@ -39,6 +39,10 @@ def index_library(config, backend=None, limit=1000, dry_run=False):
                 ref = None if preview is None else {k: preview[k] for k in ("path", "source_path", "sha256", "view_label", "origin") if k in preview}
                 job = digest({"asset": identifier, "channel": channel, "preview": ref and {k: v for k, v in ref.items() if k != "sha256"}})
                 expected.add(job)
+                if description_only and channel == 'image':
+                    old = old_jobs.get(job)
+                    counts[old[1] if old and old[1] in {'complete', 'failed'} else 'pending'] += 1
+                    continue
                 # A description awaiting generation has no vector input yet.
                 # Keep it eligible after captioning without creating a failed job
                 # or including it in runnable pending work (which would loop).

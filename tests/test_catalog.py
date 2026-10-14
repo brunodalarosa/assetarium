@@ -37,6 +37,16 @@ def exports(config, pack="pack", names=("chair", "chair-round")):
     put(config, f"{pack}/Models/OBJ format/Textures/palette.png", b"texture fixture")
 
 
+def test_non_cc0_pack_readme_is_preserved_without_cc0_claim(catalog_config):
+    put(catalog_config, 'licensed/Models/chair.fbx')
+    put(catalog_config, 'licensed/README.md', 'Synty one-time purchase license. NOT CC0. Do not redistribute.')
+    put(catalog_config, 'README-licenses.txt', 'All original packs CC0.\n1. original.zip - original pack')
+    _, assets, _, _ = build_inventory(catalog_config)
+    evidence = assets[0]['license_evidence']
+    assert any(e['path'] == 'licensed/README.md' and 'NOT CC0' in e['excerpt'] for e in evidence)
+    assert all(e['license_identifier'] == 'unknown' for e in evidence)
+
+
 def test_actual_fts5_and_literal_search(catalog_config):
     with closing(sqlite3.connect(":memory:")) as db:
         check_fts5(db)

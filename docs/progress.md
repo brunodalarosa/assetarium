@@ -1,5 +1,21 @@
 # Progress
 
+## October 14 — Synty and CraftPix addition
+
+Published 937 new model records, expanding membership from 964 to 1,901. Generated
+882 views for 289 models and indexed all 882 images; 648 models retain unresolved
+texture faults and partial geometry evidence. Godot-native resources are listed
+separately as unsupported. Existing records, asset outputs, corrections, source
+hashes and vectors are preserved. Details, corrected verification harness receipts,
+preview review and storage measurements are in [the import report](new-packs-import.md).
+The approved overnight description run finished and published 282 new descriptions
+and vectors: 265 CraftPix, 15 Generic, and 2 Synty. Its 655 failures comprise the
+648 texture/preview blockers plus 7 caption-validation failures. Final generation
+is `v_41955003334a482e88d383e9f2c77be4`; preservation, database integrity, and live
+description search passed. Storage is 7.22 GiB, within the approved budget.
+The operation is complete with retained faults; repairs/retries require a separate
+explicit request. New artistic/accuracy approval remains pending.
+
 ## Step 1 — completed
 
 Date: October 11, 2026. Scope: repository/scaffold/contracts/environment only.
@@ -1415,3 +1431,59 @@ publication or dependency/model installation occurred. Evidence is under
 Focused synthetic test fixtures and receipts used about 11 MiB of file content,
 above the preliminary under-5-MiB estimate; no runtime, model or asset copy was
 introduced.
+
+## Manual overnight description runner — October 12, 2026
+
+The approved preparation created **Generate overnight descriptions.cmd** and a
+resumable coordinator using the existing locked offline caption/embedding
+runtimes. Its real-catalog dry run selects **450** assets (81 pending and 369
+caption faults), skips 514 usable captions, and reports no input faults. It uses
+the active v3/10–170-word rule. **No real model inference was started.**
+
+Each asset gets at most one generation attempt per run. Saved responses can be
+committed after interruption without generating again; interrupted attempts with
+no saved response become visible faults. Existing captions, owner corrections,
+prior attempt evidence, renders and image vectors are protected. Description-only
+indexing and checked catalog/index publication follow generation. Morning reports
+separate caption, indexing and worker faults, and link to raw attempts/logs.
+
+The runner owns the catalog operation/GPU leases, temporarily keeps Windows awake,
+and applies a 180-second progress watchdog only to its owned wrapper/process tree.
+Live orphan workers block unsafe resume. Unique-allocation receipts precede bulk
+work, follow batches and surround publication, with a 500 MiB growth limit and the
+existing 8 GiB total ceiling. No installation, model/source copy or cleanup runs.
+
+Preparation verified 93 focused tests across the related suite and added
+coordinator/report checks, real offline wrappers, owned-tree watchdog behavior,
+and the actual launcher dry run. A hash comparison found all **1,809 protected
+files unchanged**, including the actual catalog/index, caption records, corrections,
+job ledger and historical prompts; all 4,163 existing image vectors remain.
+Failed/corrected test receipts remain retained. Estimated actual run time is
+1.5–3 hours for current membership; accuracy still requires later review.
+See [overnight instructions](overnight-descriptions.md) and
+`data/overnight-descriptions/` for preparation evidence and future run reports.
+
+## Approved texture repair run — October 14, 2026
+
+The owner approved repairing the texture/material bindings of the 648 blocked
+new models, using supplied textures and library overrides while preserving
+originals and prior evidence. The audit found 599 supported candidates (429
+Generic, 105 CraftPix, 65 Synty); 49 unresolved mappings stay visibly faulty.
+Twelve representatives passed technical rendering/contact-sheet checks, including
+an additional supplied-alpha correction for ivy. The finalized focused suite
+passed 73 synthetic tests, with additional handoff/retrieval compatibility checks.
+Bulk rendering and image indexing finished: 594 recovered models, 49 unresolved
+mappings and five retained preview-quality failures. All thirteen final contact
+sheets were inspected. Nineteen recovered models retain pre-existing overlapping
+face faults. Preservation and live MCP detail/image-search checks passed. The
+594-model description run `8a5f127aa1fe475a8edeed0c7fd5136f` is running in the background,
+with automatic final publication/verification. No new runtime/model, original copy, geometry repair,
+Godot effect reconstruction, or unrelated caption-fault retry is included.
+
+The approved repair allowance is 2 GiB additional unique allocated storage and
+the existing 10 GiB total ceiling. Baseline/evidence and current outcomes are in
+`data/texture-repairs/20261014/`. Recovered previews are indexed/published first,
+then an explicit recovered-ID description run continues in the background. The
+completion receipt verifies preservation and separates remaining texture and
+caption faults. Owner accuracy/artistic approval remains pending. See
+[texture repair instructions](texture-repairs.md).

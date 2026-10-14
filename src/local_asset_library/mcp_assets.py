@@ -201,6 +201,8 @@ class AssetService:
                    "source_faults": (record.get("inspection_run") or {}).get("source_faults", []),
                    **caption_summary(self.config, record),
                    "limitations": result["limitations"], "preview": {"status": "not_requested"}}
+        if result.get('texture_overrides'):
+            payload['texture_overrides'] = result['texture_overrides']
         from .publication import generation
         payload['generation'] = generation(self.config)
         if args.get("include_metadata", False):

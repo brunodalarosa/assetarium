@@ -94,12 +94,19 @@ def inspection_input(config, record, resolution=640, content_only=False):
         except (OSError, ValueError, TypeError) as exc:
             actual = {"missing": path, "reason": str(exc)}
         content.append({"path": path, "actual": actual, "expected": item.get("sha256")})
+    from .texture_repair import validate_recipe
+    repair = validate_recipe(config, record)
+    if repair:
+        content.append({'texture_repair': repair})
     if content_only:
         return asset,source,reason,digest(content)
-    return asset, source, reason, digest({"source": content, "resolution": resolution,
+    settings = {"source": content, "resolution": resolution,
         "worker": file_hash(config.project_root / "src/local_asset_library/blender_worker.py"),
         "render_math": file_hash(config.project_root / "src/local_asset_library/render_math.py"),
-        "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None})
+        "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None}
+    if repair:
+        settings['repair_worker'] = file_hash(config.project_root / 'src/local_asset_library/blender_repair_worker.py')
+    return asset, source, reason, digest(settings)
 
 
 def caption_input(config, record, prompt_version=None):
@@ -242,6 +249,11 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180):
     job = {"schema_version": 1, "project_root": str(config.project_root), "source_root": str(config.source_root),
         "asset_id": record["asset_id"], "source_path": source["path"], "format": source["format"],
         "source_sha256": source["sha256"], "output": str(output), "resolution": resolution}
+    worker = 'blender_worker.py'
+    if record.get('texture_repair'):
+        from .texture_repair import validate_recipe
+        job['texture_repair'] = validate_recipe(config, record)
+        worker = 'blender_repair_worker.py'
     task = output / "job.json"
     result_path = output / "result.json"
     if result_path.exists():
@@ -250,7 +262,7 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180):
     else:
         save_json(task, job)
         command = [str(blender), "--background", "--factory-startup", "--disable-autoexec", "--offline-mode",
-            "--python-exit-code", "5", "--python", str(config.project_root / "src/local_asset_library/blender_worker.py"), "--", str(task)]
+            "--python-exit-code", "5", "--python", str(config.project_root / 'src/local_asset_library' / worker), "--", str(task)]
         process = run_process(command, config.project_root, environment(config), timeout)
         (output / "blender.log").write_text(process["output"], encoding="utf-8")
         if process["timed_out"] or process["returncode"] != 0 or not result_path.exists():

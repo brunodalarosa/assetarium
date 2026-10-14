@@ -246,3 +246,16 @@ configured membership, resumable stages, bounded browsing and atomic publication
 See [library updates](docs/library-updates.md) for manual scan/process/refresh/status,
 approved budgets, identity rules, worker coordination and current evidence paths.
 Earlier forty-asset results above remain historical pilot evidence.
+
+For owner-started generation of pending captions, double-click
+`Generate overnight descriptions.cmd`. Existing caption faults are retained;
+an explicit fault retry uses the advanced invocation documented below.
+The resumable runner uses the existing
+local model and renders, retains prior logs, refreshes description-search data
+and publishes ready results. See [overnight instructions](docs/overnight-descriptions.md)
+for morning reports, interruption recovery, limits and preparation verification.
+
+The approved October 14 texture/material repairs use supplied textures and
+library overrides, preserving original files and fault evidence. Asset handoffs
+include the bindings required when importing the unchanged FBX. See
+[texture repairs](docs/texture-repairs.md) for current processing and receipts.

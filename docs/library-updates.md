@@ -2,9 +2,9 @@
 
 The prepared Windows app and MCP server share explicitly configured membership,
 source/dependency checks, measured filters, ranking and response caps. The approved
-contract is `docs/library-membership.json`: ten packs, initially 883 logical
-assets, maximum 964 after the separately approved addition of the two City Kit
-packs. Changing this file is not owner expansion authorization.
+contract is `docs/library-membership.json`: thirteen packs, initially 883 logical
+assets, maximum 1,901 after the separately approved City Kit and October 14
+Synty/CraftPix additions. Changing this file is not owner expansion authorization.
 Source packs and shared model revisions remain read only. Step 9 is optional;
 no classification or clustering is performed.
 
@@ -14,7 +14,15 @@ usable previews remain available for partial results; new captions still await
 review. Actual coverage, resource measurements and verification are recorded in
 `docs/step8-verification.json` and `docs/progress.md`.
 The City Kit addition publishes 964 assets, with its 81 new descriptions pending;
-see `docs/city-kits-import.md` for current import and preservation evidence.
+see `docs/city-kits-import.md` for that import's preservation evidence.
+The October 14 Synty/CraftPix addition publishes 1,901 records: 937 new models,
+882 indexed preview images from 289 models, and 648 retained texture failures.
+See `docs/new-packs-import.md` for the separate fault, preview and preservation
+reports. The completed overnight run subsequently published 282 descriptions
+(265 CraftPix, 15 Generic, 2 Synty) and their search vectors. The other 655 new
+captions retain 648 source/preview blockers and 7 validation failures; no selected
+work remains unattempted. Repairs/retries and owner accuracy review are separate
+follow-up work, with all original evidence retained.
 
 Double-click `Local Asset Library.vbs`. Opening the app reads the published
 catalog/index and existing previews; it never installs, downloads, scans,
@@ -135,8 +143,9 @@ restarted to participate in the new membership/publication/lease behavior.
 
 ## Storage and evidence
 
-The approved full-library ceiling is 8 GiB unique allocated project storage,
-with up to 2 GiB additional peak allocation. External read-only originals/shared
+The October 14 approved full-library ceiling is 10 GiB unique allocated project storage,
+with up to 3 GiB additional peak allocation for the import and overnight run combined.
+The import reserves 2 GiB and the overnight run reserves 1 GiB. External read-only originals/shared
 weights are excluded. The older 20 GiB allowance is not authorization. Fresh
 base-Python receipts precede bulk work, follow each batch and follow final
 publication. Processing stops if measured growth exceeds its budget, preserving
@@ -150,3 +159,8 @@ Successful import/inference/retrieval and automated/native GUI checks are
 technical evidence, separate from owner relevance, usability, accessibility and
 artistic acceptance. Current results and limitations are recorded in
 `docs/step8-verification.json` and `docs/progress.md` when delivery completes.
+
+The separately approved October 14 texture repair run has a 2 GiB growth limit
+and the same 10 GiB total ceiling. It uses hash-bound library overrides and
+publisher material lists; originals and unrelated faults remain unchanged.
+See [texture repairs](texture-repairs.md) for scoped operations and evidence.

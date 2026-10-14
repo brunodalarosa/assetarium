@@ -328,7 +328,8 @@ def archive_evidence(config, row, inventory, packs):
 
 
 def license_evidence(config, pack, inventory):
-    paths = [path for path, row in inventory.items() if row["role"] == "license_source_evidence"
+    paths = [path for path, row in inventory.items() if (row["role"] == "license_source_evidence"
+             or path == pack + "/README.md")
              and (path.startswith(pack + "/") or path == "README-licenses.txt") and row["status"] == "available"]
     result = []
     for path in sorted(paths):
@@ -337,11 +338,14 @@ def license_evidence(config, pack, inventory):
             # Keep the collection claim and the particular pack's download/source block.
             blocks = re.split(r"(?m)(?=^\d+\. )", text)
             relevant = [block.split("\n\n", 1)[0] for block in blocks if pack + ".zip" in block]
+            if not relevant:
+                continue  # This collection note covers only its explicitly listed original packs.
             text = blocks[0] + "\n" + "\n".join(relevant) + ("\n" + text[text.find("Note:"):] if "Note:" in text else "")
         # Shared README is collection-maintainer evidence, not a bundled author license.
         result.append({"path": path, "sha256": inventory[path]["sha256"],
                        "kind": "collection_note" if path == "README-licenses.txt" else "supplied_pack_file",
-                       "license_identifier": "CC0-1.0" if re.search(r"\bCC0\b|Creative Commons Zero", text, re.I) else "unknown",
+                       "license_identifier": "CC0-1.0" if re.search(r"\bCC0\b|Creative Commons Zero", text, re.I)
+                       and not re.search(r"\b(?:not|non)[\s-]+CC0\b|\bnot\s+Creative Commons Zero", text, re.I) else "unknown",
                        "excerpt": text[:2400], "urls": re.findall(r"https?://[^\s<>\"']+", text),
                        "verification": "local supplied evidence; web/license interpretation not performed"})
     return result

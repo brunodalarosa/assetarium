@@ -82,6 +82,11 @@ def image_input(preview):
 def source_check(config, record):
     """Conservative logical-asset exclusion on missing/stale recorded files/dependencies."""
     checked = []
+    if record.get('texture_repair'):
+        from .texture_repair import validate_recipe
+        # Mapping changes are bound to rendered-view fingerprints. Keep the
+        # source fingerprint based on verified file bytes for existing clients.
+        validate_recipe(config, record)
     if record.get('metadata_fault'):
         raise ConfigError('Catalog metadata faulty: '+record['metadata_fault']['error'])
     if record["availability"] != "available":
@@ -488,7 +493,14 @@ def resolved_detail(config, identifier, source_format=None):
             if item.get("required_for_render") is not False:
                 raise
             dependencies.append({**item, "resolved_path": None, "fault": str(exc)})
+    overrides = [{**{k:b[k] for k in ('image','original_path','path','sha256','role','preserve_supplied_alpha') if k in b},
+                  'resolved_path': str(config.source_file(b['path'])),
+                  'material_users': next((t['render_users'] for t in (record.get('technical') or {}).get('textures', [])
+                                          if t['name'] == b['image']), [])}
+                 for b in (record.get('texture_repair') or {}).get('bindings', [])]
     return {"asset_id": identifier, "selected_source": {**selected, "resolved_path": str(config.source_file(selected["path"]))},
+            'texture_overrides': overrides,
             "dependencies": dependencies, "record": record,
             "limitations": ["All known logical-asset dependencies listed with referring-source evidence; binary/alternate dependency inspection may remain incomplete.",
-                            "Visual descriptions are provisional; suggested uses remain a separate field."]}
+                            "Visual descriptions are provisional; suggested uses remain a separate field."] +
+                           (["Preview uses library texture overrides. Apply the supplied overrides when importing the unchanged original source."] if overrides else [])}
