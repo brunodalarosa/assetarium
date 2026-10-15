@@ -32,3 +32,6 @@
 @media(min-width:761px){#source-browser-view{padding:24px 32px}#source-collection,#source-detail{max-height:max(280px,calc(100dvh - 310px))}#source-detail{position:sticky;top:16px}}
 @media(max-width:760px){#source-browser-view .settings-heading{flex-wrap:wrap}#close-source-browser{min-height:44px}.source-browse-link{min-height:44px}}
 @media(forced-colors:active){.source-browse-icon,#source-collection{border-color:CanvasText}}
+
+.settings-tabs{gap:8px}.settings-tabs button{background:transparent;border-color:transparent;font-weight:400}.settings-tabs button[aria-selected=true]{background:#e4eddf;border-color:#8ba690;font-weight:600}
+.general-settings-form{display:grid;justify-items:start;gap:14px;max-width:620px;margin-top:24px}.general-settings-form>label{font-weight:600}.general-settings-form .hint{line-height:1.6}.general-settings-form input{width:180px;max-width:100%}#general-settings-message{line-height:1.5;overflow-wrap:anywhere}

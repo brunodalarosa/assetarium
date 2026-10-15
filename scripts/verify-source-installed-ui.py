@@ -61,6 +61,7 @@ def verify():
         capture('import-failures.png')
         window.evaluate_js("$('close-import-failures').click()")
         window.evaluate_js("$('open-settings').click()")
+        window.evaluate_js("$('asset-sources-tab').click()")
         wait("document.querySelectorAll('.source-row').length===13")
         assert window.evaluate_js("[...document.querySelectorAll('.source-enabled input')].every(x=>x.checked)")
         assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')

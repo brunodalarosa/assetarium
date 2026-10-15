@@ -1,6 +1,7 @@
 # Asset sources
 
-The Windows app uses **Settings → Asset sources**. Add a directory using its
+The Windows app opens **Settings → General**. Select **Asset sources** to manage
+asset directories. Add a directory using its
 folder picker or path field. Every source has an **Enabled** checkbox and a
 **Remove** action. Changes apply to browsing, current searches and subsequent
 agent requests while the app stays open. Removing or disabling a source preserves
@@ -110,4 +111,12 @@ returned operation token identifies its durable log in that source's metadata.
 Earlier pilot/import commands and reports in this repository describe their
 historical configuration. Current source membership comes from Settings rather
 than the historical `docs/library-membership.json` pack list. The existing storage
-budget in that file remains enforced for processing.
+budget in that file is the default until a user saves a budget in **Settings →
+General**. The saved whole-number GiB limit lives in `data/library/settings.json`
+and applies to the combined unique allocation of LAL and source metadata. Original
+assets and shared models are excluded. Saving does not start or retry processing.
+The saved total replaces both historical total and per-operation growth limits;
+explicit reserves on legacy command-line jobs still bound those jobs. Processing
+reads the setting at its storage checks, including between stages, and preserves
+completed work when it stops at the limit. Raise the budget and explicitly choose
+**Process assets** to continue pending work. Unchanged asset faults remain skipped.

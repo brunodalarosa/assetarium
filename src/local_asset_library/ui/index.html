@@ -43,8 +43,21 @@
   <section id="settings-view" aria-label="Settings" hidden>
     <div class="settings-heading"><h2 id="settings-title" tabindex="-1">Settings</h2><button type="button" id="close-settings">Back to library</button></div>
     <div class="settings-layout">
-      <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical"><button type="button" id="asset-sources-tab" role="tab" aria-selected="true" aria-controls="asset-sources-panel">Asset sources</button></nav>
-      <section id="asset-sources-panel" role="tabpanel" aria-labelledby="asset-sources-tab">
+      <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        <button type="button" id="general-tab" role="tab" aria-selected="true" aria-controls="general-panel">General</button>
+        <button type="button" id="asset-sources-tab" role="tab" aria-selected="false" aria-controls="asset-sources-panel" tabindex="-1">Asset sources</button>
+      </nav>
+      <section id="general-panel" role="tabpanel" aria-labelledby="general-tab">
+        <h2>General</h2>
+        <form id="general-settings-form" class="general-settings-form">
+          <label for="storage-budget">Storage budget (GiB)</label>
+          <p id="storage-budget-help" class="hint">Maximum storage for LAL and generated source metadata. Original assets and shared models are excluded. Processing stops at storage checks when the budget is reached and keeps completed work.</p>
+          <input id="storage-budget" type="number" min="1" max="1048576" step="1" required aria-describedby="storage-budget-help" disabled>
+          <button type="submit" id="save-general-settings" class="primary" disabled>Save</button>
+          <p id="general-settings-message" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <section id="asset-sources-panel" role="tabpanel" aria-labelledby="asset-sources-tab" hidden>
         <h2>Asset sources</h2><p class="hint">Enable sources to include them in searches. Removing a source keeps its files and saved metadata.</p>
         <div class="source-add"><label for="source-directory">Asset directory</label><div class="source-add-controls"><input id="source-directory" type="text" placeholder="Choose an asset source directory"><button type="button" id="choose-source">Choose folder…</button><button class="primary" type="button" id="add-source">Add source</button></div></div>
         <p id="sources-message" role="status" aria-live="polite"></p><div id="source-list"></div><p class="hint" id="sources-empty" hidden>No asset sources yet. Add a directory to get started.</p>

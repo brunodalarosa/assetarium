@@ -113,6 +113,7 @@ def verify():
         wait('state.context&&state.items.length===3&&state.sources.length===3')
         js("(async()=>{$('query').value='item0';$('mode').value='keyword';await search();window.savedLibraryCards=[...$('grid').children];return true;})()")
         js("$('open-settings').click();true")
+        js("$('asset-sources-tab').click();true")
         wait("!$('settings-view').hidden&&document.querySelectorAll('.source-browse-link').length===3")
         capture('01-source-links.png')
         assert window.evaluate_js("document.querySelector('.source-browse-link').getAttribute('aria-label').includes('Browse assets')")

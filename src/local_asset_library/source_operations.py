@@ -209,11 +209,11 @@ def process_source(config, source, token):
     # file identity. Model/runtime installations and original files are excluded.
     from .source_storage import receipt
     before = receipt(config, "before-" + token)
-    budgets_path = config.project_root / "docs/library-membership.json"
-    budgets = json.loads(budgets_path.read_text())["budget"]
+    from .settings import storage_budget
+    budgets = storage_budget(config)
     base = before["totals"]["allocated_bytes"]
     if base >= budgets['total_allocated_bytes']:
-        raise ConfigError('Source processing storage budget is already exhausted; no asset work started')
+        raise ConfigError('Storage budget reached. Increase it in Settings → General, then process this source again; completed work is preserved')
     stages = [("inspection", ".venv-mcp"), ("caption", ".venv-caption"), ("embeddings", ".venv-embedding")]
     for i, (stage, environment) in enumerate(stages):
         if cancelled(scoped, token):
@@ -234,9 +234,10 @@ def process_source(config, source, token):
         if completed.returncode:
             raise ConfigError("Source processing worker failed; see its saved operation log")
         measured = receipt(config, stage + "-" + token)
+        budgets = storage_budget(config)
         if (measured["totals"]["allocated_bytes"] > budgets["total_allocated_bytes"] or
                 measured["totals"]["allocated_bytes"] - base > budgets["peak_additional_allocated_bytes"]):
-            raise ConfigError("Source processing exceeded the storage budget; completed work preserved")
+            raise ConfigError("Storage budget reached. Increase it in Settings → General, then process this source again; completed work is preserved")
     if cancelled(scoped, token):
         state(scoped, status="cancelled", phase="Cancelled; completed assets saved", current_asset=None)
         return
@@ -246,7 +247,11 @@ def process_source(config, source, token):
     aggregate(config)
     state(scoped, status="verifying", phase="Scanning to verify publication", progress=.98)
     status = scan_source(config, source)
-    receipt(config, "published-" + token)
+    measured = receipt(config, "published-" + token)
+    budgets = storage_budget(config)
+    if (measured["totals"]["allocated_bytes"] > budgets["total_allocated_bytes"] or
+            measured["totals"]["allocated_bytes"] - base > budgets["peak_additional_allocated_bytes"]):
+        raise ConfigError("Storage budget reached. Increase it in Settings → General, then process this source again; completed work is preserved")
     state(scoped, status="complete_with_faults" if status["failed"] or status["needs_processing"] else "complete",
           phase="Finished with recorded issues" if status["failed"] or status["needs_processing"] else "Up to date and published",
           progress=1, current_asset=None)

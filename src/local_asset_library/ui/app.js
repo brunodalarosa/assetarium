@@ -266,7 +266,7 @@ $('source-load-more').onclick=()=>browseSource();
 $('source-collection').addEventListener('scroll',maybeLoadSource);
 $('close-source-browser').onclick=async()=>{
  const collection=state.sourceBrowse;++collection.generation;++collection.detailGeneration;collection.observer?.disconnect();LALPreview.dispose();
- showLibraryView('settings-view');await loadSources();renderSourceSettings();
+ showLibraryView('settings-view');selectSettingsTab('asset-sources');await loadSources();renderSourceSettings();
  window.scrollTo(0,state.sourcesScroll||0);
  [...$('source-list').querySelectorAll('[data-action="browse"]')].find(button=>button.dataset.source===state.sourceReturnKey)?.focus({preventScroll:true});
 };
@@ -286,7 +286,37 @@ async function loadImportFailures(){
 }
 $('open-import-failures').onclick=async()=>{showLibraryView('import-failures-view');$('import-failures-title').focus();await loadImportFailures();};
 $('close-import-failures').onclick=async()=>{showLibraryView('library-view');await loadSources();$('open-import-failures').focus();};
-$('open-settings').onclick=async()=>{showLibraryView('settings-view');$('settings-title').focus();await loadSources();};
+function selectSettingsTab(section,focus=false){
+ for(const name of ['general','asset-sources']){
+  const selected=name===section,tab=$(name+'-tab');
+  tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;$(name+'-panel').hidden=!selected;
+ }
+ if(focus)$(section+'-tab').focus();
+}
+for(const section of ['general','asset-sources']){
+ const tab=$(section+'-tab');tab.onclick=()=>selectSettingsTab(section);
+ tab.onkeydown=event=>{
+  if(!['ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
+  event.preventDefault();selectSettingsTab(event.key==='Home'?'general':event.key==='End'?'asset-sources':section==='general'?'asset-sources':'general',true);
+ };
+}
+async function loadGeneralSettings(){
+ $('storage-budget').disabled=true;$('save-general-settings').disabled=true;$('general-settings-message').textContent='Loading settings…';
+ try{
+  const result=await state.api.general_settings();if(result.status==='faulty')throw Error(result.reason);
+  $('storage-budget').value=result.storage_budget_gib;$('storage-budget').disabled=false;$('save-general-settings').disabled=false;$('general-settings-message').textContent='';
+ }catch(error){$('storage-budget').disabled=false;$('save-general-settings').disabled=false;$('general-settings-message').textContent=error.message;}
+}
+$('general-settings-form').onsubmit=async event=>{
+ event.preventDefault();if(!$('general-settings-form').reportValidity())return;
+ const value=$('storage-budget').value;$('storage-budget').disabled=true;$('save-general-settings').disabled=true;$('general-settings-message').textContent='Saving…';
+ try{
+  const result=await state.api.save_general_settings(value);if(result.status==='faulty')throw Error(result.reason);
+  $('storage-budget').value=result.storage_budget_gib;$('general-settings-message').textContent=`Saved. Storage budget: ${result.storage_budget_gib} GiB. Processing uses this value at its next storage check.`;
+ }catch(error){$('general-settings-message').textContent=error.message;}
+ finally{$('storage-budget').disabled=false;$('save-general-settings').disabled=false;}
+};
+$('open-settings').onclick=async()=>{showLibraryView('settings-view');selectSettingsTab('general');$('settings-title').focus();await Promise.all([loadGeneralSettings(),loadSources()]);};
 $('close-settings').onclick=async()=>{showLibraryView('library-view');await loadSources();$('open-settings').focus();};
 $('choose-source').onclick=async()=>{const result=await state.api.choose_source_directory();if(result.status==='selected')$('source-directory').value=result.directory;else if(result.status==='faulty')$('sources-message').textContent=result.reason;};
 $('add-source').onclick=()=>{const directory=$('source-directory').value.trim();if(directory)sourceAction('add',null,directory);else $('sources-message').textContent='Choose an asset directory first.';};

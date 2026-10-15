@@ -35,6 +35,9 @@ def working(config):
 
 def policy(config):
     value = json.loads((config.project_root / "docs/library-membership.json").read_text(encoding="utf-8"))
+    from .settings import storage_budget, settings_path
+    if 'budget' in value or settings_path(config).exists():
+        value['budget'] = storage_budget(config, value.get('budget'))
     if config.sources_registry:
         from .sources import registry
         value = dict(value, packs=[config.source_key] if config.source_key else

@@ -107,6 +107,14 @@ class DesktopBridge:
     def sources(self):
         return self._wait(self._present(self._sources))
 
+    def general_settings(self):
+        from .settings import general_settings
+        return self._wait(self._present(general_settings, self._config))
+
+    def save_general_settings(self, storage_budget_gib):
+        from .settings import save_general_settings
+        return self._wait(self._present(save_general_settings, self._config, storage_budget_gib))
+
     def importing_failures(self):
         from .sources import importing_failures
         return self._wait(self._present(importing_failures, self._config))
