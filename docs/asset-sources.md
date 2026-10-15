@@ -27,9 +27,10 @@ warning while retaining the original diagnostic history.
 ## Source cards
 
 The library shows one warning card for each source that needs processing or
-publication. It remains visible through processing, publication, cancellation,
-interruption and recorded failures. Only a subsequent scan confirming that every
-current asset is up to date and published clears it. Caption review notes,
+publication. It remains visible through processing, publication, cancellation
+and interruption while actionable work remains. A subsequent scan clears it
+when there is no unattempted work and current results have been published.
+Recorded failures appear in the importing failures report. Caption review notes,
 warnings and pending owner approval do not count as processing failures.
 
 Click **Process assets** to inspect/render pending assets, generate descriptions,
@@ -50,8 +51,21 @@ its outstanding source operations.
 
 Unchanged faulty assets are retained with evidence and skipped, including on a
 subsequent **Process assets** click. Other usable assets can finish and publish.
-Cards for unresolved failures remain visible; processing is not permission to
-repair originals or retry unchanged failures. GPU processing shares the existing
+Recorded failures do not keep pending-import cards visible. **Importing failures
+report** opens a scrollable list of original asset paths from all configured
+sources, including disabled sources. Removed sources retain their metadata but
+are excluded from this view. An asset with several source formats lists each
+original model path. Usable partial results remain available after publication.
+
+Readiness uses saved stage outcomes, rather than assuming every incomplete stage
+has never been attempted. Failed/unsupported stages block dependent work; other
+unfinished work stays pending. Partial embedding outcomes are terminal unless
+description generation is still pending. Every scan saves each asset's current
+file/dependency fingerprint, attempted state and outcome in
+`metadata-lal/library/import-status.json`. New or changed inputs become pending;
+unchanged failures are retained. Unpublished results still require publication
+before their card disappears. Processing is not permission to repair originals
+or retry unchanged failures. GPU processing shares the existing
 inference lease with semantic search. Browsing and keyword search remain available.
 
 ## Storage and identity

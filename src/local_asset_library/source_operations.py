@@ -247,8 +247,8 @@ def process_source(config, source, token):
     state(scoped, status="verifying", phase="Scanning to verify publication", progress=.98)
     status = scan_source(config, source)
     receipt(config, "published-" + token)
-    state(scoped, status="complete_with_faults" if status["needs_processing"] else "complete",
-          phase="Finished with recorded issues" if status["needs_processing"] else "Up to date and published",
+    state(scoped, status="complete_with_faults" if status["failed"] or status["needs_processing"] else "complete",
+          phase="Finished with recorded issues" if status["failed"] or status["needs_processing"] else "Up to date and published",
           progress=1, current_asset=None)
 
 

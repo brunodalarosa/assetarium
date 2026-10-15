@@ -46,7 +46,20 @@ def verify():
         assert operation_status(config)['status']=='complete'
         assert bridge._gateway.worker is None
         report['library']=window.evaluate_js("({assets:state.context.pilot_count,sources:state.sources.length,warnings:document.querySelectorAll('.source-warning').length,cards:state.items.length})")
+        from local_asset_library.sources import importing_failures,registry,source_status
+        expected=importing_failures(config)
+        assert expected['assets']>0 and not expected['unavailable']
+        assert all(not source_status(config,source)['needs_processing'] for source in registry(config)['sources'])
+        wait("document.querySelectorAll('.source-warning').length===0")
+        report['library']['warnings']=window.evaluate_js("document.querySelectorAll('.source-warning').length")
         capture('library.png')
+        window.evaluate_js("$('open-import-failures').click()")
+        wait("!$('import-failures-view').hidden&&!state.loadingFailures&&document.querySelectorAll('#import-failures-list li').length>0")
+        assert window.evaluate_js("[...$('import-failures-list').children].map(x=>x.textContent)")==expected['paths']
+        assert window.evaluate_js("$('import-failures-list').scrollHeight>$('import-failures-list').clientHeight")
+        report['failures']={'assets':expected['assets'],'paths':len(expected['paths']),'scrollable':True,'pending_cards':0}
+        capture('import-failures.png')
+        window.evaluate_js("$('close-import-failures').click()")
         window.evaluate_js("$('open-settings').click()")
         wait("document.querySelectorAll('.source-row').length===13")
         assert window.evaluate_js("[...document.querySelectorAll('.source-enabled input')].every(x=>x.checked)")

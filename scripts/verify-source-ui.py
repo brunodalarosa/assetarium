@@ -10,7 +10,10 @@ import uuid
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/'src'),str(ROOT/'tests')]
-from test_sources import managed,ready_source
+from test_sources import managed,ready_source,failed_caption
+from local_asset_library.incremental import working,update_record
+from local_asset_library.membership import records
+from local_asset_library.source_operations import publish_source
 from local_asset_library import sources
 from local_asset_library.source_operations import state,cancel,cancelled
 from local_asset_library.desktop import DesktopBridge,create_window,profile_path,record_profile_outcome
@@ -142,6 +145,27 @@ def verify():
         wait("!$('settings-view').hidden")
         assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
         capture('settings-narrow.png');report['checks'].append('Narrow settings view has no horizontal overflow')
+        # Failed attempts remain inspectable without presenting a futile action.
+        work=working(sources.bound(config,one));record=records(work)[0]
+        original=json.loads(json.dumps(record));failed_caption(work,record)
+        publish_source(sources.bound(config,one));sources.aggregate(config);sources.scan_source(config,one)
+        js("$('close-settings').click();true")
+        wait("state.sources.some(x=>x.failed===1&&!x.needs_processing)&&document.querySelectorAll('.source-warning').length===1")
+        report['checks'].append('A published retained failure creates no pending-import card; the other unfinished source keeps its card')
+        js("$('open-import-failures').click();true")
+        wait("!$('import-failures-view').hidden&&document.querySelectorAll('#import-failures-list li').length>0")
+        expected=sources.importing_failures(config)['paths']
+        assert window.evaluate_js("[...$('import-failures-list').children].map(x=>x.textContent)")==expected
+        assert window.evaluate_js("getComputedStyle($('import-failures-list')).overflowY==='auto'&&document.documentElement.scrollWidth<=innerWidth")
+        capture('import-failures-narrow.png')
+        report['checks'].append('Failure report displays original paths as selectable text in a scrollable list without narrow-screen overflow')
+        js("$('close-import-failures').click();true")
+        wait("!$('library-view').hidden&&document.activeElement.id==='open-import-failures'")
+        report['checks'].append('Back to library preserves the current library view and returns keyboard focus')
+        update_record(work,original);sources.scan_source(config,one)
+        js("$('open-import-failures').click();true")
+        wait("!$('import-failures-empty').hidden&&$('import-failures-list').hidden")
+        report['checks'].append('Empty failure report has an explicit empty state')
         report['status']='passed'
     except BaseException as exc:
         report.update(status='faulty',reason=str(exc),traceback=traceback.format_exc())

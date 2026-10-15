@@ -51,6 +51,13 @@
       </section>
     </div>
   </section>
+  <section id="import-failures-view" aria-labelledby="import-failures-title" hidden>
+    <div class="settings-heading"><h2 id="import-failures-title" tabindex="-1">Importing failures report</h2><button type="button" id="close-import-failures">Back to library</button></div>
+    <p id="import-failures-summary" role="status" aria-live="polite">Loading recorded failures…</p>
+    <p id="import-failures-error" role="alert" hidden></p>
+    <ul id="import-failures-list" aria-label="Asset paths with recorded importing failures" tabindex="0" hidden></ul>
+    <p id="import-failures-empty" hidden>No importing failures recorded.</p>
+  </section>
   <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Read-only originals · manual updates</span></footer>
   <script>/* BUNDLED_SCRIPT */</script>
 </body>

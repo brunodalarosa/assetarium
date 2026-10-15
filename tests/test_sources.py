@@ -63,6 +63,137 @@ def ready_source(config, backend, source):
     return work
 
 
+def failed_caption(work, record):
+    record['processing'].update(caption='failed', embeddings='partial')
+    record['stage_faults'] = {'caption': {'status': 'failed', 'error': 'Synthetic retained fault'}}
+    update_record(work, record)
+
+
+def test_published_failures_leave_pending_cards_but_keep_report_and_attempt(managed):
+    config, backend, one, _ = managed
+    work = ready_source(config, backend, one)
+    record = records(work)[0]
+    failed_caption(work, record)
+    # Usable partial results still have to be published once.
+    assert sources.scan_source(config, one)['pending_ids'] == [record['asset_id']]
+    publish_source(sources.bound(config, one)); sources.aggregate(config)
+    for _ in range(2):
+        status = sources.scan_source(config, one)
+        assert status['failed'] == 1 and not status['needs_processing'] and status['pending'] == 0
+    saved = json.loads(work.output_path('data', 'library/import-status.json').read_text())['assets'][record['asset_id']]
+    assert saved['attempted'] and saved['state'] == 'failed'
+    report = sources.importing_failures(config)
+    assert report['assets'] == 1 and not report['unavailable']
+    assert report['paths'] == sorted([str(config.source_file(f['path'])) for f in record['files']], key=str.casefold)
+    # Classification leaves all fault evidence and usable outputs untouched.
+    assert records(work)[0] == record
+
+
+def test_failures_do_not_hide_unattempted_or_changed_assets(managed):
+    config, backend, one, _ = managed
+    work = ready_source(config, backend, one)
+    failed, unfinished = records(work)[:2]
+    failed_caption(work, failed)
+    # Even with a failed caption, unattempted image vectors remain actionable.
+    failed_caption(work, unfinished)
+    unfinished['processing']['embeddings'] = 'pending'
+    update_record(work, unfinished)
+    publish_source(sources.bound(config, one))
+    (Path(one['path']) / 'new.obj').write_text('v 0 0 7\n')
+    status = sources.scan_source(config, one)
+    assert status['pending'] == 2 and status['failed'] == 2
+    assert failed['asset_id'] not in status['pending_ids'] and unfinished['asset_id'] in status['pending_ids']
+    saved_path = work.output_path('data', 'library/import-status.json')
+    before = json.loads(saved_path.read_text())['assets'][failed['asset_id']]
+    config.source_file(failed['files'][0]['path']).write_text('v 9 0 0\n')
+    status = sources.scan_source(config, one)
+    after = json.loads(saved_path.read_text())['assets'][failed['asset_id']]
+    assert failed['asset_id'] in status['pending_ids']
+    assert after['state'] == 'pending' and not after['attempted']
+    assert after['input_fingerprint'] != before['input_fingerprint']
+    assert sources.importing_failures(config)['assets'] == 1
+
+
+@pytest.mark.parametrize('stage', ['inventory', 'inspection', 'previews', 'caption', 'embeddings'])
+def test_terminal_attempts_block_only_dependent_work(stage):
+    record = {'processing': dict.fromkeys(['inventory', 'inspection', 'previews', 'caption', 'embeddings'], 'complete'),
+              'previews': [], 'description': None}
+    record['processing'][stage] = 'failed'
+    if stage in {'inventory', 'inspection', 'previews'}:
+        record['processing'].update(caption='pending', embeddings='pending')
+    outcome = sources.import_outcome(record)
+    assert outcome['state'] == 'failed' and stage in outcome['failed_stages']
+
+
+def test_cancelled_unattempted_work_and_deferred_descriptions_stay_pending():
+    record = {'processing': {'inventory': 'complete', 'inspection': 'complete', 'previews': 'complete',
+                             'caption': 'pending', 'embeddings': 'partial'}, 'previews': [], 'description': None}
+    assert sources.import_outcome(record)['state'] == 'pending'
+    record['processing'].update(caption='complete', embeddings='pending')
+    assert sources.import_outcome(record)['state'] == 'pending'
+
+
+def test_partial_preview_fault_keeps_available_caption_work_pending():
+    record = {'processing': {'inventory': 'complete', 'inspection': 'complete', 'previews': 'partial',
+                             'caption': 'pending', 'embeddings': 'partial'}, 'technical': {'triangles': 1},
+              'previews': [{'origin': 'rendered', 'view_label': label} for label in ('front', 'side', 'three_quarter')]}
+    assert 'caption' in sources.import_outcome(record)['pending_stages']
+
+
+def test_deferred_description_is_not_a_recorded_import_failure(managed):
+    config, backend, one, _ = managed
+    work = ready_source(config, backend, one)
+    record = records(work)[0]
+    record['description'] = None
+    record['caption_provenance'] = None
+    record['processing'].update(caption='pending', embeddings='partial')
+    update_record(work, record)
+    status = sources.scan_source(config, one)
+    assert status['pending'] == 1 and status['failed'] == 0
+    assert sources.importing_failures(config)['assets'] == 0
+    with closing(sqlite3.connect(work.output_path('data','embeddings/index.sqlite'))) as db, db:
+        db.execute("UPDATE jobs SET status='failed' WHERE asset_id=? AND channel='image'", (record['asset_id'],))
+    assert sources.scan_source(config, one)['failed'] == 1
+    assert sources.importing_failures(config)['assets'] == 1
+
+
+def test_deleted_assets_do_not_return_from_published_failure_history(managed):
+    config, backend, one, _ = managed
+    work = ready_source(config, backend, one)
+    for record in records(work):
+        failed_caption(work, record)
+    publish_source(sources.bound(config, one))
+    assert sources.importing_failures(config)['assets'] == 3
+    for record in records(work):
+        for file in record['files']:
+            config.source_file(file['path']).unlink()
+    sources.scan_source(config, one)
+    assert not sources.importing_failures(config)['paths']
+
+
+def test_failure_report_includes_disabled_sources_excludes_removed_and_review_notes(managed):
+    config, backend, one, two = managed
+    for source in (one, two):
+        work = ready_source(config, backend, source)
+        failed_caption(work, records(work)[0])
+        warning = records(work)[1]
+        warning['caption_review'] = {'findings': [{'severity': 'warning', 'reason': 'Uncertain visual detail'}]}
+        update_record(work, warning)
+    sources.set_enabled(config, one['key'], False)
+    report = sources.importing_failures(config)
+    assert report['assets'] == 2 and len(report['paths']) == len(set(report['paths']))
+    assert any(Path(path).parent == Path(one['path']) for path in report['paths'])
+    sources.remove(config, two['key'])
+    assert sources.importing_failures(config)['assets'] == 1
+    from local_asset_library.desktop import DesktopBridge
+    bridge = DesktopBridge(config)
+    try:
+        assert bridge.importing_failures()['paths'] == sources.importing_failures(config)['paths']
+        assert bridge._gateway.worker is None
+    finally:
+        bridge._close()
+
+
 def test_independent_roots_and_source_owned_results(managed):
     config,backend,one,two=managed
     work=ready_source(config,backend,one)

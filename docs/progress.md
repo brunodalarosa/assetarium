@@ -1,5 +1,35 @@
 # Progress
 
+## October 14 — Separate importing failures from pending work
+
+Added **Importing failures report**, a scrollable list of original model paths
+from configured sources, including disabled ones. Saved processing outcomes and
+current input fingerprints distinguish retained failures from unattempted work.
+Failure-only sources no longer show pending-import cards; unfinished independent
+stages, changed files and unpublished results remain actionable. Deferred
+descriptions and caption review notes are not reported as import failures.
+Deleted assets do not return from older published failure records.
+
+Refreshed all 13 installed source statuses: 150 affected assets, 266 original
+model paths and no pending cards. All 1,901 catalog records and 8,742 vector rows
+remain identical to the preserved publication. No original asset or generated
+result was repaired or retried. Added UX guidance to `AGENTS.md` for the future
+open source release, including asking the owner about unclear UX choices.
+
+Actual WebView2 checks cover report navigation, selectable paths, scrollability,
+keyboard focus, narrow layout and empty state. Final regression suite: **313
+tests passed**, with no failures, errors or skips
+(`data/gui/import-failures-tests-final.xml`). Installed-library verification:
+`data/gui/source-installed-4c0dfee4dd/report.json`; synthetic UI verification:
+`data/gui/source-settings-01bf5c12f0/report.json`. Owner usability approval remains
+separate from these technical checks.
+
+Before/after unique-allocation receipts under `data/storage/` record 237,640,504
+additional bytes during the measured verification period (about 227 MiB, above
+the 50 MB estimate). Retained verification data brings the measured total to
+10,127,443,656 bytes (9.43 GiB), below the configured 10 GiB allowance. No runtime,
+model installation or original-asset copy was added.
+
 ## October 14 — Configurable sources and source-owned metadata
 
 Added **Settings → Asset sources**, live enabled-source membership, background

@@ -7,6 +7,15 @@ Before starting implementation, follow these two steps in order:
 
 Do not edit implementation files until the user has explicitly approved both checkpoints. Read-only investigation needed to clarify the scope or prepare the plan is allowed. If either the scope or plan changes materially, confirm the affected checkpoint again before continuing.
 
+## User experience
+
+LAL is being refined iteratively for a future open source release. Give user
+experience extra care: keep actions clear, make progress and outcomes easy to
+understand, and avoid offering actions that cannot resolve the displayed state.
+Distinguish actionable pending work from recorded failures while preserving
+failure evidence and usable results. When unsure what good UX means for a
+particular feature, ask the user before choosing its behavior.
+
 ## Fault handling
 
 This policy applies to asset investigation, import/export and processing.

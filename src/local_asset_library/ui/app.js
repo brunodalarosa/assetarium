@@ -78,6 +78,7 @@ $('previous-page').onclick=()=>{state.offset=Math.max(0,state.offset-40);browse(
 const operations=node('div',undefined,'library-operations');
 for(const [label,operation,dry] of [['Scan','scan',false],['Status','status',false]]){const button=node('button',label);button.type='button';button.onclick=async()=>{if(operation==='scan'&&state.context?.managed_sources){await sourceAction('scan');return;}const result=await state.api.operation(operation,dry);if(result.status==='faulty')fail(result.reason);else if(operation==='status'){await refreshContext();status('Processing and published coverage updated.');}else status(`${label} started. Evidence: ${result.evidence}`);};operations.append(button);}
 const reload=node('button','Refresh published view');reload.type='button';reload.onclick=()=>refreshContext(true);operations.append(reload);$('search-form').after(operations);
+const failuresButton=node('button','Importing failures report');failuresButton.id='open-import-failures';failuresButton.type='button';operations.append(failuresButton);
 async function refreshContext(force=false){
  if(!state.api)return;
  try{
@@ -103,7 +104,7 @@ const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operati
 
 const sourceCards=new Map();state.sources=[];state.sourcesRevision=null;state.loadingSources=false;
 function operationActive(operation){return ['queued','scanning','processing','publishing','cancelling','verifying'].includes(operation?.status);}
-function sourceMessage(source){if(source.scan_fault)return source.scan_fault;if(!source.scanned)return 'Waiting for the source scan. Assets must be processed before they appear in searches.';if(source.needs_processing)return `${source.pending||0} ${(source.pending||0)===1?'asset needs':'assets need'} processing or publication.${source.failed?' '+source.failed+(source.failed===1?' has a recorded failure.':' have recorded failures.'):''}`;return 'Up to date and published.';}
+function sourceMessage(source){if(source.scan_fault)return source.scan_fault;if(!source.scanned)return 'Waiting for the source scan. Assets must be processed before they appear in searches.';if(source.needs_processing)return `${source.pending||0} ${(source.pending||0)===1?'asset needs':'assets need'} processing or publication.`;if(source.failed)return 'Import finished. Recorded failures are listed in the importing failures report.';return 'Up to date and published.';}
 function renderSourceWarnings(){
  const shown=new Set();
  for(const source of state.sources){
@@ -149,6 +150,7 @@ async function loadSources(){
   state.sources=result.sources||[];renderSourceWarnings();
   const changed=state.sourcesRevision!==result.revision;state.sourcesRevision=result.revision;
   if(!$('settings-view').hidden)renderSourceSettings();
+  if(!$('import-failures-view').hidden&&changed)await loadImportFailures();
   if(changed&&state.context&&result.revision!==state.context.sources_revision)await refreshContext();
  }catch(error){$('sources-message').textContent=error.message;}finally{state.loadingSources=false;}
 }
@@ -163,7 +165,24 @@ async function sourceAction(action,key=null,directory=null,enabled=null){
   await loadSources();
  }catch(error){$('sources-message').textContent=error.message;if($('settings-view').hidden)fail(error.message);await loadSources();}
 }
-$('open-settings').onclick=async()=>{$('library-view').hidden=true;$('settings-view').hidden=false;$('settings-title').focus();await loadSources();};
+function showLibraryView(view){for(const id of ['library-view','settings-view','import-failures-view'])$(id).hidden=id!==view;}
+async function loadImportFailures(){
+ if(state.loadingFailures)return;state.loadingFailures=true;
+ $('import-failures-list').setAttribute('aria-busy','true');
+ try{
+  const result=await state.api.importing_failures();if(result.status==='faulty')throw Error(result.reason);
+  const paths=result.paths||[],signature=JSON.stringify(paths);
+  if(signature!==state.failurePaths){$('import-failures-list').replaceChildren(...paths.map(path=>node('li',path)));state.failurePaths=signature;}
+  $('import-failures-list').hidden=!paths.length;$('import-failures-empty').hidden=!!paths.length;
+  $('import-failures-summary').textContent=`${result.assets||0} ${(result.assets||0)===1?'asset':'assets'} with recorded failures · ${paths.length} ${paths.length===1?'path':'paths'}`;
+  const unavailable=result.unavailable||[];$('import-failures-error').hidden=!unavailable.length;
+  $('import-failures-error').textContent=unavailable.map(item=>`Could not read saved failures for ${item.source}: ${item.reason}`).join('\n');
+ }catch(error){$('import-failures-error').hidden=false;$('import-failures-error').textContent=error.message;$('import-failures-summary').textContent='Could not load the failures report.';}
+ finally{$('import-failures-list').setAttribute('aria-busy','false');state.loadingFailures=false;}
+}
+$('open-import-failures').onclick=async()=>{showLibraryView('import-failures-view');$('import-failures-title').focus();await loadImportFailures();};
+$('close-import-failures').onclick=async()=>{showLibraryView('library-view');await loadSources();$('open-import-failures').focus();};
+$('open-settings').onclick=async()=>{showLibraryView('settings-view');$('settings-title').focus();await loadSources();};
 $('close-settings').onclick=async()=>{$('settings-view').hidden=true;$('library-view').hidden=false;await loadSources();$('open-settings').focus();};
 $('choose-source').onclick=async()=>{const result=await state.api.choose_source_directory();if(result.status==='selected')$('source-directory').value=result.directory;else if(result.status==='faulty')$('sources-message').textContent=result.reason;};
 $('add-source').onclick=()=>{const directory=$('source-directory').value.trim();if(directory)sourceAction('add',null,directory);else $('sources-message').textContent='Choose an asset directory first.';};

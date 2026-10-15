@@ -217,6 +217,75 @@ def read_records(config):
         return [json.loads(r[0]) for r in db.execute("SELECT record FROM assets ORDER BY asset_id")]
 
 
+def import_outcome(record, embedding_failed=None):
+    """Classify saved stage attempts without retrying retained faults.
+
+    A failed prerequisite blocks its dependent stages. Independent unfinished
+    work (for example image vectors after a caption failure) remains pending.
+    Scanning changed source files resets these durable stage states to pending.
+    """
+    stages = record["processing"]
+    faults = {stage for stage, value in stages.items() if value in {"failed", "unsupported", "partial"}}
+    if stages.get("embeddings") == "partial" and stages.get("caption") == "pending" and embedding_failed is False:
+        # Completed image vectors plus a deferred description are not a failure.
+        faults.discard("embeddings")
+    attempted = any(stages.get(stage) in {"complete", "failed", "partial"}
+                    for stage in ("inspection", "previews", "caption", "embeddings"))
+    pending = set()
+    if "inventory" not in faults:
+        for stage, prerequisites in (("inspection", ()), ("previews", ("inspection",)),
+                                     ("caption", ("inspection", "previews"))):
+            blocked = faults.intersection(prerequisites)
+            # A partial preview run can still supply all caption inputs.
+            if stage == "caption" and blocked == {"previews"} and record.get("technical"):
+                rendered = [p for p in record.get("previews", []) if p.get("origin") == "rendered"]
+                labels = [p.get("view_label") for p in rendered]
+                if {"front", "side", "three_quarter"}.issubset(labels) and len(labels) == len(set(labels)):
+                    blocked = set()
+            if stages.get(stage) != "complete" and stage not in faults and not blocked:
+                pending.add(stage)
+        if stages.get("embeddings") not in {"complete", "partial"} and "embeddings" not in faults:
+            if record.get("previews") or record.get("description") or not faults:
+                pending.add("embeddings")
+    return {"state": "pending" if pending else "failed" if faults else "complete",
+            "attempted": attempted, "pending_stages": sorted(pending), "failed_stages": sorted(faults)}
+
+
+def embedding_failures(config):
+    """Read saved vector attempts; partial can also mean a deferred description."""
+    path = config.output_path("data", "embeddings/index.sqlite")
+    if not path.exists():
+        return None
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
+        return {row[0] for row in db.execute("SELECT DISTINCT asset_id FROM jobs WHERE status='failed'")}
+
+
+def importing_failures(config):
+    """Original paths for failed assets in registered sources, even if disabled."""
+    paths, assets, unavailable = set(), 0, []
+    for source in registry(config)["sources"]:
+        scoped = bound(config, source)
+        try:
+            work = replace(scoped, catalog_generation="work")
+            current = work if work.output_path("data", "catalog.sqlite").exists() else scoped
+            records = read_records(current)
+            vector_faults = embedding_failures(current)
+            for record in records:
+                failed_vector = None if vector_faults is None else record["asset_id"] in vector_faults
+                if not import_outcome(record, failed_vector)["failed_stages"]:
+                    continue
+                assets += 1
+                for file in record["files"]:
+                    relative = _relative(file["path"])
+                    if relative.parts[0] != source["key"]:
+                        raise ConfigError("Asset path does not belong to its source")
+                    paths.add(str(Path(source["path"]).joinpath(*relative.parts[1:])))
+        except (OSError, ValueError, sqlite3.Error) as exc:
+            unavailable.append({"source": source["name"], "reason": str(exc)})
+    return {"status": "ready", "paths": sorted(paths, key=lambda path: (path.casefold(), path)),
+            "assets": assets, "unavailable": unavailable}
+
+
 def source_status(config, source):
     scoped = bound(config, source)
     path = scoped.output_path("data", "library/source-status.json")
@@ -336,13 +405,19 @@ def scan_source(config, source):
         os.replace(candidate.output_path("data", "catalog.sqlite"), target)
         write_membership(work, merged)
     published = {r["asset_id"]: r for r in read_records(scoped)}
-    incomplete, failed, unpublished = [], [], []
+    incomplete, failed, unpublished, imports = [], [], [], {}
+    vector_faults = embedding_failures(work)
     searchable = []
     for record in merged:
         identifier = record["asset_id"]
-        if any(record["processing"].get(s) != "complete" for s in ("inspection", "previews", "caption", "embeddings")):
+        outcome = import_outcome(record, None if vector_faults is None else identifier in vector_faults)
+        # Keep the current input identity with the saved outcome. Old failures
+        # cannot suppress a new attempt after a source/dependency change.
+        imports[identifier] = {**outcome, "input_fingerprint": digest({"files": record["files"],
+            "dependencies": [d for d in record["dependencies"] if not d.get("inspection_version")]})}
+        if outcome["state"] == "pending":
             incomplete.append(identifier)
-        if any(record["processing"].get(s) in {"failed", "unsupported", "partial"} for s in ("inventory", "inspection", "caption", "embeddings")):
+        if outcome["failed_stages"]:
             failed.append(identifier)
         old_pub = published.get(identifier)
         if old_pub is None or encoded(old_pub) != encoded(record):
@@ -350,11 +425,14 @@ def scan_source(config, source):
         if old_pub and identifier not in changed and old_pub["files"] == record["files"]:
             searchable.append(identifier)
     pending_ids = sorted(set(incomplete + unpublished))
+    atomic_json(scoped.output_path("data", "library/import-status.json"),
+                {"schema_version": 1, "inventory_hash": inventory_hash, "assets": imports})
     status = {"scanned": True, "scanned_utc": now(), "inventory_hash": inventory_hash,
               "assets": len(merged), "pending": len(pending_ids), "failed": len(failed),
               "pending_ids": pending_ids, "searchable_ids": sorted(searchable),
               "needs_processing": bool(pending_ids), "removed": len(set(old) - {r["asset_id"] for r in merged}),
-              "reason": "Assets need processing or publication" if pending_ids else "Up to date and published"}
+              "reason": ("Assets need processing or publication" if pending_ids else
+                         "Import finished with recorded failures" if failed else "Up to date and published")}
     atomic_json(status_path, status)
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():

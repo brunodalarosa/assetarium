@@ -4,7 +4,9 @@ Current workflow: **Settings → Asset sources** controls directories and live
 enabled-source membership. The app scans enabled sources on opening, and **Scan**
 checks changes during a session. One warning card per source offers **Process
 assets**, a processing/publication progress bar, and graceful **Cancel**. Cards
-clear only after a scan verifies that current assets are up to date and published.
+clear after a scan verifies that no actionable work remains and current results
+are published. Retained failures appear in **Importing failures report**, a
+scrollable list of original model paths, instead of keeping pending cards open.
 Generated source information now lives in each directory's `metadata-lal`.
 See [asset sources](asset-sources.md) for storage, cancellation and fault rules.
 

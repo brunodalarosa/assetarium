@@ -23,8 +23,11 @@ in each source's `metadata-lal`. See [asset sources](../asset-sources.md).
 The library shows one warning card per source needing processing/publication.
 **Process assets** performs both, with a progress bar spanning processing,
 publication and a final verification scan. **Cancel** finishes and saves the
-current asset before stopping. The card remains until a scan confirms that all
-current assets are up to date and published. The separate Process pending and
+current asset before stopping. The card remains until a scan confirms that no
+actionable work remains and current results have been published. Recorded failures
+do not trigger pending cards: **Importing failures report** opens a scrollable list
+of original asset paths, including disabled sources. Saved attempts distinguish
+unchanged failures from new/changed files and unfinished work. The separate Process pending and
 Publish ready work buttons have been removed. Scan remains available during a
 session; processing never starts automatically when sources/files are added.
 

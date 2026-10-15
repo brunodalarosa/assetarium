@@ -103,6 +103,10 @@ class DesktopBridge:
     def sources(self):
         return self._wait(self._present(self._sources))
 
+    def importing_failures(self):
+        from .sources import importing_failures
+        return self._wait(self._present(importing_failures, self._config))
+
     def _sources(self):
         from .sources import registry, source_status, revision
         from .source_operations import operation_status
