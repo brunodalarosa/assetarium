@@ -16,6 +16,7 @@ from test_retrieval import indexed
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 from local_asset_library.mcp_assets import AssetService
 from PIL import Image
+from ui_text import assert_ui_text
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
@@ -58,6 +59,7 @@ def js(script):
 
 
 def capture(name):
+    assert_ui_text(window, name, report)
     from System import Action
     from System.IO import MemoryStream
     from System.Threading.Tasks import Task

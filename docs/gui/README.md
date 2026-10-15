@@ -97,6 +97,20 @@ visible focus. The layout adapts to narrow windows; details move below the grid.
 Basic native keyboard checks and rendered inspection are separate from a full
 screen-reader/accessibility audit and Bruno's usability approval.
 
+## UI text encoding checks
+
+Keep UI source reads and writes explicitly UTF-8; Windows' default Python text
+encoding can otherwise corrupt punctuation and icons during edits. Run
+`python -m pytest tests/test_ui_encoding.py` through the existing MCP runtime
+wrapper. It checks every app-owned UI file and the actual packaged desktop HTML,
+including separators, loading ellipses, pagination, accessibility text and icons.
+The search, source-navigation and interactive-preview native harnesses also check
+DOM text and accessible attributes whenever they capture a screen. The preview
+fixture includes accented and non-Latin asset names. The encoding-fix run passed
+17 focused tests and 20 native snapshots; evidence is in
+`data/gui/encoding-fix-summary.json`. It caught the original corrupted script and
+found no remaining corruption in the 189 tracked text files audited.
+
 ## Evidence and fault boundaries
 
 Detail separates measured geometry and inspected-file/hash evidence, provisional

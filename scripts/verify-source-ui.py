@@ -17,6 +17,7 @@ from local_asset_library.source_operations import publish_source
 from local_asset_library import sources
 from local_asset_library.source_operations import state,cancel,cancelled
 from local_asset_library.desktop import DesktopBridge,create_window,profile_path,record_profile_outcome
+from ui_text import assert_ui_text
 
 run=uuid.uuid4().hex[:10]
 OUT=ROOT/'data/gui'/('source-settings-'+run);OUT.mkdir(parents=True)
@@ -86,6 +87,7 @@ def js(script):
 
 
 def capture(name):
+    assert_ui_text(window, name, report)
     from System import Action
     from System.IO import MemoryStream
     from System.Threading.Tasks import Task
@@ -165,6 +167,7 @@ def verify():
         update_record(work,original);sources.scan_source(config,one)
         js("$('open-import-failures').click();true")
         wait("!$('import-failures-empty').hidden&&$('import-failures-list').hidden")
+        capture('import-failures-empty.png')
         report['checks'].append('Empty failure report has an explicit empty state')
         report['status']='passed'
     except BaseException as exc:

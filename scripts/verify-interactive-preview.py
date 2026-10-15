@@ -19,6 +19,7 @@ from test_mcp_assets import update
 from local_asset_library.captions import file_hash
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 from PIL import Image, ImageChops
+from ui_text import assert_ui_text
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
@@ -33,6 +34,8 @@ if not args.real_assets:
     fixture.mkdir(parents=True, exist_ok=False)
     config, backend, records = indexed.__wrapped__(fixture)
     record = deepcopy(records[0])
+    record['display_name'] = 'Caf\u00e9 \u2014 carr\u00e9 \u25c7 \u5de5\u5177'
+    record['pack_id'] = 'kenney_even'
     source = config.source_file(record['files'][0]['path'])
     source.write_text('mtllib preview.mtl\nv -1 0 -1\nv 1 0 -1\nv 0 2 0\nv 0 0 1\n'
         'vt 0 0\nvt 1 0\nvt 0.5 1\nusemtl Red\nf 1/1 3/3 2/2\nf 1/1 2/2 4/3\nf 2/1 3/3 4/2\nf 3/1 1/2 4/3\n')
@@ -127,6 +130,7 @@ def js(script):
 
 
 def capture(name):
+    assert_ui_text(window, name, report)
     from System import Action
     from System.IO import MemoryStream
     from System.Threading.Tasks import Task
@@ -181,8 +185,16 @@ def verify():
     try:
         wait('Boolean(state.context && state.items.length===40)')
         assert window.gui.renderer=='edgechromium'
+        window.evaluate_js('closeDetail()')
+        assert window.evaluate_js("$('page-info').textContent") == '1\u201340 of 40'
+        assert window.evaluate_js("$('detail').querySelector('.detail-empty span').textContent") == '\u25c7'
+        assert ' \u00b7 ' in window.evaluate_js("$('coverage').textContent")
+        capture('00-library-text.png')
         identifier=json.dumps(record['asset_id'])
         js(f"(async()=>{{await selectAsset({identifier});return true;}})()")
+        assert window.evaluate_js("$('detail').querySelector('.detail-header h2').textContent") == record['display_name']
+        assert window.evaluate_js("$('detail').querySelector('.close-detail').textContent") == '\u00d7'
+        assert window.evaluate_js("$('detail').querySelector('.pack').textContent") == 'Kenney \u00b7 even'
         window.evaluate_js("LALPreview.current.launch.click()")
         wait("Boolean(LALPreview.current.loadingText)")
         capture('01-loading.png')
