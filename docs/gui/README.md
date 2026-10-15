@@ -20,6 +20,25 @@ It scans enabled asset sources for file changes in the background.
 checkboxes. Results refresh live. Source-specific generated information is stored
 in each source's `metadata-lal`. See [asset sources](../asset-sources.md).
 
+Click a source name or its **🔍** icon to browse that source inside LAL, including
+disabled sources. The scrollable grid loads saved published assets in batches of
+forty, with lazy thumbnails and a **Load more assets** keyboard alternative.
+Select any card to use the same inspection panel and interactive 3D preview as
+the main library. This view has no search controls and does not change Enabled,
+scan, process or publish assets. Sources without saved published records explain
+that scanning/processing is needed. **Back to asset sources** restores the source
+list position and focus; the main library's query and result cards are preserved.
+Saved faulty items remain visible with their evidence. An unsupported or faulty
+3D source retains the existing image/evidence behavior.
+
+Source browsing uses a registered source's own published membership and generation
+through the existing desktop services. Disabled-source inspection is limited to
+this explicit source scope; main library/MCP visibility is unchanged. Removed
+sources and assets from other sources cannot use that scope. Viewer failures
+share the library's retained fault history, and file tickets remain source scoped.
+Native verification: `scripts/verify-source-browser.py --run-name <unique-name>`
+through the existing MCP runtime, using isolated synthetic assets only.
+
 The library shows one warning card per source needing processing/publication.
 **Process assets** performs both, with a progress bar spanning processing,
 publication and a final verification scan. **Cancel** finishes and saves the

@@ -37,7 +37,7 @@
     <div id="error" role="alert" hidden></div>
     <div class="workspace">
       <section class="collection" aria-label="Library assets"><div id="grid" class="grid" tabindex="-1" aria-busy="true"></div><p id="empty" hidden>No assets match these settings.</p></section>
-      <aside id="detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p><p class="hint">Source files stay in their original location.</p></div></aside>
+      <aside id="detail" class="asset-detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p><p class="hint">Source files stay in their original location.</p></div></aside>
     </div>
   </main>
   <section id="settings-view" aria-label="Settings" hidden>
@@ -49,6 +49,20 @@
         <div class="source-add"><label for="source-directory">Asset directory</label><div class="source-add-controls"><input id="source-directory" type="text" placeholder="Choose an asset source directory"><button type="button" id="choose-source">Choose folder…</button><button class="primary" type="button" id="add-source">Add source</button></div></div>
         <p id="sources-message" role="status" aria-live="polite"></p><div id="source-list"></div><p class="hint" id="sources-empty" hidden>No asset sources yet. Add a directory to get started.</p>
       </section>
+    </div>
+  </section>
+  <section id="source-browser-view" aria-labelledby="source-browser-title" hidden>
+    <div class="settings-heading"><div><p class="source-browser-eyebrow">Asset source contents</p><h2 id="source-browser-title" tabindex="-1"></h2></div><button type="button" id="close-source-browser">Back to asset sources</button></div>
+    <p id="source-browser-path" class="hint"></p>
+    <p id="source-browser-status" role="status" aria-live="polite"></p>
+    <p id="source-browser-error" role="alert" hidden></p>
+    <div class="workspace">
+      <section id="source-collection" class="collection" aria-label="Source assets" tabindex="0">
+        <div id="source-grid" class="grid" tabindex="-1" aria-busy="false"></div>
+        <p id="source-empty" hidden></p>
+        <button id="source-load-more" type="button" hidden>Load more assets</button>
+      </section>
+      <aside id="source-detail" class="asset-detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p></div></aside>
     </div>
   </section>
   <section id="import-failures-view" aria-labelledby="import-failures-title" hidden>

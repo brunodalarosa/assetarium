@@ -57,9 +57,13 @@ CDN, HTTP server, inference, model downloads or duplicate converted asset cache.
 See [vendored dependencies and attribution](../../src/local_asset_library/ui/vendor/README.md).
 
 The desktop bridge accepts asset IDs, source formats and opaque file tickets;
-it never accepts a caller-supplied path. Membership, enabled-source visibility,
-publication generation and resolved source boundaries are checked before
+it never accepts a caller-supplied path. Membership, publication generation,
+resolved source boundaries and the caller's browsing scope are checked before
 delivery. Each file's actual bytes are verified against its catalog hash.
+Library inspection respects enabled-source visibility. The explicit source
+contents view can inspect a registered disabled source's saved published assets
+without enabling it; it uses that source's membership and generation. Removed
+sources cannot issue or read tickets. Both views share retained viewer failures.
 Delivery is bounded to 64 files, 64 MiB per file, 128 MiB total and 128 filename
 aliases. Conflicting basenames with different contents are an explicit fault
 because the upstream importer resolves dependency filenames by basename.

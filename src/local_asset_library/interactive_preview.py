@@ -47,10 +47,16 @@ def viewer_shell():
 
 
 class InteractivePreviewService:
-    def __init__(self, service):
+    def __init__(self, service, history=None):
         self.service = service
         self.config = service.config
         self.tickets = {}
+        if history is not None:
+            # Library and source views retain the same input-specific failures.
+            self.fault_path = history.fault_path
+            self.faults = history.faults
+            self.evidence_fault = history.evidence_fault
+            return
         self.fault_path = self.config.output_path('data', 'gui/interactive-preview-faults.jsonl')
         self.faults = {}
         self.evidence_fault = None

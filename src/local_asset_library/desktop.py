@@ -49,6 +49,8 @@ class DesktopBridge:
             self._service = DesktopService(self._config)
             from .interactive_preview import InteractivePreviewService
             self._interactive_preview = InteractivePreviewService(self._service)
+            from .source_browser import SourceBrowser
+            self._source_browser = SourceBrowser(self._config, self._interactive_preview)
             self._gateway.service = self._service
         except Exception as exc:
             self._init_error = str(exc)
@@ -159,6 +161,29 @@ class DesktopBridge:
 
     def browse(self, filters=None, offset=0, page_size=40):
         return self._wait(self._present(self._service.browse, filters, offset, page_size))
+
+    def source_browse(self, key, offset=0, page_size=40):
+        return self._wait(self._present(self._source_browser.call, 'browse', key, offset, page_size))
+
+    def source_asset(self, key, asset_id, source_format=None, preview_view='three_quarter', expected_version=None):
+        return self._wait(self._present(self._source_browser.call, 'asset', key,
+                                      asset_id, source_format, preview_view, expected_version))
+
+    def source_thumbnail(self, key, asset_id, expected_version=None):
+        return self._wait(self._present(self._source_browser.call, 'thumbnail', key, asset_id, expected_version))
+
+    def source_preview_prepare(self, key, asset_id, source_format, expected_version):
+        return self._wait(self._present(self._source_browser.call, 'prepare', key,
+                                      asset_id, source_format, expected_version))
+
+    def source_preview_file(self, key, ticket, index):
+        return self._wait(self._present(self._source_browser.call, 'file', key, ticket, index))
+
+    def source_preview_fault(self, key, ticket, reason, missing_files=None):
+        return self._wait(self._present(self._source_browser.call, 'fault', key, ticket, reason, missing_files))
+
+    def source_preview_release(self, key, ticket):
+        return self._wait(self._present(self._source_browser.call, 'release', key, ticket))
 
     def asset(self, asset_id, source_format=None, preview_view='three_quarter', expected_version=None):
         return self._wait(self._present(self._service.asset, asset_id, source_format, preview_view, expected_version))

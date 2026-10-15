@@ -185,7 +185,7 @@ window.LALPreview = (() => {
           catch (error) { this.warning.textContent += ' Could not save fault evidence: ' + error.message; }
         }
       } else if (message.type === 'fault') await this.fault(message.reason);
-      else if (message.type === 'search') { if (!this.fullscreen) document.getElementById('query')?.focus(); }
+      else if (message.type === 'search') { if (!this.fullscreen) this.item.onSearch?.(); }
       else if (message.type === 'escape') { if (this.fullscreen) this.exitFullscreen(); else this.stop(); }
       else if (message.type === 'command-done') { this.requests.get(message.request)?.(); this.requests.delete(message.request); }
     }
