@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "files": {
+    "draco-1.5.7/draco_decoder.js": {
+      "bytes": 58763,
+      "sha256": "e8049906ef3f8f75d3456c22a3f31bfdfe5b5b5bd09ccdec613b9e9a49d554d8"
+    },
+    "draco-1.5.7/draco_decoder.wasm": {
+      "bytes": 285948,
+      "sha256": "2516a4e43526d71787bf2f678f951329f7f858f8f15f42d4bc9e370b31a0da3a"
+    },
+    "draco-1.5.7/LICENSE": {
+      "bytes": 13898,
+      "sha256": "d3709b0fb4b8a94bbb1d02b8a2e484f258b0d9c5c5a01f940391f3fe662cd1a4"
+    },
+    "licenses/chevrotain-LICENSE": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "licenses/fflate-LICENSE": {
+      "bytes": 1069,
+      "sha256": "805f6cb28bb8b6d3a0badd83c93bccd9671fa01a3b4b92b7042b0743325ac243"
+    },
+    "licenses/regexp-to-ast-LICENSE": {
+      "bytes": 1068,
+      "sha256": "ffdfd706a54ae16965504e916e4e236bc76bcd1573c6f88045daec6c1fed64c5"
+    },
+    "licenses/three-LICENSE": {
+      "bytes": 1081,
+      "sha256": "bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/negx.jpg": {
+      "bytes": 72645,
+      "sha256": "83ad0856f960fea8936d41d001ae60b5235cb46f3ad91436e8e4e968badb5fc6"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/negy.jpg": {
+      "bytes": 116664,
+      "sha256": "96ab22893b5a200d0d186120af3b9db730d542d85d651f2ce0bf619266bb05ac"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/negz.jpg": {
+      "bytes": 69317,
+      "sha256": "0b22789b9cf4b4bfb7f34a3e61261e330c86de9cfa31c80fcacbd9f9c32f4b6b"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/posx.jpg": {
+      "bytes": 79088,
+      "sha256": "b34e1dd4558686bc9dc0fd17753c7609e6e75683625657eca7e223bebe7f8725"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/posy.jpg": {
+      "bytes": 24875,
+      "sha256": "84a7a36eff72d77a3f547c6c68207dc1c7c103e6dfa713aa23d18b59baf6b5b9"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/posz.jpg": {
+      "bytes": 78363,
+      "sha256": "cd88f9c072025ddd1b954bd0f5acc7289b94c773df80df10eecb43bb911a3841"
+    },
+    "online3dviewer-0.18.0/envmaps/citadella/readme.txt": {
+      "bytes": 240,
+      "sha256": "b9bfbc910be0db34dbc4104ac442e36035c58bfc175df5536b6cf8b5c2a6f505"
+    },
+    "online3dviewer-0.18.0/o3dv.license.md": {
+      "bytes": 1091,
+      "sha256": "1927cc1a53b4ee5a4fb8213b21c4ed5b2a412f5aa314fb8777edccc1f3e5749e"
+    },
+    "online3dviewer-0.18.0/o3dv.min.js": {
+      "bytes": 1058042,
+      "sha256": "3b3bf3ad87a6bb697c001db40c0640674849b20e27c7e58abf29a64691c00b08"
+    }
+  }
+}

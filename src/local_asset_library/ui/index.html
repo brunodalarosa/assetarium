@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src data: blob:; font-src 'none'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Local Asset Library</title>
   <style>/* BUNDLED_STYLE */</style>
 </head>
@@ -59,6 +59,7 @@
     <p id="import-failures-empty" hidden>No importing failures recorded.</p>
   </section>
   <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Read-only originals · manual updates</span></footer>
+  <script>/* INTERACTIVE_PREVIEW_SCRIPT */</script>
   <script>/* BUNDLED_SCRIPT */</script>
 </body>
 </html>

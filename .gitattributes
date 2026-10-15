@@ -1,2 +1,8 @@
 # Preserve approved owner artifacts and hash-bound step 7 evidence byte-for-byte.
 docs/mcp/*.json -text
+
+# Preserve upstream distributions byte-for-byte on Windows, including notices.
+# Their generated shaders and underlined license headings are not project style.
+src/local_asset_library/ui/vendor/** -text linguist-vendored whitespace=-trailing-space conflict-marker-size=32
+src/local_asset_library/ui/vendor/README.md text linguist-vendored=false
+src/local_asset_library/ui/vendor/manifest.json text linguist-vendored=false

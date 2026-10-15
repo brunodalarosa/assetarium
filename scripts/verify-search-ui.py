@@ -121,9 +121,13 @@ def verify():
           assert($('search-busy').hidden&&!$('submit').disabled&&$('error').textContent.includes('Synthetic search failure'),'error_completion');
           $('query').value='clear race';const clearing=search();$('clear').click();finish(pending[3]);await clearing;
           await new Promise(resolve=>setTimeout(resolve,300));assert($('search-busy').hidden&&$('mode').value==='combined'&&$('limit').value==='20','clear_reset');
-          $('query').value='refresh race';const refreshing=search();const reload=refreshContext(true);finish(pending[4]);await Promise.all([refreshing,reload]);
-          assert($('search-busy').hidden&&!$('submit').disabled&&state.lastSettings===null,'refresh_supersedes');
-          $('query').value='success';const successful=search();finish(pending[5],[{asset_id:'fixture',name:'fixture',pack:'synthetic',caption_owner_review:'pending'}]);await successful;
+          $('query').value='refresh race';const refreshing=search();const reload=refreshContext(true);finish(pending[4]);await refreshing;
+          // Refresh replays an active search against the current publication.
+          // Resolve that new request too; leaving it pending deadlocks the harness.
+          while(pending.length<6)await new Promise(resolve=>setTimeout(resolve,10));
+          finish(pending[5]);await reload;
+          assert($('search-busy').hidden&&!$('submit').disabled&&state.lastSettings.query==='refresh race','refresh_supersedes');
+          $('query').value='success';const successful=search();finish(pending[6],[{asset_id:'fixture',name:'fixture',pack:'synthetic',caption_owner_review:'pending'}]);await successful;
           assert($('search-busy').hidden&&!$('submit').disabled&&state.items[0].asset_id==='fixture','success_completion');
           return busyChecks;})()""")
         assert all(outcomes.values()), outcomes

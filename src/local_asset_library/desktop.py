@@ -47,6 +47,8 @@ class DesktopBridge:
                 from .sources import aggregate
                 aggregate(self._config)
             self._service = DesktopService(self._config)
+            from .interactive_preview import InteractivePreviewService
+            self._interactive_preview = InteractivePreviewService(self._service)
             self._gateway.service = self._service
         except Exception as exc:
             self._init_error = str(exc)
@@ -164,6 +166,22 @@ class DesktopBridge:
     def thumbnail(self, asset_id, expected_version=None):
         return self._wait(self._present(self._service.thumbnail, asset_id, expected_version))
 
+    def preview_shell(self):
+        from .interactive_preview import viewer_shell
+        return viewer_shell()
+
+    def preview_prepare(self, asset_id, source_format, expected_version):
+        return self._wait(self._present(self._interactive_preview.prepare, asset_id, source_format, expected_version))
+
+    def preview_file(self, ticket, index):
+        return self._wait(self._present(self._interactive_preview.file, ticket, index))
+
+    def preview_fault(self, ticket, reason, missing_files=None):
+        return self._wait(self._present(self._interactive_preview.fault, ticket, reason, missing_files))
+
+    def preview_release(self, ticket):
+        return self._wait(self._present(self._interactive_preview.release, ticket))
+
     def operation(self, operation, dry_run=True):
         if operation not in {'scan', 'process', 'refresh', 'status'} or type(dry_run) is not bool:
             return {'status': 'faulty', 'reason': 'Invalid manual library operation'}
@@ -276,6 +294,7 @@ def create_window(config, bridge):
     html = (ui / 'index.html').read_text(encoding='utf-8')
     html = html.replace('/* BUNDLED_STYLE */', (ui / 'style.css').read_text(encoding='utf-8'))
     html = html.replace('/* BUNDLED_SCRIPT */', (ui / 'app.js').read_text(encoding='utf-8'))
+    html = html.replace('/* INTERACTIVE_PREVIEW_SCRIPT */', (ui / 'interactive-preview.js').read_text(encoding='utf-8'))
     window = webview.create_window('Local Asset Library', html=html, js_api=bridge,
         width=1280, height=860, min_size=(640, 480), resizable=True, background_color='#f4f3ef')
     bridge._window = window

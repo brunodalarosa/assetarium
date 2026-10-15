@@ -41,6 +41,16 @@ is explicit: a missing or faulty requested view produces a reason, not another
 image. Source-format selection verifies that export and shows its original path;
 **Copy source path** copies text only.
 
+Click the inspection image or **Explore in 3D** to interact with the selected
+source directly in the inspection card. **Open fullscreen** opens the same
+preview across the LAL window. Drag to rotate, right-drag to pan, and scroll to
+zoom. The toolbar provides Fit, Reset view, zoom buttons and standard view
+presets; Display options adds perspective/orthographic projection, background,
+edges, up-axis and upright/free-orbit navigation. Fullscreen preserves the
+loaded model and camera, and Escape returns to the inspection card. Back to
+image releases the interactive viewer. See [interactive previews](3d-preview.md)
+for format support, limits and verification evidence.
+
 Enter a description or filename and press **Enter** or **Search**. The default
 mode is explicitly `combined`. **Clear** resets query, filters and
 mode (combined) and shortlist limit (20), restoring paged library browsing without starting the model. With an empty
@@ -135,7 +145,10 @@ The GUI thread renders local bundled HTML/CSS/JavaScript. An app-owned backgroun
 loop handles gateway calls, and source/detail operations run separately from the
 serialized GPU queue. Request generations prevent obsolete results or previews
 from replacing newer views. The pinned pywebview bridge requires local inline
-script/evaluation; CSP blocks external resources, connections, frames and uploads.
+script/evaluation; CSP blocks external resources, network connections and uploads.
+An opaque-origin, scripts-only sandbox frame is allowed for interactive 3D;
+its only resources are bundled scripts, data URLs and in-memory blob URLs. It
+cannot access the desktop bridge or the parent document. No HTTP listener is added.
 Asset text is inserted as text rather than executable HTML.
 
 Browsing does not load a model. The first semantic query starts one private
