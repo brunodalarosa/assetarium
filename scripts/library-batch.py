@@ -20,6 +20,7 @@ from local_asset_library.publication import atomic_json
 parser = argparse.ArgumentParser()
 parser.add_argument('operation', choices=['scan', 'process', 'refresh', 'status'])
 parser.add_argument('--dry-run', action='store_true')
+parser.add_argument('--source', help='Registered asset source key')
 parser.add_argument('--batch-size', type=int, default=50)
 parser.add_argument('--skip-captions', action='store_true', help='Leave descriptions pending; inspect and index available images only')
 parser.add_argument('--peak-reserve-mib', type=int, default=2048, help='Estimated and enforced additional storage ceiling for this run')
@@ -30,6 +31,18 @@ stages = [('inspection', '.venv-mcp'), ('caption', '.venv-caption'), ('embedding
 if args.skip_captions:
     stages = [item for item in stages if item[0] != 'caption']
 config = load_config(root / 'config.example.toml', root)
+if config.sources_registry:
+    from local_asset_library.sources import registry,source_status
+    from local_asset_library.source_operations import start
+    if args.dry_run or args.operation=='status':
+        print(json.dumps({'sources':[source_status(config,s) for s in registry(config)['sources']]}))
+    elif args.operation in {'scan','process'}:
+        if args.operation=='process' and not args.source:
+            parser.error('Choose --source or use the source card in LAL')
+        print(json.dumps(start(config,args.operation,args.source)))
+    else:
+        parser.error('Process assets publishes automatically; use the source card in LAL')
+    raise SystemExit(0)
 run = root / 'data/library/operations' / uuid.uuid4().hex
 run.mkdir(parents=True, exist_ok=False)
 def storage(name):

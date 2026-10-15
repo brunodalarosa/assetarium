@@ -7,10 +7,13 @@ resumable incremental stages, bounded browsing and atomic catalog/index publicat
 See [current operations](docs/library-updates.md) and [progress](docs/progress.md).
 Earlier forty-asset pilot measurements and real-agent evidence remain preserved.
 
-The source collection is read only:
-`C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs`.
-Generated asset data and runtime caches stay in this repository. Model weights
-are shared at `C:\BrunoOS\Local-models`. Play Shapes remains independent.
+Open **Settings → Asset sources** in the Windows app to add/remove directories
+and enable or disable their assets in live searches. Original asset files remain
+read only. Each source owns a `metadata-lal` directory containing its generated
+records, inspections, previews, descriptions, reviews, faults, checkpoints and
+vectors. LAL retains settings, derived combined indexes, application evidence and
+runtime caches centrally. Model weights are shared at `C:\BrunoOS\Local-models`.
+See [asset sources and processing](docs/asset-sources.md). Play Shapes remains independent.
 Local agent clients have additive, backed-up MCP registration.
 
 From this repository in PowerShell:
@@ -45,7 +48,7 @@ Storage names are fixed to ignored `data/`, `cache/`, `logs/`, `scratch/`, and
 `.venv/`. `[storage].models` explicitly selects the shared absolute directory
 `C:\BrunoOS\Local-models`; `"models"` still supports isolated local fixtures.
 Paths inside every storage root must be relative. Parent traversal, overlapping
-source/output roots, Windows device/stream paths, and resolved links escaping
+asset sources, Windows device/stream paths, and resolved links escaping
 a root are rejected.
 Future stages must use the boundary API in `config.py`; it is application policy,
 not an operating-system sandbox, and does not defend against concurrent link swaps.
@@ -120,8 +123,9 @@ Blender is discovered from the configured executable, PATH, then installed Windo
 locations. A discovered executable must support the required imports and offline
 flags; failures remain visible. This machine reuses Blender 5.2.2 LTS. Override its
 path with `blender` in local configuration. No installer or automatic download runs.
-All Blender user resources, temporary files and outputs are directed into project
-storage. Embedded scripts are disabled. Jobs run sequentially with a per-asset
+Blender user resources and temporary files remain in project storage; generated
+inspection outputs go into the owning source's `metadata-lal`. Embedded scripts
+are disabled. Jobs run sequentially with a per-asset
 timeout, explicit errors, source/dependency checks, and validated cached results.
 Unchanged faulty results are retained without automatic retries. Every kind of
 fault is marked with evidence, and the batch moves on. Only use `--retry-faults`
@@ -229,9 +233,9 @@ unverified. See [progress](docs/progress.md) for faults and evidence boundaries.
 ## Windows desktop app
 
 Double-click `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs` to browse
-the approved pilot and search through the same backend as MCP in a normal,
-resizable Windows window. No terminal, installer, model download or processing
-step is part of startup. Enter submits; Clear restores browsing. Asset detail
+enabled asset sources and search through the same backend as MCP in a normal,
+resizable Windows window. Startup scans enabled sources for file changes without
+installing, downloading models or processing assets. Enter submits; Clear restores browsing. Asset detail
 includes explicit views/formats, source-path copying and existing fault/evidence
 records. Search settings can be copied as exact MCP argument JSON.
 

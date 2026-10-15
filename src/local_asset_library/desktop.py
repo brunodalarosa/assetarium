@@ -27,6 +27,7 @@ class DesktopBridge:
         self._ready = threading.Event()
         self._presentation_lock = threading.Lock()
         self._closed = False
+        self._owned_source_operations = set()
         self._thread = threading.Thread(target=self._run, name='asset-gateway', daemon=True)
         self._thread.start()
         if not self._ready.wait(10):
@@ -42,6 +43,9 @@ class DesktopBridge:
             self._diagnostics = log.open('a', encoding='utf-8')
             self._gateway = Gateway(self._config, audit_namespace='gui', diagnostic_stream=self._diagnostics,
                 subprocess_flags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            if self._config.sources_registry and not self._config.output_path('data','catalog.sqlite').exists():
+                from .sources import aggregate
+                aggregate(self._config)
             self._service = DesktopService(self._config)
             self._gateway.service = self._service
         except Exception as exc:
@@ -95,6 +99,57 @@ class DesktopBridge:
 
     def context(self):
         return self._wait(self._present(self._service.context))
+
+    def sources(self):
+        return self._wait(self._present(self._sources))
+
+    def _sources(self):
+        from .sources import registry, source_status, revision
+        from .source_operations import operation_status
+        return {'status': 'ready', 'sources': [source_status(self._config, s) for s in registry(self._config)['sources']],
+                'revision': revision(self._config), 'scan': operation_status(self._config)}
+
+    def source_action(self, action, key=None, directory=None, enabled=None):
+        if not self._config.sources_registry:
+            return {'status': 'faulty', 'reason': 'Configure asset sources before using source settings'}
+        return self._wait(self._present(self._source_action, action, key, directory, enabled))
+
+    def _source_action(self, action, key, directory, enabled):
+        from . import sources
+        from .source_operations import cancel
+        if action == 'add':
+            source = sources.add(self._config, directory)
+            return self._start_source_operation('scan', source['key'])
+        if action == 'enabled':
+            source = sources.set_enabled(self._config, key, enabled)
+            if enabled:
+                self._start_source_operation('scan', key)
+            return {'status': 'saved'}
+        if action == 'remove':
+            sources.remove(self._config, key)
+            return {'status': 'saved'}
+        if action == 'scan':
+            return self._start_source_operation('scan', key)
+        if action == 'process':
+            return self._start_source_operation('process', key)
+        if action == 'cancel':
+            return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
+        raise ConfigError('Unknown asset source action')
+
+    def _start_source_operation(self, operation, key):
+        from .source_operations import start
+        result = start(self._config, operation, key)
+        if result.get('token'):
+            self._owned_source_operations.add(result['token'])
+        return result
+
+    def choose_source_directory(self):
+        import webview
+        try:
+            selected = self._window.create_file_dialog(webview.FileDialog.FOLDER)
+            return {'status': 'selected', 'directory': selected[0]} if selected else {'status': 'cancelled'}
+        except Exception as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
 
     def browse(self, filters=None, offset=0, page_size=40):
         return self._wait(self._present(self._service.browse, filters, offset, page_size))
@@ -191,6 +246,15 @@ class DesktopBridge:
         if self._closed:
             return
         self._closed = True
+        if self._config.sources_registry:
+            from .sources import registry, bound
+            from .source_operations import cancel, operation_status
+            for source in registry(self._config)['sources']:
+                scoped = bound(self._config, source)
+                if operation_status(scoped).get('token') in self._owned_source_operations:
+                    cancel(scoped)
+            if operation_status(self._config).get('token') in self._owned_source_operations:
+                cancel(self._config)
         future = asyncio.run_coroutine_threadsafe(self._gateway.close(), self._loop)
         try:
             future.result(timeout=15)
@@ -208,8 +272,10 @@ def create_window(config, bridge):
     html = (ui / 'index.html').read_text(encoding='utf-8')
     html = html.replace('/* BUNDLED_STYLE */', (ui / 'style.css').read_text(encoding='utf-8'))
     html = html.replace('/* BUNDLED_SCRIPT */', (ui / 'app.js').read_text(encoding='utf-8'))
-    return webview.create_window('Local Asset Library', html=html, js_api=bridge,
+    window = webview.create_window('Local Asset Library', html=html, js_api=bridge,
         width=1280, height=860, min_size=(640, 480), resizable=True, background_color='#f4f3ef')
+    bridge._window = window
+    return window
 
 
 def profile_path(config, bridge, window):

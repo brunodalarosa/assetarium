@@ -1,4 +1,20 @@
-# Library updates and processing — Step 8
+# Library updates and processing
+
+Current workflow: **Settings → Asset sources** controls directories and live
+enabled-source membership. The app scans enabled sources on opening, and **Scan**
+checks changes during a session. One warning card per source offers **Process
+assets**, a processing/publication progress bar, and graceful **Cancel**. Cards
+clear only after a scan verifies that current assets are up to date and published.
+Generated source information now lives in each directory's `metadata-lal`.
+See [asset sources](asset-sources.md) for storage, cancellation and fault rules.
+
+For current command-line operation, `library-batch.py scan` checks enabled sources,
+`library-batch.py status` reports their state, and
+`library-batch.py process --source KEY` starts processing and automatic publication
+for that source. These operations reuse existing offline runtimes. Source settings
+replace the historical pack allowlist; the existing storage budget still applies.
+
+## Earlier Step 8 and import workflow (historical)
 
 The prepared Windows app and MCP server share explicitly configured membership,
 source/dependency checks, measured filters, ranking and response caps. The approved

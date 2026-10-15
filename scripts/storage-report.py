@@ -10,9 +10,15 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def measure(root):
+def measure(root, seen=None):
     root = root.resolve(strict=True)
-    seen = set()
+    # Explicit long paths are needed for deep per-source history directories.
+    # Keep report paths relative to the same traversal root.
+    walk_root = root
+    if os.name == 'nt' and not str(root).startswith('\\\\?\\'):
+        value = str(root)
+        walk_root = Path('\\\\?\\UNC\\' + value[2:] if value.startswith('\\\\') else '\\\\?\\' + value)
+    seen = set() if seen is None else seen
     areas = {}
     faults = []
     excluded_links = []
@@ -48,15 +54,15 @@ def measure(root):
     def walk_error(exc):
         faults.append({"path": str(exc.filename), "status": "faulty", "reason": str(exc)})
 
-    for directory, dirs, files in os.walk(root, followlinks=False, onerror=walk_error):
+    for directory, dirs, files in os.walk(walk_root, followlinks=False, onerror=walk_error):
         for name in dirs[:]:
             path = Path(directory) / name
             if path.is_symlink() or path.is_junction():
                 dirs.remove(name)
-                excluded_links.append(str(path.relative_to(root)))
+                excluded_links.append(str(path.relative_to(walk_root)))
         for name in files:
             path = Path(directory) / name
-            relative = path.relative_to(root)
+            relative = path.relative_to(walk_root)
             try:
                 if path.is_symlink():
                     raise ValueError("File link excluded from project accounting")

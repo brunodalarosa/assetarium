@@ -70,13 +70,101 @@ $('mode').onchange=()=>{const reference=$('mode').value==='reference';$('referen
 $('copy-settings').onclick=()=>{if(state.lastSettings)copy(JSON.stringify(state.lastSettings,null,2),'Exact MCP search_assets settings copied. Use the same catalog and index versions.');};
 $('grid').addEventListener('keydown',event=>{const card=event.target.closest('.card');if(!card)return;const cards=[...$('grid').querySelectorAll('.card')],index=cards.indexOf(card),columns=Math.max(1,getComputedStyle($('grid')).gridTemplateColumns.split(' ').length);let next=index;if(event.key==='ArrowRight')next++;else if(event.key==='ArrowLeft')next--;else if(event.key==='ArrowDown')next+=columns;else if(event.key==='ArrowUp')next-=columns;else if(event.key==='Home')next=0;else if(event.key==='End')next=cards.length-1;else return;event.preventDefault();cards[Math.max(0,Math.min(cards.length-1,next))]?.focus();});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.selected)closeDetail();if(event.ctrlKey&&event.key.toLowerCase()==='f'){event.preventDefault();$('query').focus();}});
-window.addEventListener('pywebviewready',async()=>{state.api=window.pywebview.api;try{state.context=await state.api.context();if(state.context.status==='faulty')throw Error(state.context.reason);$('scope').textContent=`Approved ${state.context.pilot_count}-asset library`;$('inventory').textContent=`${state.context.inventory_count} inventory records · ${state.context.generation}`;addOptions($('pack'),state.context.packs,packName);addOptions($('format'),state.context.formats,x=>x.toUpperCase());$('version').textContent=`Catalog ${state.context.versions.catalog.slice(0,10)} · index ${state.context.versions.index.slice(0,10)}`;$('version').title=JSON.stringify(state.context.versions,null,2);await browse();await refreshContext();$('query').focus();}catch(error){fail(error.message);status('Startup data is faulty. No model loading or fallback attempted.');$('grid').setAttribute('aria-busy','false');}});
+window.addEventListener('pywebviewready',async()=>{state.api=window.pywebview.api;try{state.context=await state.api.context();if(state.context.status==='faulty')throw Error(state.context.reason);$('scope').textContent=`Approved ${state.context.pilot_count}-asset library`;$('inventory').textContent=`${state.context.inventory_count} inventory records · ${state.context.generation}`;addOptions($('pack'),state.context.packs,packName);addOptions($('format'),state.context.formats,x=>x.toUpperCase());$('version').textContent=`Catalog ${state.context.versions.catalog.slice(0,10)} · index ${state.context.versions.index.slice(0,10)}`;$('version').title=JSON.stringify(state.context.versions,null,2);await browse();await refreshContext();await loadSources();if(state.context.managed_sources)await sourceAction('scan');$('query').focus();}catch(error){fail(error.message);status('Startup data is faulty. No model loading or fallback attempted.');$('grid').setAttribute('aria-busy','false');}});
 
 const paging=node('nav',undefined,'paging');paging.setAttribute('aria-label','Asset pages');
 for(const [id,label] of [['previous-page','Previous page'],['page-info',''],['next-page','Next page']]){const element=node(id==='page-info'?'span':'button',label);element.id=id;if(element.tagName==='BUTTON')element.type='button';paging.append(element);}$('grid').before(paging);
 $('previous-page').onclick=()=>{state.offset=Math.max(0,state.offset-40);browse(false);};$('next-page').onclick=()=>{state.offset+=40;browse(false);};
 const operations=node('div',undefined,'library-operations');
-for(const [label,operation,dry] of [['Check changes','scan',true],['Scan','scan',false],['Process pending','process',false],['Publish ready work','refresh',false],['Status','status',false]]){const button=node('button',label);button.type='button';button.onclick=async()=>{const result=await state.api.operation(operation,dry);if(result.status==='faulty')fail(result.reason);else if(operation==='status'){await refreshContext();status('Processing and published coverage updated.');}else status(`${label} started. Evidence: ${result.evidence}`);};operations.append(button);}
+for(const [label,operation,dry] of [['Scan','scan',false],['Status','status',false]]){const button=node('button',label);button.type='button';button.onclick=async()=>{if(operation==='scan'&&state.context?.managed_sources){await sourceAction('scan');return;}const result=await state.api.operation(operation,dry);if(result.status==='faulty')fail(result.reason);else if(operation==='status'){await refreshContext();status('Processing and published coverage updated.');}else status(`${label} started. Evidence: ${result.evidence}`);};operations.append(button);}
 const reload=node('button','Refresh published view');reload.type='button';reload.onclick=()=>refreshContext(true);operations.append(reload);$('search-form').after(operations);
-async function refreshContext(force=false){if(!state.api)return;if(force){++state.generation;searchBusy(null);state.lastSettings=null;$('copy-settings').disabled=true;$('grid').setAttribute('aria-busy','false');}try{const context=await state.api.context();if(context.status==='faulty')throw Error(context.reason);const changed=context.generation!==state.context?.generation;if(changed||force){const selected=state.selected;++state.detailGeneration;state.context=context;state.cardNodes.clear();$('grid').replaceChildren();$('detail').replaceChildren(node('p','Loading the current published version…'));$('scope').textContent=`Approved ${context.pilot_count}-asset library`;$('inventory').textContent=`${context.inventory_count} inventory records · ${context.generation}`;$('version').textContent=`Catalog ${context.versions.catalog.slice(0,10)} · index ${context.versions.index.slice(0,10)}`;$('version').title=JSON.stringify(context.versions);await browse(false);if(selected)await selectAsset(selected,null,'three_quarter',false);else closeDetail();status('Published library updated; selection and filters retained.');}const source=context.working_coverage||context.coverage,coverage=Object.values(source.packs);const pending=coverage.reduce((n,p)=>n+(p.stages.caption.pending||0),0),failed=coverage.reduce((n,p)=>n+(p.stages.caption.failed||0),0),progress=context.processing_status; $('coverage').textContent=`${context.coverage.membership} published · ${source.membership} configured · ${pending} captions pending · ${failed} caption failures · ${progress.stage||'processing'}: ${progress.status}${progress.selected?' '+progress.completed+'/'+progress.selected:''} · owner reviews remain separate`; }catch(error){fail(error.message);}}
+async function refreshContext(force=false){
+ if(!state.api)return;
+ try{
+  const context=await state.api.context();if(context.status==='faulty')throw Error(context.reason);
+  const changed=context.generation!==state.context?.generation||context.sources_revision!==state.context?.sources_revision;
+  if(changed||force){
+   const wasBrowsing=state.browsing;let selected=state.selected;
+   ++state.generation;++state.detailGeneration;searchBusy(null);state.context=context;state.lastSettings=null;$('copy-settings').disabled=true;
+   if(context.visible_asset_ids){const visible=new Set(context.visible_asset_ids);renderCards(state.items.filter(item=>visible.has(item.asset_id)),state.generation);if(selected&&!visible.has(selected)){closeDetail();selected=null;}}
+   for(const [id,values,label] of [['pack',context.packs,packName],['format',context.formats,x=>x.toUpperCase()]]){const select=$(id),value=select.value;while(select.options.length>1)select.remove(1);addOptions(select,values,label);select.value=values.includes(value)?value:'';}
+   $('scope').textContent=`${context.pilot_count} library assets`;$('inventory').textContent=`${context.inventory_count} published records`;
+   $('version').textContent=`Catalog ${context.versions.catalog.slice(0,10)} · index ${context.versions.index.slice(0,10)}`;
+   if(wasBrowsing)await browse(false);else await search();
+   if(selected){await selectAsset(selected,null,'three_quarter',false);}else closeDetail();
+  }
+  const source=context.working_coverage||context.coverage,coverage=Object.values(source.packs);
+  const pending=coverage.reduce((n,p)=>n+(p.stages.caption.pending||0),0),failed=coverage.reduce((n,p)=>n+(p.stages.caption.failed||0),0);
+  $('coverage').textContent=`${context.coverage.membership} in the library · ${pending} descriptions pending · ${failed} description failures`;
+ }catch(error){fail(error.message);}
+}
 const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operations.after(coverageLine);setInterval(()=>refreshContext(),20000);
+
+
+const sourceCards=new Map();state.sources=[];state.sourcesRevision=null;state.loadingSources=false;
+function operationActive(operation){return ['queued','scanning','processing','publishing','cancelling','verifying'].includes(operation?.status);}
+function sourceMessage(source){if(source.scan_fault)return source.scan_fault;if(!source.scanned)return 'Waiting for the source scan. Assets must be processed before they appear in searches.';if(source.needs_processing)return `${source.pending||0} ${(source.pending||0)===1?'asset needs':'assets need'} processing or publication.${source.failed?' '+source.failed+(source.failed===1?' has a recorded failure.':' have recorded failures.'):''}`;return 'Up to date and published.';}
+function renderSourceWarnings(){
+ const shown=new Set();
+ for(const source of state.sources){
+  const operation=source.operation||{},active=operationActive(operation);
+  if(!source.needs_processing&&!source.scan_fault&&!active)continue;
+  shown.add(source.key);let card=sourceCards.get(source.key);
+  if(!card){
+   const root=node('article',undefined,'source-warning'),title=node('h3'),path=node('p',undefined,'source-path'),message=node('p');
+   const bar=node('progress');bar.max=100;bar.setAttribute('aria-label','Processing and publishing progress');
+   const label=node('p',undefined,'source-progress-label'),actions=node('div',undefined,'source-actions'),process=node('button','Process assets','primary'),cancel=node('button','Cancel');
+   process.type=cancel.type='button';process.dataset.source=cancel.dataset.source=source.key;process.dataset.action='process';cancel.dataset.action='cancel';
+   process.onclick=()=>sourceAction('process',source.key);cancel.onclick=()=>sourceAction('cancel',source.key);actions.append(process,cancel);root.append(title,path,message,bar,label,actions);$('source-warnings').append(root);
+   card={root,title,path,message,bar,label,process,cancel};sourceCards.set(source.key,card);
+  }
+  card.title.textContent=source.name;card.path.textContent=source.path;card.message.textContent=sourceMessage(source);
+  const cancelPending=operation.status==='cancelling';
+  card.process.disabled=active||!source.enabled;card.process.title=source.enabled?'':'Enable this source in Settings before processing';
+  card.cancel.hidden=!active;card.cancel.disabled=cancelPending;card.cancel.textContent=cancelPending?'Cancelling…':'Cancel';
+  card.bar.hidden=!(active||operation.status==='cancelled'||operation.status==='complete_with_faults');card.bar.value=Math.round((operation.progress||0)*100);
+  card.bar.setAttribute('aria-valuetext',`${Math.round((operation.progress||0)*100)}% — ${operation.phase||'Waiting'}`);
+  card.label.textContent=operation.reason||((active||operation.status==='cancelled'||operation.status==='complete_with_faults')?`${operation.phase||operation.status}${operation.total?' · '+operation.completed+' / '+operation.total:''}`:'');
+ }
+ for(const [key,card] of sourceCards){if(!shown.has(key)){card.root.remove();sourceCards.delete(key);}}
+ $('source-warnings').hidden=!shown.size;
+}
+function renderSourceSettings(){
+ const focused=document.activeElement?.dataset;const focusKey=focused?.source,focusAction=focused?.action;
+ $('source-list').replaceChildren();$('sources-empty').hidden=state.sources.length>0;
+ for(const source of state.sources){
+  const row=node('article',undefined,'source-row'),info=node('div'),controls=node('div',undefined,'source-controls');
+  info.append(node('h3',source.name),node('p',source.path),node('p',sourceMessage(source)));
+  const label=node('label',undefined,'source-enabled'),checkbox=node('input');checkbox.type='checkbox';checkbox.checked=source.enabled;checkbox.dataset.source=source.key;checkbox.dataset.action='enabled';checkbox.setAttribute('aria-label','Enable '+source.name);
+  checkbox.onchange=()=>sourceAction('enabled',source.key,null,checkbox.checked);label.append(checkbox,document.createTextNode('Enabled'));
+  const remove=node('button','Remove');remove.type='button';remove.dataset.source=source.key;remove.dataset.action='remove';remove.disabled=operationActive(source.operation);remove.onclick=()=>sourceAction('remove',source.key);
+  controls.append(label,remove);row.append(info,controls);$('source-list').append(row);
+ }
+ if(focusKey&&focusAction)[...$('source-list').querySelectorAll('[data-source]')].find(x=>x.dataset.source===focusKey&&x.dataset.action===focusAction)?.focus();
+}
+async function loadSources(){
+ if(!state.api||state.loadingSources)return;state.loadingSources=true;
+ try{
+  const result=await state.api.sources();if(result.status==='faulty')throw Error(result.reason);
+  state.sources=result.sources||[];renderSourceWarnings();
+  const changed=state.sourcesRevision!==result.revision;state.sourcesRevision=result.revision;
+  if(!$('settings-view').hidden)renderSourceSettings();
+  if(changed&&state.context&&result.revision!==state.context.sources_revision)await refreshContext();
+ }catch(error){$('sources-message').textContent=error.message;}finally{state.loadingSources=false;}
+}
+async function sourceAction(action,key=null,directory=null,enabled=null){
+ ++state.generation;searchBusy(null);++state.detailGeneration;
+ try{
+  const result=await state.api.source_action(action,key,directory,enabled);if(result.status==='faulty')throw Error(result.reason);
+  if(action==='cancel'){const source=state.sources.find(x=>x.key===key);if(source)source.operation={...source.operation,status:'cancelling',phase:result.reason};renderSourceWarnings();}
+  $('sources-message').textContent=result.reason||'';
+  if(action==='add')$('source-directory').value='';
+  if(['enabled','remove'].includes(action)){closeDetail();await refreshContext(true);}
+  await loadSources();
+ }catch(error){$('sources-message').textContent=error.message;if($('settings-view').hidden)fail(error.message);await loadSources();}
+}
+$('open-settings').onclick=async()=>{$('library-view').hidden=true;$('settings-view').hidden=false;$('settings-title').focus();await loadSources();};
+$('close-settings').onclick=async()=>{$('settings-view').hidden=true;$('library-view').hidden=false;await loadSources();$('open-settings').focus();};
+$('choose-source').onclick=async()=>{const result=await state.api.choose_source_directory();if(result.status==='selected')$('source-directory').value=result.directory;else if(result.status==='faulty')$('sources-message').textContent=result.reason;};
+$('add-source').onclick=()=>{const directory=$('source-directory').value.trim();if(directory)sourceAction('add',null,directory);else $('sources-message').textContent='Choose an asset directory first.';};
+setInterval(loadSources,1500);

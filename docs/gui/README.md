@@ -11,9 +11,22 @@ Double-click `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs`.
 It opens a normal, resizable Windows window without an extra terminal. The
 launcher resolves its own directory, so shortcuts and other starting directories
 work. It invokes the prepared `.venv-mcp\Scripts\pythonw.exe`; startup never
-installs packages, downloads weights, scans assets or rebuilds data.
+installs packages, downloads weights or starts rendering/model inference.
+It scans enabled asset sources for file changes in the background.
 
 ## Using the app
+
+**Settings → Asset sources** adds/removes directories and changes their Enabled
+checkboxes. Results refresh live. Source-specific generated information is stored
+in each source's `metadata-lal`. See [asset sources](../asset-sources.md).
+
+The library shows one warning card per source needing processing/publication.
+**Process assets** performs both, with a progress bar spanning processing,
+publication and a final verification scan. **Cancel** finishes and saves the
+current asset before stopping. The card remains until a scan confirms that all
+current assets are up to date and published. The separate Process pending and
+Publish ready work buttons have been removed. Scan remains available during a
+session; processing never starts automatically when sources/files are added.
 
 The initial grid contains a bounded page of the published approved membership, with its actual membership and
 counts supplied by the backend. The full inventory count is context, not browse

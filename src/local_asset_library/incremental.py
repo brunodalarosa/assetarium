@@ -35,6 +35,13 @@ def working(config):
 
 def policy(config):
     value = json.loads((config.project_root / "docs/library-membership.json").read_text(encoding="utf-8"))
+    if config.sources_registry:
+        from .sources import registry
+        value = dict(value, packs=[config.source_key] if config.source_key else
+                     [s['key'] for s in registry(config)['sources']], approved=True)
+        value.pop('maximum_assets', None)
+        if not value['packs']:
+            return value
     packs = value.get("packs")
     if (value.get("schema_version") != 1 or value.get("approved") is not True
             or not isinstance(packs, list) or not packs or len(set(packs)) != len(packs)
@@ -249,6 +256,8 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180):
     job = {"schema_version": 1, "project_root": str(config.project_root), "source_root": str(config.source_root),
         "asset_id": record["asset_id"], "source_path": source["path"], "format": source["format"],
         "source_sha256": source["sha256"], "output": str(output), "resolution": resolution}
+    if config.source_key:
+        job.update(source_prefix=config.source_key, metadata_root=str(config.metadata_root))
     worker = 'blender_worker.py'
     if record.get('texture_repair'):
         from .texture_repair import validate_recipe
@@ -290,14 +299,15 @@ def run_caption(config, record, fingerprint, backend):
     return {"status": outcome["status"], "result_path": "data/" + relative, "attempts": outcome["attempts"]}
 
 
-def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640):
+def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
+            cancelled=None, progress=None):
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
     selected = records(work)
     if stage == "embeddings":
         from .library_index import index_library
-        return index_library(work, backend, limit, dry_run)
+        return index_library(work, backend, limit, dry_run, cancelled=cancelled, progress=progress)
     pending, retained = [], Counter()
     with closing(ledger(config)) as db:
         for record in selected:
@@ -341,12 +351,18 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                 fp = caption_input(work, record, prompt_version=CAPTION_PROMPT_VERSION)
             pending.append((record, fp))
         report = {"stage": stage, "pending": len(pending), "selected": min(limit, len(pending)), "retained": dict(retained), "dry_run": dry_run, "outcomes": []}
+        report['pending_ids'] = [r['asset_id'] for r, _ in pending]
         if dry_run:
             return report
         started = time.monotonic()
         atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':stage,'selected':len(pending[:limit]),'completed':0,'pid':os.getpid()})
         for record, fp in pending[:limit]:
+            if cancelled and cancelled():
+                report['cancelled'] = True
+                break
             identifier = record["asset_id"]
+            if progress:
+                progress(identifier, len(report['outcomes']), min(limit, len(pending)))
             checkpoint(db, identifier, stage, fp, "running", {"resumable": True})
             print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
             try:
@@ -369,6 +385,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
             checkpoint(db, identifier, stage, final_fp, outcome["status"], outcome)
             report["outcomes"].append({"asset_id": identifier, **outcome})
             atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':stage,'selected':len(pending[:limit]),'completed':len(report['outcomes']),'pid':os.getpid(),'last_asset':identifier,'last_status':outcome['status']})
+            if progress:
+                progress(None, len(report['outcomes']), min(limit, len(pending)))
         report["elapsed_seconds"] = time.monotonic() - started
         report['complete']=sum(o['status']=='complete' for o in report['outcomes'])
         report['failed']=sum(o['status']=='failed' for o in report['outcomes'])

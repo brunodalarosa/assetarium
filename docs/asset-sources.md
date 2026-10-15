@@ -1,0 +1,99 @@
+# Asset sources
+
+The Windows app uses **Settings → Asset sources**. Add a directory using its
+folder picker or path field. Every source has an **Enabled** checkbox and a
+**Remove** action. Changes apply to browsing, current searches and subsequent
+agent requests while the app stays open. Removing or disabling a source preserves
+its original files and generated metadata. Re-adding its directory recovers its
+saved identity and published results.
+
+After upgrading from the single-root version, reopen LAL and reconnect any agent
+server connections that were already running. They need to load the new code
+once; subsequent source toggles apply live without reconnecting or restarting.
+
+The app scans enabled sources in the background at startup. Enabling a source
+also scans it. **Scan** checks for changes during an open session. Scans detect
+added, changed and removed files; unchanged files reuse their verified hashes
+when filesystem identity, size, modification time and change time agree. The
+source's own `metadata-lal` directory is always excluded. Scanning runs no model
+inference or rendering. Removed and changed assets are excluded from searches
+when discovered; their prior generated evidence is retained.
+
+An unavailable source is recorded in LAL's availability diagnostics, excluded from
+searches, and left on disk as-is; other sources still scan. It is never recreated
+just to write an error. A later successful scan clears the current availability
+warning while retaining the original diagnostic history.
+
+## Source cards
+
+The library shows one warning card for each source that needs processing or
+publication. It remains visible through processing, publication, cancellation,
+interruption and recorded failures. Only a subsequent scan confirming that every
+current asset is up to date and published clears it. Caption review notes,
+warnings and pending owner approval do not count as processing failures.
+
+Click **Process assets** to inspect/render pending assets, generate descriptions,
+create search vectors and publish usable results for that source. The progress
+bar includes processing, source publication, combined search publication and the
+verification scan. Other sources retain their published results. New asset
+processing remains an explicit action; adding a source only registers/scans it.
+The former **Process pending** and **Publish ready work** buttons are replaced by
+this source-specific action.
+
+**Cancel** requests a graceful stop. The worker finishes its current asset in
+the current stage, commits its checkpoint, then stops before beginning another
+asset. During embedding, all views/channels of the current asset finish together.
+An atomic publication already in progress finishes safely. Completed checkpoints
+are reused by the next explicit processing action. Workers are never killed to
+cancel a source operation. Closing the app requests the same graceful stop for
+its outstanding source operations.
+
+Unchanged faulty assets are retained with evidence and skipped, including on a
+subsequent **Process assets** click. Other usable assets can finish and publish.
+Cards for unresolved failures remain visible; processing is not permission to
+repair originals or retry unchanged failures. GPU processing shares the existing
+inference lease with semantic search. Browsing and keyword search remain available.
+
+## Storage and identity
+
+The local registry is `data/library/sources.json`. Each source's
+`metadata-lal/source.json` stores its persistent identifier and catalog key.
+Directories must be separate and must not overlap LAL, shared model storage or
+one another. Directory links and metadata directory escapes are rejected.
+
+`metadata-lal` contains its catalog snapshots, working catalog, source inventory,
+processing/job history, vector snapshots, inspections, image previews, caption
+outputs, owner correction overlays, review classification, source operation logs,
+and source-specific historical evidence. Saved `data/...` references in records
+are logical references resolved to this directory. This preserves existing asset
+identities and vector fingerprints while moving files.
+
+LAL's central catalog and search index are derived combinations of source
+publications. Enabling/disabling sources filters the visible membership without
+copying model files, rerendering or reindexing. Central application logs, model
+capability receipts, runtime caches, shared historical reports and migration/storage
+receipts remain application-owned. Mixed-source JSON reports are also partitioned
+into each relevant source's historical evidence.
+
+The approved initial migration registers the 13 former top-level asset-pack
+directories as enabled sources. Individual result files move within C: with a
+per-file hash-checked journal. Original files, result bytes, vector bytes, reviews
+and fault evidence are preserved. Migration receipts are under
+`data/library/source-migration/`; it refuses automatic repetition.
+
+Storage receipts include unique allocated bytes across the project and all source
+metadata directories, deduplicating hard links. They exclude original asset files
+and shared model weights. Existing prepared runtimes and offline models are reused.
+
+## Maintenance commands
+
+From the prepared runtime, `python -m local_asset_library.cli status` reports
+source state, and `scan` scans enabled sources. `--asset-source KEY` selects an
+individual source. `python scripts/library-batch.py process --source KEY` starts
+the same source operation used by the app; it publishes automatically. The
+returned operation token identifies its durable log in that source's metadata.
+
+Earlier pilot/import commands and reports in this repository describe their
+historical configuration. Current source membership comes from Settings rather
+than the historical `docs/library-membership.json` pack list. The existing storage
+budget in that file remains enforced for processing.

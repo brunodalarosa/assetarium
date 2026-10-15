@@ -3,8 +3,16 @@ from pathlib import Path
 import json
 import sqlite3
 from contextlib import closing
+import sys
 
 root=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(root/'src'))
+from local_asset_library.config import load_config
+config=load_config(root/'config.example.toml',root)
+if config.sources_registry:
+    from local_asset_library.sources import registry,source_status
+    print(json.dumps({'sources':[source_status(config,s) for s in registry(config)['sources']]}))
+    raise SystemExit(0)
 jobs=root/'data/library/jobs.sqlite'
 progress=root/'data/library/processing-status.json'
 result={'stages':{},'processing':json.loads(progress.read_text(encoding='utf-8')) if progress.exists() else {'status':'idle'}}

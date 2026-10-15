@@ -11,9 +11,9 @@
   <a class="skip" href="#grid">Skip to assets</a>
   <header>
     <div class="brand"><span class="mark" aria-hidden="true">◈</span><div><h1>Local Asset Library</h1><p>Prepared assets, close at hand.</p></div></div>
-    <div class="scope"><strong id="scope">Loading library…</strong><span id="inventory">Local · read only</span></div>
+    <div class="header-actions"><div class="scope"><strong id="scope">Loading library…</strong><span id="inventory">Local · read only</span></div><button id="open-settings" type="button">Settings</button></div>
   </header>
-  <main>
+  <main id="library-view">
     <form id="search-form" aria-label="Search library assets">
       <label class="sr" for="query">Search the approved library</label>
       <div class="search-row"><input id="query" type="search" placeholder="Describe an asset, or search its name…" maxlength="1024" autocomplete="off"><button class="primary" type="submit" id="submit">Search</button><button type="button" id="clear">Clear</button></div>
@@ -30,15 +30,27 @@
         <p class="hint">Technical filters require measured evidence for the selected format. Enter with an empty query browses the filtered pilot.</p>
       </details>
     </form>
+    <section id="source-warnings" aria-label="Asset sources needing attention" tabindex="0" hidden></section>
     <div class="results-bar"><div><h2 id="results-title">Browse the library</h2><span id="search-busy" hidden role="status" aria-live="polite"><span class="search-spinner" aria-hidden="true"></span>Searching…</span><p id="status" role="status" aria-live="polite">Loading existing records and previews…</p></div><button id="copy-settings" type="button" disabled>Copy search settings</button></div>
     <p class="hint" id="candidate-note" hidden>Ranked suggestions may include unrelated assets—even when the requested object is absent. Review the previews.</p>
-    <p class="hint" id="reproduce-note" hidden>Copies the completed search. Agents must submit those settings against the same catalog and index versions to reproduce this shortlist.</p>
+    <p class="hint" id="reproduce-note" hidden>Copies the completed search. Agents must use the same catalog, index and enabled sources to reproduce this shortlist.</p>
     <div id="error" role="alert" hidden></div>
     <div class="workspace">
       <section class="collection" aria-label="Library assets"><div id="grid" class="grid" tabindex="-1" aria-busy="true"></div><p id="empty" hidden>No assets match these settings.</p></section>
       <aside id="detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p><p class="hint">Source files stay in their original location.</p></div></aside>
     </div>
   </main>
+  <section id="settings-view" aria-label="Settings" hidden>
+    <div class="settings-heading"><h2 id="settings-title" tabindex="-1">Settings</h2><button type="button" id="close-settings">Back to library</button></div>
+    <div class="settings-layout">
+      <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical"><button type="button" id="asset-sources-tab" role="tab" aria-selected="true" aria-controls="asset-sources-panel">Asset sources</button></nav>
+      <section id="asset-sources-panel" role="tabpanel" aria-labelledby="asset-sources-tab">
+        <h2>Asset sources</h2><p class="hint">Enable sources to include them in searches. Removing a source keeps its files and saved metadata.</p>
+        <div class="source-add"><label for="source-directory">Asset directory</label><div class="source-add-controls"><input id="source-directory" type="text" placeholder="Choose an asset source directory"><button type="button" id="choose-source">Choose folder…</button><button class="primary" type="button" id="add-source">Add source</button></div></div>
+        <p id="sources-message" role="status" aria-live="polite"></p><div id="source-list"></div><p class="hint" id="sources-empty" hidden>No asset sources yet. Add a directory to get started.</p>
+      </section>
+    </div>
+  </section>
   <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Read-only originals · manual updates</span></footer>
   <script>/* BUNDLED_SCRIPT */</script>
 </body>

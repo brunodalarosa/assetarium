@@ -91,31 +91,60 @@ def check_fts5(connection):
 
 def walk_source(config):
     """Sorted inventory; directory links are visible exclusions, never traversed."""
+    if config.sources_registry and not config.source_key:
+        from .sources import registry, bound
+        return sorted([r for s in registry(config)["sources"] if s["enabled"]
+                       for r in walk_source(bound(config, s))], key=lambda r: r["path"])
+    if config.sources_registry and not config.source_root.is_dir():
+        raise ConfigError("Asset source directory is unavailable")
     rows = []
-    for directory, dirs, files in os.walk(config.source_root, followlinks=False):
+    prefix = config.source_key + "/" if config.source_key else ""
+    cached = {}
+    cache_path = None
+    if config.source_key:
+        from .publication import read_json
+        cache_path = config.output_path("data", "library/scan-cache.json")
+        if cache_path.exists():
+            cached = read_json(cache_path).get("files", {})
+    next_cache = {}
+    def walk_error(exc):
+        raise ConfigError("Source directory cannot be scanned: " + str(exc))
+    for directory, dirs, files in os.walk(config.source_root, followlinks=False, onerror=walk_error):
         dirs.sort()
         for name in list(dirs):
             path = Path(directory) / name
+            if name.casefold() == "metadata-lal":
+                dirs.remove(name)
+                continue
             if path.is_symlink() or path.is_junction():
                 dirs.remove(name)
-                rows.append({"path": path.relative_to(config.source_root).as_posix(), "role": "boundary_exclusion",
+                rows.append({"path": prefix + path.relative_to(config.source_root).as_posix(), "role": "boundary_exclusion",
                              "status": "excluded_directory_link", "sha256": None, "size": None, "mtime_ns": None})
         for name in sorted(files):
             path = Path(directory) / name
-            relative = path.relative_to(config.source_root).as_posix()
+            relative = prefix + path.relative_to(config.source_root).as_posix()
             row = {"path": relative, "role": "unclassified", "status": "available"}
             try:
                 source = config.source_file(relative)
                 before = source.stat()
-                with config.open_source(relative) as stream:
-                    row["sha256"] = file_hash(stream)
+                identity = [before.st_size, before.st_mtime_ns, before.st_ctime_ns, before.st_ino]
+                previous = cached.get(relative, {})
+                if cache_path and previous.get("identity") == identity:
+                    row["sha256"] = previous["sha256"]
+                else:
+                    with config.open_source(relative) as stream:
+                        row["sha256"] = file_hash(stream)
                 after = source.stat()
                 if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                     raise ConfigError(f"Source changed while hashing: {relative}")
                 row.update(size=after.st_size, mtime_ns=after.st_mtime_ns)
+                next_cache[relative] = {"identity": identity, "sha256": row["sha256"]}
             except (ConfigError, OSError) as exc:
                 row.update(status="rejected", error=str(exc), sha256=None, size=None, mtime_ns=None)
             rows.append(row)
+    if cache_path:
+        from .publication import atomic_json
+        atomic_json(cache_path, {"files": next_cache})
     return sorted(rows, key=lambda row: row["path"])
 
 
@@ -278,9 +307,10 @@ def dependencies(config, row, inventory):
                 raise ConfigError("Absolute or remote dependency is not permitted")
             # Parent references are legitimate in formats, but must resolve inside the source root.
             target = (config.source_file(path).parent / reference).resolve()
-            if not target.is_relative_to(config.source_root) or target == config.source_root:
+            boundary = config.source_directory(path)
+            if not target.is_relative_to(boundary) or target == boundary:
                 raise ConfigError("Dependency escapes source root")
-            relative = target.relative_to(config.source_root).as_posix()
+            relative = config.source_relative(target, path)
             dep["path"] = relative
             if relative in inventory and inventory[relative]["status"] == "available":
                 config.source_file(relative)  # Apply reserved-name and resolved-link policy too.
@@ -501,7 +531,9 @@ def read_database(config):
         raise ConfigError("Catalog missing; run scan first")
     db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
     metadata = dict((key, json.loads(value)) for key, value in db.execute("SELECT key,value FROM metadata"))
-    if metadata.get("source_root") != str(config.source_root) or metadata.get("source_id") != SOURCE_ID:
+    root_matches = (metadata.get('source_key', config.source_key) == config.source_key
+                    if config.sources_registry and config.source_key else metadata.get('source_root') == str(config.source_root))
+    if not root_matches or metadata.get("source_id") != SOURCE_ID:
         db.close()
         raise ConfigError("Catalog source does not match configuration; run scan for this source")
     return db
@@ -521,8 +553,8 @@ def query(config, text, limit=5):
     result = []
     approved_ids = None
     if config.output_path('data','library/membership.json').exists():
-        from .membership import membership
-        approved_ids = set(membership(config)['asset_ids'])
+        from .membership import records
+        approved_ids = {r['asset_id'] for r in records(config)}
     with closing(read_database(config)) as db:
         for (payload,) in db.execute("""SELECT a.record FROM asset_fts f JOIN assets a ON a.asset_id=f.asset_id
             WHERE asset_fts MATCH ? AND a.availability='available' ORDER BY bm25(asset_fts), a.asset_id""", (match,)):

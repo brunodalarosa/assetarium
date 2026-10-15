@@ -13,7 +13,7 @@ def membership(config):
     if path.exists():
         value = read_json(path)
         ids = value.get("asset_ids", [])
-        if (value.get("schema_version") != 1 or not ids or len(ids) != len(set(ids))
+        if (value.get("schema_version") != 1 or (not ids and not config.sources_registry) or len(ids) != len(set(ids))
                 or any(not isinstance(i, str) or not re.fullmatch(r"asset_[0-9a-f]{32}", i) for i in ids)
                 or value.get("fingerprint") != digest(ids)):
             raise ConfigError("Configured library membership is invalid")
@@ -31,4 +31,5 @@ def records(config):
         available = {r[0]: parse_record(*r) for r in db.execute("SELECT asset_id,pack_id,name,CAST(record AS BLOB) FROM assets")}
     if any(i not in available for i in scope["asset_ids"]):
         raise ConfigError("Membership/catalog mismatch")
-    return [available[i] for i in scope["asset_ids"]]
+    from .sources import visible
+    return visible(config, [available[i] for i in scope["asset_ids"]])

@@ -1,8 +1,7 @@
-schema_version = 1
+schema_version = 2
 
-[source]
-root = 'C:\Users\backup pc\Documents\General game assets\playful-lowpoly-asset-packs'
-read_only = true
+[sources]
+registry = "data/library/sources.json"
 
 [storage]
 data = "data"

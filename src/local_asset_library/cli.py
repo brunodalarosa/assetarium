@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet", "embed-index", "detail", "process", "refresh", "status"])
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'], default='inspection')
+    parser.add_argument('--asset-source', help='Registered source key for source-specific maintenance')
     parser.add_argument("value", nargs="?")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--selection", type=Path, default=root / "docs/pilot-selection.json")
@@ -41,6 +42,32 @@ def main() -> int:
     args = parser.parse_args()
     try:
         config = load_config(args.config, root)
+        if config.sources_registry:
+            from .sources import registry, bound, get_source, source_status, scan_source, aggregate
+            source = get_source(config, args.asset_source) if args.asset_source else None
+            if args.command in {'scan','status','refresh'}:
+                if args.dry_run:
+                    print(json.dumps({'dry_run':True,'sources':[source_status(config,s) for s in registry(config)['sources']]}));return 0
+                if args.command == 'scan':
+                    from .source_operations import scan_all
+                    import uuid
+                    from .gpu_queue import lease
+                    with lease(config,'source-cli-scan',resource='operations'):
+                        scan_all(config,uuid.uuid4().hex,args.asset_source)
+                elif args.command == 'refresh':
+                    from .source_operations import publish_source,ensure_index
+                    from .gpu_queue import lease
+                    with lease(config,'source-cli-publication',resource='operations'):
+                        if source:
+                            scoped=bound(config,source);ensure_index(config,scoped);publish_source(scoped)
+                            scan_source(config,source)
+                        aggregate(config)
+                result={'sources':[source_status(config,s) for s in registry(config)['sources']]}
+                print(json.dumps(result,ensure_ascii=False));return 0
+            if args.command == 'process' and source is None:
+                raise ConfigError('Choose --asset-source or use its Process assets card in LAL')
+            if source:
+                config=bound(config,source)
         if args.command=='embed-index' and (root/'docs/library-membership.json').exists():
             raise ConfigError('Use library-batch.py process for coordinated incremental indexing')
         if args.command == 'process' and not args.dry_run:
@@ -150,6 +177,10 @@ def main() -> int:
         result = {"source_root": str(config.source_root), "source_read_only": True,
                   "project_root": str(root), "models_root": str(config.storage_root("models")),
                   "storage_valid": True}
+        if config.sources_registry:
+            result.pop('source_root')
+            from .sources import registry
+            result['sources'] = registry(config)['sources']
         if args.command == "doctor":
             with sqlite3.connect(":memory:") as connection:
                 connection.execute("CREATE VIRTUAL TABLE probe USING fts5(text)")

@@ -1,5 +1,44 @@
 # Progress
 
+## October 14 — Configurable sources and source-owned metadata
+
+Added **Settings → Asset sources**, live enabled-source membership, background
+startup scans, and source cards with **Process assets**, combined processing/
+publication progress and graceful cancellation at asset boundaries. Cards clear
+only after a scan confirms that current assets are up to date and published.
+Separate Process pending/Publish ready work controls are removed.
+
+Migrated the 13 current folders to enabled sources and moved 23,969 individual
+generated files into their `metadata-lal` folders. Current published records for
+all 1,901 assets, all 8,742 existing vector entries and every original-file receipt
+are unchanged. All 5,864 rendered-preview references resolve to source metadata.
+Existing processing issues affecting 150 assets remain visible across 11 source
+cards; no existing asset was reprocessed, repaired or retried.
+
+Verification: **301 tests passed**, including real Blender rendering into source
+metadata; actual WebView2 startup, active-search toggles, busy refresh exclusion,
+source cards, progress/cancel and responsive Settings checks passed. A separate
+two-cube source verified real cancellation, checkpoint reuse, complete description/
+image vectors and processing through publication/verification. It was detached
+afterward. A fresh real STDIO server verified migrated PNG delivery and live
+disable/re-enable in semantic search. Owner usability/artistic approval is separate.
+
+Windows long-path defects in historical-report copying and storage traversal were
+fixed and regression-tested. The original migration fault receipt is preserved;
+all 246 missing report copies were subsequently completed without rerunning assets.
+An old project-root assumption in caption publication was fixed and verified with
+all eight expected vectors on the two-cube check. Temporary QA combined indexes
+were removed only after proving that every row/vector remains in authoritative
+source snapshots; source outputs, fault records, previews and reports were kept.
+
+Receipts: `data/library/verification/source-preservation.json`,
+`data/library/source-migration/report-copies-completion.json`,
+`data/library/verification/source-test-cache-cleanup.json`,
+`data/gui/source-all-tests-final.xml`, `data/gui/source-settings-ac74562cc7/`,
+`data/gui/source-installed-72a58c9c31/`, and source-operation/source-agent reports
+under `data/library/verification/`. Existing agent connections running the old
+server code require a one-time reconnect after this upgrade.
+
 ## October 14 — Synty and CraftPix addition
 
 Published 937 new model records, expanding membership from 964 to 1,901. Generated

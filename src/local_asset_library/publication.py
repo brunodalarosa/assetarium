@@ -14,11 +14,24 @@ _snapshot = ContextVar("asset_publication", default=None)
 _hashes = ContextVar('asset_request_hashes', default=None)
 
 
+def filesystem_path(path):
+    """Use Windows' explicit long-path API without changing stored references."""
+    value = os.fspath(path)
+    if os.name != 'nt' or value.startswith('\\\\?\\'):
+        return value
+    value = os.path.abspath(value)
+    return '\\\\?\\UNC\\' + value[2:] if value.startswith('\\\\') else '\\\\?\\' + value
+
+
+def snapshot_key(config):
+    return (str(config.project_root), str(config.metadata_root or ""))
+
+
 def generation(config):
     if config.catalog_generation:
         return config.catalog_generation
     pinned = _snapshot.get()
-    if pinned and pinned[0] == str(config.project_root):
+    if pinned and pinned[0] == snapshot_key(config):
         return pinned[1]
     path = config.output_path("data", "library/active.json")
     if not path.exists():
@@ -33,10 +46,10 @@ def generation(config):
 @contextmanager
 def snapshot(config):
     parent = _snapshot.get()
-    if parent and parent[0] == str(config.project_root):
+    if parent and parent[0] == snapshot_key(config):
         yield
         return
-    token = _snapshot.set((str(config.project_root), generation(config)))
+    token = _snapshot.set((snapshot_key(config), generation(config)))
     hashes_token = _hashes.set({})
     try:
         yield
@@ -83,16 +96,17 @@ def pinned_config(function):
 
 
 def atomic_json(path, value):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + '.' + uuid.uuid4().hex + ".pending")
-    with temp.open("w", encoding="utf-8") as stream:
+    from pathlib import Path
+    Path(filesystem_path(path.parent)).mkdir(parents=True, exist_ok=True)
+    temp = path.with_name('.' + uuid.uuid4().hex + ".pending")
+    with open(filesystem_path(temp), "w", encoding="utf-8") as stream:
         json.dump(value, stream, ensure_ascii=False, indent=2)
         stream.flush()
         os.fsync(stream.fileno())
     deadline=time.monotonic()+2
     while True:
         try:
-            os.replace(temp,path)
+            os.replace(filesystem_path(temp),filesystem_path(path))
             break
         except PermissionError:
             if time.monotonic()>=deadline:
@@ -118,7 +132,7 @@ def read_json(path):
     kernel.CreateFileW.argtypes=[wintypes.LPCWSTR,wintypes.DWORD,wintypes.DWORD,ctypes.c_void_p,wintypes.DWORD,wintypes.DWORD,wintypes.HANDLE]
     kernel.CreateFileW.restype=wintypes.HANDLE
     kernel.CloseHandle.argtypes=[wintypes.HANDLE]
-    handle=kernel.CreateFileW(str(path),0x80000000,7,None,3,0x80,None)
+    handle=kernel.CreateFileW(filesystem_path(path),0x80000000,7,None,3,0x80,None)
     if handle==ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
     try:

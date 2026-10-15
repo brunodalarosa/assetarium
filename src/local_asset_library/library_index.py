@@ -13,7 +13,8 @@ from .membership import records
 from .retrieval import index_database, checked_vector, source_check, description_input, preview_file, image_input, normalize, VERSION
 
 
-def index_library(config, backend=None, limit=1000, dry_run=False, description_only=False):
+def index_library(config, backend=None, limit=1000, dry_run=False, description_only=False,
+                  cancelled=None, progress=None):
     from .incremental import update_record
     selected = records(config)
     with closing(index_database(config, readonly=dry_run)) as db:
@@ -27,13 +28,17 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
             raise ConfigError("Actual inference capability receipt does not match contract")
         old_jobs = {r[0]: r[1:] for r in db.execute("SELECT job_id,fingerprint,status,evidence FROM jobs")}
         old_vectors = {r[0]: r for r in db.execute("SELECT * FROM vectors")}
-        expected, outcomes = set(), []
+        expected, outcomes, visited = set(), [], set()
         pending, processed, deferred = 0, 0, 0
         started = time.monotonic()
         if not dry_run:
             atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':'embeddings','completed':0,'selected':limit,'pid':os.getpid()})
-        for record in selected:
+        for position, record in enumerate(selected):
             identifier = record["asset_id"]
+            if not dry_run and cancelled and cancelled():
+                break
+            if not dry_run and progress:
+                progress(identifier, position, len(selected))
             counts = {"complete": 0, "failed": 0, "pending": 0, "deferred": 0}
             for channel, preview in [("description", None)] + [("image", p) for p in record["previews"]]:
                 ref = None if preview is None else {k: preview[k] for k in ("path", "source_path", "sha256", "view_label", "origin") if k in preview}
@@ -124,10 +129,14 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                     "partial" if counts["complete"] and (counts["failed"] or counts["deferred"]) else
                     "failed" if counts["failed"] else "pending" if counts['deferred'] else "complete")
                 update_record(config, record)
+                visited.add(identifier)
+                if progress:
+                    progress(None, position + 1, len(selected))
         if not dry_run:
             with db:
-                for (job,) in db.execute("SELECT job_id FROM jobs").fetchall():
-                    if job not in expected:
+                current_ids = {r['asset_id'] for r in selected}
+                for job, identifier in db.execute("SELECT job_id,asset_id FROM jobs").fetchall():
+                    if identifier not in current_ids or (identifier in visited and job not in expected):
                         db.execute("DELETE FROM vectors WHERE job_id=?", (job,))
                         db.execute("DELETE FROM jobs WHERE job_id=?", (job,))
                 values = {"version": VERSION, "contract": contract, "contract_fingerprint": common, "pilot_ids": [r["asset_id"] for r in selected], "input_policy": "effective-description-content-v1",'image_input_policy':'verified-view-content-v1'}

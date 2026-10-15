@@ -112,7 +112,9 @@ class Gateway:
                 if self.closing:
                     raise ConfigError('Gateway is closing')
                 validate(name, args)
-                if name == 'search_assets' and args.get('mode',DEFAULT_MODE) != 'keyword':
+                from .retrieval import pilot_records
+                has_sources = bool(pilot_records(self.config)) if self.config.sources_registry else True
+                if name == 'search_assets' and args.get('mode',DEFAULT_MODE) != 'keyword' and has_sources:
                     result = await self.semantic(name,args)
                     payload, image, evidence, error = (result[k] for k in ('payload','image','evidence','is_error'))
                 else:

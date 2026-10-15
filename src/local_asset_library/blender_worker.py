@@ -16,6 +16,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from render_math import duplicate_faces, framing  # noqa: E402 -- same trusted source directory
 
+SOURCE_PREFIX = ""
+
 
 def sha(path):
     with path.open("rb") as stream:
@@ -33,6 +35,13 @@ def inside(root, path):
 
 
 def source_path(root, relative):
+    if SOURCE_PREFIX:
+        prefix = SOURCE_PREFIX + "/"
+        if not relative.startswith(prefix):
+            raise ValueError("File belongs to another asset source")
+        relative = relative[len(prefix):]
+    if "metadata-lal" in (p.casefold() for p in Path(relative).parts):
+        raise ValueError("Generated metadata is not an original asset")
     if PureWindowsPath(relative).anchor or Path(relative).is_absolute() or ".." in Path(relative).parts:
         raise ValueError("Source path must be relative without parent traversal")
     path = inside(root, root / relative)
@@ -158,7 +167,7 @@ def inspect(source_root):
         elif image.filepath:
             try:
                 actual = inside(source_root, bpy.path.abspath(image.filepath, library=image.library))
-                row["path"] = actual.relative_to(source_root).as_posix()
+                row["path"] = (SOURCE_PREFIX + "/" if SOURCE_PREFIX else "") + actual.relative_to(source_root).as_posix()
                 row["status"] = "available" if actual.is_file() else "missing"
                 if actual.is_file():
                     row["sha256"] = sha(actual)
@@ -304,14 +313,23 @@ def render(technical, output, resolution):
 
 
 def main():
+    global SOURCE_PREFIX
     job_path = Path(sys.argv[sys.argv.index("--") + 1]).resolve()
     job = json.loads(job_path.read_text(encoding="utf-8"))
     project = Path(job["project_root"]).resolve()
     source_root = Path(job["source_root"]).resolve()
     if project.is_relative_to(source_root) or source_root.is_relative_to(project):
         raise ValueError("Source and project overlap")
-    inside(project, job_path)
-    output = inside(project / "data", job["output"])
+    SOURCE_PREFIX = job.get("source_prefix") or ""
+    output_root = project / "data"
+    if SOURCE_PREFIX:
+        output_root = source_root / "metadata-lal"
+        if output_root.resolve() != output_root or Path(job.get("metadata_root", "")).resolve() != output_root:
+            raise ValueError("Invalid source metadata boundary")
+        inside(output_root, job_path)
+    else:
+        inside(project, job_path)
+    output = inside(output_root, job["output"])
     output.mkdir(parents=True, exist_ok=True)
     result_path = inside(output, output / "result.json")
     result = {"schema_version": 1, "asset_id": job["asset_id"], "source_path": job["source_path"],

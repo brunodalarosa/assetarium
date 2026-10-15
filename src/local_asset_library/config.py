@@ -45,6 +45,20 @@ class Config:
     blender: Path | None
     models_root: Path | None = None
     catalog_generation: str | None = None
+    sources_registry: Path | None = None
+    source_key: str | None = None
+    metadata_root: Path | None = None
+
+    def source_directory(self, relative: str) -> Path:
+        if self.sources_registry:
+            from .sources import source_for_path
+            return Path(source_for_path(self, relative)["path"])
+        return self.source_root
+
+    def source_relative(self, actual: Path, referring: str) -> str:
+        root = self.source_directory(referring)
+        relative = actual.relative_to(root).as_posix()
+        return referring.split("/", 1)[0] + "/" + relative if self.sources_registry else relative
 
     def storage_root(self, area: str) -> Path:
         if area not in STORAGE_NAMES:
@@ -61,7 +75,15 @@ class Config:
 
     def source_file(self, relative: str) -> Path:
         """Resolve an existing source file for reading only."""
-        target = _inside(self.source_root, relative)
+        _relative(relative)
+        if self.sources_registry:
+            root = self.source_directory(relative)
+            parts = relative.replace("\\", "/").split("/", 1)
+            if len(parts) != 2 or "metadata-lal" in (p.casefold() for p in Path(parts[1]).parts):
+                raise ConfigError("Generated metadata is not an original asset")
+            target = _inside(root, parts[1])
+        else:
+            target = _inside(self.source_root, relative)
         if not target.is_file():
             raise ConfigError("Source file is missing or not a regular file")
         return target
@@ -71,6 +93,12 @@ class Config:
         return self.source_file(relative).open("rb")
 
     def output_path(self, area: str, relative: str) -> Path:
+        _relative(relative)
+        if area == "data" and self.sources_registry:
+            from .sources import generated_path
+            managed = generated_path(self, relative)
+            if managed is not None:
+                return managed
         if area == "data" and relative in {"catalog.sqlite", "embeddings/index.sqlite", "library/membership.json"}:
             from .publication import generation
             selected = self.catalog_generation or generation(self)
@@ -78,7 +106,7 @@ class Config:
                 relative = "library/generations/" + selected + "/" + relative
         storage = self.storage_root(area)
         target = _inside(storage, relative)
-        if target.is_relative_to(self.source_root):
+        if not self.sources_registry and target.is_relative_to(self.source_root):
             raise ConfigError("Cannot write into the source collection")
         return target
 
@@ -88,18 +116,19 @@ def load_config(path: Path, project_root: Path) -> Config:
     try:
         with path.open("rb") as stream:
             raw = tomllib.load(stream)
-        if not isinstance(raw.get("source"), dict) or not isinstance(raw.get("storage"), dict) or not isinstance(raw.get("tools", {}), dict):
+        managed = raw.get("schema_version") == 2 and isinstance(raw.get("sources"), dict)
+        if (not managed and not isinstance(raw.get("source"), dict)) or not isinstance(raw.get("storage"), dict) or not isinstance(raw.get("tools", {}), dict):
             raise ConfigError("Configuration sections must be tables")
-        if raw.get("schema_version") != 1:
+        if raw.get("schema_version") != 1 and not managed:
             raise ConfigError("Unsupported configuration schema")
-        source = raw["source"]
+        source = raw.get("source", {"read_only": True, "root": str(root.parent / ".lal-managed-sources")})
         if source.get("read_only") is not True:
             raise ConfigError("Source must be explicitly read-only")
         source_root = Path(source["root"])
         if not source_root.is_absolute():
             raise ConfigError("Source root must be absolute")
         source_root = source_root.resolve()
-        if not source_root.is_dir():
+        if not managed and not source_root.is_dir():
             raise ConfigError("Source directory is missing")
         if source_root.is_relative_to(root) or root.is_relative_to(source_root):
             raise ConfigError("Source and repository roots must not overlap")
@@ -126,7 +155,13 @@ def load_config(path: Path, project_root: Path) -> Config:
         if storage_settings != STORAGE_NAMES:
             raise ConfigError("Storage must use the fixed ignored project directories")
         blender = raw.get("tools", {}).get("blender")
-        config = Config(root, source_root, Path(blender) if blender else None, models_root)
+        registry = None
+        if managed:
+            if raw["sources"].get("registry") != "data/library/sources.json":
+                raise ConfigError("Sources registry must use data/library/sources.json")
+            registry = _inside(root, "data/library/sources.json")
+        config = Config(root, source_root, Path(blender) if blender else None, models_root,
+                        sources_registry=registry)
         for area in STORAGE_NAMES:
             config.output_path(area, "boundary-check")
         return config

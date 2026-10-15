@@ -18,6 +18,7 @@ class DesktopService(AssetService):
         self.item_faults = {}
         self.version = None
         self.preview_bindings = {}
+        self.source_revision = None
 
     def preview_binding(self, identifier, view):
         from .catalog import digest
@@ -36,8 +37,10 @@ class DesktopService(AssetService):
 
     def synchronize(self):
         version = generation(self.config)
-        if version != self.version:
-            for key in list(self.preview_faults):
+        from .sources import revision
+        source_revision = revision(self.config)
+        if version != self.version or source_revision != self.source_revision:
+            for key in list(self.preview_faults) if version != self.version else []:
                 try:
                     unchanged=self.preview_bindings.get(key)==self.preview_binding(*key)
                 except (OSError,ValueError):
@@ -48,6 +51,7 @@ class DesktopService(AssetService):
             self.item_faults.clear()
             self.query_faults.clear()
             self.version = version
+            self.source_revision = source_revision
         return version
 
     def _record_fault(self, identifier, channel, reason):
@@ -79,8 +83,11 @@ class DesktopService(AssetService):
             if not process_alive(progress['pid']):
                 progress = {**progress, 'status':'interrupted',
                             'reason':'Worker stopped; use Process pending to resume completed checkpoints.'}
-        pending_coverage = coverage(working(self.config)) if working(self.config).output_path('data','catalog.sqlite').exists() else None
+        pending_coverage = (coverage(working(self.config)) if not self.config.sources_registry and
+                            working(self.config).output_path('data','catalog.sqlite').exists() else None)
         return {'pilot_count': len(records), 'inventory_count': total, 'generation': version,
+                'visible_asset_ids': [r['asset_id'] for r in records],
+                'managed_sources': bool(self.config.sources_registry), 'sources_revision': self.source_revision,
                 'coverage': coverage(self.config),
                 'processing_status':progress,'working_coverage':pending_coverage,
                 'packs': sorted({r['pack_id'] for r in records}),

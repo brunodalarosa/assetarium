@@ -122,7 +122,12 @@ class AssetService:
         from .membership import membership
         if identifier not in set(membership(self.config)['asset_ids']):
             raise ConfigError("Asset ID unavailable in configured approved membership")
-        return detail(self.config, identifier)
+        record = detail(self.config, identifier)
+        if self.config.sources_registry:
+            from .sources import visible
+            if not visible(self.config, [record]):
+                raise ConfigError('Asset source is disabled, removed, or awaiting processing/publication')
+        return record
 
     def preview(self, record, view):
         item = next((p for p in record["previews"] if p.get("view_label") == view), None)
@@ -135,7 +140,8 @@ class AssetService:
     @pinned
     def execute(self, name, args):
         from .publication import generation
-        version = generation(self.config)
+        from .sources import revision
+        version = (generation(self.config), revision(self.config))
         if getattr(self, '_publication_version', None) != version:
             self.query_faults.clear()
             self._publication_version = version
@@ -147,7 +153,8 @@ class AssetService:
         key = encoded(args)
         if key in self.query_faults:
             raise ConfigError("Unchanged faulty query retained: " + self.query_faults[key])
-        if mode != "keyword" and self.backend is None:
+        has_sources = bool(pilot_records(self.config)) if self.config.sources_registry else True
+        if mode != "keyword" and has_sources and self.backend is None:
             if self.backend_fault:
                 raise ConfigError("Embedding runtime faulty; explicit repair/retry required: " + self.backend_fault)
             try:

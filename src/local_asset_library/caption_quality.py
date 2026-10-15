@@ -66,6 +66,11 @@ def caption_quality(config, record):
             path = (config.project_root / CLASSIFICATION_PATH).resolve()
             if not path.is_relative_to(config.project_root):
                 raise ValueError("Classification path escapes project")
+            if config.sources_registry:
+                from .sources import get_source, bound
+                local = bound(config, get_source(config, record['pack_id'])).output_path('data','reviews/caption-classification.json')
+                if local.exists():
+                    path = local
             if path.is_file():
                 saved = json.loads(path.read_text(encoding="utf-8"))
                 if saved.get("schema_version") != 1 or not isinstance(saved.get("assets"), dict):

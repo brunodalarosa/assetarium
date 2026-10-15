@@ -1,5 +1,12 @@
 # Project storage
 
+Current source storage: generated asset results now belong to the corresponding
+source's `metadata-lal` folder. Source processing/migration receipts measure unique
+allocation across this project **and** those folders, deduplicating file identities.
+The standalone `storage-report.py` still reports just the selected project root;
+combined receipts are saved as `data/storage/sources-*.json`. Original asset files
+and shared model weights remain excluded. See [asset sources](asset-sources.md).
+
 The October 11, 2026 cleanup reduced unique file allocation from **14.465 GiB to
 5.531 GiB**, reclaiming **8.934 GiB (about 62%)**. Logical sizes still add up to
 9.545 GiB because the two environments name the same shared GPU libraries.

@@ -350,7 +350,7 @@ class SearchEngine:
         rankings = {}
         if mode in {"keyword", "combined", "keyword_description"}:
             rankings["keyword"] = keyword_ranking(self.config, text, records)
-        if mode != "keyword":
+        if mode != "keyword" and records:
             if self.backend is None or self.contract is None:
                 raise ConfigError("Semantic search requires the verified embedding runtime")
             fingerprint = digest(self.contract)
@@ -358,7 +358,10 @@ class SearchEngine:
                 metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
                 if metadata.get("version") != VERSION or metadata.get("contract_fingerprint") != fingerprint or metadata.get("contract") != self.contract:
                     raise ConfigError("Query/index embedding contract mismatch; reindex explicitly")
-                if set(metadata["pilot_ids"]) != {r["asset_id"] for r in pilot_records(self.config)}:
+                from .membership import membership
+                expected_ids = (set(membership(self.config)['asset_ids']) if self.config.sources_registry and not self.config.source_key
+                                else {r['asset_id'] for r in pilot_records(self.config)})
+                if set(metadata["pilot_ids"]) != expected_ids:
                     raise ConfigError("Pilot query/index scope mismatch")
                 channels = (["description", "image"] if mode == "combined" else
                             ["description"] if mode == "keyword_description" else
@@ -457,7 +460,7 @@ class SearchEngine:
         evidence = {"response": response, "channel_rankings": rankings, "eligible_channel_rankings": eligible,
                     "excluded": excluded, "elapsed_seconds": time.perf_counter() - started,
                     "contract_fingerprint": digest(self.contract) if self.contract else None,
-                    "query_metrics": dict(self.backend.last_metrics) if mode != "keyword" else None}
+                    "query_metrics": dict(self.backend.last_metrics) if mode != "keyword" and self.backend else None}
         return response, evidence
 
 
