@@ -44,7 +44,9 @@ once; subsequent source toggles apply live without reconnecting or restarting.
 The app scans enabled sources in the background at startup. Enabling a source
 also scans it; reopen the app (or toggle the source) to rescan during a session. Scans detect
 added, changed and removed files; unchanged files reuse their verified hashes
-when filesystem identity, size, modification time and change time agree. The
+when file ID, size, modification time and NTFS change time agree. Scans seed the
+shared `cache/file-hashes.sqlite` record that searches and detail checks reuse
+(decision 0004). The
 source's own `metadata-lal` directory is always excluded. Scanning runs no model
 inference or rendering. Removed and changed assets are excluded from searches
 when discovered; their prior generated evidence is retained.

@@ -58,22 +58,45 @@ def snapshot(config):
         _hashes.reset(hashes_token)
 
 
-def verified_hash(path):
-    """Share reads within one pinned request only; later requests verify bytes afresh."""
+def request_memo(key, compute):
+    """Reuse a boundary check within one pinned request; later requests recheck."""
+    cache = _hashes.get()
+    if cache is None:
+        return compute()
+    key = ('memo', *key)
+    if key not in cache:
+        cache[key] = compute()
+    return cache[key]
+
+
+def verified_hash(path, fresh=False):
+    """SHA-256 reused while the file's stat identity is unchanged (decision 0004).
+
+    ``fresh=True`` (and ``hash_cache.require_fresh()``) re-reads the bytes, for
+    explicit audits and removal checks.
+    """
     import hashlib
-    before = path.stat()
-    key = (str(path), before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+    from . import hash_cache
+    identity = hash_cache.file_identity(path)
+    key = (str(path), *identity)
     cache = _hashes.get()
     if cache is not None and key in cache:
         return cache[key]
+    fresh = fresh or hash_cache.fresh_required()
+    if not fresh:
+        known = hash_cache.lookup(path, identity)
+        if known is not None:
+            if cache is not None:
+                cache[key] = known
+            return known
     value = hashlib.sha256()
     with path.open('rb') as stream:
         for chunk in iter(lambda:stream.read(1024*1024),b''):
             value.update(chunk)
-    after = path.stat()
-    if (before.st_size,before.st_mtime_ns,before.st_ctime_ns) != (after.st_size,after.st_mtime_ns,after.st_ctime_ns):
+    if hash_cache.file_identity(path) != identity:
         raise ConfigError('File changed while verifying bytes: ' + str(path))
     result=value.hexdigest()
+    hash_cache.store(path, identity, result)
     if cache is not None:
         cache[key]=result
     return result

@@ -5,8 +5,10 @@ them and must never accept source files as writable destinations.
 """
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path, PureWindowsPath
 import os
+import stat
 import tomllib
 
 
@@ -20,6 +22,7 @@ STORAGE_NAMES = {
 }
 
 
+@lru_cache(maxsize=65536)
 def _relative(value: str) -> Path:
     windows = PureWindowsPath(value)
     path = Path(value)
@@ -31,8 +34,21 @@ def _relative(value: str) -> Path:
     return path
 
 
+_REPARSE_POINT = 0x400
+
+
 def _inside(root: Path, relative: str) -> Path:
-    target = (root / _relative(relative)).resolve()
+    candidate = root / _relative(relative)
+    # Directories resolve once per pinned request (shared by many files); the
+    # leaf is resolved too whenever it is a link, so escapes are still rejected.
+    from .publication import request_memo
+    target = request_memo(("resolved-directory", str(candidate.parent)), candidate.parent.resolve) / candidate.name
+    try:
+        info = os.lstat(target)
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & _REPARSE_POINT:
+            target = target.resolve()
+    except OSError:
+        pass
     if target == root or not target.is_relative_to(root):
         raise ConfigError("Path escapes its permitted root")
     return target
@@ -61,6 +77,11 @@ class Config:
         return referring.split("/", 1)[0] + "/" + relative if self.sources_registry else relative
 
     def storage_root(self, area: str) -> Path:
+        from .publication import request_memo
+        return request_memo(("storage-root", area, str(self.project_root), str(self.models_root)),
+                            lambda: self._storage_root(area))
+
+    def _storage_root(self, area: str) -> Path:
         if area not in STORAGE_NAMES:
             raise ConfigError("Unknown output area")
         if area == "models" and self.models_root is not None:

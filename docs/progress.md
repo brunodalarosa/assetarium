@@ -1,5 +1,38 @@
 # Progress
 
+## October 17 — Performance phase 2: hash reuse by file identity
+
+Phase 2 of the optimization plan ([decision 0004](decisions/0004-stat-identity-hash-reuse.md)).
+
+- `verified_hash` reuses recorded hashes while a file's identity (size,
+  modification time, NTFS ChangeTime, file ID) is unchanged, through one shared
+  record `cache/file-hashes.sqlite` (5.9 MB for the current library) that scans
+  seed. ChangeTime replaces Python's Windows `st_ctime` (creation time), so a
+  same-size edit with a restored modification time is still detected; the
+  existing regression test for that case passes unchanged.
+- Removal checks and the storage/preservation/model-relocation audits re-read
+  bytes (`fresh=True`, `hash_cache.require_fresh()`).
+- Source-directory validation, storage roots, registry/ownership reads and
+  directory resolution run once per pinned request; link leaves are still
+  resolved and escapes rejected.
+- Card thumbnails show the verified preview only (no source re-verification),
+  cached by preview identity at 320 px with a fast PNG encode. Detail and agent
+  `get_asset` behavior is unchanged.
+
+Read-only receipt `data/benchmarks/perf-phase2-final-20261017.json` (versus the
+baseline): keyword search 7.0 → 0.92 s; stub combined search 19.5 → 4.0 s;
+summary 3.9 → 0.24 s; browse 1.2 → 0.04 s; 12 thumbnails 1.3 → 0.27 s; detail
+0.135 → 0.069 s. The one-time first run after upgrading re-hashes files whose
+identity format changed.
+
+Verification: **394 tests passed** (`scratch/pytest-perf-p2-full`), including new
+`tests/test_hash_cache.py`; WebView2 checks passed:
+`data/gui/perf-p2-source-browser/verification.json`, `data/gui/perf-p2-search-ui/report.json`,
+`data/gui/perf-p2-library-gui`, `data/gui/source-settings-7c56837bfa/report.json`,
+`data/gui/source-installed-b135ae32ee/report.json`. Startup thumbnails still wait
+behind the shared presentation lock; phase 3 narrows it. No original asset or
+generated result was modified, retried or reprocessed.
+
 ## October 17 — Performance phase 1: startup and read caches
 
 Phase 1 of the owner-approved optimization plan (decisions

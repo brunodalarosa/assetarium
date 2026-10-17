@@ -103,9 +103,11 @@ def test_ungenerated_preview_is_pending_and_does_not_retain_a_fault(indexed):
     record['previews'] = []
     update(config, record)
     service = DesktopService(config)
+    # Cards show preview state only; detail also resolves the usable source package.
     for result in (service.thumbnail(record['asset_id']), service.asset(record['asset_id'])):
-        assert result['payload']['usable'] and result['payload']['preview']['status'] == 'pending'
+        assert result['payload']['preview']['status'] == 'pending'
         assert not result['image']
+    assert service.asset(record['asset_id'])['payload']['usable']
     assert not service.preview_faults and not service.item_faults
 
 
@@ -118,8 +120,8 @@ def test_unattempted_disabled_format_is_excluded_without_a_preview_fault(indexed
     update(config, record)
     save_general_settings(config, 24, ['gltf'])
     service = DesktopService(config)
-    result = service.thumbnail(record['asset_id'])
-    assert result['payload']['usable'] and result['payload']['preview']['status'] == 'excluded'
+    assert service.thumbnail(record['asset_id'])['payload']['preview']['status'] == 'excluded'
+    assert service.asset(record['asset_id'])['payload']['usable']
     assert not service.preview_faults
 
 

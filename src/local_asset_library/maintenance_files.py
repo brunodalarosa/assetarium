@@ -41,7 +41,7 @@ def tree_files(root, target):
 def manifest(root, targets):
     files = sorted({path for target in targets for path in tree_files(root, target)})
     return [{'path': path.relative_to(root).as_posix(), 'bytes': path.stat().st_size,
-             'sha256': verified_hash(path)} for path in files]
+             'sha256': verified_hash(path, fresh=True)} for path in files]
 
 
 def remove_manifest(root, rows):
@@ -50,7 +50,7 @@ def remove_manifest(root, rows):
     for row in rows:
         try:
             path = contained(root, Path(root) / row['path'])
-            if path.stat().st_size != row['bytes'] or verified_hash(path) != row['sha256']:
+            if path.stat().st_size != row['bytes'] or verified_hash(path, fresh=True) != row['sha256']:
                 raise ConfigError('Generated file changed after cleanup planning')
             path.unlink()
             removed.append(row['path'])

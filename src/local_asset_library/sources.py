@@ -32,6 +32,11 @@ def now():
 def registry(config):
     if not config.sources_registry:
         return {"schema_version": 1, "revision": "legacy", "sources": [], "detached": []}
+    from .publication import request_memo
+    return request_memo(("registry", str(config.sources_registry), str(config.models_root)), lambda: _registry(config))
+
+
+def _registry(config):
     if not config.sources_registry.exists():
         return {"schema_version": 1, "revision": "empty", "sources": [], "detached": []}
     stat = config.sources_registry.stat()
@@ -64,6 +69,12 @@ def _registry_file(path, stamp, size, project_root, models_root):
 
 
 def validate_directory(config, value, require_exists=True):
+    from .publication import request_memo
+    return request_memo(('source-directory', value, require_exists, str(config.project_root), str(config.models_root)),
+                        lambda: _validate_directory(config, value, require_exists))
+
+
+def _validate_directory(config, value, require_exists=True):
     if not isinstance(value, str) or not Path(value).is_absolute():
         raise ConfigError("Choose an absolute asset directory")
     path = Path(value)
@@ -129,6 +140,11 @@ def _owner_map(path, stamp, size):
 
 
 def owners(config):
+    from .publication import request_memo
+    return request_memo(("owners", str(config.project_root)), lambda: _owners(config))
+
+
+def _owners(config):
     path = config.project_root / "data/library/asset-sources.json"
     if not path.exists():
         return {}
@@ -392,7 +408,8 @@ def visible(config, records):
             allowed[source['key']] = set()
             continue
         status_path = bound(config, source).output_path("data", "library/source-status.json")
-        status = read_json(status_path) if status_path.exists() else {}
+        from .library_cache import cached_json
+        status = cached_json(status_path) if status_path.exists() else {}
         # A missing/changed file is excluded as soon as a scan discovers it,
         # while its prior published results remain available for later repair.
         allowed[source["key"]] = None if not status.get("scanned") else set(status.get("searchable_ids", []))

@@ -242,39 +242,43 @@ class AssetService:
         image = None
         faults = []
         if args.get("include_preview", False):
-            try:
-                has_view = any(p.get('view_label') == args.get('preview_view', 'three_quarter') for p in record['previews'])
-                pending_preview = (not has_view and record['processing'].get('previews') in {'pending', 'unknown'}
-                    and record['processing'].get('inspection') not in {'failed', 'unsupported'}
-                    and not (record.get('inspection_run') or {}).get('source_faults')
-                    and not (record.get('inspection_run') or {}).get('errors')
-                    and not any(k in record.get('stage_faults', {}) for k in ('inspection', 'previews')))
-                if pending_preview:
-                    from .settings import processing_eligible, processing_formats
-                    eligible = processing_eligible(record, processing_formats(self.config))
-                    payload['preview'] = ({'status': 'pending', 'reason': 'Preview has not been generated.'} if eligible else
-                        {'status': 'excluded', 'reason': 'Preview has not been generated because this source format is not selected in Settings → General.'})
-                    return bounded_detail(payload), None, {'excluded': faults}
-                preview, path = self.preview(record, args.get("preview_view", "three_quarter"))
-                from PIL import Image, ImageOps
-                if path.stat().st_size > 16 * 1024 * 1024:
-                    raise ConfigError("Preview source exceeds 16 MiB decode cap")
-                with Image.open(path) as source:
-                    if source.width * source.height > 16000000:
-                        raise ConfigError("Preview exceeds pixel cap")
-                    source.load()
-                    output = ImageOps.exif_transpose(source).convert("RGBA")
-                    output.thumbnail((512, 512), Image.Resampling.LANCZOS)
-                    stream = BytesIO()
-                    output.save(stream, format="PNG", optimize=True)
-                blob = stream.getvalue()
-                if len(blob) > IMAGE_CAP:
-                    raise ConfigError("Derived PNG exceeds 512 KiB cap")
-                image = base64.b64encode(blob).decode("ascii")
-                payload["preview"] = {"status": "image_content", "view": preview["view_label"], "mime_type": "image/png",
-                    "bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest(), "source_sha256": preview["sha256"],
-                    "dimensions": list(output.size), "delivery": "MCP ImageContent base64; client/model inspection must be verified separately"}
-            except (OSError, ValueError) as exc:
-                payload["preview"] = {"status": "faulty", "reason": str(exc)[:400]}
-                faults.append({"asset_id": record["asset_id"], "channel": "preview", "reason": str(exc)})
+            payload["preview"], image, faults = self.preview_content(record, args.get("preview_view", "three_quarter"))
         return bounded_detail(payload), image, {"excluded": faults}
+
+    def preview_content(self, record, view, size=512, optimize=True):
+        """Requested view as derived PNG, or its pending/excluded/faulty state; no substitute view."""
+        try:
+            has_view = any(p.get('view_label') == view for p in record['previews'])
+            pending_preview = (not has_view and record['processing'].get('previews') in {'pending', 'unknown'}
+                and record['processing'].get('inspection') not in {'failed', 'unsupported'}
+                and not (record.get('inspection_run') or {}).get('source_faults')
+                and not (record.get('inspection_run') or {}).get('errors')
+                and not any(k in record.get('stage_faults', {}) for k in ('inspection', 'previews')))
+            if pending_preview:
+                from .settings import processing_eligible, processing_formats
+                eligible = processing_eligible(record, processing_formats(self.config))
+                return (({'status': 'pending', 'reason': 'Preview has not been generated.'} if eligible else
+                         {'status': 'excluded', 'reason': 'Preview has not been generated because this source format is not selected in Settings → General.'}),
+                        None, [])
+            preview, path = self.preview(record, view)
+            from PIL import Image, ImageOps
+            if path.stat().st_size > 16 * 1024 * 1024:
+                raise ConfigError("Preview source exceeds 16 MiB decode cap")
+            with Image.open(path) as source:
+                if source.width * source.height > 16000000:
+                    raise ConfigError("Preview exceeds pixel cap")
+                source.load()
+                output = ImageOps.exif_transpose(source).convert("RGBA")
+                output.thumbnail((size, size), Image.Resampling.LANCZOS)
+                stream = BytesIO()
+                output.save(stream, format="PNG", optimize=optimize)
+            blob = stream.getvalue()
+            if len(blob) > IMAGE_CAP:
+                raise ConfigError("Derived PNG exceeds 512 KiB cap")
+            return ({"status": "image_content", "view": preview["view_label"], "mime_type": "image/png",
+                     "bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest(), "source_sha256": preview["sha256"],
+                     "dimensions": list(output.size), "delivery": "MCP ImageContent base64; client/model inspection must be verified separately"},
+                    base64.b64encode(blob).decode("ascii"), [])
+        except (OSError, ValueError) as exc:
+            return ({"status": "faulty", "reason": str(exc)[:400]}, None,
+                    [{"asset_id": record["asset_id"], "channel": "preview", "reason": str(exc)}])

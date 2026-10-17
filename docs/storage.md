@@ -33,6 +33,10 @@ for that file. Use uv to uninstall/replace a pinned package when making a change
 If hard links are unavailable, record the fault and plan the disk cost before
 using copies. Symlinked environments are not a substitute.
 
+`cache/file-hashes.sqlite` (a few MB) records verified hashes by file identity
+for every LAL process (decision 0004). It holds no evidence: deleting it only
+makes the next scan or search re-hash files once.
+
 Measure from the repository with the existing interpreter, without installing
 anything or repopulating the dependency cache:
 

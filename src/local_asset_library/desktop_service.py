@@ -1,4 +1,5 @@
 """Read-only presentation operations; retrieval policy remains in AssetService/SearchEngine."""
+from collections import OrderedDict
 from contextlib import closing
 import time
 
@@ -11,6 +12,10 @@ from .retrieval import current_overlay, matches, observations, pilot_records, so
 from .publication import pinned, generation,read_json
 
 
+THUMBNAIL_SIZE = 320  # Cards are at most 175 px tall; 320 px stays sharp on 2x displays.
+THUMBNAIL_CACHE = 400
+
+
 class DesktopService(AssetService):
     def __init__(self, config):
         super().__init__(config)
@@ -19,6 +24,7 @@ class DesktopService(AssetService):
         self.version = None
         self.preview_bindings = {}
         self.source_revision = None
+        self.thumbnails = OrderedDict()
 
     def preview_binding(self, identifier, view):
         from .catalog import digest
@@ -140,14 +146,35 @@ class DesktopService(AssetService):
         if expected_version and version!=expected_version:
             return {'status':'stale','generation':version,'reason':'Published library changed; refresh this view.'}
         retained=self.preview_faults.get((identifier,'three_quarter'))
-        args={'asset_id':identifier,'include_preview':not bool(retained),'preview_view':'three_quarter'}
-        payload,image,evidence=self.execute('get_asset',args)
+        validate('get_asset',{'asset_id':identifier})
+        # A card shows the verified preview image only; detail still resolves and verifies sources.
+        record=self.record(identifier)
+        payload,image={'asset_id':identifier,'name':record['display_name'],'pack':record['pack_id']},None
         if retained:
             payload['preview']=retained
-        elif payload.get('preview',{}).get('status')=='faulty':
+        else:
+            payload['preview'],image=self._thumbnail(record)
+        if not retained and payload['preview'].get('status')=='faulty':
             self.preview_faults[(identifier,'three_quarter')]=payload['preview']
             self.preview_bindings[(identifier,'three_quarter')]=self.preview_binding(identifier,'three_quarter')
         return {'payload':payload,'image':image,'generation':version}
+
+    def _thumbnail(self, record):
+        view=next((p for p in record['previews'] if p.get('view_label')=='three_quarter'),None)
+        key=view and (view.get('path'),view.get('source_path'),view.get('sha256'))
+        if key and key in self.thumbnails:
+            try:
+                self.preview(record,'three_quarter')  # Same stat-identity verification as uncached delivery.
+                self.thumbnails.move_to_end(key)
+                return self.thumbnails[key]
+            except (OSError,ValueError):
+                self.thumbnails.pop(key,None)
+        preview,image,_=self.preview_content(record,'three_quarter',size=THUMBNAIL_SIZE,optimize=False)
+        if key and image:
+            self.thumbnails[key]=(preview,image)
+            while len(self.thumbnails)>THUMBNAIL_CACHE:
+                self.thumbnails.popitem(last=False)
+        return preview,image
 
     @pinned
     def asset(self, identifier, source_format=None, view='three_quarter', expected_version=None):

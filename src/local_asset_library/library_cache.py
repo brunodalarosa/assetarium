@@ -7,7 +7,6 @@ and detail views read full records from the catalog instead.
 """
 from collections import OrderedDict
 import hashlib
-import json
 import threading
 
 from .publication import generation, snapshot_key
@@ -87,7 +86,8 @@ def cached_json(path):
     with _lock:
         if key in _json:
             return _json[key]
-    value = json.loads(path.read_text(encoding='utf-8'))
+    from .publication import read_json
+    value = read_json(path)  # Share-mode read: writers can still replace the file atomically.
     with _lock:
         if len(_json) > 256:
             _json.clear()

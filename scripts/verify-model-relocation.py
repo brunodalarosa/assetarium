@@ -9,6 +9,7 @@ from local_asset_library.captions import file_hash
 from local_asset_library.catalog import save_json
 
 root = Path(__file__).resolve().parents[1]
+from local_asset_library import hash_cache; hash_cache.require_fresh()  # Byte audit: never reuse recorded hashes (decision 0004).
 config = load_config(root / "config.example.toml", root)
 mode = sys.argv[1]
 report = {"mode": mode, "models_root": str(config.storage_root("models")), "status": "running"}

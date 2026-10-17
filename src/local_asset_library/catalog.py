@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 from .config import Config, ConfigError
+from . import hash_cache
 from .publication import pinned_config
 
 SOURCE_ID = "playful-lowpoly-v1"
@@ -131,8 +132,11 @@ def walk_source(config):
                 before = source.stat()
                 identity = [before.st_size, before.st_mtime_ns, before.st_ctime_ns, before.st_ino]
                 previous = cached.get(relative, {})
+                shared = hash_cache.file_identity(source)
                 if cache_path and previous.get("identity") == identity:
                     row["sha256"] = previous["sha256"]
+                elif known := hash_cache.lookup(source, shared):
+                    row["sha256"] = known
                 else:
                     with config.open_source(relative) as stream:
                         row["sha256"] = file_hash(stream)
@@ -140,6 +144,9 @@ def walk_source(config):
                 if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                     raise ConfigError(f"Source changed while hashing: {relative}")
                 row.update(size=after.st_size, mtime_ns=after.st_mtime_ns)
+                # The shared record lets runtime checks reuse scan hashes (decision 0004).
+                if shared == hash_cache.file_identity(source):
+                    hash_cache.store(source, shared, row["sha256"])
                 next_cache[relative] = {"identity": identity, "sha256": row["sha256"]}
             except (ConfigError, OSError) as exc:
                 row.update(status="rejected", error=str(exc), sha256=None, size=None, mtime_ns=None)

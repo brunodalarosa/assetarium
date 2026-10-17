@@ -9,6 +9,7 @@ import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+from local_asset_library import hash_cache; hash_cache.require_fresh()  # Byte audit: never reuse recorded hashes (decision 0004).
 from local_asset_library.catalog import save_json, query, verify_source
 from local_asset_library.captions import file_hash
 from local_asset_library.config import load_config
