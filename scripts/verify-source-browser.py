@@ -18,6 +18,7 @@ from ui_text import assert_ui_text
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
+parser.add_argument('--kaykit-regressions', action='store_true')
 args = parser.parse_args()
 if not args.run_name.replace('-', '').isalnum():
     parser.error('Invalid run name')
@@ -32,6 +33,28 @@ for i in range(48):
         'v -1 0 -1\nv 1 0 -1\nv 0 2 0\nv 0 0 1\nf 1 3 2\nf 1 2 4\nf 2 3 4\nf 3 1 4\n')
 ready_source(config, backend, one)
 ready_source(config, backend, two)
+pending_id = None
+if args.kaykit_regressions:
+    from local_asset_library.incremental import working, update_record
+    from local_asset_library.membership import records
+    from local_asset_library.source_operations import publish_source
+    # Reproduce oversized optional evidence on the first browsed source card.
+    scope = sources.bound(config, one)
+    record = next(r for r in records(working(scope)) if r['display_name'] == 'extra00')
+    record['inspection_run'] = {'source_faults': [], 'errors': ['Synthetic optional evidence ' * 1600]}
+    update_record(working(scope), record)
+    publish_source(scope)
+    # A different source has a genuinely unattempted preview, not a failure.
+    scope = sources.bound(config, two)
+    record = next(r for r in records(working(scope)) if r['display_name'] == 'item1')
+    pending_id = record['asset_id']
+    record.update(technical=None, previews=[], description=None, caption_provenance=None, inspection_run=None)
+    record['processing'].update(inspection='pending', previews='pending', caption='pending', embeddings='pending')
+    update_record(working(scope), record)
+    publish_source(scope)
+    sources.aggregate(config)
+    sources.scan_source(config, one)
+    sources.scan_source(config, two)
 sources.set_enabled(config, one['key'], False)
 empty_dir = fixture / 'empty-source'
 empty_dir.mkdir()
@@ -111,6 +134,11 @@ def capture(name):
 def verify():
     try:
         wait('state.context&&state.items.length===3&&state.sources.length===3')
+        if args.kaykit_regressions:
+            selector = '#grid .card[data-id="' + pending_id + '"]'
+            wait('Boolean(document.querySelector(' + json.dumps(selector) + ')?.textContent.includes("Preview pending"))')
+            assert not window.evaluate_js('document.querySelector(' + json.dumps(selector) + ').textContent.includes("Preview fault")')
+            report['checks'].append('Never-generated preview is labeled pending without a false preview-fault badge')
         js("(async()=>{$('query').value='item0';$('mode').value='keyword';await search();window.savedLibraryCards=[...$('grid').children];return true;})()")
         js("$('open-settings').click();true")
         js("$('asset-sources-tab').click();true")
@@ -132,6 +160,10 @@ def verify():
         report['checks'].append('Scrolling loads the final batch without duplicates or losing earlier cards')
         js("$('source-collection').scrollTop=0;document.querySelector('#source-grid .card').click();true")
         wait("Boolean(document.querySelector('#source-detail .detail-header')&&LALPreview.current)")
+        if args.kaykit_regressions:
+            assert window.evaluate_js('!LALPreview.current.launch.disabled&&Boolean(LALPreview.current.item.image)')
+            assert not window.evaluate_js("$('source-detail').textContent.includes('deterministic cap')||$('source-detail').textContent.includes('No verified source')")
+            report['checks'].append('Large optional metadata preserves detail image, verified source and enabled interactive preview')
         assert not window.evaluate_js("Boolean(document.querySelector('#detail .detail-header'))")
         js('LALPreview.current.launch.click();true')
         wait('Boolean(LALPreview.current?.ready)', 60)

@@ -3,7 +3,7 @@ from contextlib import closing
 import hashlib
 import time
 
-from .catalog import read_database
+from .catalog import read_database, relevant_license_evidence
 from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .mcp_assets import AssetService, FORMATS, MODES, VIEWS, error_payload, validate
@@ -155,7 +155,9 @@ class DesktopService(AssetService):
         if expected_version and expected_version != version:
             return {'status': 'stale', 'generation': version, 'reason': 'Published library changed; refresh this view.'}
         started = time.perf_counter()
-        args = {'asset_id': identifier, 'include_metadata': True, 'include_preview': True, 'preview_view': view}
+        # Desktop presentation below already carries full evidence. The bounded
+        # agent metadata envelope must not gate desktop sources or image delivery.
+        args = {'asset_id': identifier, 'include_preview': True, 'preview_view': view}
         if source_format is not None:
             args['source_format'] = source_format
         validate('get_asset', args)
@@ -196,7 +198,7 @@ class DesktopService(AssetService):
             'technical': {k: technical.get(k) for k in ('inspected_path', 'inspected_format', 'inspected_sha256',
                 'original_geometry_totals', 'evaluated_instance_totals', 'unit_settings', 'armatures', 'actions',
                 'world_bounds', 'objects', 'meshes', 'materials')},
-            'processing': record['processing'], 'license_evidence': record.get('license_evidence'),
+            'processing': record['processing'], 'license_evidence': relevant_license_evidence(record),
             'source_faults': (record.get('inspection_run') or {}).get('source_faults', []),
             'stage_faults':record.get('stage_faults',{}),
             'caption_faults': (record.get('caption_provenance') or {}).get('visual_faults', []),

@@ -69,6 +69,28 @@ def failed_caption(work, record):
     update_record(work, record)
 
 
+def test_source_import_restriction_survives_scans_without_affecting_other_sources(managed):
+    config, _, one, two = managed
+    root = Path(one['path'])
+    for folder, extension in [('gltf', 'gltf'), ('obj', 'obj'), ('fbx', 'fbx'), ('fbx(unity)', 'fbx')]:
+        target = root / 'Pack/Assets' / folder / ('arch.' + extension)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('{"asset":{"version":"2.0"}}' if extension == 'gltf' else 'synthetic')
+    scoped = sources.bound(config, one)
+    identity_path = scoped.output_path('data', 'source.json')
+    value = json.loads(identity_path.read_text())
+    value['import_formats'] = ['gltf']
+    sources.atomic_json(identity_path, value)
+    originals = {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+    for _ in range(2):
+        assert sources.scan_source(config, one)['assets'] == 1
+        rows = records(working(scoped))
+        assert rows[0]['files'][0]['format'] == 'gltf'
+        assert rows[0]['source_relative_identity'].endswith('gltf/arch.gltf')
+    assert sources.scan_source(config, two)['assets'] == 3
+    assert all(Path(p).read_bytes() == blob for p, blob in originals.items())
+
+
 def test_published_failures_leave_pending_cards_but_keep_report_and_attempt(managed):
     config, backend, one, _ = managed
     work = ready_source(config, backend, one)
@@ -297,7 +319,7 @@ def test_cancellation_finishes_current_inspection_and_checkpoints(managed,monkey
     config,_,one,_=managed
     sources.scan_source(config,one);scoped=sources.bound(config,one)
     stop=[False];finished=[]
-    def inspect(work,record,*args):
+    def inspect(work,record,*args,**kwargs):
         finished.append(record['asset_id'])
         record['processing']['inspection']='complete'
         incremental.update_record(work,record)

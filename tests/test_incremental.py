@@ -32,7 +32,7 @@ def library(tmp_path):
         for i in range(3):
             (source / pack / f'item{i}.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
     for path in ('src/local_asset_library/blender_worker.py', 'src/local_asset_library/render_math.py',
-                 'src/local_asset_library/caption_backend.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt'):
+                 'src/local_asset_library/caption_backend.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt', 'prompts/caption-v4.txt'):
         target = root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_text('synthetic contract')
     save_json(root / 'docs/caption-model.json', {'revision': 'synthetic'})
     save_json(root / 'docs/library-membership.json', {'schema_version': 1, 'approved': True, 'packs': ['one','two'], 'approval': 'synthetic'})
@@ -187,7 +187,7 @@ def test_stage_checkpoint_failure_and_resume(library,monkeypatch):
     config,_=library
     from local_asset_library import incremental
     attempted=[]
-    def fake(config,record,fp,resolution=640):
+    def fake(config,record,fp,resolution=640,formats=None):
         attempted.append(record['asset_id'])
         if len(attempted)==2:raise RuntimeError('synthetic asset fault')
         if len(attempted)==3:raise KeyboardInterrupt('stop')
@@ -267,7 +267,7 @@ def test_caption_settings_are_independent_from_owner_and_budget(library):
     assert process(config,'caption',dry_run=True)['pending']==6
 
 
-def test_new_prompt_keeps_completed_v2_captions_and_new_jobs_use_v3(library):
+def test_new_prompt_keeps_completed_v2_captions_and_new_jobs_use_v4(library):
     config,_=library
     work=ready(config)
     from local_asset_library.incremental import caption_input,seed
@@ -276,13 +276,13 @@ def test_new_prompt_keeps_completed_v2_captions_and_new_jobs_use_v3(library):
         update_record(work,record)
     seed(work)
     old={r['asset_id']:caption_input(work,r) for r in records(work)}
-    (config.project_root/'prompts/caption-v3.txt').write_text('Changed future prompt; 10-170 words')
+    (config.project_root/'prompts/caption-v4.txt').write_text('Changed future prompt; 10-170 words')
     assert process(config,'caption',dry_run=True)['retained']=={'complete':6}
     assert all(caption_input(work,r)==old[r['asset_id']] for r in records(work))
     record=records(work)[0]
     record.update(description=None,caption_provenance=None)
     record['processing']['caption']='pending'
-    assert caption_input(work,record)==caption_input(work,record,prompt_version='v3')
+    assert caption_input(work,record)==caption_input(work,record,prompt_version='v4')
     assert caption_input(work,record)!=caption_input(work,record,prompt_version='v2')
     # A changed old input needs generation under the active prompt, with a
     # fingerprint that matches the version recorded in the new result.
@@ -319,7 +319,7 @@ def test_settings_change_does_not_retry_unchanged_source_fault(library,monkeypat
     config,_=library
     from local_asset_library import incremental
     calls=[]
-    def faulty(config,record,fp,resolution=640):
+    def faulty(config,record,fp,resolution=640,formats=None):
         calls.append(record['asset_id'])
         raise RuntimeError('unchanged synthetic geometry fault')
     monkeypatch.setattr(incremental,'run_inspection',faulty)

@@ -5,7 +5,7 @@ from io import BytesIO
 import json
 import re
 
-from .catalog import detail, encoded
+from .catalog import detail, encoded, relevant_license_evidence
 from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detail, validate_filters
@@ -96,6 +96,24 @@ def bounded(payload, cap, removable=None):
             payload["truncated"] = True
         else:
             raise ConfigError("Response exceeds deterministic cap; no incomplete usable package returned")
+
+
+def bounded_detail(payload):
+    """Optional evidence must not discard a verified, complete source package."""
+    while True:
+        try:
+            return bounded(payload, DETAIL_CAP)
+        except ConfigError:
+            metadata = payload.get('metadata', {})
+            optional = set(metadata) - {'formats', 'processing'}
+            if not optional:
+                raise  # Never trim source paths, dependencies, or source faults.
+            key = max(optional, key=lambda name: (len(encoded(metadata[name])), name))
+            metadata.pop(key)
+            delivery = payload.setdefault('metadata_delivery', {
+                'status': 'partial', 'omitted_fields': [],
+                'reason': 'Optional metadata exceeds the response limit; full evidence remains in the local catalog. Source and dependencies are complete.'})
+            delivery['omitted_fields'].append(key)
 
 
 def error_payload(exc, identifier=None):
@@ -217,7 +235,7 @@ class AssetService:
             payload["metadata"] = {"formats": sorted({f["format"] for f in record["files"]}),
                 "technical": {k: technical.get(k) for k in ("inspected_path", "inspected_sha256", "inspected_format", "evaluated_instance_totals", "unit_settings")},
                 "description": record.get("description"), "suggested_uses": record.get("suggested_uses"),
-                "processing": record["processing"], "license_evidence": record.get("license_evidence"),
+                "processing": record["processing"], "license_evidence": relevant_license_evidence(record),
                 'stage_faults':record.get('stage_faults',{}), 'inspection_run':record.get('inspection_run'),
                 "caption_quality": caption_quality(self.config, record),
                 "caption_fault_evidence": (record.get("caption_provenance") or {}).get("visual_faults", [])}
@@ -225,6 +243,18 @@ class AssetService:
         faults = []
         if args.get("include_preview", False):
             try:
+                has_view = any(p.get('view_label') == args.get('preview_view', 'three_quarter') for p in record['previews'])
+                pending_preview = (not has_view and record['processing'].get('previews') in {'pending', 'unknown'}
+                    and record['processing'].get('inspection') not in {'failed', 'unsupported'}
+                    and not (record.get('inspection_run') or {}).get('source_faults')
+                    and not (record.get('inspection_run') or {}).get('errors')
+                    and not any(k in record.get('stage_faults', {}) for k in ('inspection', 'previews')))
+                if pending_preview:
+                    from .settings import processing_eligible, processing_formats
+                    eligible = processing_eligible(record, processing_formats(self.config))
+                    payload['preview'] = ({'status': 'pending', 'reason': 'Preview has not been generated.'} if eligible else
+                        {'status': 'excluded', 'reason': 'Preview has not been generated because this source format is not selected in Settings → General.'})
+                    return bounded_detail(payload), None, {'excluded': faults}
                 preview, path = self.preview(record, args.get("preview_view", "three_quarter"))
                 from PIL import Image, ImageOps
                 if path.stat().st_size > 16 * 1024 * 1024:
@@ -247,4 +277,4 @@ class AssetService:
             except (OSError, ValueError) as exc:
                 payload["preview"] = {"status": "faulty", "reason": str(exc)[:400]}
                 faults.append({"asset_id": record["asset_id"], "channel": "preview", "reason": str(exc)})
-        return bounded(payload, DETAIL_CAP), image, {"excluded": faults}
+        return bounded_detail(payload), image, {"excluded": faults}

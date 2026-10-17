@@ -53,12 +53,21 @@
           <label for="storage-budget">Storage budget (GiB)</label>
           <p id="storage-budget-help" class="hint">Maximum storage for LAL and generated source metadata. Original assets and shared models are excluded. Processing stops at storage checks when the budget is reached and keeps completed work.</p>
           <input id="storage-budget" type="number" min="1" max="1048576" step="1" required aria-describedby="storage-budget-help" disabled>
+          <fieldset id="processing-formats" aria-describedby="processing-formats-help" disabled>
+            <legend>Formats to process</legend>
+            <p id="processing-formats-help" class="hint">Scanning counts every supported format. New processing batches use only selected formats. Existing results are kept. Uncheck all to pause processing.</p>
+            <div class="processing-format-options">
+              <label><input id="processing-format-fbx" type="checkbox" value="fbx" checked>FBX</label>
+              <label><input id="processing-format-gltf" type="checkbox" value="gltf" checked>glTF / GLB</label>
+              <label><input id="processing-format-obj" type="checkbox" value="obj" checked>OBJ</label>
+            </div>
+          </fieldset>
           <button type="submit" id="save-general-settings" class="primary" disabled>Save</button>
           <p id="general-settings-message" role="status" aria-live="polite"></p>
         </form>
       </section>
       <section id="asset-sources-panel" role="tabpanel" aria-labelledby="asset-sources-tab" hidden>
-        <h2>Asset sources</h2><p class="hint">Enable sources to include them in searches. Removing a source keeps its files and saved metadata.</p>
+        <h2>Asset sources</h2><p class="hint">Enable sources to include them in searches. Removing a source keeps its files and saved metadata. Counts include all scanned formats; assets with alternate formats appear in each applicable count.</p>
         <div class="source-add"><label for="source-directory">Asset directory</label><div class="source-add-controls"><input id="source-directory" type="text" placeholder="Choose an asset source directory"><button type="button" id="choose-source">Choose folder…</button><button class="primary" type="button" id="add-source">Add source</button></div></div>
         <p id="sources-message" role="status" aria-live="polite"></p><div id="source-list"></div><p class="hint" id="sources-empty" hidden>No asset sources yet. Add a directory to get started.</p>
       </section>

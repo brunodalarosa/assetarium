@@ -10,6 +10,13 @@ scrollable list of original model paths, instead of keeping pending cards open.
 Generated source information now lives in each directory's `metadata-lal`.
 See [asset sources](asset-sources.md) for storage, cancellation and fault rules.
 
+**Settings → General → Formats to process** limits new processing batches to
+enabled FBX, glTF/GLB and OBJ files. Scanning still inventories every supported
+format; each source displays counts by format. All three options start enabled.
+Uncheck all to pause processing. Existing results, search vectors and recorded
+failures remain preserved; formats excluded by the selection create no new
+actionable processing work. See [processing formats](asset-sources.md#processing-formats).
+
 For current command-line operation, `library-batch.py scan` checks enabled sources,
 `library-batch.py status` reports their state, and
 `library-batch.py process --source KEY` starts processing and automatic publication
@@ -182,3 +189,24 @@ The separately approved October 14 texture repair run has a 2 GiB growth limit
 and the same 10 GiB total ceiling. It uses hash-bound library overrides and
 publisher material lists; originals and unrelated faults remain unchanged.
 See [texture repairs](texture-repairs.md) for scoped operations and evidence.
+
+## KayKit detail and preview corrections
+
+The desktop uses the shared verified source/preview retrieval path and attaches
+its complete presentation evidence separately from the bounded agent metadata
+response. Large optional agent metadata is explicitly reported as partial rather
+than hiding an otherwise complete source/dependency package. Required source and
+dependency evidence is never trimmed to claim usability.
+
+An absent preview that has never been generated is pending, not a retained
+preview failure. If its format is disabled for processing, it is shown as
+excluded instead; previously generated previews remain usable. Missing or stale expected previews, recorded inspection failures
+and actual renderer errors remain faults. Still-image availability is separate
+from the interactive viewer's verified source package.
+
+Caption prompt v4 reinforces the existing JSON schema and the separation between
+observations and suggestions. It does not relax validation or invalidate
+completed v1-v3 descriptions. The explicitly authorized KayKit retry makes one
+new attempt for each of the 85 failed glTF captions, retaining old attempts and
+owner review states. Any remaining failures require another explicit retry
+request; a later routine processing run does not retry unchanged failures.

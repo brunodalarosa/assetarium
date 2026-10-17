@@ -90,6 +90,31 @@ def test_same_folder_formats_are_not_automatically_equivalent(catalog_config):
     assert len(build_inventory(catalog_config)[1]) == 2
 
 
+def test_kaykit_export_layout_groups_manifests_with_namespace(catalog_config):
+    for pack in ('City', 'Platformer'):
+        for folder, extension in [('fbx', 'fbx'), ('fbx(unity)', 'fbx'), ('gltf', 'gltf'), ('obj', 'obj')]:
+            for color in ('blue', 'red'):
+                put(catalog_config, f'KayKit/{pack}/Assets/{folder}/{color}/arch.{extension}',
+                    '{"asset":{"version":"2.0"}}' if extension == 'gltf' else 'fixture')
+    assets = build_inventory(catalog_config)[1]
+    assert len(assets) == 4
+    assert all(len(record['files']) == 4 for record in assets)
+    assert len({r['source_relative_identity'] for r in assets}) == 4
+    assert all(r['grouping']['geometry_equivalence'] == 'unverified' for r in assets)
+
+
+def test_nested_source_licenses_do_not_leak_between_subpacks(catalog_config):
+    for pack in ('City', 'Platformer'):
+        put(catalog_config, f'KayKit/{pack}/Assets/gltf/arch.gltf', '{"asset":{"version":"2.0"}}')
+        put(catalog_config, f'KayKit/{pack}/License.txt', 'Creative Commons Zero. ' + pack)
+        put(catalog_config, f'KayKit/{pack}/More Assets.url', 'URL=https://example.invalid')
+    assets = build_inventory(catalog_config)[1]
+    assert len(assets) == 2
+    for record in assets:
+        assert len(record['license_evidence']) == 1
+        assert Path(record['license_evidence'][0]['path']).parent in Path(record['files'][0]['path']).parents
+
+
 def test_nested_export_names_preserve_namespace(catalog_config):
     for directory, suffix in (("OBJ format", "obj"), ("FBX format", "fbx")):
         for folder in ("kitchen", "office"):

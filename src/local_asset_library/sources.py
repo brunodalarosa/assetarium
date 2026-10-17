@@ -17,6 +17,7 @@ import uuid
 
 from .config import ConfigError, _inside, _relative
 from .publication import atomic_json, read_json
+from .settings import processing_formats, processing_eligible, format_group, PROCESSING_FORMATS
 
 SHARED_DATA = {
     "embeddings/capability.json", "embeddings/model-download.json",
@@ -102,6 +103,24 @@ def bound(config, source):
     path = validate_directory(config, source["path"], require_exists=False)
     return replace(config, source_root=path, source_key=source["key"],
                    metadata_root=path / "metadata-lal", catalog_generation=None)
+
+
+def import_formats(config):
+    """Optional source-specific inventory restriction, separate from work settings.
+
+    Processing checkboxes retain existing imports. A deliberate import cleanup
+    can additionally restrict a source so later scans do not recreate its imports.
+    """
+    if config.metadata_root is None:
+        return None
+    path = config.output_path('data', 'source.json')
+    if not path.exists():
+        return None
+    value = read_json(path)
+    if 'import_formats' not in value:
+        return None
+    from .settings import validate_formats
+    return validate_formats(value['import_formats'])
 
 
 @lru_cache(maxsize=8)
@@ -291,11 +310,60 @@ def source_status(config, source):
     path = scoped.output_path("data", "library/source-status.json")
     status = read_json(path) if path.exists() else {
         "needs_processing": True, "pending": 0, "reason": "Scan this source to discover its assets", "scanned": False}
+    work = replace(scoped, catalog_generation='work')
+    current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
+    formats = tuple(processing_formats(config))
+    paths = [current.output_path('data', 'catalog.sqlite'), scoped.output_path('data', 'catalog.sqlite'),
+             current.output_path('data', 'embeddings/index.sqlite')]
+    signature = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) if p.exists() else (str(p), None, None) for p in paths)
+    if paths[0].exists():
+        status = dict(status, **_format_status(scoped, formats, signature))
+    status = dict(status, processing_paused=not formats, processing_formats=list(formats))
+    if not formats:
+        status.update(needs_processing=False, pending=0, pending_ids=[], reason='Processing paused: no formats selected')
     from .source_operations import operation_status
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():
         status = dict(status, **read_json(fault_path), needs_processing=True)
-    return {**source, **status, "operation": operation_status(scoped)}
+    return {**source, **status, 'import_formats': import_formats(scoped), "operation": operation_status(scoped)}
+
+
+def processing_summary(current, published, formats, vector_faults=None):
+    from .catalog import encoded
+    counts = dict.fromkeys(PROCESSING_FORMATS, 0)
+    pending, failed, skipped = [], [], 0
+    for record in current:
+        for group in {format_group(f['format']) for f in record['files']}:
+            counts[group] = counts.get(group, 0) + 1
+        identifier = record['asset_id']
+        outcome = import_outcome(record, None if vector_faults is None else identifier in vector_faults)
+        if outcome['failed_stages']:
+            failed.append(identifier)
+        if not processing_eligible(record, formats):
+            skipped += 1
+            continue
+        old = published.get(identifier)
+        if outcome['state'] == 'pending' or old is None or encoded(old) != encoded(record):
+            pending.append(identifier)
+    reason = ('Processing paused: no formats selected' if not formats else
+              'Assets need processing or publication' if pending else
+              'Import finished with recorded failures' if failed else
+              'No assets match the selected processing formats' if current and skipped == len(current) else
+              'Selected formats are up to date and published')
+    counts = {key: counts[key] for key in (*PROCESSING_FORMATS, *sorted(set(counts) - set(PROCESSING_FORMATS)))}
+    return {'format_counts': counts, 'pending_ids': sorted(pending), 'pending': len(pending), 'reason': reason,
+            'needs_processing': bool(pending), 'failed': len(failed), 'skipped_formats': skipped,
+            'eligible_assets': len(current) - skipped}
+
+
+@lru_cache(maxsize=64)
+def _format_status(scoped, formats, signature):
+    # Polling settings uses saved inventory only. Cache by database identity and
+    # settings, without rescanning originals or rewriting source metadata.
+    work = replace(scoped, catalog_generation='work')
+    current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
+    return processing_summary(read_records(current), {r['asset_id']: r for r in read_records(scoped)},
+                              formats, embedding_failures(current))
 
 
 def visible(config, records):
@@ -329,7 +397,7 @@ def revision(config):
         fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
         states.append((source["key"], path.stat().st_mtime_ns if path.exists() else None,
                        fault_path.stat().st_mtime_ns if fault_path.exists() else None))
-    return digest([value["revision"], states])[:16]
+    return digest([value["revision"], states, processing_formats(config)])[:16]
 
 
 def write_catalog(config, rows, records):
@@ -375,11 +443,13 @@ def scan_source(config, source):
             kept = deepcopy(prior)
             for key in ("files", "availability", "variants", "dependency_inspection"):
                 kept[key] = record[key]
-            # Preserve supplied collection/license evidence and prior ambiguity
-            # findings when splitting a previously combined collection.
-            kept['license_evidence'] = list({(e.get('path'), e.get('sha256')): e
-                for e in prior.get('license_evidence', []) + record.get('license_evidence', [])}.values())
-            if not same:
+            # Preserve relevant supplied and collection evidence without carrying
+            # sibling-subpack licenses into every model in a nested source.
+            from .catalog import relevant_license_evidence
+            kept['license_evidence'] = relevant_license_evidence(dict(record, license_evidence=list({
+                (e.get('path'), e.get('sha256')): e
+                for e in prior.get('license_evidence', []) + record.get('license_evidence', [])}.values())))
+            if not same or import_formats(scoped) is not None:
                 kept['grouping'] = record['grouping']
             if not same:
                 changed.add(record["asset_id"])
@@ -397,7 +467,8 @@ def scan_source(config, source):
     inventory_hash = digest(rows)
     status_path = scoped.output_path("data", "library/source-status.json")
     prior_status = read_json(status_path) if status_path.exists() else {}
-    if inventory_hash != prior_status.get("inventory_hash") or not work.output_path("data", "catalog.sqlite").exists():
+    if (inventory_hash != prior_status.get("inventory_hash") or old != {r['asset_id']: r for r in merged}
+            or not work.output_path("data", "catalog.sqlite").exists()):
         candidate = replace(scoped, catalog_generation="scan_" + uuid.uuid4().hex)
         write_catalog(candidate, rows, merged)
         target = work.output_path("data", "catalog.sqlite")
@@ -433,6 +504,9 @@ def scan_source(config, source):
               "needs_processing": bool(pending_ids), "removed": len(set(old) - {r["asset_id"] for r in merged}),
               "reason": ("Assets need processing or publication" if pending_ids else
                          "Import finished with recorded failures" if failed else "Up to date and published")}
+    formats = processing_formats(config)
+    status.update(processing_summary(merged, published, formats, vector_faults), processing_paused=not formats,
+                  processing_formats=formats)
     atomic_json(status_path, status)
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():

@@ -89,6 +89,19 @@ def test_response_overflow_fails_closed():
     with pytest.raises(ConfigError): bounded({'dependencies':['x'*17000],'usable':True},16000)
 
 
+def test_optional_large_metadata_keeps_verified_source_and_preview(indexed):
+    config, _, records = indexed
+    record = deepcopy(records[0])
+    record['inspection_run'] = {'errors': ['x' * 30000], 'source_faults': []}
+    update(config, record)
+    response, _, _ = AssetService(config).execute('get_asset', {
+        'asset_id': record['asset_id'], 'include_metadata': True})
+    assert response['usable'] and response['selected_source']['resolved_path']
+    assert response['metadata_delivery']['status'] == 'partial'
+    assert 'inspection_run' in response['metadata_delivery']['omitted_fields']
+    assert len(encoded(response)) <= 16000
+
+
 def test_fault_output_bounded_for_arbitrary_malformed_id():
     from local_asset_library.mcp_assets import error_payload
     result=error_payload(ConfigError('bad input'),'x'*100000)

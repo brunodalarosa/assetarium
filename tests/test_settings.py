@@ -33,7 +33,7 @@ def test_default_preserves_historical_policy_until_user_saves(config):
 def test_saved_total_survives_reload_and_source_binding_without_hidden_growth_cap(config):
     original = (config.project_root / 'docs/library-membership.json').read_bytes()
     result = save_general_settings(config, '24')
-    assert result == {'status': 'saved', 'storage_budget_gib': 24}
+    assert result == {'status': 'saved', 'storage_budget_gib': 24, 'processing_formats': ['fbx', 'gltf', 'obj']}
     rebound = replace(config, metadata_root=config.source_root / 'metadata-lal', source_key='fixture')
     assert general_settings(rebound)['storage_budget_gib'] == 24
     assert settings_path(rebound) == settings_path(config)

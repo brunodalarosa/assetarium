@@ -29,6 +29,8 @@ EXPORT_DIRS = {
     "GLTF format": {".glb", ".gltf"}, "DAE format": {".dae"}, "STL format": {".stl"},
     "FBX": {".fbx"}, "OBJ": {".obj"}, "Blends": {".blend"},
 }
+EXPORT_DIRS = {name.casefold(): suffixes for name, suffixes in EXPORT_DIRS.items()}
+EXPORT_DIRS.update({'gltf': {'.glb', '.gltf'}, 'glb': {'.glb'}, 'fbx(unity)': {'.fbx'}})
 
 
 def encoded(value):
@@ -181,8 +183,10 @@ def classify(path):
         return "material"
     if suffix in {".bin"}:
         return "buffer"
-    if "license" in p.name.lower() or suffix == ".url":
+    if "license" in p.name.lower() and suffix != ".url":
         return "license_source_evidence"
+    if suffix == ".url":
+        return "documentation"
     if suffix in {".html", ".txt", ".md"}:
         return "documentation"
     return "unclassified"
@@ -190,7 +194,7 @@ def classify(path):
 
 def export_slot(pack_relative):
     p = PurePosixPath(pack_relative)
-    matches = [(i, part) for i, part in enumerate(p.parts[:-1]) if part in EXPORT_DIRS and p.suffix.lower() in EXPORT_DIRS[part]]
+    matches = [(i, part) for i, part in enumerate(p.parts[:-1]) if part.casefold() in EXPORT_DIRS and p.suffix.lower() in EXPORT_DIRS[part.casefold()]]
     if len(matches) != 1:
         return None
     index, directory = matches[0]
@@ -381,12 +385,33 @@ def license_evidence(config, pack, inventory):
     return result
 
 
+def relevant_license_evidence(record):
+    """Keep collection notes and licenses from the model's own ancestor folders.
+
+    A source can contain several independently licensed subpacks. Sibling pack
+    licenses and Internet shortcuts are not evidence for this particular model.
+    The original evidence files and historical processing receipts stay intact.
+    """
+    models = [PurePosixPath(f['path']) for f in record.get('files', [])]
+    return [entry for entry in record.get('license_evidence', [])
+            if entry.get('kind') == 'collection_note' or
+            (entry.get('path') and PurePosixPath(entry['path']).suffix.casefold() != '.url'
+             and any(PurePosixPath(entry['path']).parent in model.parents for model in models))]
+
+
 def build_inventory(config):
     rows = walk_source(config)
     inventory = {row["path"]: row for row in rows}
     for row in rows:
         if row["role"] != "boundary_exclusion":
             row["role"] = classify(row["path"])
+    from .sources import import_formats
+    allowed = import_formats(config)
+    from .settings import format_group
+    if allowed is not None:
+        for row in rows:
+            if row['role'] in {'model', 'unsupported_candidate'} and format_group(PurePosixPath(row['path']).suffix[1:].lower()) not in allowed:
+                row['role'] = 'excluded_import_format'
     packs = sorted({row["path"].split("/")[0] for row in rows
                     if "/" in row["path"] and row["role"] in {"model", "unsupported_candidate"}})
     assets, ambiguities = [], []
@@ -407,6 +432,7 @@ def build_inventory(config):
                      "processing": {"inventory": "complete", "inspection": "pending", "previews": "pending",
                                     "caption": "pending", "embeddings": "pending"},
                      "provenance": {"scanner": SCANNER_VERSION}}
+            asset['license_evidence'] = relevant_license_evidence(asset)
             ranking = {"glb": 0, "gltf": 1, "obj": 2, "fbx": 3, "dae": 4, "blend": 5, "stl": 6}
             usable = [f for f in asset["files"] if f["availability"] == "available" and "." + f["format"] in MODELS]
             asset["primary_inspection_path"] = min(usable, key=lambda f: (ranking[f["format"]], f["path"]))["path"] if usable else None

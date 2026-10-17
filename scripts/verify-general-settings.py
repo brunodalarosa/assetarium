@@ -1,5 +1,6 @@
 """Verify General settings in the real WebView2 shell with synthetic sources."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import sys
@@ -14,6 +15,7 @@ from test_sources import managed, ready_source
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 from local_asset_library.publication import atomic_json
 from local_asset_library.settings import GIB, general_settings, settings_path
+from local_asset_library import sources
 
 name = 'general-settings-' + uuid.uuid4().hex[:10]
 OUT = ROOT / 'data/gui' / name
@@ -23,6 +25,16 @@ fixture.mkdir()
 config, backend, one, two = managed.__wrapped__(fixture)
 ready_source(config, backend, one)
 ready_source(config, backend, two)
+source_root = Path(one['path'])
+for extension, content in [('fbx', b'synthetic'), ('blend', b'synthetic'),
+                           ('gltf', b'{"asset":{"version":"2.0"}}'), ('glb', b'synthetic')]:
+    (source_root / ('extra.' + extension)).write_bytes(content)
+sources.scan_source(config, one)
+preserved = [p for source in (one, two) for p in Path(source['path']).iterdir() if p.is_file()]
+for source in (one, two):
+    scoped = sources.bound(config, source)
+    preserved.extend(scoped.output_path('data', name) for name in ('catalog.sqlite', 'embeddings/index.sqlite'))
+original_hashes = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in preserved}
 policy_path = config.project_root / 'docs/library-membership.json'
 value = json.loads(policy_path.read_text())
 value['budget'] = {'total_allocated_bytes': 10 * GIB, 'peak_additional_allocated_bytes': 3 * GIB}
@@ -80,12 +92,15 @@ def verify():
         wait("!$('general-panel').hidden&&!$('storage-budget').disabled&&$('storage-budget').value==='10'")
         assert window.evaluate_js("$('asset-sources-panel').hidden&&$('general-tab').getAttribute('aria-selected')==='true'")
         assert not settings_path(config).exists()
+        assert window.evaluate_js("[...$('processing-formats').querySelectorAll('input')].every(input=>input.checked)")
         report['checks'].append('General opens by default and shows the historical limit without writing it')
-        window.evaluate_js("$('storage-budget').value='24';$('save-general-settings').click()")
+        window.evaluate_js("$('storage-budget').value='24';$('processing-format-fbx').checked=false;$('processing-format-obj').checked=false;$('save-general-settings').click()")
         wait("$('general-settings-message').textContent.startsWith('Saved.')")
         assert general_settings(config)['storage_budget_gib'] == 24
+        assert general_settings(config)['processing_formats'] == ['gltf']
+        wait("state.sources.find(s=>s.key===" + json.dumps(one['key']) + ").pending===2")
         capture('01-general-saved.png')
-        report['checks'].append('Save persists 24 GiB through the real desktop bridge and confirms the result')
+        report['checks'].append('Save persists the budget and glTF-only selection; pending counts refresh immediately without processing')
         saved = settings_path(config).read_bytes()
         window.evaluate_js("$('storage-budget').value='0';$('save-general-settings').click()")
         assert not window.evaluate_js("$('storage-budget').checkValidity()")
@@ -95,9 +110,19 @@ def verify():
         report['checks'].append('Browser and backend reject invalid values without replacing the saved limit')
         window.evaluate_js("$('close-settings').click();$('open-settings').click()")
         wait("$('storage-budget').value==='24'&&!$('storage-budget').disabled")
+        assert window.evaluate_js("$('processing-format-gltf').checked&&!$('processing-format-fbx').checked&&!$('processing-format-obj').checked")
+        window.evaluate_js("$('processing-format-gltf').checked=false;$('save-general-settings').click()")
+        wait("$('general-settings-message').textContent.includes('Processing is paused')")
+        wait("state.sources.every(source=>source.processing_paused&&!source.needs_processing)")
+        assert bridge.source_action('process', one['key'])['status'] == 'faulty'
+        report['checks'].append('All unchecked saves a visible paused state, removes pending warnings and starts no source worker')
+        window.evaluate_js("$('processing-format-gltf').checked=true;$('save-general-settings').click()")
+        wait("$('general-settings-message').textContent.startsWith('Saved.')&&!$('processing-formats').disabled")
         window.evaluate_js("$('general-tab').focus();$('general-tab').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}))")
         assert window.evaluate_js("$('general-panel').hidden&&!$('asset-sources-panel').hidden&&document.activeElement===$('asset-sources-tab')&&$('general-tab').tabIndex===-1")
+        assert window.evaluate_js("[...document.querySelectorAll('.source-format-counts')].some(row=>row.textContent==='FBX: 1 · glTF / GLB: 2 · OBJ: 3 · BLEND: 1')")
         capture('02-asset-sources.png')
+        report['checks'].append('Asset Sources shows every inventoried format, including disabled FBX/OBJ and unsupported BLEND')
         window.evaluate_js("$('asset-sources-tab').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}))")
         assert window.evaluate_js("!$('general-panel').hidden&&document.activeElement===$('general-tab')")
         report['checks'].append('Reopening reloads the saved value; keyboard navigation and selected tab state work')
@@ -105,7 +130,12 @@ def verify():
         wait('innerWidth<761')
         assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
         capture('03-general-narrow.png')
+        window.evaluate_js("$('asset-sources-tab').click()")
+        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        capture('04-sources-narrow.png')
         assert bridge._gateway.worker is None
+        assert original_hashes == {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in preserved}
+        report['checks'].append('Originals, published catalogs and published vectors are byte-identical; no model or real source processing ran')
         report['checks'].append('Narrow layout has no horizontal overflow; no inference worker was loaded')
         report.update(status='passed')
     except BaseException as exc:

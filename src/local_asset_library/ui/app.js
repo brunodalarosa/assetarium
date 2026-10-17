@@ -52,7 +52,7 @@ async function loadThumbnails(items,generation,collection=state){
   if(result.status==='stale'){if(collection===state)status('Library version changed; refresh the published view.');else sourceBrowseError('Saved source contents changed. Return to asset sources and reopen this source.');continue;}
   const card=collection.cardNodes.get(item.asset_id);if(!card)continue;const payload=result.payload||{};card.thumb.replaceChildren();
   if(result.image){const image=node('img');image.src='data:image/png;base64,'+result.image;image.alt=item.name+' — three-quarter preview';card.thumb.append(image);}
-  else{const reason=payload.preview?.reason||payload.reason||result.reason||'Requested three-quarter preview unavailable';const placeholder=node('span','Preview unavailable','placeholder');placeholder.title=reason;placeholder.setAttribute('aria-label','Preview unavailable: '+reason);card.thumb.append(placeholder);const accessibleReason=node('span',reason,'sr');accessibleReason.id=(collection===state?'':'source-')+'preview-fault-'+item.asset_id;card.button.append(accessibleReason);card.button.setAttribute('aria-describedby',accessibleReason.id);card.button.querySelector('.badges').append(node('span','Preview fault','badge fault'));}
+  else{const pending=payload.preview?.status==='pending',excluded=payload.preview?.status==='excluded';const label=excluded?'Preview not selected':pending?'Preview not generated':'Preview unavailable';const reason=payload.preview?.reason||payload.reason||result.reason||'Requested three-quarter preview unavailable';const placeholder=node('span',label,'placeholder');placeholder.title=reason;placeholder.setAttribute('aria-label',label+': '+reason);card.thumb.append(placeholder);const accessibleReason=node('span',reason,'sr');accessibleReason.id=(collection===state?'':'source-')+'preview-state-'+item.asset_id;card.button.append(accessibleReason);card.button.setAttribute('aria-describedby',accessibleReason.id);card.button.querySelector('.badges').append(node('span',excluded?'Preview excluded':pending?'Preview pending':'Preview fault',pending||excluded?'badge review':'badge fault'));}
   if(payload.presentation)refreshCaptionBadge(card,item,payload.presentation);if(payload.presentation?.faults?.length)card.button.title='Recorded faults available in detail';
  }}
  const tasks=[];while(state.thumbWorkers<3&&state.thumbQueue.length){state.thumbWorkers++;tasks.push(load().finally(()=>state.thumbWorkers--));}await Promise.all(tasks);
@@ -150,7 +150,7 @@ const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operati
 
 const sourceCards=new Map();state.sources=[];state.sourcesRevision=null;state.loadingSources=false;
 function operationActive(operation){return ['queued','scanning','processing','publishing','cancelling','verifying'].includes(operation?.status);}
-function sourceMessage(source){if(source.scan_fault)return source.scan_fault;if(!source.scanned)return 'Waiting for the source scan. Assets must be processed before they appear in searches.';if(source.needs_processing)return `${source.pending||0} ${(source.pending||0)===1?'asset needs':'assets need'} processing or publication.`;if(source.failed)return 'Import finished. Recorded failures are listed in the importing failures report.';return 'Up to date and published.';}
+function sourceMessage(source){if(source.scan_fault)return source.scan_fault;if(source.processing_paused)return 'Processing paused. Select formats in General to resume.';if(!source.scanned)return 'Waiting for the source scan. Assets must be processed before they appear in searches.';if(source.needs_processing)return `${source.pending||0} ${(source.pending||0)===1?'asset needs':'assets need'} processing or publication.`;if(source.failed)return 'Import finished. Recorded failures are listed in the importing failures report.';if(source.skipped_formats&&source.eligible_assets===0)return 'No assets match the selected processing formats. Existing results remain available.';if(source.skipped_formats)return 'Selected formats are up to date. Other assets remain scanned and saved.';return 'Up to date and published.';}
 function renderSourceWarnings(){
  const shown=new Set();
  for(const source of state.sources){
@@ -167,7 +167,7 @@ function renderSourceWarnings(){
   }
   card.title.textContent=source.name;card.path.textContent=source.path;card.message.textContent=sourceMessage(source);
   const cancelPending=operation.status==='cancelling';
-  card.process.disabled=active||!source.enabled;card.process.title=source.enabled?'':'Enable this source in Settings before processing';
+  card.process.disabled=active||!source.enabled||source.processing_paused;card.process.title=source.processing_paused?'Select processing formats in Settings → General':source.enabled?'':'Enable this source in Settings before processing';
   card.cancel.hidden=!active;card.cancel.disabled=cancelPending;card.cancel.textContent=cancelPending?'Cancelling…':'Cancel';
   card.bar.hidden=!(active||operation.status==='cancelled'||operation.status==='complete_with_faults');card.bar.value=Math.round((operation.progress||0)*100);
   card.bar.setAttribute('aria-valuetext',`${Math.round((operation.progress||0)*100)}% — ${operation.phase||'Waiting'}`);
@@ -185,6 +185,9 @@ function renderSourceSettings(){
   browseButton.dataset.source=source.key;browseButton.dataset.action='browse';browseButton.setAttribute('aria-label','Browse assets in '+source.name);browseButton.title='Browse source contents';
   const icon=node('span','🔍','source-browse-icon');icon.setAttribute('aria-hidden','true');browseButton.append(node('span',source.name),icon);browseButton.onclick=()=>openSourceBrowser(source.key);heading.append(browseButton);
   info.append(heading,node('p',source.path),node('p',sourceMessage(source)));
+  const counts=source.format_counts;
+  info.append(node('p',counts?Object.entries(counts).map(([format,count])=>`${format==='gltf'?'glTF / GLB':format.toUpperCase()}: ${count}`).join(' · '):'Format counts appear after scanning.','source-format-counts'));
+  if(source.import_formats)info.append(node('p','Imported formats: '+(source.import_formats.length?source.import_formats.map(format=>format==='gltf'?'glTF / GLB':format.toUpperCase()).join(', '):'none')+'. Other original formats are retained and excluded from imports.','hint'));
   const label=node('label',undefined,'source-enabled'),checkbox=node('input');checkbox.type='checkbox';checkbox.checked=source.enabled;checkbox.dataset.source=source.key;checkbox.dataset.action='enabled';checkbox.setAttribute('aria-label','Enable '+source.name);
   checkbox.onchange=()=>sourceAction('enabled',source.key,null,checkbox.checked);label.append(checkbox,document.createTextNode('Enabled'));
   const remove=node('button','Remove');remove.type='button';remove.dataset.source=source.key;remove.dataset.action='remove';remove.disabled=operationActive(source.operation);remove.onclick=()=>sourceAction('remove',source.key);
@@ -301,20 +304,22 @@ for(const section of ['general','asset-sources']){
  };
 }
 async function loadGeneralSettings(){
- $('storage-budget').disabled=true;$('save-general-settings').disabled=true;$('general-settings-message').textContent='Loading settings…';
+ generalSettingsBusy(true);$('general-settings-message').textContent='Loading settings…';
  try{
   const result=await state.api.general_settings();if(result.status==='faulty')throw Error(result.reason);
-  $('storage-budget').value=result.storage_budget_gib;$('storage-budget').disabled=false;$('save-general-settings').disabled=false;$('general-settings-message').textContent='';
- }catch(error){$('storage-budget').disabled=false;$('save-general-settings').disabled=false;$('general-settings-message').textContent=error.message;}
+  $('storage-budget').value=result.storage_budget_gib;for(const checkbox of $('processing-formats').querySelectorAll('input'))checkbox.checked=result.processing_formats.includes(checkbox.value);generalSettingsBusy(false);$('general-settings-message').textContent='';
+ }catch(error){$('general-settings-message').textContent=error.message;}
 }
+function generalSettingsBusy(busy){for(const id of ['storage-budget','processing-formats','save-general-settings'])$(id).disabled=busy;}
 $('general-settings-form').onsubmit=async event=>{
  event.preventDefault();if(!$('general-settings-form').reportValidity())return;
- const value=$('storage-budget').value;$('storage-budget').disabled=true;$('save-general-settings').disabled=true;$('general-settings-message').textContent='Saving…';
+ const value=$('storage-budget').value,formats=[...$('processing-formats').querySelectorAll('input:checked')].map(input=>input.value);generalSettingsBusy(true);$('general-settings-message').textContent='Saving…';
  try{
-  const result=await state.api.save_general_settings(value);if(result.status==='faulty')throw Error(result.reason);
-  $('storage-budget').value=result.storage_budget_gib;$('general-settings-message').textContent=`Saved. Storage budget: ${result.storage_budget_gib} GiB. Processing uses this value at its next storage check.`;
+  const result=await state.api.save_general_settings(value,formats);if(result.status==='faulty')throw Error(result.reason);
+  $('storage-budget').value=result.storage_budget_gib;$('general-settings-message').textContent=result.processing_formats.length?`Saved. Storage budget: ${result.storage_budget_gib} GiB. Selected formats apply to new processing batches.`:'Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.';
+  await loadSources();
  }catch(error){$('general-settings-message').textContent=error.message;}
- finally{$('storage-budget').disabled=false;$('save-general-settings').disabled=false;}
+ finally{generalSettingsBusy(false);}
 };
 $('open-settings').onclick=async()=>{showLibraryView('settings-view');selectSettingsTab('general');$('settings-title').focus();await Promise.all([loadGeneralSettings(),loadSources()]);};
 $('close-settings').onclick=async()=>{showLibraryView('library-view');await loadSources();$('open-settings').focus();};

@@ -24,7 +24,7 @@ from .inspection import choose_source, discover_blender, environment, run_proces
 
 STAGES = ("inspection", "caption", "embeddings")
 COVERAGE_STAGES = ('inventory','inspection','previews','caption','embeddings')
-CAPTION_PROMPT_VERSION = 'v3'
+CAPTION_PROMPT_VERSION = 'v4'
 WORK = "work"
 _blender_runtime = {}
 
@@ -90,9 +90,15 @@ def checkpoint(db, identifier, stage, fingerprint, status, evidence):
         db.execute("INSERT INTO history(asset_id,stage,fingerprint,status,evidence,updated) VALUES (?,?,?,?,?,?)", row)
 
 
-def inspection_input(config, record, resolution=640, content_only=False):
+def inspection_input(config, record, resolution=640, content_only=False, formats=None):
     asset = {"asset_id": record["asset_id"], "pack": record["pack_id"], "name": record["display_name"], "files": record["files"]}
-    source, reason = choose_source(asset)
+    from .settings import inspected_path, processing_formats
+    path = inspected_path(record) if record['processing'].get('inspection') != 'pending' else None
+    source = next((f for f in asset['files'] if f['path'] == path), None)
+    if source:
+        reason = record.get('primary_inspection_reason', 'Preserve the previously inspected source; alternates remain uninspected')
+    else:
+        source, reason = choose_source(asset, processing_formats(config) if formats is None else formats)
     deps = [d for d in record["dependencies"] if d.get("from") == source["path"]]
     # Inactive datablocks remain evidence but do not change rendered pixels.
     deps = [d for d in deps if d.get("required_for_render") is not False]
@@ -126,7 +132,7 @@ def caption_input(config, record, prompt_version=None):
     if prompt_version is None:
         prompt_version = ((record.get('caption_provenance') or {}).get('prompt_version')
                           if record['processing'].get('caption') == 'complete' else None) or CAPTION_PROMPT_VERSION
-    if prompt_version not in {'v1', 'v2', 'v3'}:
+    if prompt_version not in {'v1', 'v2', 'v3', 'v4'}:
         raise ConfigError('Unsupported caption prompt version')
     return digest({"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
         "view_label": p.get("view_label"), "actual": s.get("current_sha256", s.get("error"))}
@@ -142,7 +148,9 @@ def caption_input(config, record, prompt_version=None):
 def stage_content(config,record,stage):
     try:
         if stage=='inspection':
-            return inspection_input(config,record,content_only=True)[3]
+            # Retained fault identity does not change when checkboxes change.
+            return inspection_input(config,record,content_only=True,
+                                    formats=('gltf', 'fbx', 'obj', 'blend', 'stl', 'dae'))[3]
         return digest([{'path':s['preview'].get('path'),'view':s['preview'].get('view_label'),
             'expected':s['preview'].get('sha256'),'actual':s.get('current_sha256',s.get('error'))}
             for s in input_state(config,record)])
@@ -247,9 +255,9 @@ def refresh(config, dry_run=False):
     return report
 
 
-def run_inspection(config, record, fingerprint, resolution=640, timeout=180):
+def run_inspection(config, record, fingerprint, resolution=640, timeout=180, formats=None):
     from .inspection import publish
-    asset, source, reason, _ = inspection_input(config, record, resolution)
+    asset, source, reason, _ = inspection_input(config, record, resolution, formats=formats)
     key = (str(config.blender), config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None)
     if key not in _blender_runtime:
         _blender_runtime[key] = discover_blender(config)
@@ -308,6 +316,9 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
     selected = records(work)
+    from .settings import processing_formats, processing_eligible
+    formats = processing_formats(config)
+    selected = [record for record in selected if processing_eligible(record, formats)]
     if stage == "embeddings":
         from .library_index import index_library
         return index_library(work, backend, limit, dry_run, cancelled=cancelled, progress=progress)
@@ -315,7 +326,7 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
     with closing(ledger(config)) as db:
         for record in selected:
             try:
-                fp = inspection_input(work, record, resolution)[3] if stage == "inspection" else caption_input(work, record)
+                fp = inspection_input(work, record, resolution, formats=formats)[3] if stage == "inspection" else caption_input(work, record)
             except (OSError, ValueError) as exc:
                 fp = digest({"asset": record["asset_id"], "stage": stage, "precondition": str(exc), "files": record["files"]})
             old = db.execute("SELECT fingerprint,status,evidence FROM jobs WHERE asset_id=? AND stage=?", (record["asset_id"], stage)).fetchone()
@@ -374,13 +385,19 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                 if stage == "inspection":
                     checked["technical"] = None
                 source_check(work, checked)
-                outcome = run_inspection(work, record, fp, resolution) if stage == "inspection" else run_caption(work, record, fp, backend)
+                outcome = run_inspection(work, record, fp, resolution, formats=formats) if stage == "inspection" else run_caption(work, record, fp, backend)
                 updated = detail(work, identifier)
                 final_fp = inspection_input(work, updated, resolution)[3] if stage == "inspection" else caption_input(work, updated)
             except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
                 outcome = {"status": "failed", "error": str(exc), "type": type(exc).__name__}
                 updated = detail(work, identifier)
                 updated["processing"][stage] = "failed"
+                if stage == 'inspection':
+                    try:
+                        _, source, reason, _ = inspection_input(work, record, resolution, formats=formats)
+                        updated.update(primary_inspection_path=source['path'], primary_inspection_reason=reason)
+                    except (OSError, ValueError, KeyError):
+                        pass  # Keep the original failure if no source could be selected.
                 updated.setdefault("stage_faults", {})[stage] = outcome
                 update_record(work, updated)
                 final_fp = fp

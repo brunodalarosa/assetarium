@@ -119,8 +119,13 @@ def source_evidence(config, assets, additional=()):
     return result
 
 
-def choose_source(asset):
+def choose_source(asset, formats=None):
+    if formats is not None:
+        from .settings import format_group
+        asset = dict(asset, files=[f for f in asset['files'] if format_group(f['format']) in formats])
     requested = REPRESENTATIVES.get((asset["pack"], asset["name"]))
+    if formats is not None and requested and format_group(requested) not in formats:
+        requested = None
     if requested:
         reason = "Explicit pilot representative to validate the " + requested + " importer; only this file's facts are measured"
     else:

@@ -86,6 +86,43 @@ def test_detail_separates_measured_observations_suggestions_review(indexed):
     assert info['scale'].startswith('Unknown physical scale')
 
 
+def test_desktop_large_evidence_does_not_disable_preview(indexed):
+    config, _, records = indexed
+    _, record = png(config, records[0])
+    record['inspection_run'] = {'errors': ['x' * 30000], 'source_faults': []}
+    update(config, record)
+    result = DesktopService(config).asset(record['asset_id'])
+    assert result['payload']['usable'] and result['image']
+    assert result['payload']['selected_source']['format'] == 'obj'
+
+
+def test_ungenerated_preview_is_pending_and_does_not_retain_a_fault(indexed):
+    config, _, records = indexed
+    record = deepcopy(records[0])
+    record['processing'].update(inspection='pending', previews='pending')
+    record['previews'] = []
+    update(config, record)
+    service = DesktopService(config)
+    for result in (service.thumbnail(record['asset_id']), service.asset(record['asset_id'])):
+        assert result['payload']['usable'] and result['payload']['preview']['status'] == 'pending'
+        assert not result['image']
+    assert not service.preview_faults and not service.item_faults
+
+
+def test_unattempted_disabled_format_is_excluded_without_a_preview_fault(indexed):
+    from local_asset_library.settings import save_general_settings
+    config, _, records = indexed
+    record = deepcopy(records[0])
+    record['processing'].update(inspection='pending', previews='pending')
+    record['previews'] = []
+    update(config, record)
+    save_general_settings(config, 24, ['gltf'])
+    service = DesktopService(config)
+    result = service.thumbnail(record['asset_id'])
+    assert result['payload']['usable'] and result['payload']['preview']['status'] == 'excluded'
+    assert not service.preview_faults
+
+
 def test_live_owner_review_and_null_suggestions_preserve_generated_uses(indexed):
     config, _, records = indexed
     _, record = png(config, records[0])

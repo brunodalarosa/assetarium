@@ -6,6 +6,36 @@ from .publication import atomic_json, read_json
 
 GIB = 1024**3
 MAX_BUDGET_GIB = 1048576
+PROCESSING_FORMATS = ('fbx', 'gltf', 'obj')
+
+
+def validate_formats(value):
+    if (not isinstance(value, list) or any(type(item) is not str or item not in PROCESSING_FORMATS for item in value)
+            or len(value) != len(set(value))):
+        raise ConfigError('Choose processing formats using the FBX, glTF and OBJ checkboxes in Settings → General')
+    return [item for item in PROCESSING_FORMATS if item in value]
+
+
+def processing_formats(config):
+    path = settings_path(config)
+    value = read_json(path) if path.exists() else {}
+    return validate_formats(value.get('processing_formats', list(PROCESSING_FORMATS)))
+
+
+def format_group(extension):
+    return 'gltf' if extension == 'glb' else extension
+
+
+def inspected_path(record):
+    return record.get('primary_inspection_path') or (record.get('technical') or {}).get('inspected_path')
+
+
+def processing_eligible(record, formats):
+    # Downstream work belongs to the source actually inspected, even when the
+    # inventory also contains an enabled alternate. Settings never replace it.
+    path = inspected_path(record) if record['processing'].get('inspection') != 'pending' else None
+    files = [f for f in record['files'] if not path or f['path'] == path]
+    return any(format_group(f['format']) in formats for f in files)
 
 
 def settings_path(config):
@@ -31,10 +61,11 @@ def storage_budget(config, fallback=None):
 
 
 def general_settings(config):
-    return {'status': 'ready', 'storage_budget_gib': storage_budget(config)['total_allocated_bytes'] / GIB}
+    return {'status': 'ready', 'storage_budget_gib': storage_budget(config)['total_allocated_bytes'] / GIB,
+            'processing_formats': processing_formats(config)}
 
 
-def save_general_settings(config, storage_budget_gib):
+def save_general_settings(config, storage_budget_gib, processing_formats=None):
     try:
         if isinstance(storage_budget_gib, bool):
             raise ValueError
@@ -45,6 +76,8 @@ def save_general_settings(config, storage_budget_gib):
         raise ConfigError(f'Enter a whole number from 1 to {MAX_BUDGET_GIB:,} GiB') from None
     path = settings_path(config)
     value = read_json(path) if path.exists() else {'schema_version': 1}
-    value.update(schema_version=1, storage_budget_bytes=int(limit) * GIB)
+    formats = validate_formats(processing_formats if processing_formats is not None else
+                               value.get('processing_formats', list(PROCESSING_FORMATS)))
+    value.update(schema_version=1, storage_budget_bytes=int(limit) * GIB, processing_formats=formats)
     atomic_json(path, value)
     return dict(general_settings(config), status='saved')

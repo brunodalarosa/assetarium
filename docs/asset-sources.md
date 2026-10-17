@@ -8,6 +8,35 @@ agent requests while the app stays open. Removing or disabling a source preserve
 its original files and generated metadata. Re-adding its directory recovers its
 saved identity and published results.
 
+## Processing formats
+
+In **Settings → General**, **Formats to process** offers **FBX**, **glTF / GLB**
+and **OBJ** checkboxes. All three start enabled. Save applies the selection to
+new processing batches in the desktop and command-line processing flows,
+including new overnight description runs. A running batch keeps its selection
+until the next batch. Unchecking everything pauses processing; scanning,
+browsing and existing search results remain available.
+
+Scanning always inventories every supported model format. **Asset sources**
+shows logical asset counts for each format, including disabled formats and
+other inventoried types such as BLEND. glTF combines `.gltf` and `.glb`; an asset
+with both counts once in that group. An asset with alternate formats counts
+once under each applicable group, so the counts need not add up to the source's
+total asset count. Counts reflect the latest saved scan and remain visible when
+a source is disabled.
+
+For a new logical asset, inspection selects an enabled source file using the
+existing format preference. Disabled formats and other inventoried types create
+no actionable processing work. Alternate formats are not converted or processed
+as separate copies of that logical asset. Downstream descriptions and search
+data belong to the file actually inspected: disabling that format defers its
+unfinished work even if an enabled alternate exists.
+
+Changing these checkboxes does not clean up, regenerate, hide or remove existing
+results or search vectors, and does not retry retained failures. Failure evidence
+stays in the importing failures report. Saving preferences refreshes pending
+indicators from saved inventory without running a scan or starting models.
+
 After upgrading from the single-root version, reopen LAL and reconnect any agent
 server connections that were already running. They need to load the new code
 once; subsequent source toggles apply live without reconnecting or restarting.
@@ -99,6 +128,35 @@ and fault evidence are preserved. Migration receipts are under
 Storage receipts include unique allocated bytes across the project and all source
 metadata directories, deduplicating hard links. They exclude original asset files
 and shared model weights. Existing prepared runtimes and offline models are reused.
+
+### Source import restrictions
+
+An explicitly cleaned source can store an `import_formats` list in its
+`metadata-lal/source.json`, using the same `fbx`, `gltf`, and `obj` families as
+processing preferences. `gltf` includes GLB. This restricts which original models
+become catalog entries during future scans; excluded originals remain read only.
+Settings shows the source's import restriction beside its format counts.
+
+This is separate from the General processing checkboxes, which retain saved
+imports and only select work. Changing those checkboxes does not undo a deliberate
+source cleanup. Removing or changing a source import restriction is an explicit
+maintenance operation, followed by scanning and processing the restored formats.
+Sources without a restriction retain their previous inventory behavior.
+
+Nested source licenses are attached only to assets in the corresponding ancestor
+folders, together with applicable collection notes. Internet shortcuts are
+documentation rather than license evidence. Full originals and historical
+evidence are retained. Equal manifests in sibling `fbx`, `fbx(unity)`, `gltf` and
+`obj` export trees can establish a logical export group, preserving subpack and
+color namespaces; they do not establish measured geometry equivalence.
+
+The owner-approved KayKit glTF cleanup uses
+`scripts/kaykit-gltf-maintenance.py`, with immutable receipts in
+`data/library/maintenance/kaykit-gltf-20261016/`. Its phases preserve glTF IDs,
+results and vectors, record original hashes, publish the restricted membership,
+then remove only manifest-listed generated imports and retired derived
+publications. Excluded fault records and their generated evidence are retained
+separately. Cleanup refuses links, out-of-root targets and automatic reruns.
 
 ## Maintenance commands
 

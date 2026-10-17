@@ -96,6 +96,10 @@ def start(config, operation, key=None):
         validate_directory(config, str(scoped.source_root))
     if operation == "process" and not get_source(config, key)["enabled"]:
         raise ConfigError("Enable this asset source before processing it")
+    if operation == 'process':
+        from .settings import processing_formats
+        if not processing_formats(config):
+            raise ConfigError('Processing is paused. Select formats in Settings → General before processing assets')
     # Reserve and spawn under one short lock, independent of a potentially long
     # running processing lease. Duplicate clicks cannot start duplicate work.
     with lease(config, "source-operation-start", resource="sources"):
@@ -201,6 +205,10 @@ def publish_source(scoped):
 
 def process_source(config, source, token):
     scoped = bound(config, source)
+    from .settings import processing_formats
+    if not processing_formats(config):
+        state(scoped, status='complete', phase='Processing paused: no formats selected', progress=1, current_asset=None)
+        return
     state(scoped, status="scanning", phase="Checking source", progress=.01)
     scan_source(config, source)
     ensure_index(config, scoped)
@@ -262,6 +270,7 @@ def worker_stage(config, source, stage, token):
     from .library_index import index_library
     from .incremental import working
     scoped = bound(config, source)
+    from .settings import processing_formats
     backend = None
     stage_index = {"inspection": 0, "caption": 1, "embeddings": 2}[stage]
     def on_progress(identifier, completed, total):
@@ -271,6 +280,8 @@ def worker_stage(config, source, stage, token):
               progress=.05 + .27 * (stage_index + completed / max(1, total)))
     for _ in range(10000):
         if cancelled(scoped, token):
+            return
+        if not processing_formats(config):
             return
         preview = process(scoped, stage, limit=1000, dry_run=True)
         if not preview.get("pending"):

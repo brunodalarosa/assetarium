@@ -12,12 +12,15 @@ Unknown labels cannot be probable. Uncertain/unknown identity needs a stated
 uncertainty. Confidence labels are uncalibrated model heuristics.
 
 Description is bounded to **10–170 words**. The active full-library prompt is
-`prompts/caption-v3.txt`; simple assets may need only 10–30 words and must not be
+`prompts/caption-v4.txt`; simple assets may need only 10–30 words and must not be
 padded. Longer descriptions remain available for complex assets. Attributes are
-bounded lists of short strings. Historical v1/v2 prompts and generation receipts
+bounded lists of short strings. Historical v1/v2/v3 prompts and generation receipts
 are preserved. Completed full-library captions are checked against their recorded
-prompt version, so adopting v3 does not itself trigger regeneration. New or
-invalidated jobs use v3 and record that version and its input fingerprint.
+prompt version, so adopting v4 does not itself trigger regeneration. New or
+invalidated jobs use v4 and record that version and its input fingerprint. The
+v4 instructions reinforce array types and keep suggestions separate from visual
+observations; validation remains unchanged. Unchanged failures still require
+explicit retry authorization.
 Changing this rule does not recover/revalidate stored failed responses or clear
 their original fault records; that requires a separate explicit operation.
 Duplicate JSON keys, wrong types, extra fields, truncated JSON and specified
