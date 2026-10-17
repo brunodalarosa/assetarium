@@ -110,7 +110,8 @@ Recent commits (`git log`) follow this shape; mirror it:
   indexes and evidence stay central under ignored `data/`. Ignored roots:
   `data/ cache/ logs/ scratch/ .venv*/`.
 - Inference is offline with no fallbacks; a model/worker failure is a visible fault,
-  never a silent substitute. Never start rendering or models at app startup.
+  never a silent substitute. Never start rendering or models at app startup (the
+  embedding worker may pre-load its libraries only; decision 0005).
 - Processing never starts automatically; scans never run models. Changing format
   settings never deletes results or retries faults.
 - Shared models live in `C:\BrunoOS\Local-models` (not owned by this project).

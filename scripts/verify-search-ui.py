@@ -142,7 +142,7 @@ def verify():
         report['reduced_motion'] = 'Bundled media rule verified statically and applied in WebView2; OS preference not changed'
         capture('static-busy.png')
         window.evaluate_js('searchBusy(null);state.api=fixtureApi')
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         report['checks'] = ['Actual packaged WebView2 startup/reset options', 'Shared bridge copied settings reproduce 20 results',
             'Slow busy display and preserved cards', 'Duplicate suppression and responsive JavaScript',
             'Success/empty/error/clear/new search/refresh lifecycle', 'Accessible live status and static reduced-motion indicator']

@@ -147,7 +147,7 @@ def test_desktop_rejects_coercible_non_object_and_false_source_format(indexed):
         response = bridge.search([['query', 'red object']])
         assert response['payload']['status'] == 'faulty'
         assert 'non-object' in response['reason']
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
     finally:
         bridge._close()
     with pytest.raises(ValueError):

@@ -133,7 +133,7 @@ def verify():
         window.evaluate_js("$('asset-sources-tab').click()")
         assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
         capture('04-sources-narrow.png')
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         assert original_hashes == {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in preserved}
         report['checks'].append('Originals, published catalogs and published vectors are byte-identical; no model or real source processing ran')
         report['checks'].append('Narrow layout has no horizontal overflow; no inference worker was loaded')

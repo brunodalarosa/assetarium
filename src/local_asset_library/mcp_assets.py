@@ -39,6 +39,10 @@ SCHEMAS = {
         "preview_view": {"type": "string", "enum": VIEWS, "default": "three_quarter"}}}}
 
 
+class TransientFault(ConfigError):
+    """Availability faults (busy GPU queue, stopped worker) are not retained per query."""
+
+
 def validate(name, arguments):
     """Strict validation also applies inside the private worker, without coercion."""
     if name not in SCHEMAS or type(arguments) is not dict:
@@ -189,11 +193,13 @@ class AssetService:
             preview, _ = self.preview(record, args.get("reference_view", "three_quarter"))
             reference = preview.get("path") or "source/" + preview["source_path"]
         try:
-            response, evidence = SearchEngine(self.config, self.backend).search(
+            # Keyword search never touches the embedding runtime or its contract.
+            response, evidence = SearchEngine(self.config, self.backend if mode != "keyword" else None).search(
                 args.get("query", ""), mode=mode, reference=reference,
                 filters=args.get("filters"), limit=args.get("limit", 5))
         except Exception as exc:
-            self.query_faults[key] = str(exc)
+            if not isinstance(exc, TransientFault):
+                self.query_faults[key] = str(exc)
             raise
         # Replace internal path with an ID reference, never pretend that it is a viewed image.
         response["query"] = args.get("query", "") if mode != "reference" else args["reference_asset_id"]

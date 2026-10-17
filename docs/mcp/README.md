@@ -31,8 +31,11 @@ point resolves its own repository/configuration regardless of client cwd.
 MCP SDK **2.3.0**, NumPy **2.3.4** and Pillow **12.1.0** are locked separately
 under `runtime/mcp/`. Semantic queries start one persistent private subprocess
 using the existing `.venv-embedding`, unchanged model/backend/lock/index
-contracts, offline weights and CUDA BF16. Its output is private JSON IPC; all
-diagnostics use stderr. There is no automatic fallback/restart after a failed
+contracts, offline weights and CUDA BF16. The worker only embeds the query text
+or reference image; the server verifies, scores and fuses rankings in-process
+(decision 0005). Its output is private JSON IPC with progress heartbeats; all
+diagnostics use stderr. The MCP server starts the worker on its first semantic
+query; only the desktop app pre-starts it. There is no automatic fallback/restart after a failed
 worker, model initialization, or unchanged failed query.
 
 The server entry point cannot process assets, scan/update the catalog, load

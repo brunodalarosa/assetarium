@@ -89,14 +89,33 @@ def cached_json(path):
     from .publication import read_json
     value = read_json(path)  # Share-mode read: writers can still replace the file atomically.
     with _lock:
-        if len(_json) > 256:
+        if len(_json) > 16384:
             _json.clear()
         _json[key] = value
     return value
 
 
+_memos = {}
+
+
+def memo(name, key, build, size=4):
+    """Small named LRU for immutable publication views (vectors, summaries)."""
+    with _lock:
+        table = _memos.setdefault(name, OrderedDict())
+        if key in table:
+            table.move_to_end(key)
+            return table[key]
+    value = build()
+    with _lock:
+        table[key] = value
+        while len(table) > size:
+            table.popitem(last=False)
+    return value
+
+
 def clear():
     with _lock:
+        _memos.clear()
         _records.clear()
         _digests.clear()
         _json.clear()

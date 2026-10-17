@@ -47,7 +47,7 @@ def verify():
         deadline=time.monotonic()+90
         while operation_status(config).get('status') in RUNNING and time.monotonic()<deadline:time.sleep(.2)
         assert operation_status(config)['status']=='complete'
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         report['library']=window.evaluate_js("({assets:state.context.pilot_count,sources:state.sources.length,warnings:document.querySelectorAll('.source-warning').length,cards:state.items.length})")
         expected=importing_failures(config)
         assert expected['assets']>0 and not expected['unavailable']

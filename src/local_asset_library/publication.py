@@ -77,12 +77,14 @@ def verified_hash(path, fresh=False):
     """
     import hashlib
     from . import hash_cache
-    identity = hash_cache.file_identity(path)
+    fresh = fresh or hash_cache.fresh_required()
+    # One identity read per file per pinned request; the same PNG serves several checks.
+    identity = (hash_cache.file_identity(path) if fresh else
+                request_memo(('identity', str(path)), lambda: hash_cache.file_identity(path)))
     key = (str(path), *identity)
     cache = _hashes.get()
     if cache is not None and key in cache:
         return cache[key]
-    fresh = fresh or hash_cache.fresh_required()
     if not fresh:
         known = hash_cache.lookup(path, identity)
         if known is not None:

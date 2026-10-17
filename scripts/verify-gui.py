@@ -155,11 +155,11 @@ def verify():
     wire = None
     try:
         wait_js("Boolean(state.context && state.items.length===state.context.pilot_count)")
-        assert bridge._gateway.worker is None, 'Browsing must not load a model'
+        assert not bridge._gateway.model_requested, 'Browsing must not load a model'
         wait_js("document.querySelectorAll('.thumb img').length===state.context.pilot_count")
         report['browse'] = {'context': bridge.context(), 'cards': window.evaluate_js('state.items.length'),
                             'thumbnails': window.evaluate_js("document.querySelectorAll('.thumb img').length"),
-                            'worker_started': False}
+                            'model_requested': False}
         assert window.gui.renderer == 'edgechromium'
         report['checks'].append('Pilot membership/counts, all existing three-quarter thumbnails, WebView2, no browse model load')
         screenshot('browse.png')

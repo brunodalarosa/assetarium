@@ -104,8 +104,9 @@ version. Full catalog/index/membership SHA-256 values are available in the foote
 description/tooltip and retained verification receipts. Versions are not added
 as invalid extra fields to the tool argument object.
 
-An indeterminate circle and **Searching…** appear immediately, including while
-the existing worker loads its model. Prior cards remain visible until completion.
+An indeterminate circle and **Searching…** appear immediately. While the worker
+is still preparing its runtime or loading the model (first semantic search only),
+the status line says so. Prior cards remain visible until completion.
 The Search button is disabled while active and repeated identical submissions
 are ignored. A different request supersedes the old one; Clear and a published
 view refresh invalidate it. Obsolete completion cannot hide a newer busy state.
@@ -188,9 +189,14 @@ its only resources are bundled scripts, data URLs and in-memory blob URLs. It
 cannot access the desktop bridge or the parent document. No HTTP listener is added.
 Asset text is inserted as text rather than executable HTML.
 
-Browsing does not load a model. The first semantic query starts one private
-existing embedding worker, with offline shared weights at
-`C:\BrunoOS\Local-models`. Subsequent searches reuse that worker. MCP and other
+Browsing does not load a model. The app starts one private embedding worker in
+the background when it opens; the worker loads its Python libraries only (no
+model, no GPU). The first semantic query loads the model (offline shared weights
+at `C:\BrunoOS\Local-models`), and the worker unloads it after ten idle minutes
+or when a processing batch needs the GPU. The worker only returns query vectors:
+vectors, verification and ranking stay in the app process (decision 0005).
+Heartbeats every five seconds separate a slow first load from a stopped worker,
+which is retained as a fault after 90 silent seconds. MCP and other
 GUI instances have their own workers and can contend for GPU memory. This app
 does not manage or terminate unrelated processes. Closing sends EOF to its worker;
 if a pending load cannot close in five seconds, only that private Windows process

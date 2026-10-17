@@ -206,7 +206,7 @@ def verify():
         js("$('close-settings').click();true")
         wait("!$('library-view').hidden")
         assert window.evaluate_js("$('query').value==='item0'&&state.lastSettings.query==='item0'&&savedLibraryCards.every((card,i)=>card===$('grid').children[i])")
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         changed = [p for p, digest in saved.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest() != digest]
         assert not changed, changed
         report['checks'].append('Main query/results and all saved fixture inputs remain unchanged; no model worker loaded')

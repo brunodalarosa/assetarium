@@ -73,7 +73,7 @@ def verify():
     try:
         wait("Boolean(state.context && state.items.length===40 && $('grid').getAttribute('aria-busy')==='false')")
         wait("document.querySelectorAll('.thumb img').length>0")
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         initial=window.evaluate_js("({count:state.context.pilot_count,cards:state.items.length,images:document.querySelectorAll('.thumb img').length,workers:state.thumbWorkers,offset:state.offset})")
         assert initial['count']>300 and initial['cards']==40 and initial['images']<40 and initial['workers']<=3
         report['initial']=initial
@@ -129,7 +129,7 @@ def verify():
         assert gui['payload']==shared
         report['checks'].append('Actual GUI bridge agrees with shared service candidate IDs/order/filter/cap/version')
         report['search']=gui
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         report['checks'].append('All browsing/keyword/detail operations completed without installing, downloading or loading a model')
         report['status']='passed'
     except BaseException as exc:

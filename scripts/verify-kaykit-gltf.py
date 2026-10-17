@@ -103,7 +103,7 @@ def verify():
         assert window.evaluate_js("LALPreview.current.summary.textContent.includes('triangles')")
         capture('03-arch-blue-3d.png')
         report['checks'].append('Actual glTF geometry, materials and dependency files load in the bundled 3D viewer')
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         report.update(status='passed', semantic_model_loaded=False)
     except Exception as exc:
         report.update(status='faulty', reason=str(exc), traceback=traceback.format_exc())

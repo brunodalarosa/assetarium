@@ -21,8 +21,9 @@ from .search_policy import DEFAULT_MODE
 
 class DesktopBridge:
     """pywebview dispatches API calls on threads; one loop owns the private gateway."""
-    def __init__(self, config):
+    def __init__(self, config, prestart_worker=True):
         self._config = config
+        self._prestart_worker = prestart_worker
         self._loop = asyncio.new_event_loop()
         self._ready = threading.Event()
         self._presentation_lock = threading.Lock()
@@ -51,11 +52,14 @@ class DesktopBridge:
             self._interactive_preview = InteractivePreviewService(self._service)
             from .source_browser import SourceBrowser
             self._source_browser = SourceBrowser(self._config, self._interactive_preview)
-            self._gateway.service = self._service
+            self._gateway.attach(self._service)
         except Exception as exc:
             self._init_error = str(exc)
             self._ready.set()
             return
+        if self._prestart_worker:
+            # Libraries only (decision 0005); the model still loads on the first semantic search.
+            self._loop.call_soon(lambda: self._loop.create_task(self._gateway.prestart()))
         self._ready.set()
         self._loop.run_forever()
         pending = asyncio.all_tasks(self._loop)
@@ -82,14 +86,17 @@ class DesktopBridge:
                 stream.write(encoded(payload) + '\n')
             return {'status': 'faulty', 'reason': payload['reason'], 'payload': payload}
 
-    async def _present(self, operation, *args):
+    async def _present(self, operation, *args, guarded=True):
         started = time.perf_counter()
-        # Source/detail work is independent of the serialized GPU search queue.
+        # Source/detail work is independent of the serialized GPU search queue. The lock
+        # protects DesktopService state only; settings, sources and change polls skip it.
         try:
-            def guarded():
+            def run():
+                if not guarded:
+                    return operation(*args)
                 with self._presentation_lock:
                     return operation(*args)
-            result = await asyncio.to_thread(guarded)
+            result = await asyncio.to_thread(run)
         except Exception as exc:
             result = {'status': 'faulty', 'reason': str(exc)}
         audit = {'operation': operation.__name__, 'elapsed_seconds': time.perf_counter() - started,
@@ -105,19 +112,19 @@ class DesktopBridge:
         return self._wait(self._present(self._service.context))
 
     def sources(self):
-        return self._wait(self._present(self._sources))
+        return self._wait(self._present(self._sources, guarded=False))
 
     def general_settings(self):
         from .settings import general_settings
-        return self._wait(self._present(general_settings, self._config))
+        return self._wait(self._present(general_settings, self._config, guarded=False))
 
     def save_general_settings(self, storage_budget_gib, processing_formats=None):
         from .settings import save_general_settings
-        return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats))
+        return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats, guarded=False))
 
     def importing_failures(self):
         from .sources import importing_failures
-        return self._wait(self._present(importing_failures, self._config))
+        return self._wait(self._present(importing_failures, self._config, guarded=False))
 
     def _sources(self):
         from .sources import registry, source_status, revision
@@ -128,7 +135,7 @@ class DesktopBridge:
     def source_action(self, action, key=None, directory=None, enabled=None):
         if not self._config.sources_registry:
             return {'status': 'faulty', 'reason': 'Configure asset sources before using source settings'}
-        return self._wait(self._present(self._source_action, action, key, directory, enabled))
+        return self._wait(self._present(self._source_action, action, key, directory, enabled, guarded=False))
 
     def _source_action(self, action, key, directory, enabled):
         from . import sources
@@ -216,7 +223,7 @@ class DesktopBridge:
         return self._wait(self._present(self._interactive_preview.release, ticket))
 
     def changes(self):
-        return self._wait(self._present(self._changes))
+        return self._wait(self._present(self._changes, guarded=False))
 
     def _changes(self):
         """Cheap stat-only tokens; views fetch heavy data only when a token changes."""
@@ -242,7 +249,8 @@ class DesktopBridge:
                                 ('source-status.json', 'source-operation.json', 'source-cancel.json', 'active.json')]
                                + [stamp(config.project_root / 'data/library/source-faults' / (source['id'] + '.json'))])
         sources.append(stamp(config.project_root / 'data/library/settings.json'))
-        return {'status': 'ready', 'library': digest(library)[:16], 'sources': digest(sources)[:16]}
+        return {'status': 'ready', 'library': digest(library)[:16], 'sources': digest(sources)[:16],
+                'worker': self._gateway.worker_phase if hasattr(self, '_gateway') else 'not_started'}
 
     async def _search(self, arguments):
         validate('search_assets', arguments)

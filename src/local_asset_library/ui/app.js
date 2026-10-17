@@ -150,6 +150,7 @@ function renderCoverage(context){
 const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operations.after(coverageLine);
 // One cheap stat-only poll; library and source data reload only when their token changes.
 const changeTokens={library:null,sources:null};let watchingChanges=false;
+const workerMessages={loading_libraries:'Searching the library… Preparing the search runtime; the window remains available.',loading_model:'Searching the library… Loading the search model (first search only); the window remains available.'};
 async function watchChanges(){
  if(watchingChanges)return;watchingChanges=true;
  const first=await state.api.changes();if(first.status!=='faulty'){changeTokens.library=first.library;changeTokens.sources=first.sources;}
@@ -158,6 +159,7 @@ async function watchChanges(){
   try{
    const tokens=await state.api.changes();if(tokens.status==='faulty')return;
    const sourcesChanged=tokens.sources!==changeTokens.sources,libraryChanged=tokens.library!==changeTokens.library;
+   if(state.activeSearch!==null&&workerMessages[tokens.worker])status(workerMessages[tokens.worker]);
    changeTokens.sources=tokens.sources;changeTokens.library=tokens.library;
    if(libraryChanged)await refreshContext();
    // Running operations also report worker liveness, which is not a file change.

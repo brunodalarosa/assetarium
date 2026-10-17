@@ -31,7 +31,8 @@ def current_overlay(config, record):
     overlay = record.get("owner_overlay")
     path = config.output_path("data", f"captions/corrections/{record['asset_id']}.json")
     if path.is_file():
-        overlay = json.loads(path.read_text(encoding="utf-8"))
+        from .library_cache import cached_json
+        overlay = cached_json(path)  # Shared and read-only; reparsed when the file changes.
     if overlay:
         validate_overlay(overlay)
     return overlay
@@ -250,6 +251,23 @@ def checked_vector(row, contract_fingerprint):
     return value
 
 
+def indexed_vectors(config, db, fingerprint):
+    """Rows and their validated float32 matrix, built once per index file and contract.
+
+    Every stored vector is checked (checksum, norm, modality, contract) when the
+    view is built; corruption raises on every search and is never cached.
+    """
+    from .library_cache import memo
+    path = config.output_path("data", "embeddings/index.sqlite")
+    stat = path.stat()
+    def build():
+        # Vector bytes are only needed for validation; the matrix holds the values.
+        rows = db.execute("SELECT * FROM vectors ORDER BY job_id").fetchall()
+        matrix = np.stack([checked_vector(row, fingerprint) for row in rows]) if rows else np.zeros((0, 768), np.float32)
+        return [row[:9] + (None, None, row[11]) for row in rows], matrix
+    return memo("vectors", (str(path), stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, fingerprint), build, size=2)
+
+
 def validate_filters(filters):
     if set(filters) - {"pack", "format", "max_triangles", "rigged"}:
         raise ConfigError("Unknown/unverified filter")
@@ -368,7 +386,7 @@ class SearchEngine:
                 channels = (["description", "image"] if mode == "combined" else
                             ["description"] if mode == "keyword_description" else
                             ["image" if mode == "reference" else mode])
-                rows = db.execute("SELECT * FROM vectors ORDER BY job_id").fetchall()
+                rows, matrix = indexed_vectors(self.config, db, fingerprint)
             if mode == "reference":
                 capability = json.loads(self.config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))
                 if capability.get("contract_fingerprint") != fingerprint or not capability.get("reference_image_query_support"):
@@ -380,10 +398,9 @@ class SearchEngine:
                 query_vector = normalize(self.backend.text(text, role="query"))
             for channel in channels:
                 selected, values = [], []
-                for row in rows:
+                for position, row in enumerate(rows):
                     if row[2] != channel or row[1] not in records:
                         continue
-                    vector = checked_vector(row, fingerprint)  # Corruption is a fatal error, not a ranking fallback.
                     try:
                         record = records[row[1]]
                         if row[5] != source_fingerprints[row[1]]:
@@ -404,10 +421,10 @@ class SearchEngine:
                                 raise ConfigError("Preview/index input fingerprint mismatch")
                             preview_file(self.config, preview)
                         selected.append(row)
-                        values.append(vector)
+                        values.append(position)
                     except (OSError, ValueError) as exc:
                         excluded.append({"asset_id": row[1], "channel": channel, "reason": str(exc)})
-                scores = np.stack(values) @ query_vector if values else []
+                scores = matrix[values] @ query_vector if values else []
                 ranking = aggregate_views(selected, scores)
                 # Preserve *unthresholded* channel rankings for later evaluation.
                 rankings[channel] = ranking

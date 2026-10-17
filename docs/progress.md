@@ -1,5 +1,47 @@
 # Progress
 
+## October 17 — Performance phase 3: embedding-only worker and pre-start
+
+Phase 3 of the optimization plan ([decision 0005](decisions/0005-embedding-worker-and-prestart.md)).
+
+- The private worker now only returns query vectors (`contract`, `text`,
+  `image`); verification, the validated vector matrix (built once per index and
+  contract), keyword search and fusion run in the app or MCP server process.
+- The desktop app pre-starts the worker at launch (libraries only, no model or
+  GPU lease; ready in about 4.5 s). The model loads on the first semantic search
+  (about 3 s) and unloads after 10 idle minutes (was 60 s) or when a batch needs
+  the GPU. Heartbeats separate a slow load from a stopped worker; the status
+  line shows "Loading the search model". Busy-queue and stopped-worker errors
+  are no longer retained as per-query faults.
+- The presentation lock covers presentation state only; settings, source and
+  change polls run concurrently. Owner overlays are parsed once per file stat;
+  file identity, source and output paths are memoized per request; containment
+  uses a normalized string check equivalent to `Path.is_relative_to`.
+
+Read-only receipt `data/benchmarks/perf-phase3-20261017.json` versus baseline:
+stub combined search 19.5 → 2.1 s; keyword 7.0 → 0.54 s; summary 3.9 → 0.18 s;
+browse 1.2 → 0.13 s. Real model through the desktop bridge (single app): first
+combined search including model load 8.0 s, then about 3 s; keyword 0.9 s.
+Installed-library startup (`data/gui/source-installed-8eece65ba1/report.json`):
+one summary load, eight thumbnails in 2.5 s total (10.9 s after phase 2), no
+model requested.
+
+New `scripts/verify-search-agreement.py`: real STDIO MCP and desktop bridge,
+both with the actual worker and model, returned identical candidates for six
+queries across combined, keyword, description and image modes
+(`data/gui/perf-p3-search-agreement/report.json`). Two concurrent workers share
+the GPU lease, so they reload the model alternately (about 5 s per search in that
+check). The legacy `verify-gui.py` still assumes the 40-asset pilot (all cards
+and thumbnails on one page) and was not run.
+
+Verification: **398 tests passed** (`scratch/pytest-perf-p3-full`), including
+new `tests/test_worker_gateway.py`; WebView2 checks passed:
+`data/gui/perf-p3-source-browser`, `data/gui/perf-p3-search-ui`,
+`data/gui/perf-p3-library-gui`, `data/gui/source-settings-2a38ffd209/report.json`,
+`data/gui/source-installed-8eece65ba1/report.json`. Verification scripts now
+assert that no model was requested instead of that no worker process exists.
+No original asset or generated result was modified, retried or reprocessed.
+
 ## October 17 — Performance phase 2: hash reuse by file identity
 
 Phase 2 of the optimization plan ([decision 0004](decisions/0004-stat-identity-hash-reuse.md)).

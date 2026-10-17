@@ -49,9 +49,15 @@ def _inside(root: Path, relative: str) -> Path:
             target = target.resolve()
     except OSError:
         pass
-    if target == root or not target.is_relative_to(root):
+    if not _contained(str(root), str(target)):
         raise ConfigError("Path escapes its permitted root")
     return target
+
+
+def _contained(root: str, target: str) -> bool:
+    """Strictly below root; same case-insensitive semantics as Path.is_relative_to on Windows."""
+    root, target = os.path.normcase(root).rstrip("\\/"), os.path.normcase(target)
+    return target.startswith(root + os.sep) and len(target) > len(root) + 1
 
 
 @dataclass(frozen=True)
@@ -96,6 +102,10 @@ class Config:
 
     def source_file(self, relative: str) -> Path:
         """Resolve an existing source file for reading only."""
+        from .publication import request_memo
+        return request_memo(("source-file", self, relative), lambda: self._source_file(relative))
+
+    def _source_file(self, relative: str) -> Path:
         _relative(relative)
         if self.sources_registry:
             root = self.source_directory(relative)
@@ -114,6 +124,10 @@ class Config:
         return self.source_file(relative).open("rb")
 
     def output_path(self, area: str, relative: str) -> Path:
+        from .publication import request_memo
+        return request_memo(("output-path", self, area, relative), lambda: self._output_path(area, relative))
+
+    def _output_path(self, area: str, relative: str) -> Path:
         _relative(relative)
         if area == "data" and self.sources_registry:
             from .sources import generated_path

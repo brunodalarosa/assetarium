@@ -107,7 +107,7 @@ def verify():
     try:
         wait("state.context&&state.context.pilot_count===6&&state.items.length===6")
         wait("document.querySelectorAll('.source-warning').length===1")
-        assert bridge._gateway.worker is None
+        assert not bridge._gateway.model_requested
         report['checks'].append('Startup scan detects a file added since the previous scan without model loading')
         assert window.evaluate_js("![...document.querySelectorAll('button')].some(x=>['Process pending','Publish ready work'].includes(x.textContent))")
         js("(()=>{$('query').value='item0';$('mode').value='keyword';return search().then(()=>true);})()")

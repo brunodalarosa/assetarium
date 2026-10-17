@@ -10,3 +10,4 @@ ask the owner first, then update the file (do not silently contradict it).
 | [0002](0002-startup-scan-and-change-detection.md) | Startup scan, stat-token change detection, no manual Scan/Status | 2026-10-17 |
 | [0003](0003-per-publication-read-caches.md) | Read paths reuse per-publication caches | 2026-10-17 |
 | [0004](0004-stat-identity-hash-reuse.md) | Re-hash files only when their identity changes | 2026-10-17 |
+| [0005](0005-embedding-worker-and-prestart.md) | Worker returns vectors; app pre-starts it; 10 min idle | 2026-10-17 |
