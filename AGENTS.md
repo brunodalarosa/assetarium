@@ -1,3 +1,7 @@
+This project is developed with both Codex and Claude (Claude Code). Every agent
+follows this file; Claude also loads `CLAUDE.md`, which imports these rules and
+adds codebase orientation only.
+
 ## Required checkpoints before implementation
 
 Before starting implementation, follow these two steps in order:
