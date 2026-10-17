@@ -144,7 +144,7 @@ def walk_source(config):
             except (ConfigError, OSError) as exc:
                 row.update(status="rejected", error=str(exc), sha256=None, size=None, mtime_ns=None)
             rows.append(row)
-    if cache_path:
+    if cache_path and next_cache != cached:
         from .publication import atomic_json
         atomic_json(cache_path, {"files": next_cache})
     return sorted(rows, key=lambda row: row["path"])

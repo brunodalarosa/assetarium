@@ -11,7 +11,7 @@ from contextlib import nullcontext
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'src'))
-from local_asset_library.config import load_config
+from local_asset_library.config import load_project_config
 from local_asset_library.gpu_queue import lease
 from local_asset_library.incremental import refresh, publish, coverage, working, process, policy
 from local_asset_library.catalog import save_json
@@ -30,7 +30,7 @@ if not 1 <= args.batch_size <= 1000 or args.peak_reserve_mib <= 0:
 stages = [('inspection', '.venv-mcp'), ('caption', '.venv-caption'), ('embeddings', '.venv-embedding')]
 if args.skip_captions:
     stages = [item for item in stages if item[0] != 'caption']
-config = load_config(root / 'config.example.toml', root)
+config = load_project_config(root)
 if config.sources_registry:
     from local_asset_library.sources import registry,source_status
     from local_asset_library.source_operations import start

@@ -159,6 +159,20 @@ def generated_path(config, relative):
     return None
 
 
+def write_changed(path, value, ignore=()):
+    """Rewrite only on content change; status mtimes drive UI revisions."""
+    if path.exists():
+        try:
+            old = read_json(path)
+        except (OSError, ValueError):
+            old = None
+        if isinstance(old, dict) and {k: v for k, v in old.items() if k not in ignore} == {
+                k: v for k, v in value.items() if k not in ignore}:
+            return False
+    atomic_json(path, value)
+    return True
+
+
 def save_registry(config, value):
     value["revision"] = uuid.uuid4().hex
     atomic_json(config.sources_registry, value)
@@ -496,8 +510,8 @@ def scan_source(config, source):
         if old_pub and identifier not in changed and old_pub["files"] == record["files"]:
             searchable.append(identifier)
     pending_ids = sorted(set(incomplete + unpublished))
-    atomic_json(scoped.output_path("data", "library/import-status.json"),
-                {"schema_version": 1, "inventory_hash": inventory_hash, "assets": imports})
+    write_changed(scoped.output_path("data", "library/import-status.json"),
+                  {"schema_version": 1, "inventory_hash": inventory_hash, "assets": imports})
     status = {"scanned": True, "scanned_utc": now(), "inventory_hash": inventory_hash,
               "assets": len(merged), "pending": len(pending_ids), "failed": len(failed),
               "pending_ids": pending_ids, "searchable_ids": sorted(searchable),
@@ -507,7 +521,8 @@ def scan_source(config, source):
     formats = processing_formats(config)
     status.update(processing_summary(merged, published, formats, vector_faults), processing_paused=not formats,
                   processing_formats=formats)
-    atomic_json(status_path, status)
+    # An unchanged scan keeps its earlier receipt time and leaves views untouched.
+    write_changed(status_path, status, ignore=("scanned_utc",))
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():
         fault_path.unlink()  # A successful explicit/startup scan resolves this application availability diagnostic.
@@ -515,7 +530,7 @@ def scan_source(config, source):
     own_path = config.project_root / "data/library/asset-sources.json"
     mapping = dict(owners(config))
     mapping.update({r["asset_id"]: source["key"] for r in previous + merged})
-    atomic_json(own_path, {"schema_version": 1, "assets": mapping})
+    write_changed(own_path, {"schema_version": 1, "assets": mapping})
     return status
 
 

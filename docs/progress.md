@@ -1,5 +1,42 @@
 # Progress
 
+## October 17 — Performance phase 1: startup and read caches
+
+Phase 1 of the owner-approved optimization plan (decisions
+[0001](decisions/0001-config-local-precedence.md)–[0003](decisions/0003-per-publication-read-caches.md),
+new `docs/decisions/` directory referenced from `AGENTS.md`).
+
+- Read paths reuse per-publication slim records (`library_cache.py`) instead of
+  re-parsing 3,393 catalog records (125 MB JSON) per call; processing still reads
+  fresh full records. Publication digests are computed once per file stat.
+- Startup loads the library summary once (was three or more times). One stat-only
+  `changes()` poll (about 30 ms) replaces the 1.5 s source poll and the 20 s
+  summary poll. Unchanged scans rewrite no status, import, ownership or scan-cache
+  file, so the launch scan no longer reloads the view. Source actions no longer
+  cancel visible thumbnail loading.
+- Manual **Scan** and **Status** buttons removed (startup scan and change
+  detection cover them). The MCP SDK loads on first search, not at startup.
+- `config.local.toml` now overrides `config.example.toml` in every runtime entry
+  point (`config.load_project_config`).
+
+Read-only receipts `data/benchmarks/perf-baseline-20261017.json` →
+`perf-phase1-20261017.json` (2,080 members, warm file cache): desktop import
+0.46 → 0.13 s; summary 3.9 → 1.0 s (2.1 s first build); browse page 1.2 → 0.17 s;
+keyword search 7.0 → 4.8 s; stub combined search 19.5 → 17.0 s (search is
+addressed in phases 2–3). Installed-library WebView2 startup check
+`data/gui/source-installed-59d7f14638/report.json`: one summary load (3.0 s), one
+browse (0.16 s), no Scan/Status buttons, startup scan complete, no model loaded.
+The installed check now derives member/source/warning expectations from the live
+registry instead of stale hard-coded counts.
+
+Verification: **389 tests passed** (`scratch/pytest-perf-p1-full`); WebView2
+checks passed: `data/gui/perf-p1-source-browser/verification.json`,
+`data/gui/perf-p1-search-ui/report.json`, `data/gui/perf-p1-library-gui`,
+`data/gui/source-settings-5f124c855a/report.json`. Storage receipts
+`data/storage/perf-before-20261017.json` → `perf-phase1-20261017.json`: +284 MB
+allocated, almost entirely new pytest/verification folders (cleanup is phase 4).
+No original asset or generated result was modified, retried or reprocessed.
+
 ## October 14 — Separate importing failures from pending work
 
 Added **Importing failures report**, a scrollable list of original model paths

@@ -12,7 +12,7 @@ import time
 import traceback
 
 from .catalog import encoded
-from .config import ConfigError, load_config
+from .config import ConfigError, load_project_config
 from .desktop_service import DesktopService
 from .mcp_assets import error_payload, validate
 from .mcp_server import Gateway
@@ -215,23 +215,34 @@ class DesktopBridge:
     def preview_release(self, ticket):
         return self._wait(self._present(self._interactive_preview.release, ticket))
 
-    def operation(self, operation, dry_run=True):
-        if operation not in {'scan', 'process', 'refresh', 'status'} or type(dry_run) is not bool:
-            return {'status': 'faulty', 'reason': 'Invalid manual library operation'}
-        if operation=='status':
-            return self.context()
-        command = [str(self._config.project_root / '.venv/Scripts/python.exe'),
-                   str(self._config.project_root / 'scripts/library-batch.py'), operation]
-        if dry_run:
-            command.append('--dry-run')
-        try:
-            process = subprocess.Popen(command, cwd=self._config.project_root,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-            return {'status': 'started', 'operation': operation, 'pid': process.pid,
-                    'evidence': 'data/library/operations/; use Status for coverage'}
-        except OSError as exc:
-            return {'status': 'faulty', 'reason': str(exc)}
+    def changes(self):
+        return self._wait(self._present(self._changes))
+
+    def _changes(self):
+        """Cheap stat-only tokens; views fetch heavy data only when a token changes."""
+        from .catalog import digest
+        def stamp(path):
+            try:
+                value = path.stat()
+                return value.st_size, value.st_mtime_ns
+            except FileNotFoundError:
+                return None
+        config = self._config
+        library = [stamp(config.project_root / 'data/library/active.json'),
+                   stamp(config.output_path('data', 'library/processing-status.json'))]
+        sources = [stamp(config.output_path('data', 'library/source-operation.json')),
+                   stamp(config.output_path('data', 'library/source-cancel.json'))]
+        if config.sources_registry:
+            from .sources import registry, bound, revision
+            library.append(revision(config))
+            sources.append(stamp(config.sources_registry))
+            for source in registry(config)['sources']:
+                scoped = bound(config, source)
+                sources.append([stamp(scoped.output_path('data', 'library/' + name)) for name in
+                                ('source-status.json', 'source-operation.json', 'source-cancel.json', 'active.json')]
+                               + [stamp(config.project_root / 'data/library/source-faults' / (source['id'] + '.json'))])
+        sources.append(stamp(config.project_root / 'data/library/settings.json'))
+        return {'status': 'ready', 'library': digest(library)[:16], 'sources': digest(sources)[:16]}
 
     async def _search(self, arguments):
         validate('search_assets', arguments)
@@ -384,7 +395,7 @@ def main():
             WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='--force-renderer-accessibility',
             TEMP=str(root / 'scratch/tmp-mcp'), TMP=str(root / 'scratch/tmp-mcp'), PYTHONNET_RUNTIME='netfx')
         (root / 'scratch/tmp-mcp').mkdir(parents=True, exist_ok=True)
-        config = load_config(root / 'config.example.toml', root)
+        config = load_project_config(root)
         bridge = DesktopBridge(config)
         import webview
         window = create_window(config, bridge)

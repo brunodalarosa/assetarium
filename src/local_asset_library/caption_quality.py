@@ -1,6 +1,4 @@
 """Current caption severity, separate from immutable generation/review evidence."""
-import json
-
 from .catalog import digest
 
 
@@ -72,7 +70,8 @@ def caption_quality(config, record):
                 if local.exists():
                     path = local
             if path.is_file():
-                saved = json.loads(path.read_text(encoding="utf-8"))
+                from .library_cache import cached_json
+                saved = cached_json(path)
                 if saved.get("schema_version") != 1 or not isinstance(saved.get("assets"), dict):
                     raise ValueError("Unsupported classification record")
                 entry = saved["assets"].get(record["asset_id"])

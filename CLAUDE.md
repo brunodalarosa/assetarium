@@ -71,7 +71,7 @@ scripts\asset-desktop.pyw`; startup never installs or runs models).
   `overnight.py` (owner-started caption runs), `library_index.py` +
   `embedding_backend.py` (vectors), `gpu_queue.py` (cross-process GPU lease),
   `maintenance_files.py` (manifest-driven removal of retired generated files).
-- **Retrieval and agents:** `retrieval.py` + `search_policy.py` (keyword /
+- **Retrieval and agents:** `library_cache.py` (per-publication slim records and digests; shared, read-only), `retrieval.py` + `search_policy.py` (keyword /
   description / image / combined RRF, bounded shortlists), `mcp_assets.py`
   (`search_assets`, `get_asset` schemas and response caps; no client-supplied
   paths), `mcp_server.py` (STDIO server + isolated `scripts/asset-worker.py`
@@ -122,6 +122,7 @@ Recent commits (`git log`) follow this shape; mirror it:
 
 ## Source-of-truth docs
 
+`docs/decisions/` (binding owner decisions, read first) ·
 `docs/progress.md` (current state, newest first) · `docs/asset-sources.md` ·
 `docs/library-updates.md` · `docs/gui/README.md` · `docs/gui/3d-preview.md` ·
 `docs/storage.md` · `docs/caption-quality.md` · `docs/caption-contract.md` ·

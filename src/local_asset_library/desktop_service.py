@@ -1,11 +1,11 @@
 """Read-only presentation operations; retrieval policy remains in AssetService/SearchEngine."""
 from contextlib import closing
-import hashlib
 import time
 
 from .catalog import read_database, relevant_license_evidence
 from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
+from .library_cache import file_digest
 from .mcp_assets import AssetService, FORMATS, MODES, VIEWS, error_payload, validate
 from .retrieval import current_overlay, matches, observations, pilot_records, source_check
 from .publication import pinned, generation,read_json
@@ -71,7 +71,7 @@ class DesktopService(AssetService):
         membership_path='library/membership.json' if scope.get('scope')=='library' else 'pilot/selection-manifest.json'
         for name, relative in (('catalog', 'catalog.sqlite'), ('index', 'embeddings/index.sqlite'),
                                ('membership', membership_path)):
-            hashes[name] = hashlib.sha256(self.config.output_path('data', relative).read_bytes()).hexdigest()
+            hashes[name] = file_digest(self.config.output_path('data', relative))
         hashes['pilot']=hashes['membership']  # Historical UI key; current membership digest is authoritative.
         from .incremental import coverage
         import json

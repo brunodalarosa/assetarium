@@ -111,6 +111,16 @@ class Config:
         return target
 
 
+def project_config_path(project_root: Path) -> Path:
+    """Ignored local overrides win; the tracked example is the shared default."""
+    local = Path(project_root) / "config.local.toml"
+    return local if local.is_file() else Path(project_root) / "config.example.toml"
+
+
+def load_project_config(project_root: Path) -> Config:
+    return load_config(project_config_path(project_root), project_root)
+
+
 def load_config(path: Path, project_root: Path) -> Config:
     root = project_root.resolve()
     try:

@@ -2,6 +2,12 @@ This project is developed with both Codex and Claude (Claude Code). Every agent
 follows this file; Claude also loads `CLAUDE.md`, which imports these rules and
 adds codebase orientation only.
 
+## Recorded decisions
+
+Read `docs/decisions/` before changing behavior. Those owner-approved decisions
+bind future changes; if a change would contradict one, ask the owner first and
+update the decision record together with the code.
+
 ## Required checkpoints before implementation
 
 Before starting implementation, follow these two steps in order:

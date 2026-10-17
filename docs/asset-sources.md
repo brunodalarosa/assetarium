@@ -42,7 +42,7 @@ server connections that were already running. They need to load the new code
 once; subsequent source toggles apply live without reconnecting or restarting.
 
 The app scans enabled sources in the background at startup. Enabling a source
-also scans it. **Scan** checks for changes during an open session. Scans detect
+also scans it; reopen the app (or toggle the source) to rescan during a session. Scans detect
 added, changed and removed files; unchanged files reuse their verified hashes
 when filesystem identity, size, modification time and change time agree. The
 source's own `metadata-lal` directory is always excluded. Scanning runs no model

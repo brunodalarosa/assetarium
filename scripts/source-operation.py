@@ -7,7 +7,7 @@ import time
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'src'))
-from local_asset_library.config import load_config
+from local_asset_library.config import load_project_config
 from local_asset_library.sources import get_source, bound
 from local_asset_library.source_operations import scan_all, process_source, worker_stage, state, operation_lease
 from local_asset_library.gpu_queue import lease
@@ -18,7 +18,7 @@ parser.add_argument('--source')
 parser.add_argument('--token', required=True)
 parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'])
 args = parser.parse_args()
-config = load_config(root / 'config.example.toml', root)
+config = load_project_config(root)
 source = get_source(config, args.source) if args.source else None
 scoped = bound(config, source) if source else config
 if args.operation == 'stage':

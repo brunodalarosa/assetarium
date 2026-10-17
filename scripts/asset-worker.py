@@ -14,10 +14,10 @@ sys.path.insert(0, str(root / 'src'))
 os.environ.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1')
 wire = sys.stdout
 with contextlib.redirect_stdout(sys.stderr):
-    from local_asset_library.config import load_config
+    from local_asset_library.config import load_project_config
     from local_asset_library.embedding_backend import EmbeddingBackend
     from local_asset_library.mcp_assets import AssetService, error_payload
-    config = load_config(root / 'config.example.toml', root)
+    config = load_project_config(root)
     service = AssetService(config, backend_factory=EmbeddingBackend)
     from local_asset_library.gpu_queue import lease,batch_requested,peer_requested
     from local_asset_library.config import ConfigError

@@ -419,7 +419,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
 
 
 def coverage(config):
-    selected = records(config)
+    from .retrieval import pilot_records
+    selected = pilot_records(config)
     packs = defaultdict(lambda: {"assets": 0, "stages": {s: Counter() for s in COVERAGE_STAGES}, "captions": Counter(), "owner_review": Counter(),
         'usable_partial_results':0,'source_faults':0,'stage_faults':0,'caption_ai_review':Counter()})
     for record in selected:

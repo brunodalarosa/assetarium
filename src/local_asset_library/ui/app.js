@@ -116,13 +116,12 @@ document.addEventListener('keydown',event=>{
  const collection=activeCollection();if(event.key==='Escape'&&collection.selected&&collectionVisible(collection))closeDetail(collection);
  if(event.ctrlKey&&event.key.toLowerCase()==='f'&&!$('library-view').hidden){event.preventDefault();$('query').focus();}
 });
-window.addEventListener('pywebviewready',async()=>{state.api=window.pywebview.api;try{state.context=await state.api.context();if(state.context.status==='faulty')throw Error(state.context.reason);$('scope').textContent=`Approved ${state.context.pilot_count}-asset library`;$('inventory').textContent=`${state.context.inventory_count} inventory records · ${state.context.generation}`;addOptions($('pack'),state.context.packs,packName);addOptions($('format'),state.context.formats,x=>x.toUpperCase());$('version').textContent=`Catalog ${state.context.versions.catalog.slice(0,10)} · index ${state.context.versions.index.slice(0,10)}`;$('version').title=JSON.stringify(state.context.versions,null,2);await browse();await refreshContext();await loadSources();if(state.context.managed_sources)await sourceAction('scan');$('query').focus();}catch(error){fail(error.message);status('Startup data is faulty. No model loading or fallback attempted.');$('grid').setAttribute('aria-busy','false');}});
+window.addEventListener('pywebviewready',async()=>{state.api=window.pywebview.api;try{state.context=await state.api.context();if(state.context.status==='faulty')throw Error(state.context.reason);$('scope').textContent=`Approved ${state.context.pilot_count}-asset library`;$('inventory').textContent=`${state.context.inventory_count} inventory records · ${state.context.generation}`;addOptions($('pack'),state.context.packs,packName);addOptions($('format'),state.context.formats,x=>x.toUpperCase());$('version').textContent=`Catalog ${state.context.versions.catalog.slice(0,10)} · index ${state.context.versions.index.slice(0,10)}`;$('version').title=JSON.stringify(state.context.versions,null,2);await browse();renderCoverage(state.context);await loadSources();watchChanges();if(state.context.managed_sources)await sourceAction('scan');$('query').focus();}catch(error){fail(error.message);status('Startup data is faulty. No model loading or fallback attempted.');$('grid').setAttribute('aria-busy','false');}});
 
 const paging=node('nav',undefined,'paging');paging.setAttribute('aria-label','Asset pages');
 for(const [id,label] of [['previous-page','Previous page'],['page-info',''],['next-page','Next page']]){const element=node(id==='page-info'?'span':'button',label);element.id=id;if(element.tagName==='BUTTON')element.type='button';paging.append(element);}$('grid').before(paging);
 $('previous-page').onclick=()=>{state.offset=Math.max(0,state.offset-40);browse(false);};$('next-page').onclick=()=>{state.offset+=40;browse(false);};
 const operations=node('div',undefined,'library-operations');
-for(const [label,operation,dry] of [['Scan','scan',false],['Status','status',false]]){const button=node('button',label);button.type='button';button.onclick=async()=>{if(operation==='scan'&&state.context?.managed_sources){await sourceAction('scan');return;}const result=await state.api.operation(operation,dry);if(result.status==='faulty')fail(result.reason);else if(operation==='status'){await refreshContext();status('Processing and published coverage updated.');}else status(`${label} started. Evidence: ${result.evidence}`);};operations.append(button);}
 const reload=node('button','Refresh published view');reload.type='button';reload.onclick=()=>refreshContext(true);operations.append(reload);$('search-form').after(operations);
 const failuresButton=node('button','Importing failures report');failuresButton.id='open-import-failures';failuresButton.type='button';operations.append(failuresButton);
 async function refreshContext(force=false){
@@ -140,12 +139,32 @@ async function refreshContext(force=false){
    if(wasBrowsing)await browse(false);else await search();
    if(selected){if(!$('library-view').hidden)await selectAsset(selected,null,'three_quarter',false,state);}else closeDetail(state);
   }
-  const source=context.working_coverage||context.coverage,coverage=Object.values(source.packs);
-  const pending=coverage.reduce((n,p)=>n+(p.stages.caption.pending||0),0),failed=coverage.reduce((n,p)=>n+(p.stages.caption.failed||0),0);
-  $('coverage').textContent=`${context.coverage.membership} in the library · ${pending} descriptions pending · ${failed} description failures`;
+  renderCoverage(context);
  }catch(error){fail(error.message);}
 }
-const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operations.after(coverageLine);setInterval(()=>refreshContext(),20000);
+function renderCoverage(context){
+ const source=context.working_coverage||context.coverage,coverage=Object.values(source.packs);
+ const pending=coverage.reduce((n,p)=>n+(p.stages.caption.pending||0),0),failed=coverage.reduce((n,p)=>n+(p.stages.caption.failed||0),0);
+ $('coverage').textContent=`${context.coverage.membership} in the library · ${pending} descriptions pending · ${failed} description failures`;
+}
+const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operations.after(coverageLine);
+// One cheap stat-only poll; library and source data reload only when their token changes.
+const changeTokens={library:null,sources:null};let watchingChanges=false;
+async function watchChanges(){
+ if(watchingChanges)return;watchingChanges=true;
+ const first=await state.api.changes();if(first.status!=='faulty'){changeTokens.library=first.library;changeTokens.sources=first.sources;}
+ setInterval(async()=>{
+  if(state.checkingChanges)return;state.checkingChanges=true;
+  try{
+   const tokens=await state.api.changes();if(tokens.status==='faulty')return;
+   const sourcesChanged=tokens.sources!==changeTokens.sources,libraryChanged=tokens.library!==changeTokens.library;
+   changeTokens.sources=tokens.sources;changeTokens.library=tokens.library;
+   if(libraryChanged)await refreshContext();
+   // Running operations also report worker liveness, which is not a file change.
+   if(sourcesChanged||state.sources.some(source=>operationActive(source.operation)))await loadSources();
+  }finally{state.checkingChanges=false;}
+ },1500);
+}
 
 
 const sourceCards=new Map();state.sources=[];state.sourcesRevision=null;state.loadingSources=false;
@@ -207,7 +226,7 @@ async function loadSources(){
  }catch(error){$('sources-message').textContent=error.message;}finally{state.loadingSources=false;}
 }
 async function sourceAction(action,key=null,directory=null,enabled=null){
- ++state.generation;searchBusy(null);++state.detailGeneration;
+ // Scans and processing never invalidate visible cards; library changes arrive through refreshContext.
  try{
   const result=await state.api.source_action(action,key,directory,enabled);if(result.status==='faulty')throw Error(result.reason);
   if(action==='cancel'){const source=state.sources.find(x=>x.key===key);if(source)source.operation={...source.operation,status:'cancelling',phase:result.reason};renderSourceWarnings();}
@@ -325,4 +344,3 @@ $('open-settings').onclick=async()=>{showLibraryView('settings-view');selectSett
 $('close-settings').onclick=async()=>{showLibraryView('library-view');await loadSources();$('open-settings').focus();};
 $('choose-source').onclick=async()=>{const result=await state.api.choose_source_directory();if(result.status==='selected')$('source-directory').value=result.directory;else if(result.status==='faulty')$('sources-message').textContent=result.reason;};
 $('add-source').onclick=()=>{const directory=$('source-directory').value.trim();if(directory)sourceAction('add',null,directory);else $('sources-message').textContent='Choose an asset directory first.';};
-setInterval(loadSources,1500);

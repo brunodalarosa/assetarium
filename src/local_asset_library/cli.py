@@ -11,7 +11,7 @@ from contextlib import nullcontext
 
 import numpy as np
 
-from .config import ConfigError, load_config
+from .config import ConfigError, load_config, project_config_path
 from .catalog import compact_search_result, detail, pilot, query, scan, verify_source
 from .inspection import inspect_pilot, review_sheet
 
@@ -19,7 +19,7 @@ from .inspection import inspect_pilot, review_sheet
 def main() -> int:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Read-only source inventory and local asset search")
-    parser.add_argument("--config", type=Path, default=root / "config.example.toml")
+    parser.add_argument("--config", type=Path, default=project_config_path(root))
     parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet", "embed-index", "detail", "process", "refresh", "status"])
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'], default='inspection')

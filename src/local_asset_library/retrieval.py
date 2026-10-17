@@ -22,8 +22,9 @@ MODES = {"keyword", "description", "image", "keyword_description", "combined", "
 
 
 def pilot_records(config):
-    from .membership import records
-    return records(config)
+    """Shared read-only slim records of the pinned publication (see library_cache)."""
+    from .library_cache import library_records
+    return library_records(config)
 
 
 def current_overlay(config, record):
@@ -147,7 +148,8 @@ def index_database(config, readonly=False):
 
 def index_pilot(config, backend):
     started = time.perf_counter()
-    records = pilot_records(config)
+    from .membership import records as full_records
+    records = full_records(config)  # Processing reads fresh full records.
     contract = backend.contract
     common = digest(contract)
     capability = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))

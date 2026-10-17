@@ -38,7 +38,9 @@ accurate disk accounting, cache cleanup and the pilot's storage planning target.
 `doctor` checks SQLite FTS5 and NumPy with synthetic in-memory data and checks the
 configured Blender executable exists. It does not render or run models.
 
-Copy `config.example.toml` to ignored `config.local.toml` for local overrides:
+Copy `config.example.toml` to ignored `config.local.toml` for local overrides.
+When it exists, the desktop app, MCP server, embedding worker, source
+operations, `library-batch.py` and the CLI default use it instead of the example:
 
 ```powershell
 .\scripts\uv.ps1 run --locked local-assets --config config.local.toml check-config

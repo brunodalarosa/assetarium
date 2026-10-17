@@ -10,13 +10,9 @@ import subprocess
 import time
 import uuid
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import CallToolResult, ImageContent, ListToolsResult, TextContent, Tool, ToolAnnotations
-
 from .catalog import encoded
 from .search_policy import DEFAULT_MODE
-from .config import ConfigError, load_config
+from .config import ConfigError, load_project_config
 from .mcp_assets import AssetService, SCHEMAS, error_payload, validate
 
 INSTRUCTIONS = ('Read-only explicitly configured approved library membership. Search compactly, then get_asset for a candidate; '
@@ -104,6 +100,8 @@ class Gateway:
             raise
 
     async def call(self, name, args):
+        # The MCP SDK loads on first use so the desktop shell starts without it.
+        from mcp.types import CallToolResult, ImageContent, TextContent
         async with self.lock:
             self.sequence += 1
             started = time.perf_counter()
@@ -143,6 +141,9 @@ class Gateway:
 
 
 async def serve(config):
+    from mcp.server import Server
+    from mcp.server.stdio import stdio_server
+    from mcp.types import ListToolsResult, Tool, ToolAnnotations
     gateway = Gateway(config)
     async def list_tools(ctx, params):
         annotations = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -165,5 +166,5 @@ async def serve(config):
 def main():
     root = Path(__file__).resolve().parents[2]
     # Client cwd is never used to resolve source/configuration paths.
-    config = load_config(root/'config.example.toml',root)
+    config = load_project_config(root)
     asyncio.run(serve(config))

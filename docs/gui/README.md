@@ -47,8 +47,12 @@ actionable work remains and current results have been published. Recorded failur
 do not trigger pending cards: **Importing failures report** opens a scrollable list
 of original asset paths, including disabled sources. Saved attempts distinguish
 unchanged failures from new/changed files and unfinished work. The separate Process pending and
-Publish ready work buttons have been removed. Scan remains available during a
-session; processing never starts automatically when sources/files are added.
+Publish ready work buttons have been removed, and so have the manual **Scan** and
+**Status** buttons: enabled sources are scanned at startup, and the app watches
+cheap file stamps (publication, source status, operation and settings files)
+every 1.5 s, reloading library or source data only when one changes. An unchanged
+scan rewrites nothing, so it never reloads the open view. Processing never starts
+automatically when sources/files are added.
 
 The initial grid contains a bounded page of the published approved membership, with its actual membership and
 counts supplied by the backend. The full inventory count is context, not browse

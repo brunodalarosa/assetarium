@@ -138,3 +138,14 @@ def test_link_escape_when_supported(setup):
         config.output_path("data", "file")
     with pytest.raises(ConfigError):
         load_config(path, root)
+
+
+def test_project_config_prefers_ignored_local_override(setup):
+    from local_asset_library.config import project_config_path, load_project_config
+    root, source, path = setup
+    (root / "config.example.toml").write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    assert project_config_path(root) == root / "config.example.toml"
+    local = root / "config.local.toml"
+    local.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    assert project_config_path(root) == local
+    assert load_project_config(root).source_root == source.resolve()
