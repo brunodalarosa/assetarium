@@ -1,267 +1,185 @@
-# Local Asset Library
+# Assetarium
 
-The library provides read-only inventory, SQLite/FTS5 and semantic search,
-technical inspection, multi-view Blender rendering, local visual descriptions,
-a Windows app and shared MCP access. Step 8 adds explicitly configured membership,
-resumable incremental stages, bounded browsing and atomic catalog/index publication.
-See [current operations](docs/library-updates.md) and [progress](docs/progress.md).
-Earlier forty-asset pilot measurements and real-agent evidence remain preserved.
+**Find, explore, and organize your game assets.**
 
-Open **Settings → Asset sources** in the Windows app to add/remove directories
-and enable or disable their assets in live searches. Original asset files remain
-read only. Each source owns a `metadata-lal` directory containing its generated
-records, inspections, previews, descriptions, reviews, faults, checkpoints and
-vectors. LAL retains settings, derived combined indexes, application evidence and
-runtime caches centrally. Model weights are shared at `C:\BrunoOS\Local-models`.
-See [asset sources and processing](docs/asset-sources.md). Play Shapes remains independent.
-Local agent clients have additive, backed-up MCP registration.
+Assetarium turns folders of 3D game assets into a searchable local catalog for
+people and AI agents. Browse previews, explore models in 3D, search by filename
+or visual description, and retrieve the actual source files and their known
+dependencies without changing the originals.
 
-From this repository in PowerShell:
+The project is in early development and is being prepared for an open source
+release. The current application targets Windows and runs from a source checkout;
+there is no packaged installer yet. Earlier documentation and the application
+still use the working name **Local Asset Library (LAL)**. Python packages, commands,
+launchers, and MCP identifiers retain their existing names for compatibility.
+
+## What it does
+
+- **Browse your collection:** register asset folders, browse individual sources,
+  and inspect saved previews and metadata in a Windows desktop app.
+- **Find suitable assets:** search filenames, generated descriptions, preview
+  images, or a combination of all three. Reference-image search uses an existing
+  catalog asset.
+- **Explore in 3D:** rotate, pan, and zoom supported source formats in the app,
+  using a bundled offline viewer.
+- **Inspect before choosing:** review geometry facts, alternate formats, known
+  dependencies, license evidence, and processing results.
+- **Connect AI agents:** expose the same search and asset-detail backend through
+  the local MCP tools `search_assets` and `get_asset`.
+- **Update incrementally:** detect source changes, resume unfinished processing,
+  and publish complete catalog/index generations while retaining usable results
+  and recorded failures.
+
+Original asset files remain read only. Generated source information lives in a
+`metadata-lal` directory alongside each registered collection. Settings, combined
+indexes, caches, and application reports stay in local project storage.
+
+Assetarium catalogs assets you supply; this repository does not include asset
+packs, model weights, or a prebuilt personal catalog. Generated descriptions and
+search scores help discovery but do not establish visual accuracy, artistic
+suitability, or licensing permissions.
+
+## Requirements
+
+| Component | Used for |
+| --- | --- |
+| Windows, Git, PowerShell, and Python **3.13** | Current development and desktop workflow |
+| `uv`, available on your PATH | Installing the pinned Python environments through the project wrappers |
+| Microsoft Edge WebView2 Runtime and .NET Framework | The Windows desktop app |
+| Blender with the required importers | Technical inspection and preview rendering |
+| Compatible NVIDIA CUDA hardware with BF16 support | The current caption and embedding pipelines |
+| Locally prepared model weights | Visual descriptions and semantic/image search |
+
+Saved previews, catalog browsing, and keyword search do not require model
+inference. New preview generation needs Blender; semantic search and caption
+generation need their separately prepared runtimes and models. Other operating
+systems and CPU-only inference are not validated by the current workflow.
+
+## Getting started
+
+### 1. Clone and configure
+
+```powershell
+git clone https://github.com/brunodalarosa/assetarium.git
+cd assetarium
+Copy-Item config.example.toml config.local.toml
+```
+
+Edit `config.local.toml` before running the application. The example contains
+machine-specific paths: set `[tools].blender` to your Blender executable and
+`[storage].models` to your shared model directory, or use `"models"` for a
+project-local model directory. Runtime entry points prefer `config.local.toml`
+when present. The local file is ignored by Git.
+
+### 2. Prepare the base and desktop environments
+
+Run these commands from the repository root:
 
 ```powershell
 .\scripts\uv.ps1 sync --locked
-.\scripts\uv.ps1 run --locked local-assets check-config
-.\scripts\uv.ps1 run --locked local-assets doctor
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest-current
+.\scripts\mcp-runtime.ps1 sync --locked --project runtime/mcp
+.\scripts\uv.ps1 run --locked --no-sync --offline local-assets check-config
+.\scripts\uv.ps1 run --locked --no-sync --offline local-assets doctor
 ```
 
-Python 3.13 is required. The wrapper keeps uv cache, virtual environment, temporary
-build files, and Hugging Face/Torch runtime caches inside ignored project folders.
-It changes environment variables only in its process. Use it for project commands;
-calling a third-party runtime directly can bypass these settings.
+`check-config` validates configuration. `doctor` checks the base dependencies and
+whether the configured Blender executable exists; it does not verify rendering,
+model inference, or asset compatibility.
 
-Runtime installations share one project-local uv cache and use hard links for
-identical immutable dependencies. See [storage guidelines](docs/storage.md) for
-accurate disk accounting, cache cleanup and the pilot's storage planning target.
+The wrappers keep environments and caches in project-controlled locations and
+share the uv cache using hard links. Captioning and embeddings have separate
+locks because their dependencies differ. See [storage guidance](docs/storage.md)
+before installing the larger runtimes or downloading models; account for several
+GiB beyond the source checkout.
 
-`local-assets` is the consistent CLI entry point. The two checks are read only;
-`doctor` checks SQLite FTS5 and NumPy with synthetic in-memory data and checks the
-configured Blender executable exists. It does not render or run models.
+### 3. Open the app and add your assets
 
-Copy `config.example.toml` to ignored `config.local.toml` for local overrides.
-When it exists, the desktop app, MCP server, embedding worker, source
-operations, `library-batch.py` and the CLI default use it instead of the example:
+Double-click **Local Asset Library.vbs** in the checkout. The launcher uses the
+prepared desktop environment; it does not install dependencies or download models.
+
+In **Settings → Asset sources**, register your asset directories. Enabled sources
+are scanned at startup to detect changes; scanning does not render assets or run
+models. **Process assets** starts the processing/publication workflow explicitly,
+using the Blender, runtime, and model setup required by its pending stages.
+
+For the current setup and processing details, read:
+
+- [Desktop app and controls](docs/gui/README.md)
+- [Asset sources and processing](docs/asset-sources.md)
+- [Incremental library updates](docs/library-updates.md)
+- [Model locations and shared storage](docs/model-storage.md)
+- [Caption model contract](docs/caption-contract.md)
+- [Embedding and search contract](docs/embedding-contract.md)
+
+Model preparation is still a developer workflow. Some historical preparation and
+verification scripts read `config.example.toml` directly rather than the local
+override; review their configuration assumptions before using them on a new
+machine. Installing the base and desktop environments alone does not prepare
+captioning or semantic search.
+
+## Use with AI agents
+
+Assetarium provides a local STDIO MCP server with two tools:
+
+| Tool | Purpose |
+| --- | --- |
+| `search_assets` | Return a bounded shortlist using the shared search modes and filters |
+| `get_asset` | Retrieve source paths, known dependencies, metadata, and an optional actual preview image |
+
+After preparing the desktop/MCP runtime, clients can launch:
 
 ```powershell
-.\scripts\uv.ps1 run --locked local-assets --config config.local.toml check-config
+& '.\.venv-mcp\Scripts\python.exe' scripts\asset-mcp.py
 ```
 
-Storage names are fixed to ignored `data/`, `cache/`, `logs/`, `scratch/`, and
-`.venv/`. `[storage].models` explicitly selects the shared absolute directory
-`C:\BrunoOS\Local-models`; `"models"` still supports isolated local fixtures.
-Paths inside every storage root must be relative. Parent traversal, overlapping
-asset sources, Windows device/stream paths, and resolved links escaping
-a root are rejected.
-Future stages must use the boundary API in `config.py`; it is application policy,
-not an operating-system sandbox, and does not defend against concurrent link swaps.
+This command waits for MCP messages on standard input. Configure your client with
+absolute executable and script paths from your own checkout. Existing setup
+snippets in the detailed documentation describe the original development machine
+and need their paths adapted. The server searches published results; it does not
+process assets or import them into a game engine.
 
-SQLite/FTS5 will store records and exact keyword retrieval; NumPy will provide exact
-vector similarity. Dependencies are pinned in `pyproject.toml` and `uv.lock`.
-No model inference dependencies or weights were installed by step 1.
+See [MCP setup and tool contracts](docs/mcp/README.md) and the
+[asset-selection skill](skills/local-asset-library/SKILL.md).
 
-The shared model folders are `qwen3-vl-2b/89644892e4d85e24eaac8bacfd4f463576704203`
-and `embeddinggemma-2/914f7f89142e33e77833254d9c9b90c3cef7303b` directly
-under `C:\BrunoOS\Local-models`. Other projects may load these same folders.
-This project does not own the shared root or count unrelated models against its
-budget. Hugging Face inference caches remain under project `cache/`.
-See [model relocation](docs/model-storage.md) for verification and usage.
+## Development and contributions
 
-Continue from [progress](docs/progress.md), [environment evidence](docs/environment.md),
-[catalog contract](docs/catalog-contract.md), and the versioned
-[plan](docs/plan/PROJECT.md).
+Bug reports, reproducible examples, documentation improvements, and focused pull
+requests are welcome through the [GitHub repository](https://github.com/brunodalarosa/assetarium).
+Describe the expected behavior, what happened, and the relevant runtime or format.
+Use small synthetic examples instead of uploading proprietary asset packs,
+private configuration, or model weights.
 
-Catalog workflow (module invocation also works where console launchers are restricted):
+Read [AGENTS.md](AGENTS.md) and the [recorded decisions](docs/decisions/README.md)
+before implementation. These document the project's approval checkpoints,
+original-file protection, fault handling, and storage requirements. Desktop and
+MCP changes should continue to use the same retrieval and validation backend.
+
+With the desktop/MCP environment already prepared, run the test suite using:
 
 ```powershell
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli scan
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli search 'sedan sports'
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli search 'chair rounded'
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli get asset_18db4ca35f9737b123a769899bfc288e
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli pilot
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli verify-source
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest
 ```
 
-`scan` hashes all source files twice, compares them, verifies extracted ZIP
-counterparts, and writes only `data/catalog.sqlite`, `data/reports/` and
-`data/evidence/`. It inventories supplied images and parses dependency references;
-it does not import models, render or execute embedded scripts. `scan` rebuilds the
-step 2 catalog transactionally and refuses to replace later-stage metadata or
-owner corrections. That historical scanner is retained; Step 8's coordinator
-stages scans and preserves downstream results and owner overlays.
+Some integration checks require Blender or the native Windows desktop stack.
+The reusable test directory contains temporary fixtures; application evidence
+and processing reports are retained separately.
 
-`search` treats input as literal keyword terms joined with AND; it supports camel
-case and punctuation-separated names. Default limit is five logical assets,
-maximum twenty; output has a 6,000-character cap, including size metadata.
-Trimming is explicit. The token estimate is a character heuristic, not an actual
-tokenizer count. Results resolve available source paths; complete records are
-requested with `get`. Search does not rehash each file, so content staleness needs
-`verify-source` or a fresh scan. Missing paths are omitted; stored stale/missing
-records are excluded. Search is a filename baseline, not semantic retrieval.
+## Documentation and project status
 
-`pilot` resolves the exact identities in versioned
-[pilot-selection.json](docs/pilot-selection.json) and writes
-`data/pilot/selection-manifest.json` with IDs, formats, dependencies, supplied
-views, hashes, rationale and coverage. No source assets are copied. The manifest
-has no wall-clock fields and is byte-for-byte reproducible for unchanged inputs.
+- [Progress and verification history](docs/progress.md)
+- [Owner-approved technical decisions](docs/decisions/README.md)
+- [Interactive 3D previews](docs/gui/3d-preview.md)
+- [Caption quality and review](docs/caption-quality.md)
+- [Storage and retention](docs/storage.md)
+- [Original staged project plan](docs/plan/PROJECT.md)
+- [Vendored viewer dependencies and attribution](src/local_asset_library/ui/vendor/README.md)
 
-See the [catalog summary](docs/catalog-summary.md) and
-[inspection report](docs/inspection-report.md) for measured results and limitations.
+Detailed reports include historical pilot results and development-machine paths.
+They record the checks performed at those milestones, rather than promising
+compatibility with every machine, asset format, or collection.
 
-Inspection workflow:
+## License
 
-```powershell
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli inspect --phase representatives --resolution 640 --timeout 180
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli review-sheet --phase representatives
-# Open the representative sheet with image tools and inspect materials/framing FIRST.
-.\scripts\uv.ps1 run --locked python scripts/record_image_review.py representatives --observations 'Your actual image review findings'
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli inspect --phase pilot --resolution 640 --timeout 180
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli review-sheet --phase pilot
-# Open the pilot sheet and inspect it FIRST.
-.\scripts\uv.ps1 run --locked python scripts/record_image_review.py pilot --observations 'Your actual image review findings'
-.\scripts\uv.ps1 run --locked python scripts/check_inspection.py
-```
-
-Blender is discovered from the configured executable, PATH, then installed Windows
-locations. A discovered executable must support the required imports and offline
-flags; failures remain visible. This machine reuses Blender 5.2.2 LTS. Override its
-path with `blender` in local configuration. No installer or automatic download runs.
-Blender user resources and temporary files remain in project storage; generated
-inspection outputs go into the owning source's `metadata-lal`. Embedded scripts
-are disabled. Jobs run sequentially with a per-asset
-timeout, explicit errors, source/dependency checks, and validated cached results.
-Unchanged faulty results are retained without automatic retries. Every kind of
-fault is marked with evidence, and the batch moves on. Only use `--retry-faults`
-after an explicit request to retry; source repair is outside the batch workflow.
-Changing worker code, source/dependencies, runtime or resolution requires a new
-representative run and image review before the pilot proceeds.
-
-The original selection manifest is retained. `data/inspection/processed-manifest.json`
-adds the actual primary source choice and reason for each asset. Each job directory
-contains metadata, source hashes, render settings, images and logs. Supplied
-thumbnails remain baseline evidence. Review receipts distinguish technical checks
-from pending owner artistic approval. CPU Cycles avoids this machine's observed
-GPU renderer crash; imported materials are retained. Exact duplicate faces trigger
-a recorded shadow-ray override to avoid self-shadow artifacts, without changing
-source geometry. Physical size, author front, animation behavior, and alternate
-format equivalence remain unknown or unverified.
-
-Local vision uses a separate `.venv-caption/` environment and dependency lock
-in `runtime/caption/`. Its wrapper directs caches and temporary files into this
-project; weights use shared model storage. Existing Ollama/OpenCode stays independent.
-See [caption contract](docs/caption-contract.md) and
-[model evidence](docs/caption-model.json).
-
-```powershell
-.\scripts\caption-runtime.ps1 sync --locked --project runtime/caption
-.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/prepare_caption_model.py
-.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_pilot.py smoke
-.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_pilot.py calibration --prompt-version v2
-.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_review_images.py calibration-v2
-```
-
-Use `prepare_caption_model.py --verify-only` for existing weights. The download
-script checks current exact-revision official metadata, license, remaining
-model budget and a real CUDA BF16 kernel before transfer. Inference is offline.
-The ten calibration outputs must be viewed with image tools alongside their
-text, then recorded with `record_caption_review.py` before running the pilot.
-Do not create a receipt just because the process exited successfully.
-
-```powershell
-# After actual image/text review; supplied notes document this run's review:
-.\scripts\uv.ps1 run --locked python scripts/record_caption_review.py calibration-v2 --notes docs/caption-calibration-v2-review.json --approve-prompt v2
-.\scripts\caption-runtime.ps1 run --locked --project runtime/caption python scripts/caption_pilot.py pilot --prompt-version v2
-.\scripts\uv.ps1 run --locked python scripts/check_captions.py
-```
-
-Review [the pilot captions and real input images](data/captions/review/pilot-v2.html).
-Each asset links to its editable owner correction JSON. Change desired visual
-fields inside `description`, or replace `suggested_uses`; leave other fields
-untouched. Bruno's caption and artistic approval remain pending until his review.
-Apply corrections and refresh the sheet without loading the model:
-
-```powershell
-.\scripts\uv.ps1 run --locked python scripts/caption_pilot.py review --prompt-version v2
-```
-
-AI review is separate technical evidence. Invalid responses, uncertain identity,
-review faults and original inspector faults remain visible. Step 4 ends before
-[step 5: embeddings](docs/plan/prompts/05-embeddings-and-search.md) and full-library
-processing.
-
-## Step 5: pilot embedding search
-
-The original `search 'apple'` command remains the full-catalog filename baseline.
-Explicit modes now use configured published membership; the following measurements
-record the original forty-asset pilot. See
-[embedding contract](docs/embedding-contract.md), [measurement evidence](docs/embedding-evidence.json)
-and [progress](docs/progress.md) for versions, faults and limitations.
-
-```powershell
-# Install the separately locked environment; runtime caches remain project-local.
-.\scripts\embedding-runtime.ps1 sync --locked --project runtime/embedding
-# One pinned download, CUDA probe and byte-budget check; use --verify-only once downloaded.
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python scripts/prepare_embedding_model.py
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python scripts/embedding_capability.py
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli embed-index
-
-# Keyword needs only the base environment; the three semantic modes need the embedding runtime.
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli search 'apple' --mode keyword
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a boxy orange-red car with wheels' --mode description --rankings-output embeddings/car-description.json
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a red apple with a green leaf' --mode image --rankings-output embeddings/apple-image.json
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a chair with a curved back and flat seat' --mode combined --rankings-output embeddings/chair-combined.json
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search --mode reference --reference 'data/inspection/asset_24e2752dbb26ecd19677091f78243709/fbx/a30ceb622a88a274/three_quarter.png' --rankings-output embeddings/reference-apple.json
-.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python -m local_asset_library.cli search 'a car with wheels' --mode combined --pack kenney_car-kit --format glb --max-triangles 3000 --rigged no
-.\scripts\uv.ps1 run --locked python -m local_asset_library.cli detail asset_24e2752dbb26ecd19677091f78243709 --format fbx
-```
-
-Each standard shortlist is capped at five logical assets and 6,000 characters.
-Semantic candidates are labeled weak/unvalidated; similarity is not probability.
-An optional `--min-similarity` supports explicit negative-query evaluation and
-retains unthresholded rankings. It is not a confidence threshold. Full rankings
-are saved separately; the default path contains only the last successful search.
-Queries never fall back after inference failure. Changed contracts require
-capability verification and reindexing. Generated indexes, views and reports
-remain project-local; weights use shared storage. No export, full indexing, MCP integration or benchmark
-approval is part of this step.
-
-## Agent access (step 7)
-
-Local STDIO MCP tools, setup snippets, restoration instructions and real client
-evidence are documented in [docs/mcp/README.md](docs/mcp/README.md).
-Codex completed the real prop-selection workflow. OpenCode connected and
-received the preview, but its local Qwen workflow timed out and remains
-unverified. See [progress](docs/progress.md) for faults and evidence boundaries.
-
-## Windows desktop app
-
-Double-click `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs` to browse
-enabled asset sources and search through the same backend as MCP in a normal,
-resizable Windows window. Startup scans enabled sources for file changes without
-installing, downloading models or processing assets. Enter submits; Clear restores browsing. Asset detail
-includes explicit views/formats, source-path copying and existing fault/evidence
-records. Search settings can be copied as exact MCP argument JSON.
-
-See [desktop usage and runtime ownership](docs/gui/README.md) and
-[verification summary](docs/gui/verification.json). This is an additional stage
-between steps 7 and 8. Step 8's separately approved update/expansion path is now
-documented below; owner usability approval remains pending.
-## Current library operations
-
-Step 8 extends the existing Windows app and shared MCP backend to explicitly
-configured membership, resumable stages, bounded browsing and atomic publication.
-See [library updates](docs/library-updates.md) for manual scan/process/refresh/status,
-approved budgets, identity rules, worker coordination and current evidence paths.
-Earlier forty-asset results above remain historical pilot evidence.
-
-For owner-started generation of pending captions, double-click
-`Generate overnight descriptions.cmd`. Existing caption faults are retained;
-an explicit fault retry uses the advanced invocation documented below.
-The resumable runner uses the existing
-local model and renders, retains prior logs, refreshes description-search data
-and publishes ready results. See [overnight instructions](docs/overnight-descriptions.md)
-for morning reports, interruption recovery, limits and preparation verification.
-
-The approved October 14 texture/material repairs use supplied textures and
-library overrides, preserving original files and fault evidence. Asset handoffs
-include the bindings required when importing the unchanged FBX. See
-[texture repairs](docs/texture-repairs.md) for current processing and receipts.
+A project-wide open source license has not been selected yet. The project is
+being prepared for that release. Bundled third-party components retain their own
+licenses and attribution notices; asset packs and model weights are separate.
