@@ -1,5 +1,45 @@
 # Progress
 
+## October 17 — Performance phase 4: retention and footprint
+
+Phase 4 of the optimization plan ([decision 0006](decisions/0006-retention.md)).
+
+- New `retention.py`: after every combined publication, keep the active
+  generation plus the two newest older `v_*` generations centrally and in each
+  source (`work`/scan folders untouched); stale combined-publication shortcuts
+  go with their generation and are rebuilt on demand. Each app launch keeps the
+  ten newest `data/gui/runs` audits. Faults never fail a publication; receipts
+  are written under `data/maintenance/`.
+- `maintenance_files` now uses Windows long-path syntax (trees over 260
+  characters), validates each directory once per operation, and can lift the
+  read-only attribute of immutable publications only after re-verifying bytes.
+  The link test now uses a real junction.
+- New two-step `scripts/cleanup-scratch.py --plan` / `--apply PLAN` removed old
+  pytest/verification folders from `scratch/`; links were removed as links and
+  only when they pointed inside their own folder. Runtime temp, Blender,
+  download and unclassified folders, scripts and logs were kept. Tests now reuse
+  `--basetemp scratch/pytest` (pytest's cleanup does not traverse junctions,
+  covered by `tests/test_retention.py`).
+
+Cleanup (receipts in `data/maintenance/`): 13 superseded central generations
+(1.67 GB; a first pass retained 21 read-only files as faults, removed after the
+read-only fix), 48 launch audits (7 MB), and 164 reviewed scratch folders in three
+passes (1.34 GB, then 0.05 GB, then 2.09 GB after the read-only and long-path
+fixes; no remaining faults). Each later plan was checked to be a subset of the
+first reviewed plan. Source generations were already within the limit. Storage
+receipts: `data/storage/perf-before-phase4-20261017.json` → `perf-after-phase4-20261017.json`:
+allocated 11.74 → **7.05 GiB** (−4.69 GiB), files 547,093 → 102,944. Against the
+session start (`perf-before-20261017.json`, 10.51 GiB) the project is 3.46 GiB smaller.
+
+Verification: **403 tests passed** (`scratch/pytest`); WebView2 checks passed:
+`data/gui/source-installed-9c12240acf/report.json` (10 launch audits retained),
+`data/gui/perf-p4-source-browser`, `data/gui/source-settings-9fec3080c6/report.json`.
+Final read-only receipt `data/benchmarks/perf-phase4-20261017.json` matches phase 3
+(warm summary 0.14 s, browse 0.03 s, keyword 0.58 s, stub combined 2.1 s).
+Earlier phase entries cite `scratch/pytest-perf-*` folders that this cleanup
+removed; their pass counts remain recorded here. No original asset or generated
+asset result was modified, retried or reprocessed.
+
 ## October 17 — Performance phase 3: embedding-only worker and pre-start
 
 Phase 3 of the optimization plan ([decision 0005](decisions/0005-embedding-worker-and-prestart.md)).

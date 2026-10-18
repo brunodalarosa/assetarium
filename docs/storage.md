@@ -33,6 +33,13 @@ for that file. Use uv to uninstall/replace a pinned package when making a change
 If hard links are unavailable, record the fault and plan the disk cost before
 using copies. Symlinked environments are not a substitute.
 
+Retention (decision 0006) keeps the active publication plus the two newest older
+generations, centrally and per source, and the ten newest `data/gui/runs`
+launch audits. Each publication and each app launch applies it through the
+reviewed manifest flow and writes a receipt under `data/maintenance/`. Old
+pytest/verification folders in `scratch/` are removed only by the explicit
+two-step `scripts/cleanup-scratch.py --plan` / `--apply PLAN`.
+
 `cache/file-hashes.sqlite` (a few MB) records verified hashes by file identity
 for every LAL process (decision 0004). It holds no evidence: deleting it only
 makes the next scan or search re-hash files once.
@@ -111,7 +118,7 @@ verification without repeating already-passed GPU inference.
 Run the full test suite in the existing MCP environment, which includes Pillow:
 
 ```powershell
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest-current
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest
 ```
 
 The lightweight base environment does not provide every image dependency used by

@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from local_asset_library.config import ConfigError
@@ -35,12 +37,30 @@ def test_tree_validation_checks_links_before_deletion(tmp_path, monkeypatch):
     root = tmp_path / 'metadata'
     target = root / 'inspection'
     target.mkdir(parents=True)
-    secret = target / 'redirected'
-    secret.mkdir()
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    (outside / 'secret.bin').write_bytes(b'never removed')
     keep = target / 'preview.png'
     keep.write_bytes(b'keep')
-    original = type(secret).is_junction
-    monkeypatch.setattr(type(secret), 'is_junction', lambda p: p == secret or original(p))
+    import subprocess
+    result = subprocess.run(['cmd', '/c', 'mklink', '/J', str(target / 'redirected'), str(outside)], capture_output=True)
+    assert result.returncode == 0, result.stderr.decode(errors='replace')
     with pytest.raises(ConfigError, match='links'):
         manifest(root, [target])
-    assert keep.read_bytes() == b'keep'
+    assert keep.read_bytes() == b'keep' and (outside / 'secret.bin').read_bytes() == b'never removed'
+
+
+def test_long_paths_are_validated_and_removed(tmp_path):
+    from local_asset_library.maintenance_files import manifest, remove_empty_tree, remove_manifest
+    from local_asset_library.publication import filesystem_path
+    root = tmp_path / 'generated'
+    deep = root / 'target' / ('a' * 90) / ('b' * 90) / ('c' * 90)
+    os.makedirs(filesystem_path(deep))
+    leaf = deep / 'file.bin'
+    with open(filesystem_path(leaf), 'wb') as stream:
+        stream.write(b'deep')
+    assert len(str(leaf)) > 260
+    rows = manifest(root, [root / 'target'])
+    assert [r['bytes'] for r in rows] == [4]
+    assert remove_manifest(root, rows)['removed'] == [rows[0]['path']]
+    assert not remove_empty_tree(root, root / 'target') and not os.path.exists(filesystem_path(root / 'target'))

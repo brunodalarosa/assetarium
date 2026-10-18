@@ -92,7 +92,7 @@ def verified_hash(path, fresh=False):
                 cache[key] = known
             return known
     value = hashlib.sha256()
-    with path.open('rb') as stream:
+    with open(filesystem_path(path), 'rb') as stream:
         for chunk in iter(lambda:stream.read(1024*1024),b''):
             value.update(chunk)
     if hash_cache.file_identity(path) != identity:

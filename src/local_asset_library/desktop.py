@@ -57,6 +57,13 @@ class DesktopBridge:
             self._init_error = str(exc)
             self._ready.set()
             return
+        def retain_runs():
+            from .retention import retire_gui_runs
+            try:
+                retire_gui_runs(self._config)  # Keeps the ten newest launch audits, including this one.
+            except Exception:
+                logging.exception('Launch audit retention fault')
+        self._loop.call_soon(lambda: self._loop.run_in_executor(None, retain_runs))
         if self._prestart_worker:
             # Libraries only (decision 0005); the model still loads on the first semantic search.
             self._loop.call_soon(lambda: self._loop.create_task(self._gateway.prestart()))

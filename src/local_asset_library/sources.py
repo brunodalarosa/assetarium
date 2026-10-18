@@ -595,6 +595,7 @@ def aggregate(config):
             if not previous_config.output_path('data',relative).is_file():
                 raise ConfigError('A saved combined publication is incomplete; retained for review')
         atomic_json(active_path,previous)
+        _retain(config)
         return {'generation':previous['generation'],'reused':True,'membership':len(records)}
     contract_path = config.project_root / 'data/library/embedding-contract.json'
     if not meta:
@@ -619,4 +620,15 @@ def aggregate(config):
     publication = {"generation": target.catalog_generation, "sources_fingerprint": fingerprint}
     atomic_json(projection_path,publication)
     atomic_json(active_path,publication)
+    _retain(config)
     return {"generation": target.catalog_generation, "membership": len(records)}
+
+
+def _retain(config):
+    """Retire superseded generations (decision 0006); never fails the publication."""
+    from .retention import retire_generations, write_receipt
+    try:
+        retire_generations(config)
+    except Exception as exc:
+        write_receipt(config, 'generation-retention', [{'root': str(config.project_root), 'targets': [], 'bytes': 0,
+                      'faults': [{'status': 'faulty', 'reason': str(exc) or type(exc).__name__}]}])

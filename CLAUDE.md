@@ -33,9 +33,9 @@ Prefer `--locked --no-sync --offline` for runs.
 
 ```powershell
 # Full suite (313+ tests, includes real Blender fixtures; takes minutes)
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest-<new-name>
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest
 # Targeted
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_desktop.py tests/test_sources.py --basetemp scratch/pytest-<new-name>
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_desktop.py tests/test_sources.py --basetemp scratch/pytest
 # Real WebView2 verification with isolated synthetic assets (writes data/gui/<run-name>/report.json)
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/verify-source-browser.py --run-name <unique-name>
 # Config/health (read only)
@@ -45,7 +45,8 @@ Prefer `--locked --no-sync --offline` for runs.
 .\.venv\Scripts\python.exe scripts/storage-report.py --output <new-name>.json
 ```
 
-Use a new `--basetemp` / `--run-name` each time; existing outputs are evidence.
+Reuse `--basetemp scratch/pytest` (pytest clears it; it holds no evidence, decision 0006).
+Use a new `--run-name` / receipt name each time; existing outputs are evidence.
 pytest config lives in `pyproject.toml` (`-q -p no:cacheprovider`). Some tests
 create Windows junctions and may need sandbox permission. Launch the app with
 `Local Asset Library.vbs` (it runs `.venv-mcp\Scripts\pythonw.exe
