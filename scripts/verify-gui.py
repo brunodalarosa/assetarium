@@ -13,7 +13,7 @@ import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
-from local_asset_library.config import load_config
+from local_asset_library.config import load_project_config
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -135,6 +135,22 @@ def screenshot(name):
     stream.Dispose()
 
 
+# The library is paged (40 cards) and thumbnails load only near the viewport.
+PAGE = 'Math.min(40,state.context.pilot_count)'
+THUMBNAILS_SETTLED = "document.querySelectorAll('.thumb img').length>0&&state.thumbQueue.length===0&&state.thumbWorkers===0"
+
+
+def all_items(filters=None):
+    """Every library member across browse pages (the first page alone is not representative)."""
+    items, offset = [], 0
+    while True:
+        page = bridge.browse(filters or {}, offset, 100)
+        items.extend(page['items'])
+        offset += len(page['items'])
+        if not page['items'] or offset >= page['total_count']:
+            return items
+
+
 def search_script(arguments):
     values = {'query': arguments.get('query', ''), 'mode': arguments['mode'], 'limit': str(arguments['limit']),
               'pack': '', 'format': '', 'triangles': '', 'rigged': ''}
@@ -154,18 +170,18 @@ def search_script(arguments):
 def verify():
     wire = None
     try:
-        wait_js("Boolean(state.context && state.items.length===state.context.pilot_count)")
+        wait_js(f"Boolean(state.context && state.items.length==={PAGE})")
         assert not bridge._gateway.model_requested, 'Browsing must not load a model'
-        wait_js("document.querySelectorAll('.thumb img').length===state.context.pilot_count")
+        wait_js(THUMBNAILS_SETTLED)
         report['browse'] = {'context': bridge.context(), 'cards': window.evaluate_js('state.items.length'),
                             'thumbnails': window.evaluate_js("document.querySelectorAll('.thumb img').length"),
                             'model_requested': False}
         assert window.gui.renderer == 'edgechromium'
-        report['checks'].append('Pilot membership/counts, all existing three-quarter thumbnails, WebView2, no browse model load')
+        report['checks'].append('Library counts, first browse page, visible three-quarter thumbnails, WebView2, no browse model load')
         screenshot('browse.png')
         if args.render_only:
             if args.caption_classification:
-                records = bridge.browse()['items']
+                records = all_items()
                 expected = {level: sum(r['caption_status'] == level for r in records)
                             for level in ('warning', 'fault', 'review_note', 'clear')}
                 actual_badges = window.evaluate_js("({warning:document.querySelectorAll('.card .caption-quality-badge.warning').length,fault:document.querySelectorAll('.card .caption-quality-badge.fault').length})")
@@ -199,13 +215,13 @@ def verify():
                     assert not gui['error'] and gui['captured']['payload'] == mcp_search
                     report['searches'].append({'arguments': search_args, 'asset_ids': gui['ids'], 'caption_level': level})
                     js('browse()')
-                    wait_js("document.querySelectorAll('.thumb img').length===state.context.pilot_count")
+                    wait_js(THUMBNAILS_SETTLED)
                 wire.close()
                 wire = None
                 report['checks'].append('Actual severity badges and rendered note/warning/fault separation; three real STDIO detail/search payloads agree; original evidence retained')
             gui = js(search_script({'query': 'apple', 'mode': 'keyword', 'filters': {}, 'limit': 5}))
             assert not gui['error'] and gui['ids']
-            wait_js("document.querySelectorAll('.thumb img').length===state.items.length")
+            wait_js(THUMBNAILS_SETTLED)
             js('selectAsset(' + json.dumps(gui['ids'][0]) + ')')
             screenshot('detail.png')
             window.resize(680, 760)
@@ -215,7 +231,7 @@ def verify():
             report['checks'].append('Final concise cards and evidence detail rendered in the actual shell; narrow layout; keyword only; no model load')
             report['status'] = 'passed'
             return
-        records = bridge.browse()['items']
+        records = all_items()
         apple = next(r for r in records if r['name'].casefold() == 'apple')
         wire = Wire()
         cases = [
@@ -273,9 +289,9 @@ def verify():
         assert copied['status'] == 'copied'
         report['checks'].append('Native clipboard accepted exact reproducible MCP argument JSON')
         js("(async()=>{$('clear').click();await new Promise(resolve=>setTimeout(resolve,400));return true;})()")
-        wait_js('state.items.length===state.context.pilot_count')
+        wait_js(f'state.items.length==={PAGE}')
         assert state_free_resources(window)
-        report['checks'].append('Clear restores full pilot; all app-loaded resource URLs are local/data')
+        report['checks'].append('Clear restores the first library page; all app-loaded resource URLs are local/data')
         wire.close()
         wire = None
         report['status'] = 'passed'
@@ -298,7 +314,7 @@ def state_free_resources(window):
 
 os.environ.update(PYTHONNET_RUNTIME='netfx', WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='--force-renderer-accessibility',
     TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
-config = load_config(ROOT / 'config.example.toml', ROOT)
+config = load_project_config(ROOT)
 bridge = DesktopBridge(config)
 window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)

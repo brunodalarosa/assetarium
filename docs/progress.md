@@ -1,5 +1,23 @@
 # Progress
 
+## October 18 — `verify-gui.py` updated for the paged library
+
+The legacy real WebView2 + STDIO MCP agreement check still assumed the 40-asset
+pilot (all members on one page, every thumbnail loaded, Clear restoring the full
+pilot). It now expects one browse page (`min(40, members)`), waits for the
+visible-only thumbnail queue to settle, finds `apple` and caption-severity
+examples across all browse pages, and loads `config.load_project_config`
+(decision 0001). App behavior is unchanged.
+
+Full mode passed (`data/gui/verify-gui-paged-20261018/report.json`): ten
+packaged-form searches (combined, keyword, filtered, description, image and
+reference) exactly match real STDIO MCP payloads, order and truncation with the
+actual model; keyboard, native resize, synthetic race/truncation/error checks,
+clipboard and local-only resources pass; the pre-started GUI worker closed with
+exit code 0. Searches took about 5 s each because the GUI and MCP workers
+alternate on the GPU lease. Render-only mode passed
+(`data/gui/verify-gui-paged-render-20261018/report.json`).
+
 ## October 17 — Performance phase 4: retention and footprint
 
 Phase 4 of the optimization plan ([decision 0006](decisions/0006-retention.md)).
