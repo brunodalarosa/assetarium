@@ -177,6 +177,42 @@ def infer_caption(backend, inputs, prompt, max_attempts=2):
     return {"status": "failed", "description": None, "suggested_uses": [], "attempts": attempts}
 
 
+def infer_captions(backend, inputs_list, prompt, max_new_tokens=1100, batch_size=None):
+    """One batched generation; single attempt per asset, same outcome shape as infer_caption.
+
+    GpuMemoryError propagates: it is a machine limit, not an asset outcome. A backend
+    may supply its own generate_batch (synthetic test backends do); QwenBackend uses
+    caption_batching, keeping caption_backend.py and its fingerprints unchanged.
+    """
+    from .caption_batching import GpuMemoryError, generate_batch, memory_message
+    started = time.perf_counter()
+    outcomes = []
+    own = getattr(backend, 'generate_batch', None)
+    try:
+        results = own(inputs_list, prompt, max_new_tokens) if own else generate_batch(backend, inputs_list, prompt, max_new_tokens)
+    except GpuMemoryError:
+        # Name the configured setting, not a smaller final batch.
+        raise GpuMemoryError(memory_message(batch_size or len(inputs_list))) from None
+    for result in results:
+        if isinstance(result, BaseException):
+            outcomes.append({"status": "failed", "description": None, "suggested_uses": [],
+                             "attempts": [{"status": "inference_failed", "error": f"{type(result).__name__}: {result}",
+                                           "elapsed_seconds": time.perf_counter() - started}]})
+            continue
+        raw, metrics = result
+        attempt = {"raw": raw, "metrics": metrics, "prompt_sha256": digest(prompt), "max_new_tokens": max_new_tokens}
+        try:
+            caption = parse_caption(raw)
+        except (ValueError, TypeError) as exc:
+            outcomes.append({"status": "failed", "description": None, "suggested_uses": [],
+                             "attempts": [{"status": "invalid_output", "error": str(exc), **attempt}]})
+            continue
+        uses = caption.pop("suggested_uses")
+        outcomes.append({"status": "complete", "description": caption, "suggested_uses": uses,
+                         "attempts": [{"status": "complete", **attempt}]})
+    return outcomes
+
+
 def validate_overlay(value):
     if not isinstance(value, dict) or set(value) != {"schema_version", "description", "suggested_uses", "caption_review", "artistic_suitability", "notes"}:
         raise ValueError("Invalid owner correction overlay fields")

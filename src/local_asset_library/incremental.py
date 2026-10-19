@@ -18,7 +18,7 @@ from .catalog import (build_inventory, detail, digest, encoded, read_database, s
 from .config import ConfigError
 from .membership import records, membership
 from .publication import atomic_json, generation
-from .captions import file_hash, image_inputs, input_state, infer_caption
+from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
 from .inspection import choose_source, discover_blender, environment, run_process, validate_result
 
@@ -125,16 +125,21 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
     return asset, source, reason, digest(settings)
 
 
-def caption_input(config, record, prompt_version=None):
+def caption_input(config, record, prompt_version=None, generation=None):
     # Model/runtime contracts and prompt affect inference. Severity/owner review do not.
-    # Completed captions retain their generation prompt for cache validation;
+    # Completed captions retain their generation prompt and mode for cache validation;
     # adopting a new default is not a request to regenerate existing results.
+    from .caption_batching import MODE, POLICY
+    provenance = (record.get('caption_provenance') or {}) if record['processing'].get('caption') == 'complete' else {}
     if prompt_version is None:
-        prompt_version = ((record.get('caption_provenance') or {}).get('prompt_version')
-                          if record['processing'].get('caption') == 'complete' else None) or CAPTION_PROMPT_VERSION
+        prompt_version = provenance.get('prompt_version') or CAPTION_PROMPT_VERSION
     if prompt_version not in {'v1', 'v2', 'v3', 'v4'}:
         raise ConfigError('Unsupported caption prompt version')
-    return digest({"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
+    if generation is None:
+        generation = provenance.get('generation_mode', 'sequential') if provenance else MODE
+    if generation not in {'sequential', MODE}:
+        raise ConfigError('Unsupported caption generation mode')
+    value = {"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
         "view_label": p.get("view_label"), "actual": s.get("current_sha256", s.get("error"))}
         for s in input_state(config, record) for p in [s["preview"]]],
         "model": {k: v for k,v in json.loads((config.project_root / "docs/caption-model.json").read_text(encoding="utf-8")).items()
@@ -142,7 +147,11 @@ def caption_input(config, record, prompt_version=None):
         "prompt": file_hash(config.project_root / f"prompts/caption-{prompt_version}.txt"),
         "backend": file_hash(config.project_root / "src/local_asset_library/caption_backend.py"),
         "runtime": file_hash(config.project_root / "runtime/caption/uv.lock"),
-        "generation_policy": "single-attempt-no-fault-retry-v1"})
+        "generation_policy": "single-attempt-no-fault-retry-v1"}
+    if generation == MODE:  # Sequential fingerprints stay byte-identical to earlier results.
+        value.update(generation_policy=POLICY,
+                     batching=file_hash(config.project_root / "src/local_asset_library/caption_batching.py"))
+    return digest(value)
 
 
 def stage_content(config,record,stage):
@@ -293,21 +302,43 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
     return {"status": result["status"], "result_path": str(result_path), "seconds": result.get("elapsed_seconds"), "errors": result.get("errors", [])}
 
 
-def run_caption(config, record, fingerprint, backend):
-    from .captions import publish
-    inputs = image_inputs(config, record)
+def returned(value):
+    if isinstance(value, BaseException):
+        raise value
+    return value
+
+
+def run_captions(config, batch, backend, batch_size=None):
+    """Generate one batch of (record, fingerprint, inputs); return each outcome or its exception.
+
+    Every asset is re-checked, saved and published on its own. GpuMemoryError propagates
+    before anything is recorded, so the batch stays pending.
+    """
+    from .captions import infer_captions, publish
+    from .caption_batching import MODE
     prompt_path = config.project_root / f'prompts/caption-{CAPTION_PROMPT_VERSION}.txt'
     prompt = prompt_path.read_text(encoding="utf-8")
-    outcome = infer_caption(backend, inputs, prompt, max_attempts=1)
-    image_inputs(config, record)
-    relative = f"captions/library/{record['asset_id']}/{fingerprint}.json"
-    provenance = {"fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
-        "prompt_version": CAPTION_PROMPT_VERSION, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
-        "attempts": outcome["attempts"], "ai_review": "pending", "owner_caption_review": "pending",
-        "owner_artistic_suitability": "pending", "result_path": "data/" + relative}
-    save_json(config.output_path("data", relative), {"asset_id": record["asset_id"], **outcome, "provenance": provenance})
-    publish(config, record["asset_id"], outcome, provenance)
-    return {"status": outcome["status"], "result_path": "data/" + relative, "attempts": outcome["attempts"]}
+    outcomes = infer_captions(backend, [inputs for _, _, inputs in batch], prompt, batch_size=batch_size)
+    results = []
+    for position, ((record, fingerprint, inputs), outcome) in enumerate(zip(batch, outcomes)):
+        try:
+            image_inputs(config, record)
+            relative = f"captions/library/{record['asset_id']}/{fingerprint}.json"
+            provenance = {"fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
+                "prompt_version": CAPTION_PROMPT_VERSION, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
+                "generation_mode": MODE, "batch": {"size": batch_size or len(batch), "assets": len(batch), "position": position},
+                "attempts": outcome["attempts"], "ai_review": "pending", "owner_caption_review": "pending",
+                "owner_artistic_suitability": "pending", "result_path": "data/" + relative}
+            save_json(config.output_path("data", relative), {"asset_id": record["asset_id"], **outcome, "provenance": provenance})
+            publish(config, record["asset_id"], outcome, provenance)
+            results.append({"status": outcome["status"], "result_path": "data/" + relative, "attempts": outcome["attempts"]})
+        except (OSError, ValueError, RuntimeError, KeyError) as exc:
+            results.append(exc)
+    return results
+
+
+def run_caption(config, record, fingerprint, backend):
+    return returned(run_captions(config, [(record, fingerprint, image_inputs(config, record))], backend)[0])
 
 
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
@@ -369,23 +400,16 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         if dry_run:
             return report
         started = time.monotonic()
-        atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':stage,'selected':len(pending[:limit]),'completed':0,'pid':os.getpid()})
-        for record, fp in pending[:limit]:
-            if cancelled and cancelled():
-                report['cancelled'] = True
-                break
+        chosen = pending[:limit]
+        status_path = config.output_path('data','library/processing-status.json')
+        atomic_json(status_path,{'status':'running','stage':stage,'selected':len(chosen),'completed':0,'pid':os.getpid()})
+        from .settings import caption_batch_size
+        size = caption_batch_size(config) if stage == 'caption' else 1
+
+        def settle(record, fp, run):
             identifier = record["asset_id"]
-            if progress:
-                progress(identifier, len(report['outcomes']), min(limit, len(pending)))
-            checkpoint(db, identifier, stage, fp, "running", {"resumable": True})
-            print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
             try:
-                from .retrieval import source_check
-                checked = deepcopy(record)
-                if stage == "inspection":
-                    checked["technical"] = None
-                source_check(work, checked)
-                outcome = run_inspection(work, record, fp, resolution, formats=formats) if stage == "inspection" else run_caption(work, record, fp, backend)
+                outcome = run()
                 updated = detail(work, identifier)
                 final_fp = inspection_input(work, updated, resolution)[3] if stage == "inspection" else caption_input(work, updated)
             except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
@@ -404,9 +428,47 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
             outcome['fault_content']=stage_content(work,updated,stage)
             checkpoint(db, identifier, stage, final_fp, outcome["status"], outcome)
             report["outcomes"].append({"asset_id": identifier, **outcome})
-            atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':stage,'selected':len(pending[:limit]),'completed':len(report['outcomes']),'pid':os.getpid(),'last_asset':identifier,'last_status':outcome['status']})
+            atomic_json(status_path,{'status':'running','stage':stage,'selected':len(chosen),'completed':len(report['outcomes']),'pid':os.getpid(),'last_asset':identifier,'last_status':outcome['status']})
+
+        from .retrieval import source_check
+        for start in range(0, len(chosen), size):
+            if cancelled and cancelled():
+                report['cancelled'] = True
+                break
+            group = chosen[start:start + size]
             if progress:
-                progress(None, len(report['outcomes']), min(limit, len(pending)))
+                progress(group[0][0]["asset_id"], len(report['outcomes']), len(chosen))
+            ready = []
+            for record, fp in group:
+                checkpoint(db, record["asset_id"], stage, fp, "running", {"resumable": True})
+                print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
+                try:
+                    checked = deepcopy(record)
+                    if stage == "inspection":
+                        checked["technical"] = None
+                    source_check(work, checked)
+                    inputs = image_inputs(work, record) if stage == "caption" else None
+                except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
+                    settle(record, fp, lambda exc=exc: returned(exc))
+                    continue
+                if stage == "inspection":
+                    settle(record, fp, lambda: run_inspection(work, record, fp, resolution, formats=formats))
+                else:
+                    ready.append((record, fp, inputs))
+            if ready:
+                from .caption_batching import GpuMemoryError
+                try:
+                    results = run_captions(work, ready, backend, batch_size=size)
+                except GpuMemoryError as exc:
+                    # Ledger rows stay "running", which the next pass treats as pending.
+                    report.update(stopped=str(exc), elapsed_seconds=time.monotonic() - started)
+                    save_json(config.output_path("data", f"library/batches/{stage}-{uuid.uuid4().hex}.json"), report)
+                    atomic_json(status_path,{'status':'stopped','stage':stage,'completed':len(report['outcomes']),'reason':str(exc)})
+                    raise
+                for (record, fp, _), result in zip(ready, results):
+                    settle(record, fp, lambda result=result: returned(result))
+            if progress:
+                progress(None, len(report['outcomes']), len(chosen))
         report["elapsed_seconds"] = time.monotonic() - started
         report['complete']=sum(o['status']=='complete' for o in report['outcomes'])
         report['failed']=sum(o['status']=='failed' for o in report['outcomes'])

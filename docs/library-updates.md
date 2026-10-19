@@ -17,6 +17,12 @@ Uncheck all to pause processing. Existing results, search vectors and recorded
 failures remain preserved; formats excluded by the selection create no new
 actionable processing work. See [processing formats](asset-sources.md#processing-formats).
 
+**Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets how
+many assets share one description model call. Larger is faster and uses more GPU
+memory. Changing it never re-queues finished descriptions. Running out of GPU
+memory stops processing with that message and leaves the batch pending
+([decision 0007](decisions/0007-batched-description-generation.md)).
+
 For current command-line operation, `library-batch.py scan` checks enabled sources,
 `library-batch.py status` reports their state, and
 `library-batch.py process --source KEY` starts processing and automatic publication

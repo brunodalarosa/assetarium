@@ -125,9 +125,10 @@ class DesktopBridge:
         from .settings import general_settings
         return self._wait(self._present(general_settings, self._config, guarded=False))
 
-    def save_general_settings(self, storage_budget_gib, processing_formats=None):
+    def save_general_settings(self, storage_budget_gib, processing_formats=None, caption_batch_size=None):
         from .settings import save_general_settings
-        return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats, guarded=False))
+        return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
+                                        caption_batch_size, guarded=False))
 
     def importing_failures(self):
         from .sources import importing_failures

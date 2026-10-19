@@ -93,11 +93,15 @@ def verify():
         assert window.evaluate_js("$('asset-sources-panel').hidden&&$('general-tab').getAttribute('aria-selected')==='true'")
         assert not settings_path(config).exists()
         assert window.evaluate_js("[...$('processing-formats').querySelectorAll('input')].every(input=>input.checked)")
-        report['checks'].append('General opens by default and shows the historical limit without writing it')
-        window.evaluate_js("$('storage-budget').value='24';$('processing-format-fbx').checked=false;$('processing-format-obj').checked=false;$('save-general-settings').click()")
+        assert window.evaluate_js("$('caption-batch-size').value==='8'&&!$('caption-batch-size').disabled")
+        report['checks'].append('General opens by default and shows the historical limit and default batch size 8 without writing them')
+        window.evaluate_js("$('storage-budget').value='24';$('processing-format-fbx').checked=false;$('processing-format-obj').checked=false;$('caption-batch-size').value='4';$('save-general-settings').click()")
         wait("$('general-settings-message').textContent.startsWith('Saved.')")
         assert general_settings(config)['storage_budget_gib'] == 24
         assert general_settings(config)['processing_formats'] == ['gltf']
+        assert general_settings(config)['caption_batch_size'] == 4
+        assert window.evaluate_js("$('general-settings-message').textContent.includes('Description batch size: 4')")
+        report['checks'].append('Save persists description batch size 4 and names it in the confirmation')
         wait("state.sources.find(s=>s.key===" + json.dumps(one['key']) + ").pending===2")
         capture('01-general-saved.png')
         report['checks'].append('Save persists the budget and glTF-only selection; pending counts refresh immediately without processing')
@@ -107,9 +111,11 @@ def verify():
         assert settings_path(config).read_bytes() == saved
         assert bridge.save_general_settings('invalid')['status'] == 'faulty'
         assert settings_path(config).read_bytes() == saved
+        assert bridge.save_general_settings('24', ['gltf'], '3')['status'] == 'faulty'
+        assert settings_path(config).read_bytes() == saved
         report['checks'].append('Browser and backend reject invalid values without replacing the saved limit')
         window.evaluate_js("$('close-settings').click();$('open-settings').click()")
-        wait("$('storage-budget').value==='24'&&!$('storage-budget').disabled")
+        wait("$('storage-budget').value==='24'&&!$('storage-budget').disabled&&$('caption-batch-size').value==='4'")
         assert window.evaluate_js("$('processing-format-gltf').checked&&!$('processing-format-fbx').checked&&!$('processing-format-obj').checked")
         window.evaluate_js("$('processing-format-gltf').checked=false;$('save-general-settings').click()")
         wait("$('general-settings-message').textContent.includes('Processing is paused')")

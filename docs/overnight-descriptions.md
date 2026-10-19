@@ -57,7 +57,12 @@ Double-click the same launcher again to resume an unfinished run. Completed,
 failed and skipped assets in that run are not generated again. A saved response
 can be committed after interruption without another generation. An attempt
 interrupted before its response was saved becomes an explicit fault instead of
-being silently repeated.
+being silently repeated. Descriptions are generated in batches (*Settings →
+General → Description batch size*, default 8); `inflight.json` lists the whole
+batch, so an interrupted batch records each of its assets as interrupted. If a
+batch runs out of GPU memory, the run stops with a message naming the batch size,
+nothing is recorded as failed and those assets stay pending; lower the size and
+resume.
 
 Once a run has finished, manually launching the script again starts a **new** run
 for remaining pending captions. An actual fault retry requires an explicit
@@ -72,8 +77,9 @@ remains intact. Advanced optional arguments:
 ```
 
 The 180-second progress watchdog stops only the wrapper and descendants created
-by this runner. A stalled caption asset is recorded as faulty and processing
-continues with the next asset in a fresh worker. A model startup or indexing
+by this runner. A stalled caption batch is recorded as faulty and processing
+continues with the next batch in a fresh worker. One batch is bounded by the
+120-second generation limit, inside the watchdog window. A model startup or indexing
 failure stops the run with a clear report and leaves remaining work resumable.
 No unchanged asset fault is automatically retried within a run. If the launcher
 window was closed while a worker remained alive, restarting is blocked until

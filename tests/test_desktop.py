@@ -181,3 +181,20 @@ def test_desktop_default_exact_shared_shortlist_and_close(indexed, monkeypatch):
         bridge._close()
     assert not bridge._thread.is_alive()
     assert json.loads((bridge._gateway.audit_root / 'lifecycle.json').read_text())['closed']
+
+
+def test_desktop_bridge_saves_description_batch_size_with_general_settings(indexed):
+    from local_asset_library.settings import save_general_settings
+    config, _, _ = indexed
+    save_general_settings(config, 24)  # This fixture has no historical membership budget.
+    bridge = DesktopBridge(config)
+    try:
+        assert bridge.general_settings()['caption_batch_size'] == 8
+        saved = bridge.save_general_settings('24', ['fbx', 'gltf', 'obj'], '2')
+        assert saved['status'] == 'saved' and saved['caption_batch_size'] == 2
+        assert bridge.general_settings()['caption_batch_size'] == 2
+        refused = bridge.save_general_settings('24', ['gltf'], '3')
+        assert refused['status'] == 'faulty' and 'batch size' in refused['reason']
+        assert bridge.general_settings()['caption_batch_size'] == 2
+    finally:
+        bridge._close()

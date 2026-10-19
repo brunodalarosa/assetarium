@@ -411,7 +411,7 @@ def test_caption_publication_stores_logical_owner_overlay_path(managed,monkeypat
     config,backend,one,_=managed;work=ready_source(config,backend,one)
     record=records(work)[0]
     outcome={'status':'complete','description':record['description'],'suggested_uses':[], 'attempts':[]}
-    monkeypatch.setattr(incremental,'infer_caption',lambda *args,**kwargs:outcome)
+    monkeypatch.setattr(captions,'infer_captions',lambda *args,**kwargs:[outcome])
     backend.settings={}
     result=run_caption(work,record,'a'*64,backend)
     published=detail(work,record['asset_id'])

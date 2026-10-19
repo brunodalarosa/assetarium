@@ -17,6 +17,8 @@ from local_asset_library.membership import records
 from local_asset_library.library_index import index_library
 from local_asset_library.overnight import (plan, create_run, caption_batch, outcomes, remaining,
     run_path, recover_inflight, verify_protected, record_fault, set_state, summary)
+from local_asset_library.settings import save_general_settings
+from local_asset_library.caption_batching import GpuMemoryError
 
 
 class CaptionBackend(Backend):
@@ -92,6 +94,7 @@ def test_failed_generation_moves_on_and_preserves_previous_evidence(overnight):
 
 def test_interruption_never_repeats_attempt_in_same_run(overnight):
     config, _, _ = overnight
+    save_general_settings(config, 8, None, 1)  # One asset per batch: the single-asset contract.
     identifier = create_run(config)
     first = CaptionBackend([KeyboardInterrupt()])
     # The fake backend mimics an interrupt during actual generation.
@@ -260,3 +263,45 @@ def test_morning_report_separates_new_and_retained_index_faults(overnight):
     assert report['description_index']['new_failed'] == 1
     assert report['description_index']['retained_failed'] == 1
     assert report['description_index']['failures'][0]['error'] == 'Synthetic vector fault'
+
+
+def test_batched_run_uses_one_generation_and_records_batch_provenance(overnight):
+    config, _, _ = overnight
+    identifier = create_run(config)
+    backend = CaptionBackend([json.dumps(caption()), json.dumps(caption())])
+    caption_batch(config, identifier, lambda _: backend)
+    assert backend.batches == [2] and not remaining(config, identifier)
+    saved = [json.loads(p.read_text(encoding='utf-8')) for p in (run_path(config, identifier) / 'attempts').glob('*.json')]
+    assert {s['provenance']['generation_mode'] for s in saved} == {'batched-v1'}
+    assert sorted(s['provenance']['batch']['position'] for s in saved) == [0, 1]
+    assert {s['provenance']['batch']['size'] for s in saved} == {8}
+    assert not (run_path(config, identifier) / 'inflight.json').exists()
+
+
+def test_interrupted_batch_records_every_inflight_asset_once(overnight):
+    config, _, _ = overnight
+    identifier = create_run(config)
+    first = CaptionBackend([])
+    def interrupted(*args, **kwargs):
+        first.calls.append(args)
+        raise KeyboardInterrupt()
+    first.generate = interrupted
+    with pytest.raises(KeyboardInterrupt):
+        caption_batch(config, identifier, lambda _: first)
+    assert len(json.loads((run_path(config, identifier) / 'inflight.json').read_text())['asset_ids']) == 2
+    recover_inflight(config, identifier)
+    assert len(outcomes(config, identifier)) == 2 and not remaining(config, identifier)
+    second = CaptionBackend([])
+    caption_batch(config, identifier, lambda _: second)
+    assert not second.calls
+
+
+def test_gpu_memory_stop_leaves_overnight_assets_pending(overnight):
+    config, _, _ = overnight
+    save_general_settings(config, 8, None, 4)
+    identifier = create_run(config)
+    backend = CaptionBackend([GpuMemoryError('synthetic out of memory')])
+    with pytest.raises(GpuMemoryError, match='batch size 4'):
+        caption_batch(config, identifier, lambda _: backend)
+    assert not (run_path(config, identifier) / 'inflight.json').exists()
+    assert not outcomes(config, identifier) and len(remaining(config, identifier)) == 2

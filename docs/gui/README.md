@@ -42,7 +42,11 @@ through the existing MCP runtime, using isolated synthetic assets only.
 The library shows one warning card per source needing processing/publication.
 **Process assets** performs both, with a progress bar spanning processing,
 publication and a final verification scan. **Cancel** finishes and saves the
-current asset before stopping. The card remains until a scan confirms that no
+current asset (or, while writing descriptions, the current batch) before stopping.
+**Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets
+how many assets are described per model call. If processing stops because the GPU
+ran out of memory, the source card names the batch size; lower it and press
+**Process assets** again. Finished descriptions are never redone. The card remains until a scan confirms that no
 actionable work remains and current results have been published. Recorded failures
 do not trigger pending cards: **Importing failures report** opens a scrollable list
 of original asset paths, including disabled sources. Saved attempts distinguish

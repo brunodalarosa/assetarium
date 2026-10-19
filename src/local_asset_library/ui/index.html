@@ -62,6 +62,14 @@
               <label><input id="processing-format-obj" type="checkbox" value="obj" checked>OBJ</label>
             </div>
           </fieldset>
+          <label for="caption-batch-size">Description batch size</label>
+          <p id="caption-batch-size-help" class="hint">How many assets are described together in one model call. Larger batches finish sooner but use more GPU memory. If processing stops for lack of GPU memory, choose a smaller size. Finished descriptions are never redone.</p>
+          <select id="caption-batch-size" aria-describedby="caption-batch-size-help" disabled>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="4">4</option>
+            <option value="8">8 (default)</option>
+          </select>
           <button type="submit" id="save-general-settings" class="primary" disabled>Save</button>
           <p id="general-settings-message" role="status" aria-live="polite"></p>
         </form>

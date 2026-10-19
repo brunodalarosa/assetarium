@@ -6,6 +6,7 @@ import pytest
 
 from local_asset_library.captions import file_hash
 from local_asset_library.config import Config, ConfigError
+from local_asset_library.caption_batching import GpuMemoryError
 from local_asset_library.captions import (validate_caption, parse_caption, infer_caption,
     image_inputs, merge_record, effective_caption, overlay_for, reuse_caption,
     verify_calibration, caption_fingerprint)
@@ -31,6 +32,18 @@ class Backend:
         if isinstance(value, Exception):
             raise value
         return value, {"elapsed_seconds": 0.01}
+    def generate_batch(self, inputs_list, prompt, max_new_tokens):
+        # Synthetic batches: one queued output per asset; GPU memory faults stop the whole batch.
+        self.batches = getattr(self, 'batches', []) + [len(inputs_list)]
+        results = []
+        for inputs in inputs_list:
+            try:
+                results.append(self.generate(inputs, prompt, max_new_tokens))
+            except GpuMemoryError:
+                raise
+            except Exception as exc:
+                results.append(exc)
+        return results
 
 
 def test_uncertainty_and_uses_remain_separate():

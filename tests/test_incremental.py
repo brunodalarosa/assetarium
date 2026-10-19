@@ -32,7 +32,7 @@ def library(tmp_path):
         for i in range(3):
             (source / pack / f'item{i}.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
     for path in ('src/local_asset_library/blender_worker.py', 'src/local_asset_library/render_math.py',
-                 'src/local_asset_library/caption_backend.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt', 'prompts/caption-v4.txt'):
+                 'src/local_asset_library/caption_backend.py', 'src/local_asset_library/caption_batching.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt', 'prompts/caption-v4.txt'):
         target = root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_text('synthetic contract')
     save_json(root / 'docs/caption-model.json', {'revision': 'synthetic'})
     save_json(root / 'docs/library-membership.json', {'schema_version': 1, 'approved': True, 'packs': ['one','two'], 'approval': 'synthetic'})
@@ -439,3 +439,102 @@ def test_dead_worker_status_is_interrupted_without_reprocessing(library,monkeypa
     status=DesktopService(work).context()['processing_status']
     assert status['status']=='interrupted' and status['completed']==2
     assert json.loads(config.output_path('data','library/processing-status.json').read_text())['status']=='running'
+
+
+class BatchBackend:
+    """Synthetic batched caption backend; never loads a model."""
+    contract = {'model_id': 'synthetic', 'revision': 'synthetic'}
+    settings = {'seed': 0}
+    def __init__(self, outputs, fault_on_batch=None):
+        self.outputs, self.batches, self.fault_on_batch = iter(outputs), [], fault_on_batch
+    def resources(self):
+        return {}
+    def generate_batch(self, inputs_list, prompt, max_new_tokens):
+        from local_asset_library.caption_batching import GpuMemoryError, memory_message
+        self.batches.append(len(inputs_list))
+        if len(self.batches) == self.fault_on_batch:
+            raise GpuMemoryError(memory_message(len(inputs_list)))
+        return [(next(self.outputs), {'elapsed_seconds': 0.01}) for _ in inputs_list]
+
+
+def pending_captions(config):
+    from local_asset_library.incremental import seed
+    work = ready(config)
+    seed(work)
+    for record in records(work):
+        record.update(description=None, caption_provenance=None)
+        record['processing']['caption'] = 'pending'
+        update_record(work, record)
+    return work
+
+
+def test_caption_batches_follow_setting_and_isolate_one_bad_output(library):
+    from test_captions import caption
+    from local_asset_library.settings import save_general_settings
+    config, _ = library
+    work = pending_captions(config)
+    save_general_settings(config, 8, None, 4)
+    good = json.dumps(caption())
+    backend = BatchBackend([good, '{}', good, good, good, good])
+    result = process(config, 'caption', 6, backend=backend)
+    assert backend.batches == [4, 2]
+    assert result['complete'] == 5 and result['failed'] == 1
+    complete = [r for r in records(work) if r['processing']['caption'] == 'complete']
+    assert {r['caption_provenance']['generation_mode'] for r in complete} == {'batched-v1'}
+    assert sorted(r['caption_provenance']['batch']['assets'] for r in complete) == [2, 2, 4, 4, 4]
+    assert {r['caption_provenance']['batch']['size'] for r in complete} == {4}
+    # Finished and failed results are retained; neither is generated again.
+    again = process(config, 'caption', dry_run=True)
+    assert again['pending'] == 0 and again['retained'] == {'complete': 5, 'failed': 1}
+
+
+def test_completed_sequential_captions_keep_byte_identical_fingerprints(library):
+    from local_asset_library.incremental import caption_input, seed
+    config, _ = library
+    work = ready(config)
+    seed(work)
+    before = {r['asset_id']: caption_input(work, r) for r in records(work)}
+    assert all(before[r['asset_id']] == caption_input(work, r, generation='sequential') for r in records(work))
+    # Editing the batching module never re-queues descriptions made one at a time.
+    (config.project_root / 'src/local_asset_library/caption_batching.py').write_text('changed batching')
+    assert process(config, 'caption', dry_run=True)['retained'] == {'complete': 6}
+    assert all(caption_input(work, r) == before[r['asset_id']] for r in records(work))
+    record = records(work)[0]
+    record.update(description=None, caption_provenance=None)
+    record['processing']['caption'] = 'pending'
+    assert caption_input(work, record) == caption_input(work, record, generation='batched-v1')
+    assert caption_input(work, record) != caption_input(work, record, generation='sequential')
+    with pytest.raises(ConfigError, match='generation mode'):
+        caption_input(work, record, generation='parallel')
+
+
+def test_gpu_memory_stop_keeps_batch_pending_and_records_no_fault(library):
+    from test_captions import caption
+    from local_asset_library.caption_batching import GpuMemoryError
+    from local_asset_library.settings import save_general_settings
+    config, _ = library
+    work = pending_captions(config)
+    save_general_settings(config, 8, None, 4)
+    backend = BatchBackend([json.dumps(caption())] * 6, fault_on_batch=2)
+    with pytest.raises(GpuMemoryError, match='batch size 4. Lower it in Settings → General'):
+        process(config, 'caption', 6, backend=backend)
+    status = json.loads(config.output_path('data', 'library/processing-status.json').read_text(encoding='utf-8'))
+    assert status['status'] == 'stopped' and 'GPU memory' in status['reason']
+    assert sum(r['processing']['caption'] == 'complete' for r in records(work)) == 4
+    assert not any(r['processing']['caption'] == 'failed' for r in records(work))
+    resumed = process(config, 'caption', dry_run=True)
+    assert resumed['pending'] == 2 and resumed['retained'] == {'complete': 4}
+
+
+def test_cancel_takes_effect_between_batches(library):
+    from test_captions import caption
+    from local_asset_library.settings import save_general_settings
+    config, _ = library
+    pending_captions(config)
+    save_general_settings(config, 8, None, 2)
+    backend = BatchBackend([json.dumps(caption())] * 6)
+    seen = []
+    result = process(config, 'caption', 6, backend=backend, cancelled=lambda: bool(backend.batches),
+                     progress=lambda identifier, completed, total: seen.append((completed, total)))
+    assert result['cancelled'] and backend.batches == [2] and len(result['outcomes']) == 2
+    assert seen == [(0, 6), (2, 6)]

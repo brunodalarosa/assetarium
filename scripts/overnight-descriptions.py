@@ -100,6 +100,8 @@ def supervise(config, identifier, command, phase, timeout=180):
                 time.sleep(0.25)
             if process.returncode:
                 recover_inflight(config, identifier)
+                if fault_path.exists():  # The worker's own reason, such as not enough GPU memory.
+                    raise RuntimeError(read_json(fault_path)['reason'])
                 raise RuntimeError(f'{phase} worker exited with code {process.returncode}; see {log.name}')
             return {'status': 'passed', 'log': log.name}
         except BaseException as exc:
@@ -155,7 +157,14 @@ def worker(config, identifier, stage):
         if stage == 'caption':
             from local_asset_library.caption_backend import QwenBackend
             model = json.loads((config.project_root / 'docs/caption-model.json').read_text(encoding='utf-8'))
-            caption_batch(config, identifier, lambda work: QwenBackend(work, model))
+            from local_asset_library.caption_batching import GpuMemoryError
+            try:
+                caption_batch(config, identifier, lambda work: QwenBackend(work, model))
+            except GpuMemoryError as exc:
+                token = os.environ.get('OVERNIGHT_WORKER_TOKEN') or ''
+                atomic_json(run_path(config, identifier) / ('worker-fault-' + token[:12] + '.json'),
+                            {'status': 'faulty', 'phase': 'caption', 'kind': 'gpu_memory', 'reason': str(exc), 'utc': utc()})
+                raise
         else:
             from local_asset_library.embedding_backend import EmbeddingBackend
             progress(config, identifier, stage, status='loading_model')

@@ -328,16 +328,16 @@ async function loadGeneralSettings(){
  generalSettingsBusy(true);$('general-settings-message').textContent='Loading settings…';
  try{
   const result=await state.api.general_settings();if(result.status==='faulty')throw Error(result.reason);
-  $('storage-budget').value=result.storage_budget_gib;for(const checkbox of $('processing-formats').querySelectorAll('input'))checkbox.checked=result.processing_formats.includes(checkbox.value);generalSettingsBusy(false);$('general-settings-message').textContent='';
+  $('storage-budget').value=result.storage_budget_gib;for(const checkbox of $('processing-formats').querySelectorAll('input'))checkbox.checked=result.processing_formats.includes(checkbox.value);$('caption-batch-size').value=String(result.caption_batch_size);generalSettingsBusy(false);$('general-settings-message').textContent='';
  }catch(error){$('general-settings-message').textContent=error.message;}
 }
-function generalSettingsBusy(busy){for(const id of ['storage-budget','processing-formats','save-general-settings'])$(id).disabled=busy;}
+function generalSettingsBusy(busy){for(const id of ['storage-budget','processing-formats','caption-batch-size','save-general-settings'])$(id).disabled=busy;}
 $('general-settings-form').onsubmit=async event=>{
  event.preventDefault();if(!$('general-settings-form').reportValidity())return;
  const value=$('storage-budget').value,formats=[...$('processing-formats').querySelectorAll('input:checked')].map(input=>input.value);generalSettingsBusy(true);$('general-settings-message').textContent='Saving…';
  try{
-  const result=await state.api.save_general_settings(value,formats);if(result.status==='faulty')throw Error(result.reason);
-  $('storage-budget').value=result.storage_budget_gib;$('general-settings-message').textContent=result.processing_formats.length?`Saved. Storage budget: ${result.storage_budget_gib} GiB. Selected formats apply to new processing batches.`:'Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.';
+  const result=await state.api.save_general_settings(value,formats,$('caption-batch-size').value);if(result.status==='faulty')throw Error(result.reason);
+  $('storage-budget').value=result.storage_budget_gib;$('caption-batch-size').value=String(result.caption_batch_size);$('general-settings-message').textContent=result.processing_formats.length?`Saved. Storage budget: ${result.storage_budget_gib} GiB. Description batch size: ${result.caption_batch_size}. Selected formats apply to new processing batches.`:'Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.';
   await loadSources();
  }catch(error){$('general-settings-message').textContent=error.message;}
  finally{generalSettingsBusy(false);}

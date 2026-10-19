@@ -18,7 +18,7 @@ import uuid
 
 from .catalog import detail, digest, encoded, save_json
 from .caption_quality import caption_quality
-from .captions import file_hash, image_inputs, infer_caption, publish as publish_caption
+from .captions import file_hash, image_inputs, infer_captions, publish as publish_caption
 from .config import ConfigError
 from .incremental import (CAPTION_PROMPT_VERSION, caption_input, checkpoint, ledger,
                           policy, stage_content, update_record, working)
@@ -241,14 +241,46 @@ def record_fault(config, identifier, asset_id, reason, kind):
 
 
 def caption_batch(config, identifier, backend_factory, limit=25):
+    from .caption_batching import GpuMemoryError, MODE
+    from .settings import caption_batch_size
     path = run_path(config, identifier)
     work = working(config)
     tasks = remaining(config, identifier)[:limit]
     backend = None
+    size = caption_batch_size(config)
     prompt_path = config.project_root / f'prompts/caption-{CAPTION_PROMPT_VERSION}.txt'
     prompt = prompt_path.read_text(encoding='utf-8')
     progress(config, identifier, 'caption', status='starting')
+
+    def generate(ready):
+        nonlocal backend
+        if backend is None:
+            progress(config, identifier, 'caption', status='loading_model', current=None)
+            backend = backend_factory(work)
+        progress(config, identifier, 'caption', current=ready[0][0], completed=len(outcomes(config, identifier)))
+        # This intent precedes generation, so an interrupted batch is not
+        # automatically repeated when the owner resumes the same run.
+        atomic_json(path / 'inflight.json', {'asset_ids': [t['asset_id'] for t, _, _, _ in ready], 'started_utc': utc(),
+                                             'fingerprints': {t['asset_id']: fp for t, _, _, fp in ready}})
+        try:
+            results = infer_captions(backend, [inputs for _, _, inputs, _ in ready], prompt, batch_size=size)
+        except GpuMemoryError:
+            # Out of GPU memory generated nothing: these assets stay pending in this run.
+            (path / 'inflight.json').unlink()
+            raise
+        for position, ((_, record, inputs, fp), outcome) in enumerate(zip(ready, results)):
+            provenance = {'fingerprint': fp, 'run_id': identifier, 'model': backend.contract,
+                          'settings': backend.settings, 'prompt_version': CAPTION_PROMPT_VERSION,
+                          'prompt_sha256': file_hash(prompt_path), 'input_views': inputs,
+                          'generation_mode': MODE, 'batch': {'size': size, 'assets': len(ready), 'position': position},
+                          'attempts': outcome['attempts'], 'ai_review': 'pending',
+                          'owner_caption_review': 'pending', 'owner_artistic_suitability': 'pending'}
+            persist(config, identifier, record, outcome, provenance)
+        (path / 'inflight.json').unlink()
+        return any(a.get('status') == 'inference_failed' for o in results for a in o['attempts'])
+
     try:
+        ready = []
         for task in tasks:
             asset_id = task['asset_id']
             progress(config, identifier, 'caption', current=task, completed=len(outcomes(config, identifier)))
@@ -271,23 +303,14 @@ def caption_batch(config, identifier, backend_factory, limit=25):
             except (OSError, ValueError, KeyError) as exc:
                 record_fault(config, identifier, asset_id, str(exc), 'input_failed')
                 continue
-            if backend is None:
-                progress(config, identifier, 'caption', status='loading_model', current=None)
-                backend = backend_factory(work)
-                progress(config, identifier, 'caption', current=task, completed=len(outcomes(config, identifier)))
-            # This intent precedes generation, so an interrupted request is not
-            # automatically repeated when the owner resumes the same run.
-            atomic_json(path / 'inflight.json', {'asset_id': asset_id, 'started_utc': utc(), 'fingerprint': fp})
-            outcome = infer_caption(backend, inputs, prompt, max_attempts=1)
-            provenance = {'fingerprint': fp, 'run_id': identifier, 'model': backend.contract,
-                          'settings': backend.settings, 'prompt_version': CAPTION_PROMPT_VERSION,
-                          'prompt_sha256': file_hash(prompt_path), 'input_views': inputs,
-                          'attempts': outcome['attempts'], 'ai_review': 'pending',
-                          'owner_caption_review': 'pending', 'owner_artistic_suitability': 'pending'}
-            persist(config, identifier, record, outcome, provenance)
-            (path / 'inflight.json').unlink()
-            if any(a.get('status') == 'inference_failed' for a in outcome['attempts']):
-                break  # Fresh owned worker for the NEXT asset, never a retry.
+            ready.append((task, record, inputs, fp))
+            if len(ready) == size:
+                failed, ready = generate(ready), []
+                if failed:
+                    break  # Fresh owned worker for the NEXT batch, never a retry.
+        else:
+            if ready:
+                generate(ready)
         progress(config, identifier, 'caption', status='batch_complete', completed=len(outcomes(config, identifier)))
     finally:
         if backend is not None:
@@ -298,8 +321,9 @@ def recover_inflight(config, identifier):
     path = run_path(config, identifier) / 'inflight.json'
     if path.exists():
         value = read_json(path)
-        record_fault(config, identifier, value['asset_id'],
-                     'Generation was interrupted; this run will not repeat the attempt.', 'interrupted')
+        for asset_id in value.get('asset_ids') or [value['asset_id']]:
+            record_fault(config, identifier, asset_id,
+                         'Generation was interrupted; this run will not repeat the attempt.', 'interrupted')
         path.unlink()
 
 

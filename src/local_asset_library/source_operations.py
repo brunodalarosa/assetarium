@@ -29,9 +29,18 @@ def operation_status(config):
     if value.get("status") in RUNNING and value.get("pid") and not process_alive(value["pid"]):
         return dict(value, status="interrupted", reason="Operation stopped; completed asset checkpoints are preserved")
     if value.get("status") in RUNNING and cancelled(config, value.get("token")):
-        return dict(value, status="cancelling", phase=("Finishing the current asset before stopping"
+        return dict(value, status="cancelling", phase=(finishing(value.get('stage'))
                     if value.get('current_asset') else "Stopping safely; completed assets are saved"))
     return value
+
+
+def finishing(stage):
+    # Descriptions are generated in batches; cancelling waits for the whole batch.
+    return "Finishing the current batch before stopping" if stage == 'caption' else "Finishing the current asset before stopping"
+
+
+def stage_fault_path(scoped, token):
+    return scoped.output_path("data", "library/operations/" + token + "-stage-fault.json")
 
 
 def active_operation(config):
@@ -240,7 +249,9 @@ def process_source(config, source, token):
         completed = subprocess.run(command, cwd=config.project_root, env=env,
                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         if completed.returncode:
-            raise ConfigError("Source processing worker failed; see its saved operation log")
+            fault = stage_fault_path(scoped, token)
+            raise ConfigError(read_json(fault)["reason"] if fault.exists() else
+                              "Source processing worker failed; see its saved operation log")
         measured = receipt(config, stage + "-" + token)
         budgets = storage_budget(config)
         if (measured["totals"]["allocated_bytes"] > budgets["total_allocated_bytes"] or
@@ -275,7 +286,7 @@ def worker_stage(config, source, stage, token):
     stage_index = {"inspection": 0, "caption": 1, "embeddings": 2}[stage]
     def on_progress(identifier, completed, total):
         state(scoped, status="cancelling" if cancelled(scoped, token) else "processing",
-              phase=("Finishing current asset before stopping" if cancelled(scoped, token) else STAGE_LABELS[stage]),
+              phase=(finishing(stage) if cancelled(scoped, token) else STAGE_LABELS[stage]),
               stage=stage, completed=completed, total=total, current_asset=identifier,
               progress=.05 + .27 * (stage_index + completed / max(1, total)))
     for _ in range(10000):
@@ -294,8 +305,14 @@ def worker_stage(config, source, stage, token):
                 else:
                     from .embedding_backend import EmbeddingBackend
                     backend = EmbeddingBackend(scoped)
-            result = process(scoped, stage, limit=1000, backend=backend,
-                             cancelled=lambda: cancelled(scoped, token), progress=on_progress)
+            from .caption_batching import GpuMemoryError
+            try:
+                result = process(scoped, stage, limit=1000, backend=backend,
+                                 cancelled=lambda: cancelled(scoped, token), progress=on_progress)
+            except GpuMemoryError as exc:
+                # A machine limit, not an asset fault: the coordinator shows this reason.
+                atomic_json(stage_fault_path(scoped, token), {"reason": str(exc), "utc": now()})
+                raise
         if cancelled(scoped, token):
             return
         if not result.get("outcomes") and not result.get("processed"):

@@ -54,12 +54,20 @@ the stage fingerprint. This pilot cache does not implement full-library refresh.
 
 Qwen uses local files only, pinned revision and runtime lock, verified model file
 hashes, BF16 CUDA/SDPA, fixed seed per call, one beam and bounded output/time.
+Library and overnight processing generate several assets per call
+(`caption_batching.py`, *Settings → General → Description batch size*, default 8;
+[decision 0007](decisions/0007-batched-description-generation.md)). Each asset is
+still validated, saved and published on its own and records `generation_mode` and
+`batch` provenance. Completed results keep the fingerprint of the mode they were
+made with, so batching never regenerates them. Running out of GPU memory stops the
+run and leaves the batch pending; it is never recorded as an asset fault.
 Final sampling: temperature 0.7, top-p 0.8, top-k 20, repetition penalty 1.1;
 1,100 output tokens (1,500 corrective), 120-second generation limit. The model
 card motivates sampling; the modest repetition penalty was selected after
 greedy calibration repeated viewpoint wording. These inputs/settings are
-reproducible; byte-identical output across different hardware/library versions
-is not promised. PyTorch's time limit is checked between generation iterations,
+reproducible for one-at-a-time generation; batched wording also depends on which
+assets share a batch. Byte-identical output across different hardware/library
+versions is not promised. PyTorch's time limit is checked between generation iterations,
 so it is not an OS-level hard deadline for a hung CUDA kernel.
 
 Owner overlays live in `data/captions/corrections/<asset_id>.json`. They contain

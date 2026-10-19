@@ -1,5 +1,45 @@
 # Progress
 
+## October 18 — Batched description generation
+
+Descriptions were the bottleneck: about 9.3 s per asset with the GPU only ~41%
+busy (27 tokens/s, per-token overhead). A read-only benchmark on 20 rendered
+Cartoon City assets (`scripts/benchmark-caption-batching.py`,
+`scratch/caption-batch-benchmark/batching-2026-10-18a/`) measured 9.24 / 5.29 /
+3.00 / 2.22 s per asset at batch 1 / 2 / 4 / 8 (4.2× at 8), 79 of 80 valid
+outputs, 6.4 GB peak GPU memory, and exact reproduction of all 20 stored
+descriptions at batch 1. The owner reviewed the batched outputs and approved
+adopting them ([decision 0007](decisions/0007-batched-description-generation.md)).
+
+- New `caption_batching.py` generates several assets per call with the unchanged
+  model, prompt, images and sampling. `caption_backend.py` is untouched.
+- Process assets (`incremental.process`) and overnight runs use it. Each asset is
+  still validated, saved, published and checkpointed alone; one invalid output
+  fails only that asset. Overnight `inflight.json` lists the whole batch.
+- *Settings → General → Description batch size*: 1 / 2 / 4 / 8, default 8.
+- Out of GPU memory stops with a message naming the batch size; the batch stays
+  pending and no fault is recorded. The source card shows the reason.
+- Cancel finishes the current batch, and its wording says so.
+- Completed descriptions keep the fingerprint of the mode they were made with
+  (`generation_mode`, default `sequential`); new ones record `batched-v1` and
+  `batch` provenance.
+
+Verification: full suite **424 passed** on this change alone (433 with the
+separate, uncommitted dependency-override work present); 21 new test cases cover
+settings, batching, fingerprints, out-of-memory, cancel, overnight and the
+desktop bridge. Read-only
+dry runs on all 9 enabled sources were identical before and after the change
+(pending counts, pending asset lists and retained complete/failed counts;
+Cartoon City 2,874 pending / 892 complete / 11 failed, KayKit 80 pending). The
+production module on 10 real assets (`scratch/caption-batch-benchmark/pipeline-batch8-2026-10-18b/`):
+14.9 s for a batch of 8, 9/10 valid (the invalid output was rejected by the
+existing technical-claim rule), 6.4 GB peak. WebView2: `verify-general-settings.py`
+passed (`data/gui/general-settings-b9eabaf119/`) and `verify-source-browser.py`
+passed (`data/gui/batching-source-browser-2026-10-18/`). Added storage under
+1.2 MB; no installs, environments or model copies. Retiring the legacy
+pilot/calibration runner and the KayKit maintenance script are separate owner
+tasks.
+
 ## October 18 — `verify-gui.py` updated for the paged library
 
 The legacy real WebView2 + STDIO MCP agreement check still assumed the 40-asset

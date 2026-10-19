@@ -8,7 +8,7 @@ import pytest
 from local_asset_library.config import Config, ConfigError
 from local_asset_library.publication import atomic_json
 from local_asset_library.settings import (GIB, general_settings, save_general_settings,
-                                          settings_path, storage_budget)
+                                          settings_path, storage_budget, caption_batch_size)
 from local_asset_library.incremental import policy
 from local_asset_library import source_operations as operations
 
@@ -33,7 +33,8 @@ def test_default_preserves_historical_policy_until_user_saves(config):
 def test_saved_total_survives_reload_and_source_binding_without_hidden_growth_cap(config):
     original = (config.project_root / 'docs/library-membership.json').read_bytes()
     result = save_general_settings(config, '24')
-    assert result == {'status': 'saved', 'storage_budget_gib': 24, 'processing_formats': ['fbx', 'gltf', 'obj']}
+    assert result == {'status': 'saved', 'storage_budget_gib': 24, 'processing_formats': ['fbx', 'gltf', 'obj'],
+                      'caption_batch_size': 8}
     rebound = replace(config, metadata_root=config.source_root / 'metadata-lal', source_key='fixture')
     assert general_settings(rebound)['storage_budget_gib'] == 24
     assert settings_path(rebound) == settings_path(config)
@@ -49,6 +50,33 @@ def test_invalid_limit_preserves_saved_settings(config, value):
     with pytest.raises(ConfigError, match='whole number'):
         save_general_settings(config, value)
     assert settings_path(config).read_bytes() == before
+
+
+def test_caption_batch_size_defaults_to_eight_and_saves_with_other_settings(config):
+    assert general_settings(config)['caption_batch_size'] == 8 == caption_batch_size(config)
+    assert save_general_settings(config, 24, ['gltf'], '4')['caption_batch_size'] == 4
+    rebound = replace(config, metadata_root=config.source_root / 'metadata-lal', source_key='fixture')
+    assert caption_batch_size(rebound) == 4
+    # Saving other settings keeps the chosen batch size.
+    assert save_general_settings(config, 30)['caption_batch_size'] == 4
+    assert general_settings(config)['processing_formats'] == ['gltf']
+
+
+@pytest.mark.parametrize('value', [0, 3, 16, -1, True, 'eight', '', 4.0, [8]])
+def test_invalid_caption_batch_size_preserves_saved_settings(config, value):
+    save_general_settings(config, 24, None, 2)
+    before = settings_path(config).read_bytes()
+    with pytest.raises(ConfigError, match='batch size of 1, 2, 4 or 8'):
+        save_general_settings(config, 24, None, value)
+    assert settings_path(config).read_bytes() == before
+
+
+def test_bad_saved_caption_batch_size_is_a_visible_fault(config):
+    save_general_settings(config, 24)
+    value = json.loads(settings_path(config).read_text(encoding='utf-8'))
+    atomic_json(settings_path(config), dict(value, caption_batch_size=64))
+    with pytest.raises(ConfigError, match='batch size'):
+        caption_batch_size(config)
 
 
 def test_bad_saved_limit_never_silently_uses_another_budget(config):
@@ -110,3 +138,22 @@ def test_publication_growth_is_checked_before_reporting_completion(config, monke
     with pytest.raises(ConfigError, match='completed work is preserved'):
         operations.process_source(config, {'key': 'fixture'}, 'test-token')
     assert len(calls) == 3 and all(s['status'] != 'complete' for s in states)
+
+
+def test_gpu_memory_reason_from_stage_worker_reaches_the_source_card(config, monkeypatch):
+    save_general_settings(config, 24)
+    calls, states = coordinator(config, monkeypatch, [11 * GIB])
+    reason = 'Not enough GPU memory for description batch size 8. Lower it in Settings → General'
+    def failing(command, **kwargs):
+        calls.append(command)
+        atomic_json(operations.stage_fault_path(config, 'test-token'), {'reason': reason})
+        return SimpleNamespace(returncode=1)
+    monkeypatch.setattr(operations.subprocess, 'run', failing)
+    with pytest.raises(ConfigError, match='batch size 8. Lower it'):
+        operations.process_source(config, {'key': 'fixture'}, 'test-token')
+    assert len(calls) == 1
+
+
+def test_cancelling_caption_stage_names_the_batch():
+    assert operations.finishing('caption') == 'Finishing the current batch before stopping'
+    assert operations.finishing('inspection') == 'Finishing the current asset before stopping'

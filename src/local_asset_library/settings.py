@@ -7,6 +7,8 @@ from .publication import atomic_json, read_json
 GIB = 1024**3
 MAX_BUDGET_GIB = 1048576
 PROCESSING_FORMATS = ('fbx', 'gltf', 'obj')
+CAPTION_BATCH_SIZES = (1, 2, 4, 8)
+DEFAULT_CAPTION_BATCH_SIZE = 8
 
 
 def validate_formats(value):
@@ -20,6 +22,20 @@ def processing_formats(config):
     path = settings_path(config)
     value = read_json(path) if path.exists() else {}
     return validate_formats(value.get('processing_formats', list(PROCESSING_FORMATS)))
+
+
+def validate_caption_batch_size(value):
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value)
+    if type(value) is not int or value not in CAPTION_BATCH_SIZES:
+        raise ConfigError('Choose a description batch size of 1, 2, 4 or 8 in Settings → General')
+    return value
+
+
+def caption_batch_size(config):
+    path = settings_path(config)
+    value = read_json(path) if path.exists() else {}
+    return validate_caption_batch_size(value.get('caption_batch_size', DEFAULT_CAPTION_BATCH_SIZE))
 
 
 def format_group(extension):
@@ -62,10 +78,10 @@ def storage_budget(config, fallback=None):
 
 def general_settings(config):
     return {'status': 'ready', 'storage_budget_gib': storage_budget(config)['total_allocated_bytes'] / GIB,
-            'processing_formats': processing_formats(config)}
+            'processing_formats': processing_formats(config), 'caption_batch_size': caption_batch_size(config)}
 
 
-def save_general_settings(config, storage_budget_gib, processing_formats=None):
+def save_general_settings(config, storage_budget_gib, processing_formats=None, caption_batch_size=None):
     try:
         if isinstance(storage_budget_gib, bool):
             raise ValueError
@@ -78,6 +94,9 @@ def save_general_settings(config, storage_budget_gib, processing_formats=None):
     value = read_json(path) if path.exists() else {'schema_version': 1}
     formats = validate_formats(processing_formats if processing_formats is not None else
                                value.get('processing_formats', list(PROCESSING_FORMATS)))
-    value.update(schema_version=1, storage_budget_bytes=int(limit) * GIB, processing_formats=formats)
+    batch = validate_caption_batch_size(caption_batch_size if caption_batch_size is not None else
+                                        value.get('caption_batch_size', DEFAULT_CAPTION_BATCH_SIZE))
+    value.update(schema_version=1, storage_budget_bytes=int(limit) * GIB, processing_formats=formats,
+                 caption_batch_size=batch)
     atomic_json(path, value)
     return dict(general_settings(config), status='saved')
