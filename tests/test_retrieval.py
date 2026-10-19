@@ -291,3 +291,34 @@ def test_reference_excludes_parent_before_view_aggregation(indexed):
     assert all(r['asset_id'] != records[0]['asset_id'] for r in evidence['channel_rankings']['image'])
     with pytest.raises(ConfigError, match='only accepted'):
         SearchEngine(config, backend).search('object','combined',exclude_image_hashes={parent['sha256']})
+
+
+def test_line_endings_alone_keep_embedding_contract_and_vectors(indexed):
+    from local_asset_library import embedding_backend
+    from local_asset_library.publication import line_ending_hashes
+    config, backend, _ = indexed
+    lock = config.project_root / "runtime/embedding/uv.lock"
+    lock.parent.mkdir(parents=True)
+    lock.write_bytes(b"version = 1\nrevision = 3\n")
+    adapter = line_ending_hashes(Path(embedding_backend.__file__))  # Never written; the other ending is simulated.
+
+    def contract():
+        return {**backend.contract, "adapter_sha256": adapter[0], "runtime_lock_sha256": file_hash(lock)}
+    backend.contract = contract()
+    save_json(config.output_path("data", "embeddings/capability.json"), {"contract": backend.contract,
+              "contract_fingerprint": digest(backend.contract), "actual_text_and_image_inference": True,
+              "reference_image_query_support": True, "test_double": True})
+    assert index_pilot(config, backend)["complete"] == 120
+    # A checkout may rewrite the adapter or runtime lock as CRLF (or back); inference reads the same text.
+    lock.write_bytes(b"version = 1\r\nrevision = 3\r\n")
+    flipped = SyntheticBackend()
+    flipped.contract = {**contract(), "adapter_sha256": adapter[-1]}
+    assert digest(flipped.contract) != digest(backend.contract)
+    response, _ = SearchEngine(config, flipped).search("red object", "description")
+    assert response["results"]
+    report = index_pilot(config, flipped)
+    assert report["complete"] == 120 and all(o["reused"] for o in report["outcomes"])
+    assert not [c for c in flipped.calls if c[0] != "query"]
+    lock.write_bytes(b"version = 1\r\nrevision = 4\r\n")
+    with pytest.raises(ConfigError, match="contract mismatch"):
+        SearchEngine(config, flipped, {**flipped.contract, "runtime_lock_sha256": file_hash(lock)}).search("red object", "description")

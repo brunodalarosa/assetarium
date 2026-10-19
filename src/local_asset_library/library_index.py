@@ -10,7 +10,8 @@ from .catalog import digest, encoded, save_json
 from .config import ConfigError
 from .publication import atomic_json
 from .membership import records
-from .retrieval import index_database, checked_vector, source_check, description_input, preview_file, image_input, normalize, VERSION
+from .retrieval import (index_database, checked_vector, source_check, description_input, preview_file, image_input, normalize,
+                        recorded_contract, VERSION)
 
 
 def index_library(config, backend=None, limit=1000, dry_run=False, description_only=False,
@@ -22,7 +23,7 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
     selected = [record for record in inventory if processing_eligible(record, formats)]
     with closing(index_database(config, readonly=dry_run)) as db:
         metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
-        contract = backend.contract if backend else metadata.get("contract")
+        contract = recorded_contract(config, backend.contract) if backend else metadata.get("contract")
         if not contract:
             raise ConfigError("Verified embedding contract missing")
         common = digest(contract)

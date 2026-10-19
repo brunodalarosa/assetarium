@@ -104,6 +104,26 @@ def verified_hash(path, fresh=False):
     return result
 
 
+_endings = {}
+
+
+def line_ending_hashes(path):
+    """SHA-256 of a text file as stored, with LF and with CRLF line endings.
+
+    Git checkouts (core.autocrlf, fresh clones) may swap endings without changing
+    what Python, uv or the model read; recorded hashes are matched against these.
+    """
+    import hashlib
+    from . import hash_cache
+    key = (str(path), *hash_cache.file_identity(path))
+    if key not in _endings:
+        with open(filesystem_path(path), 'rb') as stream:
+            data = stream.read()
+        lf = data.replace(b'\r\n', b'\n')
+        _endings[key] = tuple(dict.fromkeys(hashlib.sha256(d).hexdigest() for d in (data, lf, lf.replace(b'\n', b'\r\n'))))
+    return _endings[key]
+
+
 def pinned(method):
     @wraps(method)
     def call(self, *args, **kwargs):

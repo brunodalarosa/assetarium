@@ -474,6 +474,8 @@ def scan_source(config, source):
             kept = deepcopy(prior)
             for key in ("files", "availability", "variants", "dependency_inspection"):
                 kept[key] = record[key]
+            from .dependency_overrides import synchronize_recipe
+            synchronize_recipe(kept, record)
             # Preserve relevant supplied and collection evidence without carrying
             # sibling-subpack licenses into every model in a nested source.
             from .catalog import relevant_license_evidence

@@ -64,7 +64,10 @@ bytes/checksum and its individual view reference. Query and index contracts must
 match exactly before similarity is computed. Input fingerprints are checked
 against current descriptions/view bytes; unavailable or changed input rows are
 excluded with evidence. Changing a contract requires an explicit capability check
-and reindex, not automatic migration.
+and reindex, not automatic migration. A backend source or runtime lock that differs
+from `data/embeddings/capability.json` only by LF/CRLF line endings (a git checkout)
+keeps its recorded hash (`retrieval.recorded_contract`); any other byte change is
+still a contract change.
 
 Only the existing 40 IDs in the pilot manifest are accepted for step 5 indexing.
 Jobs publish atomically to SQLite and preserve usable successful items. Unchanged

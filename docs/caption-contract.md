@@ -16,7 +16,10 @@ Description is bounded to **10–170 words**. The active full-library prompt is
 padded. Longer descriptions remain available for complex assets. Attributes are
 bounded lists of short strings. Historical v1/v2/v3 prompts and generation receipts
 are preserved. Completed full-library captions are checked against their recorded
-prompt version, so adopting v4 does not itself trigger regeneration. New or
+prompt version, so adopting v4 does not itself trigger regeneration. Line endings
+are not part of a prompt: when a prompt file differs from a completed caption's
+recorded `prompt_sha256` only by LF/CRLF (for example after a git checkout), the
+caption keeps its fingerprint, because the model reads the same text. New or
 invalidated jobs use v4 and record that version and its input fingerprint. The
 v4 instructions reinforce array types and keep suggestions separate from visual
 observations; validation remains unchanged. Unchanged failures still require

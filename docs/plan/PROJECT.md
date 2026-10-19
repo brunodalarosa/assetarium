@@ -1,8 +1,10 @@
 # Local Asset Library
 
+> Historical v1 proposal. For new asset-type development, use [Project_v2_expansion.md](Project_v2_expansion.md) and its eight expansion prompts. The ten original prompts were retired on October 18, 2026. This document's step numbers, setup instructions, estimates, and status describe the original proposal; current `AGENTS.md`, recorded decisions, and implementation evidence take precedence.
+
 Project proposal and sequential implementation plan, prepared October 11, 2026; remaining stages revised October 12, 2026.
 
-Status: the pilot backend, agent access and Windows desktop app are implemented. Steps 8–10 remain future work. Consult `C:\BrunoOS\Local-Asset-Library\docs\progress.md` for current evidence, owner decisions and limitations; this plan does not itself authorize full-library processing.
+Historical status at the time of this proposal: the pilot backend, agent access and Windows desktop app were implemented; steps 8–10 were future work. Consult `C:\BrunoOS\Local-Asset-Library\docs\progress.md` for current evidence, owner decisions and limitations; this plan does not itself authorize full-library processing.
 
 ## Purpose
 
@@ -124,11 +126,11 @@ Use a local STDIO MCP server with a small interface, initially `search_assets` a
 
 ## Execution instructions
 
-Run one numbered prompt at a time using GPT-6.1 Sol. Start step 1 from `C:\BrunoOS`; subsequent steps use `C:\BrunoOS\Local-Asset-Library` as the workspace. Each prompt is a standalone file in this plan's `prompts/` directory.
+The original ten launch prompts have been deleted. The `prompts/` directory now contains only the eight expansion prompts linked from [Project_v2_expansion.md](Project_v2_expansion.md); their numbers do not correspond to the v1 steps below.
 
-Step 1 must first create the new folder and initialize it as a Git repository. If a populated directory or repository already exists at the target, inspect it and report the conflict before changing it. Never reset or delete it.
+The repository already exists. Do not rerun original project-creation instructions. Use the expansion plan's authority and approval workflow for new work.
 
-Copy this plan and its prompt files into `docs/plan/` during step 1. Subsequent work refers to that versioned copy. Maintain `docs/progress.md` with step status, actual commands, outputs, model/runtime versions, evidence paths, blockers, and the next runnable step. Never claim a step passed from source code alone. Keep implementation changes in local commits after appropriate checks, without a remote, push, or publication unless separately requested. Do not spawn subagents by default.
+The remaining sections preserve the original design and milestone history. They do not authorize implementation or Git publication. Current working instructions are in the expansion reference and applicable repository/session rules.
 
 Dependency installation and downloads required by an approved stage use the existing runtime wrappers and storage rules. Before a model download, verify its license, official runtime support, size and device requirements. The original 8 GiB model/20 GiB generated-data planning allowances are historical estimates, not blanket expansion approval. The current target is below 6 GiB of unique allocated pilot project storage, excluding external assets and shared models. Step 8 must estimate and obtain an approved full-library storage/runtime budget from measured pilot costs; do not treat the pilot target as a full-library cap. A projected increase of 500 MiB or more, another runtime or exceeding the pilot target must be explained at the required plan checkpoint. Save fresh base-Python storage receipts before and after installations or bulk processing; count unique allocated bytes, not summed folder sizes. Reuse shared weights and read-only originals. No cloud API keys or paid services are required.
 
@@ -154,7 +156,6 @@ Create `C:\BrunoOS\Local-Asset-Library` and initialize Git before creating imple
 
 Done when: the repository is new, runnable, and contains an initial local scaffold commit; source-pack paths are configured as read only; environment evidence distinguishes verified, missing, and untested capabilities.
 
-Prompt: [01-create-repository.md](prompts/01-create-repository.md).
 
 ## Step 2 — Catalog assets and establish the baseline
 
@@ -162,7 +163,6 @@ Inventory the source packs; distinguish per-asset previews, pack sheets, texture
 
 Done when: all discovered candidates have a catalog status; grouping evidence and unresolved cases are visible; pilot selection is reproducible; basic search returns original paths without altering sources.
 
-Prompt: [02-catalog-and-baseline.md](prompts/02-catalog-and-baseline.md).
 
 ## Step 3 — Inspect models and render views
 
@@ -170,7 +170,6 @@ Build a batch Blender inspector and renderer. Prefer an existing portable model 
 
 Done when: representative files have valid metadata and usable views; pilot assets are processed or have explicit error states; texture/format failures are distinguishable from successful renders; originals remain unchanged.
 
-Prompt: [03-inspect-and-render.md](prompts/03-inspect-and-render.md).
 
 ## Step 4 — Generate local visual descriptions
 
@@ -178,7 +177,6 @@ Select a locally runnable vision-language model through official documentation a
 
 Done when: image inputs are actually consumed; output follows the schema; uncertain identity is recorded; technical facts are not hallucinated into the visual description; model/prompt provenance is reproducible. Owner visual review remains distinct from technical validation.
 
-Prompt: [04-local-visual-descriptions.md](prompts/04-local-visual-descriptions.md).
 
 ## Step 5 — Embed and search
 
@@ -186,7 +184,6 @@ Implement EmbeddingGemma 2 text and image inference according to the model contr
 
 Done when: real finite normalized embeddings are stored; query/index contracts match; each channel can be tested separately; results resolve to logical asset IDs; no code path fabricates embeddings after inference failure.
 
-Prompt: [05-embeddings-and-search.md](prompts/05-embeddings-and-search.md).
 
 ## Step 6 — Evaluate before scaling
 
@@ -198,7 +195,6 @@ Proposed expansion gate: combined retrieval improves Hit@5 on the labeled natura
 
 Done when: a reproducible report exists with real/provisional evidence separated. The step ends awaiting Bruno's explicit pilot decision. Do not manufacture approval or proceed to full indexing merely because tests pass.
 
-Prompt: [06-pilot-evaluation.md](prompts/06-pilot-evaluation.md).
 
 ## Step 7 — Connect agents through local MCP
 
@@ -208,7 +204,6 @@ Run a real agent task: find a requested prop, inspect its preview, resolve a usa
 
 Done when: the intended client has performed the workflow; result size is measured; unavailable clients remain explicitly unverified; no pack or game project was modified.
 
-Prompt: [07-agent-mcp-integration.md](prompts/07-agent-mcp-integration.md).
 
 ## Implemented GUI milestone — between steps 7 and 8
 
@@ -228,7 +223,6 @@ Estimate full-library runtime, peak/retained unique allocated storage and GPU us
 
 Done when: no-change refresh skips unchanged work; appropriate contract/content changes invalidate only affected stages; interruption resumes without fault retries; deleted assets disappear and renames follow documented identity rules; the expanded library is browseable without eager loading of every preview; GUI/MCP agree on candidates, ordering, filters and truncation against the same version; every candidate has coverage/status with notes and warnings separate from operational failure. Full processing and owner acceptance remain evidence-backed decisions.
 
-Prompt: [08-incremental-full-library.md](prompts/08-incremental-full-library.md).
 
 ## Step 9 — Optional classification and clustering in the existing GUI
 
@@ -238,7 +232,6 @@ Display suggestions and groups in the existing app with member previews, represe
 
 Done when: suggestions and groups are inspectable in the GUI, versioned enough to compare and useful on a modest reviewed sample; unknown handling, caption-warning effects and preservation of accepted labels are demonstrated; search remains usable with the extension disabled. Record this step as skipped if Bruno does not choose it; Step 10 and core search can proceed without it.
 
-Prompt: [09-classification-and-clustering.md](prompts/09-classification-and-clustering.md).
 
 ## Step 10 — Finish desktop/agent operational documentation and handoff
 
@@ -248,7 +241,6 @@ Repeat held-out retrieval evaluation after full indexing to detect ranking degra
 
 Done when: another fresh Codex chat can operate both interfaces from repository documents; acceptance requirements map to current evidence; measured coverage, storage and operating costs are reported; unresolved failures, warnings and human reviews remain visible. This is a local handoff, with no publication or game import, and no claim of full-library completion if Step 8 has not passed.
 
-Prompt: [10-handoff-and-final-validation.md](prompts/10-handoff-and-final-validation.md).
 
 ## Final acceptance
 

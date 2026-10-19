@@ -297,7 +297,7 @@ def dependencies(config, row, inventory):
                 for item in document.get(section, []):
                     uri = item.get("uri")
                     if uri and not uri.startswith("data:"):
-                        references.append((uri, role, f"glTF {section}.uri"))
+                        references.append((uri, role, f"glTF {section}.uri", item.get('name')))
         elif extension == ".dae":
             # XML parsing resolves no external entities. No scripts or model importers run.
             document = ET.fromstring(read_text(config, path))
@@ -309,7 +309,7 @@ def dependencies(config, row, inventory):
     except (ValueError, OSError, ET.ParseError) as exc:
         issues.append(f"Dependency parse failed: {exc}")
     result = []
-    for reference, role, evidence in references:
+    for reference, role, evidence, *extra in references:
         reference = unquote(reference).replace("\\", "/")
         dep = {"reference": reference, "role": role, "evidence": evidence, "from": path,
                "path": None, "sha256": None, "status": "missing"}
@@ -326,6 +326,8 @@ def dependencies(config, row, inventory):
             if relative in inventory and inventory[relative]["status"] == "available":
                 config.source_file(relative)  # Apply reserved-name and resolved-link policy too.
                 dep.update(status="available", sha256=inventory[relative]["sha256"])
+            from .dependency_overrides import apply_override
+            apply_override(config, row, dep, inventory, extra[0] if extra else None)
         except (ConfigError, ValueError, OSError) as exc:
             dep.update(status="rejected", error=str(exc))
         result.append(dep)
@@ -458,6 +460,10 @@ def build_inventory(config):
                 for dep in deps:
                     if dep["status"] == "available" and dep["role"] == "material":
                         pending.append(inventory[dep["path"]])
+            from .dependency_overrides import repair_recipe
+            recipe = repair_recipe(config, asset)
+            if recipe:
+                asset['texture_repair'] = recipe
             # Match exact names only in recognized preview trees at the matching export anchor.
             anchors = {export_slot(f["path"].split("/", 1)[1])[0] for f in files if export_slot(f["path"].split("/", 1)[1])}
             for preview in rows:

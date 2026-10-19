@@ -192,14 +192,15 @@ def apply_saved(config, identifier, asset_id):
     saved = read_json(raw_path)
     record = detail(work, asset_id)
     provenance = saved['provenance']
-    relative = raw_path.relative_to(config.project_root).as_posix()
+    relative = ('data/' + raw_path.relative_to(config.metadata_root).as_posix() if config.metadata_root
+                else raw_path.relative_to(config.project_root).as_posix())
     provenance = {**provenance, 'result_path': relative}
     status = saved['status']
     errors = [a.get('error') for a in saved.get('attempts', []) if a.get('error')]
     try:
         # A killed worker may have saved a valid response before committing it.
         # Recheck the exact input contract instead of silently adopting stale text.
-        current = caption_input(work, record, prompt_version=CAPTION_PROMPT_VERSION)
+        current = caption_input(work, record, prompt_version=CAPTION_PROMPT_VERSION, recorded=provenance.get('fingerprint'))
         if provenance.get('fingerprint') != current:
             raise ConfigError('Saved response input changed before publication')
         if status == 'complete':

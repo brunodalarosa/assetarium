@@ -508,6 +508,27 @@ def test_completed_sequential_captions_keep_byte_identical_fingerprints(library)
         caption_input(work, record, generation='parallel')
 
 
+def test_prompt_line_endings_alone_never_requeue_finished_descriptions(library):
+    from local_asset_library.incremental import caption_input, seed
+    config, _ = library
+    work = ready(config)
+    prompt = config.project_root / 'prompts/caption-v4.txt'
+    text = b'Describe the three views.\nReturn one JSON object; 10-170 words.\n'
+    prompt.write_bytes(text)
+    for record in records(work):
+        record['caption_provenance'].update(prompt_version='v4', prompt_sha256=file_hash(prompt))
+        update_record(work, record)
+    seed(work)
+    before = {r['asset_id']: caption_input(work, r) for r in records(work)}
+    # A git checkout may rewrite LF as CRLF (or back); the model reads the same text.
+    for content in (text.replace(b'\n', b'\r\n'), text):
+        prompt.write_bytes(content)
+        assert process(config, 'caption', dry_run=True)['retained'] == {'complete': 6}
+        assert all(caption_input(work, r) == before[r['asset_id']] for r in records(work))
+    prompt.write_bytes(text.replace(b'\n', b'\r\n') + b'Changed wording.\r\n')
+    assert process(config, 'caption', dry_run=True)['pending'] == 6
+
+
 def test_gpu_memory_stop_keeps_batch_pending_and_records_no_fault(library):
     from test_captions import caption
     from local_asset_library.caption_batching import GpuMemoryError
@@ -538,3 +559,38 @@ def test_cancel_takes_effect_between_batches(library):
                      progress=lambda identifier, completed, total: seen.append((completed, total)))
     assert result['cancelled'] and backend.batches == [2] and len(result['outcomes']) == 2
     assert seen == [(0, 6), (2, 6)]
+
+
+def test_code_line_endings_alone_never_requeue_finished_work(library):
+    from local_asset_library.incremental import caption_input, checkpoint, inspection_input, seed
+    config, _ = library
+    work = ready(config)
+    code = config.project_root / 'src/local_asset_library'
+    files = [code / 'caption_backend.py', code / 'caption_batching.py', config.project_root / 'runtime/caption/uv.lock',
+             code / 'blender_worker.py', code / 'render_math.py']
+    text = b'first line\nsecond line\n'
+    for path in files:
+        path.write_bytes(text)
+    for record in records(work)[::2]:  # Batched descriptions also hash caption_batching.py.
+        record['caption_provenance']['generation_mode'] = 'batched-v1'
+        update_record(work, record)
+    seed(work)
+    with closing(ledger(work)) as db:
+        for record in records(work):
+            checkpoint(db, record['asset_id'], 'inspection', inspection_input(work, record)[3], 'complete', {})
+    def fingerprints():
+        return {r['asset_id']: (caption_input(work, r), inspection_input(work, r)[3]) for r in records(work)}
+    before = fingerprints()
+    # A checkout may rewrite any of these as CRLF (or back); Python and uv read the same text.
+    for content in (text.replace(b'\n', b'\r\n'), text):
+        for path in files:
+            path.write_bytes(content)
+            for stage in ('caption', 'inspection'):
+                assert process(config, stage, dry_run=True)['retained'] == {'complete': 6}
+            assert content == text or fingerprints() != before  # Raw bytes alone would re-queue.
+    assert fingerprints() == before
+    (code / 'blender_worker.py').write_bytes(text + b'changed\n')
+    assert process(config, 'inspection', dry_run=True)['pending'] == 6
+    assert process(config, 'caption', dry_run=True)['retained'] == {'complete': 6}
+    (config.project_root / 'runtime/caption/uv.lock').write_bytes(text.replace(b'\n', b'\r\n') + b'changed\r\n')
+    assert process(config, 'caption', dry_run=True)['pending'] == 6

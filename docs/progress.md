@@ -1,5 +1,64 @@
 # Progress
 
+## October 18 — Code and lock line endings no longer re-queue finished work
+
+Follow-up to the prompt fix below. The caption, inspection and embedding
+fingerprints also hash raw bytes of `caption_backend.py`, `caption_batching.py`,
+`runtime/caption/uv.lock`, `blender_worker.py`, `render_math.py`,
+`blender_repair_worker.py`, `embedding_backend.py` and `runtime/embedding/uv.lock`.
+They are all LF today, but `core.autocrlf=true` and no `.gitattributes` rule cover
+them, so the next checkout that touches one (or a fresh Windows clone) writes CRLF.
+That would have re-queued every finished description and inspection, and stopped
+semantic search and indexing until a capability run and a full re-embed.
+
+- `incremental.recorded_fingerprint`: when a ledger fingerprint differs from the
+  current one, the LF and CRLF forms of those files are tried (at most 8
+  combinations, only on a mismatch); a combination that reproduces the stored
+  fingerprint keeps it. `process()` and overnight publication pass the recorded value.
+- `retrieval.recorded_contract`: the embedding adapter and runtime-lock hashes keep
+  the values in `data/embeddings/capability.json` when they differ only by line
+  endings; used by search, `index_pilot` and `index_library`.
+- `publication.line_ending_hashes`: stored/LF/CRLF hashes, cached per file identity.
+- No existing fingerprint changed and no hashed file was edited. New results still
+  hash current bytes. Any other byte change still re-queues (or is a contract change).
+  `.gitattributes` is unchanged (owner choice).
+
+Verification: full suite **436 passed** (with the uncommitted batching,
+dependency-override and prompt work present); two new tests flip each file
+LF→CRLF→LF, then make a real change; both fail with the tolerance disabled.
+Read-only dry runs (inspection, caption, embeddings) on all 9 enabled sources were
+identical before and after (all 0 pending except Cartoon City's 7,430 embeddings;
+retained complete/failed unchanged). Read-only simulation of a CRLF checkout of all
+the files against the real ledgers: 11,635 complete inspection/caption rows, all
+would have been re-queued by raw bytes and all are kept; the embedding contract of
+every source is kept. Evidence: `scratch/eol-fingerprints-2026-10-18/`. No storage
+receipt (no installation or bulk processing). Editing `incremental.py`,
+`overnight.py` and `library_index.py` changes the overnight code contract, so an
+overnight run planned before this change would refuse to continue (none was active).
+
+## October 18 — Prompt line endings no longer re-queue finished descriptions
+
+Process assets would have regenerated 80 finished KayKit_Free_pack descriptions
+(prompt v4, made by `scripts/kaykit-gltf-maintenance.py` on October 16) while
+the source card showed nothing pending. Cause: the fingerprint hashed
+`prompts/caption-v4.txt` as raw bytes. The descriptions were made from the LF
+file (`06cda9b4…`); the checkout of `main` on October 17 21:16 rewrote it as CRLF
+(`81e3e9d3…`, `core.autocrlf=true`). The text and what the model reads are
+identical (every stored attempt's text digest matches the current file).
+
+- `incremental.prompt_hash`: a completed caption keeps its recorded
+  `prompt_sha256` when the prompt file differs from it only by LF/CRLF. All other
+  fingerprints stay byte-identical; a real wording change still re-queues.
+- No description, ledger row or catalog record was rewritten.
+
+Verification: full suite **434 passed** (with the uncommitted batching and
+dependency-override work present); one new test flips LF→CRLF→LF and then
+changes wording. Caption dry run on all 9 enabled sources: KayKit 80 pending →
+0 (1487 retained complete); every other source's pending/retained counts are
+unchanged. No storage receipt (no installation or bulk processing).
+Not covered: other hashed inputs (`caption_backend.py`, `uv.lock`,
+`caption_batching.py`, inspection and embedding inputs) still hash raw bytes.
+
 ## October 18 — Batched description generation
 
 Descriptions were the bottleneck: about 9.3 s per asset with the GPU only ~41%
@@ -39,6 +98,41 @@ passed (`data/gui/batching-source-browser-2026-10-18/`). Added storage under
 1.2 MB; no installs, environments or model copies. Retiring the legacy
 pilot/calibration runner and the KayKit maintenance script are separate owner
 tasks.
+
+## October 18 — Cartoon City shared texture paths repaired; missing results running
+
+The owner approved repairing the split Godot pack while reusing successful work.
+Its four model add-ons referenced textures at nonexistent merged-pack locations;
+5,266 missing references across 3,467 models map to 16 supplied Core textures.
+Explicit source/hash-bound mappings now feed the existing texture repair worker,
+interactive preview and agent handoff without moving or copying original assets.
+The scanner retains these recipes across unchanged rescans. Successful stages
+clear current faults while retaining ledger history; source-owned caption retry
+evidence now uses the source metadata root correctly.
+
+All 19 representatives rendered successfully, covering every mapped texture and
+each affected add-on. The installed WebView2 check opened `Ambulance_2_B` with a
+rendered image and a textured 3D viewer (2,708 triangles, five meshes, four
+materials). Preservation passed for 7,657 originals, 2,480 prior per-asset output
+files, 310 rendered models, 308 usable descriptions, 1,238 vectors, and the other
+sources' active publications. The mutable Blender discovery receipt is reported
+separately. Prior catalog, ledger, verification attempts and faults are retained.
+
+The background run is generating the remaining 3,448 missing previews, followed
+by missing descriptions and search data; it retains unchanged failures and reuses
+existing results. The two independent unusable captions have one authorized retry.
+It saves cancellation/resume checkpoints and will publish and verify final
+results. The 4 GiB growth cap and existing 24 GiB library budget remain enforced.
+The latest sample publication used 10,828,577,496 unique allocated bytes, a
+568,874,096-byte increase from the combined-source baseline. Owner visual and
+caption approval remain pending; bulk completion is not yet claimed.
+
+Evidence: `data/repairs/cartoon-city-20261018/` (live `report.md`, sample and final
+verification, actual UI captures, preserved originals/results hashes and logs),
+`data/storage/sources-cartoon-city-*.json`, and
+`docs/dependency-path-overrides.md`. Regression suite: 410 passed; follow-up
+caption/mapping checks: 22 passed; final mapping checks: nine passed. Windows
+link/process tests passed with normal permissions after sandbox-only restrictions.
 
 ## October 18 — `verify-gui.py` updated for the paged library
 
@@ -354,7 +448,7 @@ text/image support, model license/revision/device needs and human visual relevan
 remain untested and belong to later stages. Technical checks do not imply owner
 visual approval.
 
-Next runnable stage: [step 2 — catalog and baseline](plan/prompts/02-catalog-and-baseline.md).
+Next runnable stage: [step 2 — catalog and baseline](plan/PROJECT.md).
 Start the next chat in this repository and use the versioned plan. Step 2 has not
 been implemented: inventory, grouping, 40-asset pilot and keyword baseline remain
 pending. No further stage is authorized by this run.
@@ -500,7 +594,7 @@ bounds, counts, physical units, animations, materials or artistic suitability ar
 claimed as inspected. Search checks current path existence but does not hash files
 on every query; content staleness needs verification/rescan until step 8.
 
-Next: execute [step 3 — inspect and render](plan/prompts/03-inspect-and-render.md)
+Next: execute [step 3 — inspect and render](plan/PROJECT.md)
 from this repository, after its scope/plan approvals with duration and disk
 estimates. Use the existing catalog and 40-asset manifest. Validate representative
 GLB, OBJ/MTL, FBX and Blender pilot cases first; disable embedded-script execution,
@@ -663,7 +757,7 @@ Pilot manifest: `C:\BrunoOS\Local-Asset-Library\data\pilot\selection-manifest.js
 Actual inspection choices/faults:
 `C:\BrunoOS\Local-Asset-Library\data\inspection\processed-manifest.json`.
 See [inspection report](inspection-report.md) for images and actual measurements.
-Next: [step 4 — local visual descriptions](plan/prompts/04-local-visual-descriptions.md).
+Next: [step 4 — local visual descriptions](plan/PROJECT.md).
 Confirm its scope/plan with duration and disk estimates; verify one small local
 vision model's official license, exact revision, image input, device support and
 remaining budget before download. Calibrate on approximately ten varied pilot
@@ -802,7 +896,7 @@ Step 4 code/technical pilot is complete with visible schema and visual failures.
 No further automatic retry or model download is needed. Bruno owns corrections,
 final caption review and artistic approval. A later choice of a better caption
 model or broader quality evaluation needs a separately authorized scope/budget.
-Next numbered stage is [step 5](plan/prompts/05-embeddings-and-search.md), requiring
+Next numbered stage is [step 5](plan/PROJECT.md), requiring
 its own scope/plan approval and actual embedding-model capability checks. No
 embedding, full-library processing, remote, push or publication occurred here.
 

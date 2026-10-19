@@ -4,6 +4,7 @@ from contextlib import closing
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
+from itertools import product
 import hashlib
 import json
 import os
@@ -17,7 +18,7 @@ from .catalog import (build_inventory, detail, digest, encoded, read_database, s
                       snapshot, walk_source, write_database, SOURCE_ID, SCANNER_VERSION)
 from .config import ConfigError
 from .membership import records, membership
-from .publication import atomic_json, generation
+from .publication import atomic_json, generation, line_ending_hashes
 from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
 from .inspection import choose_source, discover_blender, environment, run_process, validate_result
@@ -90,7 +91,7 @@ def checkpoint(db, identifier, stage, fingerprint, status, evidence):
         db.execute("INSERT INTO history(asset_id,stage,fingerprint,status,evidence,updated) VALUES (?,?,?,?,?,?)", row)
 
 
-def inspection_input(config, record, resolution=640, content_only=False, formats=None):
+def inspection_input(config, record, resolution=640, content_only=False, formats=None, recorded=None):
     asset = {"asset_id": record["asset_id"], "pack": record["pack_id"], "name": record["display_name"], "files": record["files"]}
     from .settings import inspected_path, processing_formats
     path = inspected_path(record) if record['processing'].get('inspection') != 'pending' else None
@@ -116,16 +117,47 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
         content.append({'texture_repair': repair})
     if content_only:
         return asset,source,reason,digest(content)
+    code = config.project_root / "src/local_asset_library"
+    files = {"worker": code / "blender_worker.py", "render_math": code / "render_math.py"}
     settings = {"source": content, "resolution": resolution,
-        "worker": file_hash(config.project_root / "src/local_asset_library/blender_worker.py"),
-        "render_math": file_hash(config.project_root / "src/local_asset_library/render_math.py"),
+        "worker": file_hash(files["worker"]), "render_math": file_hash(files["render_math"]),
         "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None}
     if repair:
-        settings['repair_worker'] = file_hash(config.project_root / 'src/local_asset_library/blender_repair_worker.py')
-    return asset, source, reason, digest(settings)
+        files['repair_worker'] = code / 'blender_repair_worker.py'
+        settings['repair_worker'] = file_hash(files['repair_worker'])
+    return asset, source, reason, recorded_fingerprint(settings, files, recorded)
 
 
-def caption_input(config, record, prompt_version=None, generation=None):
+def recorded_fingerprint(value, files, recorded=None):
+    """digest(value), or ``recorded`` when it differs only by LF/CRLF endings of ``files``.
+
+    ``value[key]`` is the hash of ``files[key]``. Python and uv read these files as
+    text, so a git checkout that swaps line endings must not re-queue finished work.
+    """
+    current = digest(value)
+    if recorded and recorded != current:
+        for hashes in product(*(line_ending_hashes(path) for path in files.values())):
+            if digest({**value, **dict(zip(files, hashes))}) == recorded:
+                return recorded
+    return current
+
+
+def prompt_hash(config, version, recorded=None):
+    """Current prompt bytes, or the recorded hash when only line endings differ.
+
+    The model reads the prompt as text, so a git checkout that swaps LF/CRLF
+    never changes inference and must not re-queue finished descriptions.
+    """
+    path = config.project_root / f"prompts/caption-{version}.txt"
+    current = file_hash(path)
+    if recorded and recorded != current:
+        text = path.read_bytes().replace(b"\r\n", b"\n")
+        if recorded in {hashlib.sha256(text).hexdigest(), hashlib.sha256(text.replace(b"\n", b"\r\n")).hexdigest()}:
+            return recorded
+    return current
+
+
+def caption_input(config, record, prompt_version=None, generation=None, recorded=None):
     # Model/runtime contracts and prompt affect inference. Severity/owner review do not.
     # Completed captions retain their generation prompt and mode for cache validation;
     # adopting a new default is not a request to regenerate existing results.
@@ -139,19 +171,22 @@ def caption_input(config, record, prompt_version=None, generation=None):
         generation = provenance.get('generation_mode', 'sequential') if provenance else MODE
     if generation not in {'sequential', MODE}:
         raise ConfigError('Unsupported caption generation mode')
+    files = {"backend": config.project_root / "src/local_asset_library/caption_backend.py",
+             "runtime": config.project_root / "runtime/caption/uv.lock"}
     value = {"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
         "view_label": p.get("view_label"), "actual": s.get("current_sha256", s.get("error"))}
         for s in input_state(config, record) for p in [s["preview"]]],
         "model": {k: v for k,v in json.loads((config.project_root / "docs/caption-model.json").read_text(encoding="utf-8")).items()
                   if k in {'model_id', 'revision'}},
-        "prompt": file_hash(config.project_root / f"prompts/caption-{prompt_version}.txt"),
-        "backend": file_hash(config.project_root / "src/local_asset_library/caption_backend.py"),
-        "runtime": file_hash(config.project_root / "runtime/caption/uv.lock"),
+        "prompt": prompt_hash(config, prompt_version, provenance.get('prompt_sha256')
+                              if provenance.get('prompt_version') == prompt_version else None),
+        "backend": file_hash(files["backend"]),
+        "runtime": file_hash(files["runtime"]),
         "generation_policy": "single-attempt-no-fault-retry-v1"}
     if generation == MODE:  # Sequential fingerprints stay byte-identical to earlier results.
-        value.update(generation_policy=POLICY,
-                     batching=file_hash(config.project_root / "src/local_asset_library/caption_batching.py"))
-    return digest(value)
+        files["batching"] = config.project_root / "src/local_asset_library/caption_batching.py"
+        value.update(generation_policy=POLICY, batching=file_hash(files["batching"]))
+    return recorded_fingerprint(value, files, recorded)
 
 
 def stage_content(config,record,stage):
@@ -223,6 +258,8 @@ def refresh(config, dry_run=False):
             kept = deepcopy(previous)
             for key in ("files", "availability", "display_name", "license_evidence", "grouping", "variants", "dependency_inspection"):
                 kept[key] = record[key]
+            from .dependency_overrides import synchronize_recipe
+            synchronize_recipe(kept, record)
             kept["dependencies"] = record["dependencies"] + [d for d in previous["dependencies"] if d.get("inspection_version") and any(f["path"] == d.get("from") and f["sha256"] == next((o["sha256"] for o in previous["files"] if o["path"] == f["path"]), None) for f in record["files"])]
             kept["previews"] = record["previews"] + [p for p in previous["previews"] if p.get("origin") == "rendered"]
             if not same:
@@ -356,11 +393,13 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
     pending, retained = [], Counter()
     with closing(ledger(config)) as db:
         for record in selected:
+            old = db.execute("SELECT fingerprint,status,evidence FROM jobs WHERE asset_id=? AND stage=?", (record["asset_id"], stage)).fetchone()
+            recorded = old[0] if old else None
             try:
-                fp = inspection_input(work, record, resolution, formats=formats)[3] if stage == "inspection" else caption_input(work, record)
+                fp = (inspection_input(work, record, resolution, formats=formats, recorded=recorded)[3] if stage == "inspection"
+                      else caption_input(work, record, recorded=recorded))
             except (OSError, ValueError) as exc:
                 fp = digest({"asset": record["asset_id"], "stage": stage, "precondition": str(exc), "files": record["files"]})
-            old = db.execute("SELECT fingerprint,status,evidence FROM jobs WHERE asset_id=? AND stage=?", (record["asset_id"], stage)).fetchone()
             if old and old[0]==fp and old[1] in {'failed','unsupported'} and not dry_run:
                 evidence=json.loads(old[2])
                 if 'fault_content' not in evidence:
@@ -425,6 +464,9 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                 updated.setdefault("stage_faults", {})[stage] = outcome
                 update_record(work, updated)
                 final_fp = fp
+            if outcome['status'] == 'complete' and stage in updated.get('stage_faults', {}):
+                updated['stage_faults'].pop(stage)
+                update_record(work, updated)  # Prior failures remain in the append-only stage history.
             outcome['fault_content']=stage_content(work,updated,stage)
             checkpoint(db, identifier, stage, final_fp, outcome["status"], outcome)
             report["outcomes"].append({"asset_id": identifier, **outcome})

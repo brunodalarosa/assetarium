@@ -130,7 +130,7 @@ SQLite integrity and the 883-row FTS index pass. `Apple Green`, `BirchTree Snow`
 and `chair rounded` still retrieve distinct real records with available paths;
 generated previews identify their project root explicitly.
 
-Next: [step 4 instructions](plan/prompts/04-local-visual-descriptions.md). Approve
+Next: [step 4 instructions](plan/PROJECT.md). Approve
 its scope and implementation plan with time/disk estimates. Verify a small local
 vision model's official license, revision, image support, device compatibility and
 budget before downloading; test actual images, then describe about ten varied

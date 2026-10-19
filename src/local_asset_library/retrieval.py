@@ -3,6 +3,7 @@ from contextlib import closing
 import hashlib
 import json
 import math
+from pathlib import Path
 import re
 import sqlite3
 import time
@@ -14,7 +15,7 @@ from .caption_quality import caption_summary
 from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
-from .publication import pinned
+from .publication import line_ending_hashes, pinned
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, RRF_K, RRF_WEIGHTS, search_character_cap
 
 VERSION = "pilot-retrieval-v1"
@@ -147,11 +148,36 @@ def index_database(config, readonly=False):
     return db
 
 
+def recorded_contract(config, contract):
+    """The contract with its recorded adapter/lock hashes when those files differ only by LF/CRLF.
+
+    Search and indexing compare contracts exactly; a git checkout that swaps line
+    endings changes neither inference nor vectors, so it must not force a re-embed.
+    """
+    if not contract:
+        return contract
+    try:
+        recorded = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))["contract"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return contract  # The existing capability checks report the fault.
+    result = dict(contract)
+    for key, path in (("adapter_sha256", Path(__file__).with_name("embedding_backend.py")),
+                      ("runtime_lock_sha256", config.project_root / "runtime/embedding/uv.lock")):
+        old = recorded.get(key) if isinstance(recorded, dict) else None
+        if old and contract.get(key) and contract[key] != old:
+            try:
+                if old in line_ending_hashes(path):
+                    result[key] = old
+            except OSError:
+                pass
+    return result
+
+
 def index_pilot(config, backend):
     started = time.perf_counter()
     from .membership import records as full_records
     records = full_records(config)  # Processing reads fresh full records.
-    contract = backend.contract
+    contract = recorded_contract(config, backend.contract)
     common = digest(contract)
     capability = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))
     if capability.get("contract_fingerprint") != common or not capability.get("actual_text_and_image_inference"):
@@ -335,7 +361,7 @@ def fuse(rankings, weights=None):
 class SearchEngine:
     def __init__(self, config, backend=None, contract=None):
         self.config, self.backend = config, backend
-        self.contract = contract if contract is not None else (backend.contract if backend else None)
+        self.contract = recorded_contract(config, contract if contract is not None else (backend.contract if backend else None))
 
     @pinned
     def search(self, text="", mode=DEFAULT_MODE, reference=None, filters=None, limit=5, min_similarity=None,
