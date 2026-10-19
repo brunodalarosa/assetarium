@@ -3,8 +3,8 @@
 # Claude orientation for Local Asset Library (LAL)
 
 AGENTS.md above is the shared contract for every agent (Codex and Claude): the
-two approval checkpoints, UX care, fault handling, caption severity and storage
-discipline all apply unchanged. This file only adds orientation. When they
+single scope-and-plan approval checkpoint, UX care, fault handling, caption
+severity and storage discipline all apply unchanged. This file only adds orientation. When they
 differ, AGENTS.md and the owner's instructions win.
 
 ## What LAL is
@@ -28,7 +28,7 @@ relevance judgments, expansion decisions). Being prepared for open source.
 
 Python 3.13 only. Wrappers keep uv cache, temp, HF/Torch caches inside the
 project and set `UV_LINK_MODE=hardlink`. Never `sync`/install or change pins
-without covering it at the plan checkpoint; never edit installed packages.
+without covering it at the approval checkpoint; never edit installed packages.
 Prefer `--locked --no-sync --offline` for runs.
 
 ```powershell
