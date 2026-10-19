@@ -40,13 +40,27 @@ Native verification: `scripts/verify-source-browser.py --run-name <unique-name>`
 through the existing MCP runtime, using isolated synthetic assets only.
 
 The library shows one warning card per source needing processing/publication.
-**Process assets** performs both, with a progress bar spanning processing,
-publication and a final verification scan. **Cancel** finishes and saves the
-current asset (or, while writing descriptions, the current batch) before stopping.
+**Process assets** performs both (inspection/previews and search vectors; no
+descriptions), with a progress bar spanning processing, publication and a final
+verification scan. **Cancel** finishes and saves the current asset before stopping.
+Descriptions are optional ([decision 0008](../decisions/0008-optional-descriptions-and-notifications.md)):
+**Settings → Asset sources → Generate descriptions** runs them per source in the
+background, with progress and **Cancel** in the source row and under the bell;
+**Cancel** waits for the current batch.
 **Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets
-how many assets are described per model call. If processing stops because the GPU
-ran out of memory, the source card names the batch size; lower it and press
-**Process assets** again. Finished descriptions are never redone. The card remains until a scan confirms that no
+how many assets are described per model call. If a run stops because the GPU
+ran out of memory, its report names the batch size; lower it and choose
+**Continue**. Finished descriptions are never redone.
+
+The header bell opens **Notifications**: *Descriptions ready to generate* for a
+source (actions **Generate descriptions** / **Not now**) and one report per
+description run (finished, with failures, cancelled, stopped or interrupted;
+**Continue** when descriptions remain, **View source**, dismiss ×). New notices
+also appear as a toast for 8 s (paused while hovered or focused). The bell shows
+the unread count, or a dot while a run is in progress. Escape or a click outside
+closes the panel and marks its notices read. The gear button opens Settings.
+Native verification: `scripts/verify-notifications.py --run-name <unique-name>`
+(synthetic assets; a stand-in run, no model). The card remains until a scan confirms that no
 actionable work remains and current results have been published. Recorded failures
 do not trigger pending cards: **Importing failures report** opens a scrollable list
 of original asset paths, including disabled sources. Saved attempts distinguish
@@ -220,8 +234,9 @@ and `logs/gui.log`. Per-call evidence, timing and lifecycle are under
 ## Verification and remaining scope
 
 Caption review now distinguishes minor notes, descriptive warnings and actual
-failed/unusable captions. Notes appear in asset detail; warnings and faults have
-distinct card badges. Original review evidence remains expandable, and source or
+failed/unusable captions. Notes appear in asset detail; warnings have a card
+badge. Missing or failed descriptions have no card badge (they are optional);
+asset detail explains them and keeps the recorded fault. Original review evidence remains expandable, and source or
 preview faults retain their existing presentation. See
 [`../caption-quality.md`](../caption-quality.md) for the shared desktop/agent
 classification and verification evidence.

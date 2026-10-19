@@ -13,3 +13,4 @@ ask the owner first, then update the file (do not silently contradict it).
 | [0005](0005-embedding-worker-and-prestart.md) | Worker returns vectors; app pre-starts it; 10 min idle | 2026-10-17 |
 | [0006](0006-retention.md) | Keep active + 2 generations, 10 launch audits; reusable pytest folder | 2026-10-17 |
 | [0007](0007-batched-description-generation.md) | Batched descriptions (default 8); finished ones kept; out of GPU memory stays pending | 2026-10-18 |
+| [0008](0008-optional-descriptions-and-notifications.md) | Descriptions are optional; Generate descriptions per source; notifications | 2026-10-18 |

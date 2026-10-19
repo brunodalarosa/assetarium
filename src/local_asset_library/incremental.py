@@ -379,14 +379,16 @@ def run_caption(config, record, fingerprint, backend):
 
 
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
-            cancelled=None, progress=None):
+            cancelled=None, progress=None, asset_ids=None):
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
     selected = records(work)
     from .settings import processing_formats, processing_eligible
     formats = processing_formats(config)
-    selected = [record for record in selected if processing_eligible(record, formats)]
+    # asset_ids narrows the caption/inspection selection; vectors cover the whole source.
+    selected = [record for record in selected if processing_eligible(record, formats)
+                and (asset_ids is None or stage == "embeddings" or record["asset_id"] in asset_ids)]
     if stage == "embeddings":
         from .library_index import index_library
         return index_library(work, backend, limit, dry_run, cancelled=cancelled, progress=progress)

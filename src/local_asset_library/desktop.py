@@ -137,8 +137,18 @@ class DesktopBridge:
     def _sources(self):
         from .sources import registry, source_status, revision
         from .source_operations import operation_status
-        return {'status': 'ready', 'sources': [source_status(self._config, s) for s in registry(self._config)['sources']],
-                'revision': revision(self._config), 'scan': operation_status(self._config)}
+        from .notifications import reconcile
+        statuses = [source_status(self._config, s) for s in registry(self._config)['sources']]
+        # Notices follow the statuses already read for this call; no extra scans.
+        return {'status': 'ready', 'sources': statuses, 'revision': revision(self._config),
+                'scan': operation_status(self._config), 'notifications': reconcile(self._config, statuses)['items']}
+
+    def notification_action(self, action, identifier=None):
+        return self._wait(self._present(self._notification_action, action, identifier, guarded=False))
+
+    def _notification_action(self, action, identifier):
+        from .notifications import act
+        return {'status': 'saved', 'notifications': act(self._config, action, identifier)['items']}
 
     def source_action(self, action, key=None, directory=None, enabled=None):
         if not self._config.sources_registry:
@@ -161,8 +171,8 @@ class DesktopBridge:
             return {'status': 'saved'}
         if action == 'scan':
             return self._start_source_operation('scan', key)
-        if action == 'process':
-            return self._start_source_operation('process', key)
+        if action in {'process', 'describe'}:
+            return self._start_source_operation(action, key)
         if action == 'cancel':
             return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
         raise ConfigError('Unknown asset source action')
@@ -257,6 +267,7 @@ class DesktopBridge:
                                 ('source-status.json', 'source-operation.json', 'source-cancel.json', 'active.json')]
                                + [stamp(config.project_root / 'data/library/source-faults' / (source['id'] + '.json'))])
         sources.append(stamp(config.project_root / 'data/library/settings.json'))
+        sources.append(stamp(config.project_root / 'data/library/notifications.json'))
         return {'status': 'ready', 'library': digest(library)[:16], 'sources': digest(sources)[:16],
                 'worker': self._gateway.worker_phase if hasattr(self, '_gateway') else 'not_started'}
 

@@ -194,7 +194,7 @@ def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(mana
     config, backend, one, _ = managed
     work = ready_source(config, backend, one)
     row = records(work)[0]
-    row['processing']['caption'] = 'failed'
+    row['processing']['previews'] = 'failed'
     update_record(work, row)
     before = sources.importing_failures(config)
     assert before['assets'] == 1

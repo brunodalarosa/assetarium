@@ -5,7 +5,7 @@ description: Find, compare, inspect, and select existing 3D assets through the l
 
 # Local Asset Library
 
-Use the existing `local_asset_library` MCP server to produce an evidence-backed asset selection. The server searches configured, approved library membership; it does not search every file on the computer. Coverage, captions, technical inspection, and previews can be incomplete.
+Use the existing `local_asset_library` MCP server to produce an evidence-backed asset selection. The server searches configured, approved library membership; it does not search every file on the computer. Coverage, captions, technical inspection, and previews can be incomplete. Descriptions are optional: an asset without one is still found by name and image, and its excerpt is empty.
 
 This computer's library root is `C:\BrunoOS\Local-Asset-Library`. The tools resolve their own configuration regardless of the game project's working directory. Prefer the current tool schemas over saved examples if their contracts differ.
 

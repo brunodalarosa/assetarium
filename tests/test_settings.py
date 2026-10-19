@@ -110,16 +110,18 @@ def coordinator(config, monkeypatch, allocations, after_stage=None):
 
 def test_processing_accepts_existing_usage_and_growth_above_historical_limits(config, monkeypatch):
     save_general_settings(config, 24)
-    calls, states = coordinator(config, monkeypatch, [11 * GIB, 15 * GIB, 16 * GIB, 17 * GIB, 18 * GIB])
-    operations.process_source(config, {'key': 'fixture'}, 'test-token')
-    assert len(calls) == 3 and states[-1]['status'] == 'complete'
+    calls, states = coordinator(config, monkeypatch, [11 * GIB, 15 * GIB, 16 * GIB, 17 * GIB])
+    operations.process_source(config, {'key': 'fixture', 'id': 'fixture-id', 'name': 'fixture'}, 'test-token')
+    # Importing runs inspection and search data only; descriptions are a separate run.
+    assert len(calls) == 2 and states[-1]['status'] == 'complete'
+    assert [c[c.index('--stage') + 1] for c in calls] == ['inspection', 'embeddings']
 
 
 def test_exhausted_budget_starts_no_asset_worker(config, monkeypatch):
     save_general_settings(config, 1)
     calls, _ = coordinator(config, monkeypatch, [GIB])
     with pytest.raises(ConfigError, match='Settings → General'):
-        operations.process_source(config, {'key': 'fixture'}, 'test-token')
+        operations.process_source(config, {'key': 'fixture', 'id': 'fixture-id', 'name': 'fixture'}, 'test-token')
     assert not calls
 
 
@@ -128,16 +130,16 @@ def test_changed_limit_is_applied_at_next_stage_check(config, monkeypatch):
     calls, states = coordinator(config, monkeypatch, [11 * GIB, 13 * GIB],
                                  after_stage=lambda: save_general_settings(config, 12))
     with pytest.raises(ConfigError, match='completed work is preserved'):
-        operations.process_source(config, {'key': 'fixture'}, 'test-token')
+        operations.process_source(config, {'key': 'fixture', 'id': 'fixture-id', 'name': 'fixture'}, 'test-token')
     assert len(calls) == 1 and all(s['status'] != 'complete' for s in states)
 
 
 def test_publication_growth_is_checked_before_reporting_completion(config, monkeypatch):
     save_general_settings(config, 24)
-    calls, states = coordinator(config, monkeypatch, [11 * GIB, 15 * GIB, 16 * GIB, 17 * GIB, 25 * GIB])
+    calls, states = coordinator(config, monkeypatch, [11 * GIB, 15 * GIB, 16 * GIB, 25 * GIB])
     with pytest.raises(ConfigError, match='completed work is preserved'):
-        operations.process_source(config, {'key': 'fixture'}, 'test-token')
-    assert len(calls) == 3 and all(s['status'] != 'complete' for s in states)
+        operations.process_source(config, {'key': 'fixture', 'id': 'fixture-id', 'name': 'fixture'}, 'test-token')
+    assert len(calls) == 2 and all(s['status'] != 'complete' for s in states)
 
 
 def test_gpu_memory_reason_from_stage_worker_reaches_the_source_card(config, monkeypatch):
@@ -150,7 +152,7 @@ def test_gpu_memory_reason_from_stage_worker_reaches_the_source_card(config, mon
         return SimpleNamespace(returncode=1)
     monkeypatch.setattr(operations.subprocess, 'run', failing)
     with pytest.raises(ConfigError, match='batch size 8. Lower it'):
-        operations.process_source(config, {'key': 'fixture'}, 'test-token')
+        operations.process_source(config, {'key': 'fixture', 'id': 'fixture-id', 'name': 'fixture'}, 'test-token')
     assert len(calls) == 1
 
 

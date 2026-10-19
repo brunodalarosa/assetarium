@@ -158,7 +158,10 @@ def test_suggestions_excluded_and_correction_invalidates(indexed):
     save_json(config.output_path("data", f"captions/corrections/{records[0]['asset_id']}.json"), overlay)
     response, evidence = SearchEngine(config, backend).search("object", "description")
     assert records[0]["asset_id"] not in {r["asset_id"] for r in response["results"]}
-    assert any("input fingerprint" in r["reason"] for r in evidence["excluded"])
+    # Descriptions are optional: a stale one leaves only its channel, silently.
+    assert not any(r["channel"] == "description" for r in evidence["excluded"])
+    combined, evidence = SearchEngine(config, backend).search("object", "combined", limit=40)
+    assert not any(r["channel"] == "description" for r in evidence["excluded"])
 
 
 def test_query_error_propagates(indexed):

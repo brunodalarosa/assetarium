@@ -56,17 +56,40 @@ searches, and left on disk as-is; other sources still scan. It is never recreate
 just to write an error. A later successful scan clears the current availability
 warning while retaining the original diagnostic history.
 
+## Descriptions
+
+Descriptions are optional. Assets are searchable by name and image as soon as
+they are processed; descriptions add a third signal to the default search, and a
+missing, stale or invalid description is skipped without a fault.
+
+Each source in **Settings → Asset sources** shows its description counts
+(written · missing · failed) and a **Generate descriptions** button. It is enabled
+when the source is enabled, formats are selected, no operation is running for it
+and at least one asset with usable renders lacks a description. The run happens
+in the background: it writes descriptions in batches (decision 0007), builds their
+search vectors and publishes. Its progress and **Cancel** appear in that source
+row and under the notification bell. Recorded description failures are kept and
+not retried. A cancelled or stopped run still publishes what it finished.
+
+Notifications (bell in the header) report two things: a source that finished
+processing with descriptions ready to generate, and the outcome of each
+description run. A new notice also shows a short toast. **Not now** hides a
+ready notice until more descriptions are missing; closing the panel marks notices
+read. They are saved in `data/library/notifications.json`.
+
 ## Source cards
 
 The library shows one warning card for each source that needs processing or
-publication. It remains visible through processing, publication, cancellation
+publication. Missing or failed descriptions never raise a card: descriptions are
+optional extra data ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)). It remains visible through processing, publication, cancellation
 and interruption while actionable work remains. A subsequent scan clears it
 when there is no unattempted work and current results have been published.
-Recorded failures appear in the importing failures report. Caption review notes,
-warnings and pending owner approval do not count as processing failures.
+Recorded failures appear in the importing failures report. Description failures,
+caption review notes, warnings and pending owner approval do not count as import
+failures.
 
-Click **Process assets** to inspect/render pending assets, generate descriptions,
-create search vectors and publish usable results for that source. The progress
+Click **Process assets** to inspect/render pending assets, create search vectors
+and publish usable results for that source. It does not generate descriptions. The progress
 bar includes processing, source publication, combined search publication and the
 verification scan. Other sources retain their published results. New asset
 processing remains an explicit action; adding a source only registers/scans it.
@@ -91,8 +114,8 @@ original model path. Usable partial results remain available after publication.
 
 Readiness uses saved stage outcomes, rather than assuming every incomplete stage
 has never been attempted. Failed/unsupported stages block dependent work; other
-unfinished work stays pending. Partial embedding outcomes are terminal unless
-description generation is still pending. Every scan saves each asset's current
+unfinished work stays pending. The caption stage is not part of import readiness;
+an embeddings outcome that misses only the description vector counts as complete. Every scan saves each asset's current
 file/dependency fingerprint, attempted state and outcome in
 `metadata-lal/library/import-status.json`. New or changed inputs become pending;
 unchanged failures are retained. Unpublished results still require publication

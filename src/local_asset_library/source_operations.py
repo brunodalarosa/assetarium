@@ -19,6 +19,14 @@ from .gpu_queue import lease, process_alive
 RUNNING = {"queued", "scanning", "processing", "publishing", "cancelling", "verifying"}
 STAGE_LABELS = {'inspection':'Inspecting assets and rendering previews',
                 'caption':'Writing descriptions', 'embeddings':'Preparing search data'}
+# Descriptions are optional extra data (decision 0008): importing never generates them.
+OPERATION_STAGES = {'process': ('inspection', 'embeddings'), 'describe': ('caption', 'embeddings')}
+RUNTIMES = {'inspection': 'mcp', 'caption': 'caption', 'embeddings': 'embedding'}
+
+
+def stage_progress(operation, stage, fraction=0):
+    stages = OPERATION_STAGES.get(operation, OPERATION_STAGES['process'])
+    return .05 + .85 * (stages.index(stage) + fraction) / len(stages)
 
 
 def operation_status(config):
@@ -97,18 +105,22 @@ def operation_lease(config, scoped, token):
 
 
 def start(config, operation, key=None):
-    if operation not in {"scan", "process"}:
+    if operation not in {"scan", "process", "describe"}:
         raise ConfigError("Unknown asset source operation")
+    if operation == "describe" and not key:
+        raise ConfigError("Choose an asset source to generate descriptions for")
     scoped = bound(config, get_source(config, key)) if key else config
     if key:
         from .sources import validate_directory
         validate_directory(config, str(scoped.source_root))
-    if operation == "process" and not get_source(config, key)["enabled"]:
+    if operation in {"process", "describe"} and not get_source(config, key)["enabled"]:
         raise ConfigError("Enable this asset source before processing it")
-    if operation == 'process':
+    if operation in {'process', 'describe'}:
         from .settings import processing_formats
         if not processing_formats(config):
             raise ConfigError('Processing is paused. Select formats in Settings → General before processing assets')
+    if operation == 'describe' and not (source_status(config, get_source(config, key)).get('descriptions') or {}).get('missing'):
+        raise ConfigError('Every asset that can be described already has a description or a recorded failure')
     # Reserve and spawn under one short lock, independent of a potentially long
     # running processing lease. Duplicate clicks cannot start duplicate work.
     with lease(config, "source-operation-start", resource="sources"):
@@ -132,6 +144,9 @@ def start(config, operation, key=None):
         except OSError as exc:
             state(scoped, status="faulty", reason=str(exc))
             raise
+    if operation == "describe":
+        from .notifications import clear_ready
+        clear_ready(config, get_source(config, key)["id"])
     return {"status": "started", "token": token}
 
 
@@ -212,32 +227,37 @@ def publish_source(scoped):
     return target.catalog_generation
 
 
-def process_source(config, source, token):
-    scoped = bound(config, source)
-    from .settings import processing_formats
-    if not processing_formats(config):
-        state(scoped, status='complete', phase='Processing paused: no formats selected', progress=1, current_asset=None)
-        return
-    state(scoped, status="scanning", phase="Checking source", progress=.01)
-    scan_source(config, source)
-    ensure_index(config, scoped)
-    state(scoped, status='processing', phase='Preparing processing', progress=.02)
+BUDGET_REACHED = ("Storage budget reached. Increase it in Settings → General, then process this source again; "
+                  "completed work is preserved")
+
+
+def storage_base(config, token):
     # Receipts include external metadata as well as the project, deduplicated by
     # file identity. Model/runtime installations and original files are excluded.
     from .source_storage import receipt
-    before = receipt(config, "before-" + token)
     from .settings import storage_budget
+    base = receipt(config, "before-" + token)["totals"]["allocated_bytes"]
+    if base >= storage_budget(config)['total_allocated_bytes']:
+        raise ConfigError(BUDGET_REACHED)
+    return base
+
+
+def check_budget(config, label, base):
+    from .source_storage import receipt
+    from .settings import storage_budget
+    measured = receipt(config, label)["totals"]["allocated_bytes"]
     budgets = storage_budget(config)
-    base = before["totals"]["allocated_bytes"]
-    if base >= budgets['total_allocated_bytes']:
-        raise ConfigError('Storage budget reached. Increase it in Settings → General, then process this source again; completed work is preserved')
-    stages = [("inspection", ".venv-mcp"), ("caption", ".venv-caption"), ("embeddings", ".venv-embedding")]
-    for i, (stage, environment) in enumerate(stages):
+    if measured > budgets["total_allocated_bytes"] or measured - base > budgets["peak_additional_allocated_bytes"]:
+        raise ConfigError(BUDGET_REACHED)
+
+
+def run_stages(config, source, scoped, token, operation, base):
+    """Run each stage in its own locked runtime; returns False when cancelled."""
+    for stage in OPERATION_STAGES[operation]:
         if cancelled(scoped, token):
-            state(scoped, status="cancelled", phase="Cancelled; completed assets saved", current_asset=None)
-            return
-        state(scoped, status="processing", phase=STAGE_LABELS[stage], stage=stage, progress=.05 + .27 * i)
-        runtime = {'inspection':'mcp','caption':'caption','embeddings':'embedding'}[stage]
+            return False
+        state(scoped, status="processing", phase=STAGE_LABELS[stage], stage=stage, progress=stage_progress(operation, stage))
+        runtime = RUNTIMES[stage]
         command = ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
                    str(config.project_root/'scripts'/(runtime+'-runtime.ps1')),
                    'run','--locked','--no-sync','--offline','--project',str(config.project_root/'runtime'/runtime),
@@ -252,28 +272,89 @@ def process_source(config, source, token):
             fault = stage_fault_path(scoped, token)
             raise ConfigError(read_json(fault)["reason"] if fault.exists() else
                               "Source processing worker failed; see its saved operation log")
-        measured = receipt(config, stage + "-" + token)
-        budgets = storage_budget(config)
-        if (measured["totals"]["allocated_bytes"] > budgets["total_allocated_bytes"] or
-                measured["totals"]["allocated_bytes"] - base > budgets["peak_additional_allocated_bytes"]):
-            raise ConfigError("Storage budget reached. Increase it in Settings → General, then process this source again; completed work is preserved")
-    if cancelled(scoped, token):
-        state(scoped, status="cancelled", phase="Cancelled; completed assets saved", current_asset=None)
-        return
-    state(scoped, status="publishing", phase="Publishing source", progress=.90, current_asset=None)
+        check_budget(config, stage + "-" + token, base)
+    return not cancelled(scoped, token)
+
+
+def publish_and_verify(config, source, scoped, phase):
+    state(scoped, status="publishing", phase=phase, progress=.90, current_asset=None)
     publish_source(scoped)
     state(scoped, status="publishing", phase="Updating searches", progress=.95)
     aggregate(config)
     state(scoped, status="verifying", phase="Scanning to verify publication", progress=.98)
-    status = scan_source(config, source)
-    measured = receipt(config, "published-" + token)
-    budgets = storage_budget(config)
-    if (measured["totals"]["allocated_bytes"] > budgets["total_allocated_bytes"] or
-            measured["totals"]["allocated_bytes"] - base > budgets["peak_additional_allocated_bytes"]):
-        raise ConfigError("Storage budget reached. Increase it in Settings → General, then process this source again; completed work is preserved")
+    return scan_source(config, source)
+
+
+def process_source(config, source, token):
+    scoped = bound(config, source)
+    from .settings import processing_formats
+    if not processing_formats(config):
+        state(scoped, status='complete', phase='Processing paused: no formats selected', progress=1, current_asset=None)
+        return
+    state(scoped, status="scanning", phase="Checking source", progress=.01)
+    scan_source(config, source)
+    ensure_index(config, scoped)
+    state(scoped, status='processing', phase='Preparing processing', progress=.02)
+    base = storage_base(config, token)
+    if not run_stages(config, source, scoped, token, 'process', base):
+        state(scoped, status="cancelled", phase="Cancelled; completed assets saved", current_asset=None)
+        return
+    status = publish_and_verify(config, source, scoped, "Publishing source")
+    check_budget(config, "published-" + token, base)
     state(scoped, status="complete_with_faults" if status["failed"] or status["needs_processing"] else "complete",
           phase="Finished with recorded issues" if status["failed"] or status["needs_processing"] else "Up to date and published",
           progress=1, current_asset=None)
+    from .notifications import notify_ready
+    notify_ready(config, source, (status.get("descriptions") or {}).get("missing", 0))
+
+
+def description_counts(scoped):
+    from collections import Counter
+    from .incremental import working
+    from .settings import processing_formats, processing_eligible
+    from .sources import description_state
+    formats = processing_formats(scoped)
+    return Counter(description_state(r) for r in read_records(working(scoped)) if processing_eligible(r, formats))
+
+
+DESCRIBE_END = {'complete': ('complete', 'Descriptions generated and published'),
+                'complete_with_failures': ('complete_with_faults', 'Descriptions generated; some failed and were recorded'),
+                'cancelled': ('cancelled', 'Cancelled; finished descriptions are published'),
+                'stopped': ('faulty', 'Stopped; finished descriptions are published')}
+
+
+def describe_source(config, source, token):
+    """Generate missing descriptions and their vectors, then publish what finished.
+
+    Descriptions are optional extra data (decision 0008). Recorded description
+    failures are kept, not retried. A cancel or stop still publishes completed
+    descriptions, and every run ends with one report notification.
+    """
+    from .notifications import notify_report
+    scoped = bound(config, source)
+    started = time.monotonic()
+    state(scoped, status="scanning", phase="Checking source", progress=.01)
+    scan_source(config, source)
+    ensure_index(config, scoped)
+    before = description_counts(scoped)
+    state(scoped, status='processing', phase='Preparing descriptions', progress=.02)
+    outcome, reason = None, None
+    try:
+        base = storage_base(config, token)
+        if not run_stages(config, source, scoped, token, 'describe', base):
+            outcome = 'cancelled'
+    except ConfigError as exc:
+        # Machine limits (GPU memory, storage budget) stop the run; assets stay pending.
+        outcome, reason = 'stopped', str(exc)
+    publish_and_verify(config, source, scoped, "Publishing descriptions")
+    after = description_counts(scoped)
+    failed = max(0, after['failed'] - before['failed'])
+    outcome = outcome or ('complete_with_failures' if failed else 'complete')
+    notify_report(config, source, token, outcome, written=max(0, after['complete'] - before['complete']),
+                  failed=failed, remaining=after['missing'], reason=reason,
+                  elapsed_seconds=round(time.monotonic() - started))
+    status, phase = DESCRIBE_END[outcome]
+    state(scoped, status=status, phase=phase, progress=1, current_asset=None, reason=reason)
 
 
 def worker_stage(config, source, stage, token):
@@ -283,18 +364,24 @@ def worker_stage(config, source, stage, token):
     scoped = bound(config, source)
     from .settings import processing_formats
     backend = None
-    stage_index = {"inspection": 0, "caption": 1, "embeddings": 2}[stage]
+    operation = operation_status(scoped).get("operation", "process")
+    # Description runs only describe assets whose renders are ready, so unfinished
+    # imports never gain recorded description faults.
+    only = None
+    if stage == "caption":
+        from .sources import description_state
+        only = {r["asset_id"] for r in read_records(working(scoped)) if description_state(r) == "missing"}
     def on_progress(identifier, completed, total):
         state(scoped, status="cancelling" if cancelled(scoped, token) else "processing",
               phase=(finishing(stage) if cancelled(scoped, token) else STAGE_LABELS[stage]),
               stage=stage, completed=completed, total=total, current_asset=identifier,
-              progress=.05 + .27 * (stage_index + completed / max(1, total)))
+              progress=stage_progress(operation, stage, completed / max(1, total)))
     for _ in range(10000):
         if cancelled(scoped, token):
             return
         if not processing_formats(config):
             return
-        preview = process(scoped, stage, limit=1000, dry_run=True)
+        preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
         if not preview.get("pending"):
             return
         with lease(config, "batch-source-" + stage, timeout=30) if stage != "inspection" else _nullcontext():
@@ -307,7 +394,7 @@ def worker_stage(config, source, stage, token):
                     backend = EmbeddingBackend(scoped)
             from .caption_batching import GpuMemoryError
             try:
-                result = process(scoped, stage, limit=1000, backend=backend,
+                result = process(scoped, stage, limit=1000, backend=backend, asset_ids=only,
                                  cancelled=lambda: cancelled(scoped, token), progress=on_progress)
             except GpuMemoryError as exc:
                 # A machine limit, not an asset fault: the coordinator shows this reason.

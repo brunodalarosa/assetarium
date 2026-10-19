@@ -14,10 +14,11 @@ function searchBusy(generation){state.activeSearch=generation;$('search-busy').h
 function filters(){ const f={}; if($('pack').value)f.pack=$('pack').value;if($('format').value)f.format=$('format').value;if($('triangles').value!=='')f.max_triangles=Number($('triangles').value);if($('rigged').value)f.rigged=$('rigged').value==='true';return f; }
 function settings(){const args={mode:$('mode').value,filters:filters(),limit:Number($('limit').value)};if(args.mode==='reference'){args.reference_asset_id=$('reference-asset').value;args.reference_view=$('reference-view').value;}else args.query=$('query').value;return args;}
 function addOptions(select,values,label=x=>x){for(const value of values){const o=node('option',label(value));o.value=value;select.append(o);}}
-function captionBadge(item){if(item.caption_faulty)return node('span','Caption fault','badge fault caption-quality-badge');if(item.caption_status==='warning')return node('span','Caption warning','badge warning caption-quality-badge');return null;}
-function cardLabel(item){return `${item.name}, ${packName(item.pack)}${item.source_faulty ? ', source fault' : ''}${item.caption_faulty ? ', caption fault' : item.caption_status==='warning' ? ', caption warning' : ''}`;}
+function captionBadge(item){if(item.caption_status==='warning')return node('span','Caption warning','badge warning caption-quality-badge');return null;}
+function cardLabel(item){return `${item.name}, ${packName(item.pack)}${item.source_faulty ? ', source fault' : ''}${item.caption_status==='warning' ? ', caption warning' : ''}`;}
 function refreshCaptionBadge(card,item,info){const latest={...item,...info};card.button.querySelector('.caption-quality-badge')?.remove();const flag=captionBadge(latest);if(flag)card.button.querySelector('.badges').append(flag);card.button.setAttribute('aria-label',cardLabel(latest));}
-function badges(item){const el=node('div',undefined,'badges');if(item.source_faulty)el.append(node('span','Source fault','badge fault'));const caption=captionBadge(item);if(caption)el.append(caption);if(item.caption_owner_review!=='approved')el.append(node('span','Review '+(item.caption_owner_review||'pending'),'badge review'));return el;}
+function hasDescription(item){return !item.caption_faulty&&!['pending',undefined].includes(item.caption_status);}
+function badges(item){const el=node('div',undefined,'badges');if(item.source_faulty)el.append(node('span','Source fault','badge fault'));const caption=captionBadge(item);if(caption)el.append(caption);if(hasDescription(item)&&item.caption_owner_review!=='approved')el.append(node('span','Review '+(item.caption_owner_review||'pending'),'badge review'));return el;}
 function renderCards(items, generation, collection=state, append=false) {
   const grid=collectionElement(collection,'grid');
   collection.items = append ? collection.items.concat(items) : items;
@@ -93,7 +94,7 @@ function renderDetail(result,identifier,format,view,moveFocus,collection=activeC
  const controls=node('div',undefined,'detail-controls');const viewLabel=node('label','Preview view'),viewSelect=node('select');viewSelect.id=(collection===state?'':'source-')+'detail-view';addOptions(viewSelect,collection.context.views,x=>views[x]||x);viewSelect.value=view;viewSelect.onchange=()=>selectAsset(identifier,format,viewSelect.value,false,collection);viewLabel.append(viewSelect);const formatLabel=node('label','Source format'),formatSelect=node('select');formatSelect.id=(collection===state?'':'source-')+'detail-format';addOptions(formatSelect,info.formats||[]);formatSelect.value=format||p.selected_source?.format||info.formats?.[0]||'';formatSelect.onchange=()=>selectAsset(identifier,formatSelect.value,view,false,collection);formatLabel.append(formatSelect);controls.append(viewLabel,formatLabel);body.append(controls);
  const source=section('Source location');if(p.selected_source){source.append(node('p',p.selected_source.format.toUpperCase()+' · original file · verified hash'),node('code',p.selected_source.resolved_path,'path'));const button=node('button','Copy source path');button.type='button';button.onclick=()=>copy(p.selected_source.resolved_path,'Source path copied. Asset files were not copied.');source.append(button,rawDetails('Source SHA-256',p.selected_source.sha256));}else source.append(node('p','No currently verified usable source. See recorded fault evidence.'));body.append(source);
  const technical=section('Measured technical facts'),t=info.technical||{};technical.append(node('p',info.scale,'hint'));const selectedFormat=p.selected_source?.format;if(selectedFormat&&t.inspected_format&&selectedFormat!==t.inspected_format)technical.append(node('p',selectedFormat.toUpperCase()+' is uninspected; the facts below describe '+t.inspected_format.toUpperCase()+'.','state-banner'));technical.append(facts([['Inspected format',t.inspected_format?.toUpperCase()],['Triangles',t.evaluated_instance_totals?.triangles],['Vertices',t.evaluated_instance_totals?.vertices],['Armatures',t.armatures?.length],['Actions',t.actions?.length],['Physical scale','Unknown']]));technical.append(rawDetails('Measurement and inspected-source evidence',t));body.append(technical);
- const observations=section('Generated visual observations');observations.append(node('p','Provisional observations, separate from measured facts.','hint'));if(info.observations){observations.append(node('p',info.observations.description||display(info.observations)),rawDetails('Structured observations',info.observations));}else observations.append(node('p','No usable observation description.'));body.append(observations);
+ const observations=section('Generated visual observations');observations.append(node('p','Provisional observations, separate from measured facts.','hint'));if(info.observations){observations.append(node('p',info.observations.description||display(info.observations)),rawDetails('Structured observations',info.observations));}else observations.append(node('p',info.caption_faulty?'Description generation failed; the recorded fault is listed below.':'No description yet. Descriptions are optional: this asset is searchable by name and image. Generate them in Settings → Asset sources.'));body.append(observations);
  const quality=info.caption_quality||{},captionNotes=section('Caption warnings and notes');const notes=node('ul');for(const issue of quality.issues||[]){if(issue.severity==='fault')continue;notes.append(node('li',(issue.severity==='warning'?'Warning: ':'Note: ')+issue.reason,issue.severity==='warning'?'caption-warning':undefined));}captionNotes.append(notes.childNodes.length?notes:node('p',quality.status==='fault'?'Caption unavailable; see recorded faults below.':'No caption review notes recorded.'),rawDetails('Original caption review evidence',{classification:quality.classification,issues:quality.issues,original_findings:info.caption_faults}));body.append(captionNotes);
  const suggestions=section('Suggested uses');const list=node('ul');for(const use of info.suggested_uses||[])list.append(node('li',use));suggestions.append(list.childNodes.length?list:node('p','No suggestions recorded.'),node('p','Suggestions are interpretations, not verified asset capabilities.','hint'));body.append(suggestions);
  const review=section('Owner review');review.append(facts([['Caption review',info.owner_review||'pending'],['Artistic suitability',info.owner_artistic_approval||'pending']]));body.append(review);
@@ -145,7 +146,7 @@ async function refreshContext(force=false){
 function renderCoverage(context){
  const source=context.working_coverage||context.coverage,coverage=Object.values(source.packs);
  const pending=coverage.reduce((n,p)=>n+(p.stages.caption.pending||0),0),failed=coverage.reduce((n,p)=>n+(p.stages.caption.failed||0),0);
- $('coverage').textContent=`${context.coverage.membership} in the library · ${pending} descriptions pending · ${failed} description failures`;
+ $('coverage').textContent=`${context.coverage.membership} in the library · ${pending} without descriptions · ${failed} description failures`;
 }
 const coverageLine=node('p',undefined,'hint');coverageLine.id='coverage';operations.after(coverageLine);
 // One cheap stat-only poll; library and source data reload only when their token changes.
@@ -175,7 +176,7 @@ function sourceMessage(source){if(source.scan_fault)return source.scan_fault;if(
 function renderSourceWarnings(){
  const shown=new Set();
  for(const source of state.sources){
-  const operation=source.operation||{},active=operationActive(operation);
+  const operation=source.operation?.operation==='describe'?{}:(source.operation||{}),active=operationActive(operation);
   if(!source.needs_processing&&!source.scan_fault&&!active)continue;
   shown.add(source.key);let card=sourceCards.get(source.key);
   if(!card){
@@ -188,7 +189,7 @@ function renderSourceWarnings(){
   }
   card.title.textContent=source.name;card.path.textContent=source.path;card.message.textContent=sourceMessage(source);
   const cancelPending=operation.status==='cancelling';
-  card.process.disabled=active||!source.enabled||source.processing_paused;card.process.title=source.processing_paused?'Select processing formats in Settings → General':source.enabled?'':'Enable this source in Settings before processing';
+  card.process.disabled=operationActive(source.operation)||!source.enabled||source.processing_paused;card.process.title=source.processing_paused?'Select processing formats in Settings → General':source.enabled?'':'Enable this source in Settings before processing';
   card.cancel.hidden=!active;card.cancel.disabled=cancelPending;card.cancel.textContent=cancelPending?'Cancelling…':'Cancel';
   card.bar.hidden=!(active||operation.status==='cancelled'||operation.status==='complete_with_faults');card.bar.value=Math.round((operation.progress||0)*100);
   card.bar.setAttribute('aria-valuetext',`${Math.round((operation.progress||0)*100)}% — ${operation.phase||'Waiting'}`);
@@ -209,18 +210,54 @@ function renderSourceSettings(){
   const counts=source.format_counts;
   info.append(node('p',counts?Object.entries(counts).map(([format,count])=>`${format==='gltf'?'glTF / GLB':format.toUpperCase()}: ${count}`).join(' · '):'Format counts appear after scanning.','source-format-counts'));
   if(source.import_formats)info.append(node('p','Imported formats: '+(source.import_formats.length?source.import_formats.map(format=>format==='gltf'?'glTF / GLB':format.toUpperCase()).join(', '):'none')+'. Other original formats are retained and excluded from imports.','hint'));
+  info.append(descriptionBlock(source));
   const label=node('label',undefined,'source-enabled'),checkbox=node('input');checkbox.type='checkbox';checkbox.checked=source.enabled;checkbox.dataset.source=source.key;checkbox.dataset.action='enabled';checkbox.setAttribute('aria-label','Enable '+source.name);
   checkbox.onchange=()=>sourceAction('enabled',source.key,null,checkbox.checked);label.append(checkbox,document.createTextNode('Enabled'));
   const remove=node('button','Remove');remove.type='button';remove.dataset.source=source.key;remove.dataset.action='remove';remove.disabled=operationActive(source.operation);remove.onclick=()=>sourceAction('remove',source.key);
   controls.append(label,remove);row.append(info,controls);$('source-list').append(row);
  }
- if(focusKey&&focusAction)[...$('source-list').querySelectorAll('[data-source]')].find(x=>x.dataset.source===focusKey&&x.dataset.action===focusAction)?.focus();
+ // Starting or finishing a description run swaps its button; keep focus on the counterpart.
+ const counterpart={describe:'cancel-describe','cancel-describe':'describe'}[focusAction];
+ if(focusKey&&focusAction){const controls=[...$('source-list').querySelectorAll('[data-source]')].filter(x=>x.dataset.source===focusKey);(controls.find(x=>x.dataset.action===focusAction)||controls.find(x=>x.dataset.action===counterpart))?.focus();}
+}
+// Descriptions are optional extra data (decision 0008); each source generates them on request.
+function plural(n,one,many){return `${Number(n).toLocaleString()} ${n===1?one:many}`;}
+function describeActive(source){return source.operation?.operation==='describe'&&operationActive(source.operation);}
+function descriptionSummary(source){
+ const d=source.descriptions;if(!d)return 'Description counts appear after scanning.';
+ const parts=[d.complete&&plural(d.complete,'description','descriptions')+' written',d.missing&&`${Number(d.missing).toLocaleString()} missing`,d.failed&&`${Number(d.failed).toLocaleString()} failed`].filter(Boolean);
+ return parts.length?parts.join(' · '):d.unavailable?'Descriptions can be generated after assets are processed.':'No assets to describe.';
+}
+function descriptionBlocked(source){
+ const d=source.descriptions||{};
+ if(!source.enabled)return 'Enable this source to generate descriptions.';
+ if(source.processing_paused)return 'Processing is paused. Select formats in General to generate descriptions.';
+ if(operationActive(source.operation))return 'Available when the current operation for this source finishes.';
+ if(!d.missing)return d.failed?'Nothing left to generate. Failed descriptions are recorded and not retried.':'Nothing to generate right now.';
+ return '';
+}
+const DESCRIBE_RESULTS={complete:'Last run finished.',complete_with_faults:'Last run finished; some descriptions failed and were recorded.',cancelled:'Last run was cancelled; finished descriptions were published.',faulty:'Last run stopped.',interrupted:'Last run was interrupted.'};
+function descriptionBlock(source){
+ const block=node('div',undefined,'source-descriptions'),operation=source.operation||{},id='describe-help-'+source.key;
+ const heading=node('p',undefined,'source-descriptions-summary');heading.append(node('strong','Descriptions '),document.createTextNode(descriptionSummary(source)));block.append(heading);
+ if(describeActive(source)){
+  const bar=node('progress');bar.max=100;bar.value=Math.round((operation.progress||0)*100);bar.setAttribute('aria-label','Description progress for '+source.name);
+  const phase=`${operation.phase||'Working'}${operation.total?' · '+operation.completed+' / '+operation.total:''}`;bar.setAttribute('aria-valuetext',`${bar.value}% — ${phase}`);
+  const cancel=node('button',operation.status==='cancelling'?'Cancelling…':'Cancel');cancel.type='button';cancel.disabled=operation.status==='cancelling';cancel.dataset.source=source.key;cancel.dataset.action='cancel-describe';cancel.onclick=()=>sourceAction('cancel',source.key);
+  block.append(bar,node('p',phase,'source-progress-label'),cancel);return block;
+ }
+ const blocked=descriptionBlocked(source),button=node('button','Generate descriptions');button.type='button';button.dataset.source=source.key;button.dataset.action='describe';
+ button.disabled=!!blocked;button.setAttribute('aria-describedby',id);button.onclick=()=>sourceAction('describe',source.key);
+ const help=node('p',blocked||`Runs in the background on this computer’s GPU. Assets stay searchable by name and image meanwhile.`,'hint');help.id=id;
+ block.append(button,help);
+ if(operation.operation==='describe'&&DESCRIBE_RESULTS[operation.status])block.append(node('p',DESCRIBE_RESULTS[operation.status]+(operation.reason?' '+operation.reason:''),'hint'+(operation.reason?' source-describe-reason':'')));
+ return block;
 }
 async function loadSources(){
  if(!state.api||state.loadingSources)return;state.loadingSources=true;
  try{
   const result=await state.api.sources();if(result.status==='faulty')throw Error(result.reason);
-  state.sources=result.sources||[];renderSourceWarnings();
+  state.sources=result.sources||[];renderSourceWarnings();updateNotifications(result.notifications||[]);
   const changed=state.sourcesRevision!==result.revision;state.sourcesRevision=result.revision;
   if(!$('settings-view').hidden)renderSourceSettings();
   if(!$('import-failures-view').hidden&&changed)await loadImportFailures();
@@ -346,3 +383,115 @@ $('open-settings').onclick=async()=>{showLibraryView('settings-view');selectSett
 $('close-settings').onclick=async()=>{showLibraryView('library-view');await loadSources();$('open-settings').focus();};
 $('choose-source').onclick=async()=>{const result=await state.api.choose_source_directory();if(result.status==='selected')$('source-directory').value=result.directory;else if(result.status==='faulty')$('sources-message').textContent=result.reason;};
 $('add-source').onclick=()=>{const directory=$('source-directory').value.trim();if(directory)sourceAction('add',null,directory);else $('sources-message').textContent='Choose an asset directory first.';};
+// Notifications: saved notices about optional descriptions (decision 0008). They arrive with
+// sources(), so the existing change poll is the only poll; actions call ordinary bridge methods.
+state.notifications=[];state.notificationKeys=null;state.notificationSignature=null;
+const relativeTime=new Intl.RelativeTimeFormat(undefined,{numeric:'auto'});
+function ago(utc){const seconds=(Date.parse(utc)-Date.now())/1000;if(!Number.isFinite(seconds))return '';for(const [unit,size] of [['day',86400],['hour',3600],['minute',60]])if(Math.abs(seconds)>=size)return relativeTime.format(Math.round(seconds/size),unit);return 'just now';}
+function elapsed(seconds){if(!seconds)return '';const minutes=Math.round(seconds/60);return minutes<1?`${seconds} s`:minutes<60?`${minutes} min`:`${Math.floor(minutes/60)} h ${minutes%60} min`;}
+function notificationKey(item){return item.id+'@'+item.created_utc;}
+function notificationContent(item){
+ if(item.kind==='descriptions_ready')return {tone:'info',title:'Descriptions ready to generate',
+  body:`${plural(item.missing,'asset has','assets have')} no description yet. They are already searchable by name and image; descriptions improve text search.`};
+ const written=plural(item.written||0,'description','descriptions')+' written',remaining=item.remaining?` · ${Number(item.remaining).toLocaleString()} still missing`:'';
+ switch(item.outcome){
+  case 'complete':return {tone:'success',title:'Descriptions finished',body:`${written}${item.elapsed_seconds?' in '+elapsed(item.elapsed_seconds):''}. They are published and used by search.`};
+  case 'complete_with_failures':return {tone:'warning',title:'Descriptions finished with failures',body:`${written} · ${Number(item.failed).toLocaleString()} failed. Failed descriptions are recorded and not retried; those assets stay searchable by name and image.`};
+  case 'cancelled':return {tone:'info',title:'Description run cancelled',body:`${written} and published${remaining}.`};
+  case 'stopped':return {tone:'fault',title:'Description run stopped',body:`${item.reason||'The run stopped.'} ${written} and published${remaining}.`};
+  default:return {tone:'fault',title:'Description run interrupted',body:`${item.reason||'The run stopped unexpectedly.'} Finished descriptions are saved.`};
+ }
+}
+function sourceExists(key){return state.sources.some(source=>source.key===key);}
+function notificationButton(label,action,item,className){const button=node('button',label,className);button.type='button';button.dataset.notification=item.id;button.dataset.action=action;button.onclick=()=>notificationAction(action,item);return button;}
+function notificationActions(item){
+ const actions=[];if(!sourceExists(item.source_key))return actions;
+ if(item.kind==='descriptions_ready')actions.push(notificationButton('Generate descriptions','generate',item,'primary'),notificationButton('Not now','dismiss',item));
+ else{if(item.remaining&&['cancelled','stopped','interrupted'].includes(item.outcome))actions.push(notificationButton('Continue','generate',item,'primary'));actions.push(notificationButton('View source','view',item));}
+ return actions;
+}
+function notificationElement(item,tag='li'){
+ const content=notificationContent(item),root=node(tag,undefined,`notification tone-${content.tone}${item.read?'':' unread'}`);
+ const head=node('div',undefined,'notification-head'),title=node('h3',content.title);
+ const meta=node('p',[item.source_name,ago(item.created_utc)].filter(Boolean).join(' · '),'notification-meta');
+ head.append(node('span',undefined,'notification-icon'),title);
+ if(item.kind==='descriptions_report'){const close=notificationButton('×','dismiss',item,'notification-dismiss');close.setAttribute('aria-label','Dismiss: '+content.title+', '+item.source_name);head.append(close);}
+ if(!item.read)title.prepend(node('span','Unread: ','sr'));
+ root.append(head,meta,node('p',content.body,'notification-body'));
+ const actions=notificationActions(item);if(actions.length){const row=node('div',undefined,'notification-actions');row.append(...actions);root.append(row);}
+ return root;
+}
+function runningElement(source){
+ const operation=source.operation,row=node('div',undefined,'notification running'),bar=node('progress');bar.max=100;bar.value=Math.round((operation.progress||0)*100);
+ const phase=`${operation.phase||'Working'}${operation.total?' · '+operation.completed+' / '+operation.total:''}`;bar.setAttribute('aria-label','Description progress for '+source.name);bar.setAttribute('aria-valuetext',`${bar.value}% — ${phase}`);
+ const head=node('div',undefined,'notification-head');head.append(node('span',undefined,'search-spinner'),node('h3','Generating descriptions'));
+ const cancel=node('button',operation.status==='cancelling'?'Cancelling…':'Cancel');cancel.type='button';cancel.disabled=operation.status==='cancelling';cancel.dataset.notification='running-'+source.key;cancel.dataset.action='cancel';
+ cancel.onclick=()=>sourceAction('cancel',source.key);const actions=node('div',undefined,'notification-actions');actions.append(cancel);
+ row.append(head,node('p',source.name,'notification-meta'),bar,node('p',phase,'notification-body'),actions);return row;
+}
+function renderNotifications(){
+ const running=state.sources.filter(describeActive),unread=state.notifications.filter(item=>!item.read).length;
+ const signature=JSON.stringify([state.notifications,running.map(s=>[s.key,s.operation]),state.sources.map(s=>s.key),Math.floor(Date.now()/60000)]);
+ const count=$('notifications-count');count.textContent=unread>9?'9+':String(unread);count.hidden=!unread;$('notifications-running-dot').hidden=!running.length||!!unread;
+ $('open-notifications').setAttribute('aria-label',`Notifications${unread?', '+plural(unread,'unread','unread'):''}${running.length?', description run in progress':''}`);
+ if(signature===state.notificationSignature)return;state.notificationSignature=signature;
+ const panel=$('notifications-panel'),focused=panel.contains(document.activeElement)?document.activeElement.dataset:{};
+ $('notifications-running').replaceChildren(...running.map(runningElement));
+ $('notifications-list').replaceChildren(...state.notifications.map(item=>notificationElement(item)));
+ $('notifications-empty').hidden=!!(state.notifications.length||running.length);$('notifications-read-all').disabled=!unread;
+ if(focused.notification){const match=panel.querySelector(`[data-notification="${CSS.escape(focused.notification)}"][data-action="${CSS.escape(focused.action)}"]`);(match||$('notifications-title')).focus();}
+}
+function updateNotifications(items){
+ const known=state.notificationKeys;state.notifications=items;state.notificationKeys=new Set(items.map(notificationKey));
+ renderNotifications();
+ // Only notices that arrive while the app is open pop up; earlier ones wait under the bell.
+ if(known&&$('notifications-panel').hidden)for(const item of items)if(!item.read&&!known.has(notificationKey(item)))toastNotification(item);
+}
+function toast(element,tone){
+ const region=$('toasts'),wrapper=node('div',undefined,'toast tone-'+tone),close=node('button','×','notification-dismiss');close.type='button';close.setAttribute('aria-label','Close');
+ wrapper.append(element,close);region.append(wrapper);while(region.children.length>3)region.firstElementChild.remove();
+ let timer;const remove=()=>wrapper.remove(),schedule=()=>{clearTimeout(timer);timer=setTimeout(remove,8000);};
+ close.onclick=remove;wrapper.addEventListener('pointerenter',()=>clearTimeout(timer));wrapper.addEventListener('pointerleave',schedule);
+ wrapper.addEventListener('focusin',()=>clearTimeout(timer));wrapper.addEventListener('focusout',event=>{if(!wrapper.contains(event.relatedTarget))schedule();});schedule();
+ for(const button of wrapper.querySelectorAll('.notification-actions button'))button.addEventListener('click',remove);
+}
+function toastNotification(item){const element=notificationElement(item,'div');element.querySelector('.notification-dismiss')?.remove();toast(element,notificationContent(item).tone);}
+function toastMessage(title,body,tone='info'){const element=node('div',undefined,'notification tone-'+tone),head=node('div',undefined,'notification-head');head.append(node('span',undefined,'notification-icon'),node('h3',title));element.append(head,node('p',body,'notification-body'));toast(element,tone);}
+async function generateDescriptions(key){
+ const source=state.sources.find(item=>item.key===key);
+ try{
+  const result=await state.api.source_action('describe',key,null,null);if(result.status==='faulty')throw Error(result.reason);
+  if(result.status==='busy')throw Error(result.reason);
+  // An open panel already shows the run's live progress row.
+  if($('notifications-panel').hidden)toastMessage('Generating descriptions',`${source?.name||key} · runs in the background. Follow progress under the bell or in Settings → Asset sources.`);
+ }catch(error){toastMessage('Could not start descriptions',error.message,'fault');}
+ await loadSources();
+}
+async function saveNotification(action,identifier=null){
+ const result=await state.api.notification_action(action,identifier);
+ if(result.status==='faulty'){toastMessage('Could not update notifications',result.reason,'fault');return;}
+ state.notifications=result.notifications;state.notificationKeys=new Set(result.notifications.map(notificationKey));renderNotifications();
+}
+async function openSourceSettings(key){
+ setNotificationsPanel(false);showLibraryView('settings-view');selectSettingsTab('asset-sources');await loadSources();renderSourceSettings();
+ // Prefer the description control; a disabled one cannot take focus, so fall back to the source name.
+ const controls=[...$('source-list').querySelectorAll('[data-source]')].filter(x=>x.dataset.source===key&&!x.disabled);
+ const target=controls.find(x=>['describe','cancel-describe'].includes(x.dataset.action))||controls.find(x=>x.dataset.action==='browse');
+ target?.closest('.source-row')?.scrollIntoView({block:'center'});target?.focus({preventScroll:true});
+}
+async function notificationAction(action,item){
+ if(action==='generate'){await generateDescriptions(item.source_key);return;}
+ if(action==='view'){if(!item.read)await saveNotification('read',item.id);await openSourceSettings(item.source_key);return;}
+ if(action==='dismiss'){const list=[...$('notifications-list').children],index=list.findIndex(el=>el.contains(document.activeElement));await saveNotification('dismiss',item.id);if(index>=0)($('notifications-list').children[index]?.querySelector('button')||$('notifications-title')).focus();}
+}
+function setNotificationsPanel(open){
+ const panel=$('notifications-panel'),wasOpen=!panel.hidden;if(open===wasOpen)return;
+ panel.hidden=!open;$('open-notifications').setAttribute('aria-expanded',String(open));
+ if(open){state.notificationSignature=null;renderNotifications();for(const t of [...$('toasts').children])t.remove();$('notifications-title').focus();}
+ // Closing the panel marks what was shown as read.
+ else if(state.notifications.some(item=>!item.read))saveNotification('read_all');
+}
+$('open-notifications').onclick=()=>setNotificationsPanel($('notifications-panel').hidden);
+$('notifications-read-all').onclick=()=>saveNotification('read_all');
+document.addEventListener('pointerdown',event=>{if(!$('notifications-panel').hidden&&!event.target.closest('.notifications-anchor')&&!event.target.closest('.toasts'))setNotificationsPanel(false);});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!$('notifications-panel').hidden){event.preventDefault();event.stopImmediatePropagation();setNotificationsPanel(false);$('open-notifications').focus();}},true);

@@ -3,7 +3,10 @@
 Current workflow: **Settings → Asset sources** controls directories and live
 enabled-source membership. The app scans enabled sources on opening, and **Scan**
 checks changes during a session. One warning card per source offers **Process
-assets**, a processing/publication progress bar, and graceful **Cancel**. Cards
+assets** (inspection/previews and search vectors; descriptions are optional and
+run separately with **Generate descriptions** in Settings → Asset sources,
+[decision 0008](decisions/0008-optional-descriptions-and-notifications.md)), a
+processing/publication progress bar, and graceful **Cancel**. Cards
 clear after a scan verifies that no actionable work remains and current results
 are published. Retained failures appear in **Importing failures report**, a
 scrollable list of original model paths, instead of keeping pending cards open.
@@ -20,7 +23,7 @@ actionable processing work. See [processing formats](asset-sources.md#processing
 **Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets how
 many assets share one description model call. Larger is faster and uses more GPU
 memory. Changing it never re-queues finished descriptions. Running out of GPU
-memory stops processing with that message and leaves the batch pending
+memory stops the description run with that message and leaves the batch pending
 ([decision 0007](decisions/0007-batched-description-generation.md)).
 
 For current command-line operation, `library-batch.py scan` checks enabled sources,

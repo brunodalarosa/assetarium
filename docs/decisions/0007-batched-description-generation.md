@@ -1,7 +1,9 @@
 # 0007 — Batched description generation
 
 **Decision.**
-- **Batching:** Process assets (the `incremental.process` caption stage, also used
+- **Batching:** Generate descriptions (the `incremental.process` caption stage; since
+  [decision 0008](0008-optional-descriptions-and-notifications.md) no longer part of
+  Process assets), also used
   by `library-batch.py` and the CLI) and overnight description runs generate
   descriptions for several assets in one Qwen3-VL call (`caption_batching.py`).
   Model, revision, prompt, image preparation, sampling settings, seed, 1,100-token

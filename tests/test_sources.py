@@ -69,6 +69,13 @@ def failed_caption(work, record):
     update_record(work, record)
 
 
+def failed_previews(work, record):
+    # An import failure; description failures are not (decision 0008).
+    record['processing'].update(previews='failed')
+    record['stage_faults'] = {'previews': {'status': 'failed', 'error': 'Synthetic retained fault'}}
+    update_record(work, record)
+
+
 def test_source_import_restriction_survives_scans_without_affecting_other_sources(managed):
     config, _, one, two = managed
     root = Path(one['path'])
@@ -95,7 +102,7 @@ def test_published_failures_leave_pending_cards_but_keep_report_and_attempt(mana
     config, backend, one, _ = managed
     work = ready_source(config, backend, one)
     record = records(work)[0]
-    failed_caption(work, record)
+    failed_previews(work, record)
     # Usable partial results still have to be published once.
     assert sources.scan_source(config, one)['pending_ids'] == [record['asset_id']]
     publish_source(sources.bound(config, one)); sources.aggregate(config)
@@ -115,9 +122,9 @@ def test_failures_do_not_hide_unattempted_or_changed_assets(managed):
     config, backend, one, _ = managed
     work = ready_source(config, backend, one)
     failed, unfinished = records(work)[:2]
-    failed_caption(work, failed)
-    # Even with a failed caption, unattempted image vectors remain actionable.
-    failed_caption(work, unfinished)
+    failed_previews(work, failed)
+    # Even with a failed prerequisite, unattempted image vectors remain actionable.
+    failed_previews(work, unfinished)
     unfinished['processing']['embeddings'] = 'pending'
     update_record(work, unfinished)
     publish_source(sources.bound(config, one))
@@ -136,7 +143,7 @@ def test_failures_do_not_hide_unattempted_or_changed_assets(managed):
     assert sources.importing_failures(config)['assets'] == 1
 
 
-@pytest.mark.parametrize('stage', ['inventory', 'inspection', 'previews', 'caption', 'embeddings'])
+@pytest.mark.parametrize('stage', ['inventory', 'inspection', 'previews', 'embeddings'])
 def test_terminal_attempts_block_only_dependent_work(stage):
     record = {'processing': dict.fromkeys(['inventory', 'inspection', 'previews', 'caption', 'embeddings'], 'complete'),
               'previews': [], 'description': None}
@@ -147,19 +154,40 @@ def test_terminal_attempts_block_only_dependent_work(stage):
     assert outcome['state'] == 'failed' and stage in outcome['failed_stages']
 
 
-def test_cancelled_unattempted_work_and_deferred_descriptions_stay_pending():
+@pytest.mark.parametrize('caption', ['pending', 'failed', 'unsupported'])
+def test_descriptions_are_neither_import_work_nor_import_failures(caption):
     record = {'processing': {'inventory': 'complete', 'inspection': 'complete', 'previews': 'complete',
-                             'caption': 'pending', 'embeddings': 'partial'}, 'previews': [], 'description': None}
-    assert sources.import_outcome(record)['state'] == 'pending'
-    record['processing'].update(caption='complete', embeddings='pending')
-    assert sources.import_outcome(record)['state'] == 'pending'
+                             'caption': caption, 'embeddings': 'partial'}, 'previews': [], 'description': None}
+    # Image vectors are complete; only the optional description vector is missing or failed.
+    assert sources.import_outcome(record, False) == {'state': 'complete', 'attempted': True,
+                                                     'pending_stages': [], 'failed_stages': []}
+    assert sources.description_state(record) == ('missing' if caption == 'pending' else 'failed')
+    # A failed image vector is still an import failure.
+    assert sources.import_outcome(record, True)['failed_stages'] == ['embeddings']
+    record['processing']['embeddings'] = 'failed'
+    assert sources.import_outcome(record, False)['state'] == 'complete'
 
 
-def test_partial_preview_fault_keeps_available_caption_work_pending():
+def test_cancelled_unattempted_vectors_stay_pending():
+    record = {'processing': {'inventory': 'complete', 'inspection': 'complete', 'previews': 'complete',
+                             'caption': 'complete', 'embeddings': 'pending'}, 'previews': [], 'description': None}
+    assert sources.import_outcome(record, False)['pending_stages'] == ['embeddings']
+    record['processing'].update(inspection='pending', previews='pending', caption='pending')
+    assert sources.import_outcome(record, False)['pending_stages'] == ['embeddings', 'inspection', 'previews']
+
+
+def test_description_state_waits_for_usable_renders():
     record = {'processing': {'inventory': 'complete', 'inspection': 'complete', 'previews': 'partial',
                              'caption': 'pending', 'embeddings': 'partial'}, 'technical': {'triangles': 1},
               'previews': [{'origin': 'rendered', 'view_label': label} for label in ('front', 'side', 'three_quarter')]}
-    assert 'caption' in sources.import_outcome(record)['pending_stages']
+    # A partial preview run can still supply all caption inputs.
+    assert sources.description_state(record) == 'missing'
+    record['previews'].pop()
+    assert sources.description_state(record) == 'unavailable'
+    record['processing'].update(inspection='pending', previews='pending')
+    assert sources.description_state(record) == 'unavailable'
+    record['processing']['caption'] = 'complete'
+    assert sources.description_state(record) == 'complete'
 
 
 def test_deferred_description_is_not_a_recorded_import_failure(managed):
@@ -172,6 +200,7 @@ def test_deferred_description_is_not_a_recorded_import_failure(managed):
     update_record(work, record)
     status = sources.scan_source(config, one)
     assert status['pending'] == 1 and status['failed'] == 0
+    assert status['descriptions'] == {'complete': 2, 'missing': 1, 'failed': 0, 'unavailable': 0}
     assert sources.importing_failures(config)['assets'] == 0
     with closing(sqlite3.connect(work.output_path('data','embeddings/index.sqlite'))) as db, db:
         db.execute("UPDATE jobs SET status='failed' WHERE asset_id=? AND channel='image'", (record['asset_id'],))
@@ -183,7 +212,7 @@ def test_deleted_assets_do_not_return_from_published_failure_history(managed):
     config, backend, one, _ = managed
     work = ready_source(config, backend, one)
     for record in records(work):
-        failed_caption(work, record)
+        failed_previews(work, record)
     publish_source(sources.bound(config, one))
     assert sources.importing_failures(config)['assets'] == 3
     for record in records(work):
@@ -197,7 +226,7 @@ def test_failure_report_includes_disabled_sources_excludes_removed_and_review_no
     config, backend, one, two = managed
     for source in (one, two):
         work = ready_source(config, backend, source)
-        failed_caption(work, records(work)[0])
+        failed_previews(work, records(work)[0])
         warning = records(work)[1]
         warning['caption_review'] = {'findings': [{'severity': 'warning', 'reason': 'Uncertain visual detail'}]}
         update_record(work, warning)

@@ -11,7 +11,13 @@
   <a class="skip" href="#grid">Skip to assets</a>
   <header>
     <div class="brand"><span class="mark" aria-hidden="true">◈</span><div><h1>Local Asset Library</h1><p>Prepared assets, close at hand.</p></div></div>
-    <div class="header-actions"><div class="scope"><strong id="scope">Loading library…</strong><span id="inventory">Local · read only</span></div><button id="open-settings" type="button">Settings</button></div>
+    <div class="header-actions"><div class="scope"><strong id="scope">Loading library…</strong><span id="inventory">Local · read only</span></div><div class="header-icons"><div class="notifications-anchor"><button id="open-notifications" class="bell" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="notifications-panel" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.5A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.5L18 12.6V9a6 6 0 0 0-6-6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 19.5a2.6 2.6 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="notifications-count" class="bell-count" aria-hidden="true" hidden></span><span id="notifications-running-dot" class="bell-running" aria-hidden="true" hidden></span></button>
+      <section id="notifications-panel" class="notifications-panel" role="dialog" aria-labelledby="notifications-title" hidden>
+        <div class="notifications-head"><h2 id="notifications-title" tabindex="-1">Notifications</h2><button id="notifications-read-all" class="text-button" type="button">Mark all read</button></div>
+        <div id="notifications-running" aria-live="polite"></div>
+        <ul id="notifications-list" aria-label="Notifications"></ul>
+        <p id="notifications-empty" class="notifications-empty" hidden>You’re all caught up.</p>
+      </section></div><button id="open-settings" class="icon-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button></div></div>
   </header>
   <main id="library-view">
     <form id="search-form" aria-label="Search library assets">
@@ -102,6 +108,7 @@
     <ul id="import-failures-list" aria-label="Asset paths with recorded importing failures" tabindex="0" hidden></ul>
     <p id="import-failures-empty" hidden>No importing failures recorded.</p>
   </section>
+  <div id="toasts" class="toasts" role="region" aria-label="New notifications" aria-live="polite"></div>
   <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Read-only originals · manual updates</span></footer>
   <script>/* INTERACTIVE_PREVIEW_SCRIPT */</script>
   <script>/* BUNDLED_SCRIPT */</script>

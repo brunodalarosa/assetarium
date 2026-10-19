@@ -10,7 +10,7 @@ import uuid
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/'src'),str(ROOT/'tests')]
-from test_sources import managed,ready_source,failed_caption
+from test_sources import managed,ready_source,failed_previews
 from local_asset_library.incremental import working,update_record
 from local_asset_library.membership import records
 from local_asset_library.source_operations import publish_source
@@ -151,7 +151,7 @@ def verify():
         capture('settings-narrow.png');report['checks'].append('Narrow settings view has no horizontal overflow')
         # Failed attempts remain inspectable without presenting a futile action.
         work=working(sources.bound(config,one));record=records(work)[0]
-        original=json.loads(json.dumps(record));failed_caption(work,record)
+        original=json.loads(json.dumps(record));failed_previews(work,record)
         publish_source(sources.bound(config,one));sources.aggregate(config);sources.scan_source(config,one)
         js("$('close-settings').click();true")
         wait("state.sources.some(x=>x.failed===1&&!x.needs_processing)&&document.querySelectorAll('.source-warning').length===1")

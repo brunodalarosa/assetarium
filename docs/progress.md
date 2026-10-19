@@ -1,5 +1,50 @@
 # Progress
 
+## October 18 — Descriptions are optional; Generate descriptions and notifications
+
+Name and image search already find assets without descriptions, so descriptions
+are now extra data ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)).
+
+- **Import:** Process assets runs inspection/previews and search vectors only.
+  `sources.import_outcome` ignores the caption stage; a missing or failed
+  description raises no source card and is not in Importing failures report
+  (`embedding_failures` now reads image-vector jobs only).
+- **Search:** default `combined` still uses descriptions; a missing, stale or
+  invalid description silently leaves only its channel (app and MCP faults).
+- **Generate descriptions** per source in Settings → Asset sources: written ·
+  missing · failed counts, a background `describe` operation (caption stage for
+  assets with ready renders, description vectors, publish), progress and Cancel.
+  Recorded failures are not retried; cancel and machine stops still publish.
+- **Notifications:** header bell with unread count, panel and toasts;
+  *Descriptions ready to generate* (after processing, and once for existing
+  sources) and one report per description run. Saved in
+  `data/library/notifications.json`, served with `sources()`, stamped by `changes()`.
+- Settings is now a gear icon button. Cards no longer show badges for missing or
+  failed descriptions; asset detail explains them.
+
+Verification: full suite **449 passed** (13 new tests in `tests/test_notifications.py`
+and `tests/test_sources.py`; updated import/budget tests for two-stage processing).
+New WebView2 check `scripts/verify-notifications.py` passed
+(`data/gui/notifications-2026-10-18f/`, synthetic assets, stand-in run, no model);
+`verify-source-ui.py` (`data/gui/source-settings-83f29fa205/`),
+`verify-general-settings.py` (`data/gui/general-settings-0b268c2d03/`) and
+`verify-source-browser.py` (`data/gui/optional-descriptions-source-browser-2026-10-18/`)
+passed. Read-only status of all 15 registered sources before/after
+(`scratch/descriptions-optional-2026-10-18/`): no `needs_processing` change;
+recorded import failures fall where they were only description failures
+(e.g. KayKit 5→0, Cartoon City 45→0) and real faults remain (furniture-kit 15
+image-vector, synty 24 preview); no enabled source has missing descriptions, so
+no ready notice is seeded today. Real runtimes:
+`verify-source-operation.py --describe` passed
+(`data/library/verification/source-operation-b97673af4f22427ab2ae4664f2b9093c.json`):
+Process assets published 2 cubes with 6 image vectors and 2 missing descriptions
+(0 failures); Generate descriptions wrote, indexed and published both in 125 s and
+reported `complete`. The script now writes its cubes in a selected format (the
+saved settings process glTF only, so its OBJ cubes were skipped in a first run)
+and dismisses its own notices after detaching its source. Added
+storage about 17 MB of GUI evidence and scratch fixtures; no installs or models.
+Editing `incremental.py` changes the overnight code contract (no run was active).
+
 ## October 18 — Code and lock line endings no longer re-queue finished work
 
 Follow-up to the prompt fix below. The caption, inspection and embedding

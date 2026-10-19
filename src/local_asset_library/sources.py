@@ -267,46 +267,60 @@ def read_records(config):
 
 
 def import_outcome(record, embedding_failed=None):
-    """Classify saved stage attempts without retrying retained faults.
+    """Classify saved import attempts without retrying retained faults.
 
-    A failed prerequisite blocks its dependent stages. Independent unfinished
-    work (for example image vectors after a caption failure) remains pending.
-    Scanning changed source files resets these durable stage states to pending.
+    Descriptions are optional extra data (decision 0008): a pending or failed
+    caption is neither import work nor an import failure. A failed prerequisite
+    blocks its dependent stages. Scanning changed source files resets durable
+    stage states to pending. ``embedding_failed`` reports image-vector faults.
     """
     stages = record["processing"]
-    faults = {stage for stage, value in stages.items() if value in {"failed", "unsupported", "partial"}}
-    if stages.get("embeddings") == "partial" and stages.get("caption") == "pending" and embedding_failed is False:
-        # Completed image vectors plus a deferred description are not a failure.
+    faults = {stage for stage, value in stages.items()
+              if stage != "caption" and value in {"failed", "unsupported", "partial"}}
+    # Image vectors are complete; only the optional description vector is missing or failed.
+    optional_only = stages.get("embeddings") in {"partial", "failed"} and embedding_failed is False
+    if optional_only:
         faults.discard("embeddings")
     attempted = any(stages.get(stage) in {"complete", "failed", "partial"}
-                    for stage in ("inspection", "previews", "caption", "embeddings"))
+                    for stage in ("inspection", "previews", "embeddings"))
     pending = set()
     if "inventory" not in faults:
-        for stage, prerequisites in (("inspection", ()), ("previews", ("inspection",)),
-                                     ("caption", ("inspection", "previews"))):
-            blocked = faults.intersection(prerequisites)
-            # A partial preview run can still supply all caption inputs.
-            if stage == "caption" and blocked == {"previews"} and record.get("technical"):
-                rendered = [p for p in record.get("previews", []) if p.get("origin") == "rendered"]
-                labels = [p.get("view_label") for p in rendered]
-                if {"front", "side", "three_quarter"}.issubset(labels) and len(labels) == len(set(labels)):
-                    blocked = set()
-            if stages.get(stage) != "complete" and stage not in faults and not blocked:
+        for stage, prerequisites in (("inspection", ()), ("previews", ("inspection",))):
+            if stages.get(stage) != "complete" and stage not in faults and not faults.intersection(prerequisites):
                 pending.add(stage)
-        if stages.get("embeddings") not in {"complete", "partial"} and "embeddings" not in faults:
+        if stages.get("embeddings") not in {"complete", "partial"} and not optional_only and "embeddings" not in faults:
             if record.get("previews") or record.get("description") or not faults:
                 pending.add("embeddings")
     return {"state": "pending" if pending else "failed" if faults else "complete",
             "attempted": attempted, "pending_stages": sorted(pending), "failed_stages": sorted(faults)}
 
 
+def description_state(record):
+    """complete, failed, missing (inputs ready to describe) or unavailable (no usable renders yet)."""
+    stages = record["processing"]
+    caption = stages.get("caption")
+    if caption == "complete":
+        return "complete"
+    if caption in {"failed", "unsupported", "partial"}:
+        return "failed"
+    if stages.get("inventory") in {"failed", "unsupported"} or stages.get("inspection") != "complete":
+        return "unavailable"
+    if stages.get("previews") == "complete":
+        return "missing"
+    # A partial preview run can still supply all caption inputs.
+    labels = [p.get("view_label") for p in record.get("previews", []) if p.get("origin") == "rendered"]
+    if stages.get("previews") == "partial" and record.get("technical") and {"front", "side", "three_quarter"}.issubset(labels)             and len(labels) == len(set(labels)):
+        return "missing"
+    return "unavailable"
+
+
 def embedding_failures(config):
-    """Read saved vector attempts; partial can also mean a deferred description."""
+    """Assets with failed image-vector attempts; description vectors are optional."""
     path = config.output_path("data", "embeddings/index.sqlite")
     if not path.exists():
         return None
     with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
-        return {row[0] for row in db.execute("SELECT DISTINCT asset_id FROM jobs WHERE status='failed'")}
+        return {row[0] for row in db.execute("SELECT DISTINCT asset_id FROM jobs WHERE status='failed' AND channel='image'")}
 
 
 def importing_failures(config):
@@ -362,6 +376,7 @@ def processing_summary(current, published, formats, vector_faults=None):
     from .catalog import encoded
     counts = dict.fromkeys(PROCESSING_FORMATS, 0)
     pending, failed, skipped = [], [], 0
+    descriptions = dict.fromkeys(('complete', 'missing', 'failed', 'unavailable'), 0)
     for record in current:
         for group in {format_group(f['format']) for f in record['files']}:
             counts[group] = counts.get(group, 0) + 1
@@ -372,6 +387,7 @@ def processing_summary(current, published, formats, vector_faults=None):
         if not processing_eligible(record, formats):
             skipped += 1
             continue
+        descriptions[description_state(record)] += 1
         old = published.get(identifier)
         if outcome['state'] == 'pending' or old is None or encoded(old) != encoded(record):
             pending.append(identifier)
@@ -383,7 +399,7 @@ def processing_summary(current, published, formats, vector_faults=None):
     counts = {key: counts[key] for key in (*PROCESSING_FORMATS, *sorted(set(counts) - set(PROCESSING_FORMATS)))}
     return {'format_counts': counts, 'pending_ids': sorted(pending), 'pending': len(pending), 'reason': reason,
             'needs_processing': bool(pending), 'failed': len(failed), 'skipped_formats': skipped,
-            'eligible_assets': len(current) - skipped}
+            'eligible_assets': len(current) - skipped, 'descriptions': descriptions}
 
 
 @lru_cache(maxsize=64)

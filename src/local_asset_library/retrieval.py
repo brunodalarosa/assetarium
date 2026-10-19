@@ -449,7 +449,10 @@ class SearchEngine:
                         selected.append(row)
                         values.append(position)
                     except (OSError, ValueError) as exc:
-                        excluded.append({"asset_id": row[1], "channel": channel, "reason": str(exc)})
+                        # Descriptions are optional (decision 0008): a stale or invalid one
+                        # only leaves its channel; the asset still ranks by image and keyword.
+                        if channel != "description":
+                            excluded.append({"asset_id": row[1], "channel": channel, "reason": str(exc)})
                 scores = matrix[values] @ query_vector if values else []
                 ranking = aggregate_views(selected, scores)
                 # Preserve *unthresholded* channel rankings for later evaluation.
