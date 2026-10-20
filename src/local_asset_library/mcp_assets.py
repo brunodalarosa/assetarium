@@ -11,15 +11,17 @@ from .config import ConfigError
 from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detail, validate_filters
 
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, search_character_cap
+from .asset_structure import ASSET_TYPES, structure, supported_stage
 
 ID_PATTERN = r"asset_[0-9a-f]{32}"
-FORMATS = ["blend", "dae", "fbx", "glb", "gltf", "obj", "stl"]
-VIEWS = ["three_quarter", "front", "side"]
+FORMATS = ["blend", "dae", "fbx", "glb", "gltf", "obj", "stl", "png", "wav"]
+VIEWS = ["three_quarter", "front", "side", "image"]
 MODES = [DEFAULT_MODE, "keyword_description", "keyword", "description", "image", "reference"]
 SEARCH_CAP = 6000
 DETAIL_CAP = 16000
 IMAGE_CAP = 512 * 1024
 FILTER_SCHEMA = {"type": "object", "additionalProperties": False, "properties": {
+    "asset_type": {"type": "string", "enum": list(ASSET_TYPES)},
     "pack": {"type": "string", "pattern": r"^[A-Za-z0-9_-]{1,128}$"},
     "format": {"type": "string", "enum": FORMATS},
     "max_triangles": {"type": "integer", "minimum": 0, "maximum": 1000000000},
@@ -30,13 +32,17 @@ SCHEMAS = {
         "mode": {"type": "string", "enum": MODES, "default": DEFAULT_MODE},
         "filters": FILTER_SCHEMA, "limit": {"type": "integer", "minimum": 1, "maximum": MAX_LIMIT, "default": 5},
         "reference_asset_id": {"type": "string", "pattern": "^" + ID_PATTERN + "$"},
-        "reference_view": {"type": "string", "enum": VIEWS, "default": "three_quarter"}}},
+        "reference_view": {"type": "string", "enum": VIEWS, "description": "Default: image for images, three_quarter for models."}}},
     "get_asset": {"type": "object", "required": ["asset_id"], "additionalProperties": False, "properties": {
         "asset_id": {"type": "string", "pattern": "^" + ID_PATTERN + "$"},
         "source_format": {"type": "string", "enum": FORMATS},
         "include_metadata": {"type": "boolean", "default": False},
         "include_preview": {"type": "boolean", "default": False},
-        "preview_view": {"type": "string", "enum": VIEWS, "default": "three_quarter"}}}}
+        "preview_view": {"type": "string", "enum": VIEWS, "description": "Default: image for images, three_quarter for models."}}}}
+
+
+def default_view(record):
+    return 'image' if record.get('asset_type') == 'image' else 'three_quarter'
 
 
 class TransientFault(ConfigError):
@@ -190,7 +196,7 @@ class AssetService:
         if mode == "reference":
             record = self.record(args["reference_asset_id"])
             resolved_detail(self.config, record["asset_id"])
-            preview, _ = self.preview(record, args.get("reference_view", "three_quarter"))
+            preview, _ = self.preview(record, args.get("reference_view", default_view(record)))
             reference = preview.get("path") or "source/" + preview["source_path"]
         try:
             # Keyword search never touches the embedding runtime or its contract.
@@ -226,6 +232,7 @@ class AssetService:
         if len(deps) > 64:
             raise ConfigError("Dependency count exceeds 64; cannot return an incomplete usable package")
         payload = {"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
+                   'asset_type': record.get('asset_type', 'model_3d'), 'parent_asset_id': record.get('parent_asset_id'),
                    "availability": "available", "status": "available", "usable": True,
                    "selected_source": result["selected_source"], "dependencies": deps,
                    "dependency_completeness": "Known references verified; uninspected binary/alternate dependencies remain unknown",
@@ -244,17 +251,21 @@ class AssetService:
                 "processing": record["processing"], "license_evidence": relevant_license_evidence(record),
                 'stage_faults':record.get('stage_faults',{}), 'inspection_run':record.get('inspection_run'),
                 "caption_quality": caption_quality(self.config, record),
-                "caption_fault_evidence": (record.get("caption_provenance") or {}).get("visual_faults", [])}
+                "caption_fault_evidence": (record.get("caption_provenance") or {}).get("visual_faults", []),
+                'asset_structure': structure(record), 'type_metadata': record.get('type_metadata', {'version': 1}),
+                'relationships': record.get('relationships', [])}
         image = None
         faults = []
         if args.get("include_preview", False):
-            payload["preview"], image, faults = self.preview_content(record, args.get("preview_view", "three_quarter"))
+            payload["preview"], image, faults = self.preview_content(record, args.get("preview_view", default_view(record)))
         return bounded_detail(payload), image, {"excluded": faults}
 
     def preview_content(self, record, view, size=512, optimize=True):
         """Requested view as derived PNG, or its pending/excluded/faulty state; no substitute view."""
         try:
             has_view = any(p.get('view_label') == view for p in record['previews'])
+            if not has_view and not supported_stage(record, 'previews'):
+                return ({'status': 'unsupported', 'reason': 'This asset has no implemented preview adapter.'}, None, [])
             pending_preview = (not has_view and record['processing'].get('previews') in {'pending', 'unknown'}
                 and record['processing'].get('inspection') not in {'failed', 'unsupported'}
                 and not (record.get('inspection_run') or {}).get('source_faults')

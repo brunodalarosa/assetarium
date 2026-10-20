@@ -14,3 +14,5 @@ ask the owner first, then update the file (do not silently contradict it).
 | [0006](0006-retention.md) | Keep active + 2 generations, 10 launch audits; reusable pytest folder | 2026-10-17 |
 | [0007](0007-batched-description-generation.md) | Batched descriptions (default 8); finished ones kept; out of GPU memory stays pending | 2026-10-18 |
 | [0008](0008-optional-descriptions-and-notifications.md) | Descriptions are optional; Generate descriptions per source; notifications | 2026-10-18 |
+| [0009](0009-general-capabilities.md) | Every fix and processing capability is a reusable system feature | 2026-10-19 |
+| [0010](0010-shared-project-dependencies.md) | Verify shared project-layout dependencies across enabled sources | 2026-10-19 |

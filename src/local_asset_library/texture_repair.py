@@ -122,9 +122,14 @@ def validate_recipe(config, record):
     if not source or source['sha256'] != recipe['source_sha256']:
         raise ConfigError('Texture repair does not match the original source')
     for b in recipe['bindings']:
-        if subpack(b['path']) != subpack(source['path']):
+        shared = recipe.get('kind') == 'shared_dependency_paths' and bool(b.get('dependency_resolution'))
+        if shared and (b.get('from') != source['path'] or
+                       (b.get('dependency_resolution') or {}).get('consumer_sha256') != source['sha256']):
+            raise ConfigError('Shared texture binding does not match its referring model')
+        if not shared and subpack(b['path']) != subpack(source['path']):
             raise ConfigError('Texture repair crosses a subpack boundary')
-        if file_hash(config.source_file(b['path'])) != b['sha256']:
+        from .dependency_resolution import dependency_file
+        if file_hash(dependency_file(config, b) if shared else config.source_file(b['path'])) != b['sha256']:
             raise ConfigError('Texture repair dependency changed')
         for table in b['evidence'].get('tables', []):
             if file_hash(config.source_file(table['path'])) != table['sha256']:

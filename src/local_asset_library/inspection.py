@@ -102,17 +102,20 @@ def load_pilot(config):
 def source_evidence(config, assets, additional=()):
     paths = set(additional)
     expected = {}
+    items = {}
     for asset in assets:
         for row in asset["files"] + asset["dependencies"]:
             if row.get("path") and row.get("availability", row.get("status")) == "available":
                 paths.add(row["path"])
+                items[row['path']] = row
                 if row.get("sha256"):
                     expected[row["path"]] = row["sha256"]
     result = []
     for path in sorted(paths):
-        actual = config.source_file(path)
+        from .dependency_resolution import dependency_file
+        actual = dependency_file(config, items.get(path, {'path': path}))
         stat = actual.stat()
-        with config.open_source(path) as stream:
+        with actual.open('rb') as stream:
             actual_hash = file_hash(stream)
         result.append({"path": path, "sha256": actual_hash, "size": stat.st_size,
                        "mtime_ns": stat.st_mtime_ns, "matches_catalog": expected.get(path, actual_hash) == actual_hash})
@@ -164,10 +167,12 @@ def validate_result(config, job, result):
                 if file_hash(stream) != view["sha256"]:
                     raise ConfigError("Preview hash mismatch")
     for row in result.get("sources", []):
-        config.source_file(row["path"])
+        from .dependency_resolution import dependency_file
+        dependency = next((d for d in job.get('dependency_files', []) if d['path'] == row['path']), row)
+        path = dependency_file(config, dependency)
         if not row.get("unchanged"):
             raise ConfigError("Worker reports source mutation")
-        with config.open_source(row["path"]) as stream:
+        with path.open('rb') as stream:
             if file_hash(stream) != row["before"] or row.get("after") != row["before"]:
                 raise ConfigError("Worker source/dependency hash no longer matches")
 
@@ -219,6 +224,8 @@ def publish(config, asset, source, reason, result, fingerprint, output_relative)
                                             "status": image["status"], "from": source["path"],
                                             "required_for_render": image["required_for_render"],
                                             "evidence": "Blender inspected image datablock", "inspection_version": VERSION})
+            if image.get('dependency_resolution'):
+                record['dependencies'][-1]['dependency_resolution'] = image['dependency_resolution']
     with closing(sqlite3.connect(config.output_path("data", "catalog.sqlite"))) as db, db:
         db.execute("UPDATE assets SET record=? WHERE asset_id=?", (encoded(record), asset["asset_id"]))
 

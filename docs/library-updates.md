@@ -1,8 +1,8 @@
 # Library updates and processing
 
 Current workflow: **Settings → Asset sources** controls directories and live
-enabled-source membership. The app scans enabled sources on opening, and **Scan**
-checks changes during a session. One warning card per source offers **Process
+enabled-source membership. The app scans enabled sources on opening; reopening
+or toggling a source checks changes during a session (decision 0002). One warning card per source offers **Process
 assets** (inspection/previews and search vectors; descriptions are optional and
 run separately with **Generate descriptions** in Settings → Asset sources,
 [decision 0008](decisions/0008-optional-descriptions-and-notifications.md)), a
@@ -32,7 +32,21 @@ For current command-line operation, `library-batch.py scan` checks enabled sourc
 for that source. These operations reuse existing offline runtimes. Source settings
 replace the historical pack allowlist; the existing storage budget still applies.
 
+The [shared asset foundation](catalog-contract.md#expansion-step-1-shared-asset-foundation)
+adds type-aware stages and backward-compatible schema-2 candidate catalogs.
+Existing publications are not bulk-converted. Ordinary 3D IDs, generated results,
+overlays and fingerprints remain unchanged; explicit child identities share source
+files without copies. Its PNG adapter is a synthetic foundation proof, without
+real image-source enrollment or captioning. Audio/child media adapters remain
+unsupported. Coverage adds counts by asset type. Shared desktop/MCP services
+accept `asset_type` filters; complete image browsing belongs to expansion step 2.
+
 ## Earlier Step 8 and import workflow (historical)
+
+The sections below retain the earlier operation/command evidence. Current
+decisions and the source workflow above take precedence, including startup scans,
+worker idle time and optional descriptions; historical commands do not authorize
+new processing or retries.
 
 The prepared Windows app and MCP server share explicitly configured membership,
 source/dependency checks, measured filters, ranking and response caps. The approved

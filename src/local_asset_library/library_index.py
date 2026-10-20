@@ -10,6 +10,7 @@ from .catalog import digest, encoded, save_json
 from .config import ConfigError
 from .publication import atomic_json
 from .membership import records
+from .asset_structure import asset_type
 from .retrieval import (index_database, checked_vector, source_check, description_input, preview_file, image_input, normalize,
                         recorded_contract, VERSION)
 
@@ -19,6 +20,7 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
     from .incremental import update_record
     from .settings import processing_formats, processing_eligible
     inventory = records(config)
+    inventory_by_id = {r['asset_id']: r for r in inventory}
     formats = processing_formats(config)
     selected = [record for record in inventory if processing_eligible(record, formats)]
     with closing(index_database(config, readonly=dry_run)) as db:
@@ -43,8 +45,15 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                 break
             if not dry_run and progress:
                 progress(identifier, position, len(selected))
+            if asset_type(record) == 'image' and not record['previews']:
+                # No direct-media input exists yet. Do not manufacture either a
+                # vector failure or a successful empty image index.
+                continue
             counts = {"complete": 0, "failed": 0, "pending": 0, "deferred": 0}
-            for channel, preview in [("description", None)] + [("image", p) for p in record["previews"]]:
+            # Image descriptions are a later adapter. Retain any existing failed
+            # jobs/evidence, but do not manufacture description work for images.
+            channels = ([] if asset_type(record) == 'image' else [("description", None)]) + [("image", p) for p in record["previews"]]
+            for channel, preview in channels:
                 ref = None if preview is None else {k: preview[k] for k in ("path", "source_path", "sha256", "view_label", "origin") if k in preview}
                 job = digest({"asset": identifier, "channel": channel, "preview": ref and {k: v for k, v in ref.items() if k != "sha256"}})
                 expected.add(job)
@@ -140,6 +149,11 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
             with db:
                 current_ids = {r['asset_id'] for r in inventory}
                 for job, identifier in db.execute("SELECT job_id,asset_id FROM jobs").fetchall():
+                    if identifier in visited and job not in expected:
+                        existing = inventory_by_id.get(identifier)
+                        prior = db.execute('SELECT channel,status FROM jobs WHERE job_id=?', (job,)).fetchone()
+                        if existing and asset_type(existing) == 'image' and prior == ('description', 'failed'):
+                            continue  # Optional failure history is not cleared by stage applicability.
                     if identifier not in current_ids or (identifier in visited and job not in expected):
                         db.execute("DELETE FROM vectors WHERE job_id=?", (job,))
                         db.execute("DELETE FROM jobs WHERE job_id=?", (job,))

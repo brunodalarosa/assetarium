@@ -15,8 +15,10 @@ from .caption_quality import caption_summary
 from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
-from .publication import line_ending_hashes, pinned
+from .publication import line_ending_hashes, pinned, pinned_config
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, RRF_K, RRF_WEIGHTS, search_character_cap
+from .asset_structure import asset_type
+from .dependency_resolution import dependency_file
 
 VERSION = "pilot-retrieval-v1"
 MODES = {"keyword", "description", "image", "keyword_description", "combined", "reference"}
@@ -82,6 +84,7 @@ def image_input(preview):
     return digest({k:preview[k] for k in ('path','source_path','sha256','view_label','origin') if k in preview})
 
 
+@pinned_config
 def source_check(config, record):
     """Conservative logical-asset exclusion on missing/stale recorded files/dependencies."""
     checked = []
@@ -110,8 +113,10 @@ def source_check(config, record):
                             "status": dependency.get("status"), "required_for_render": False})
             continue
         if dependency.get("status") != "available" or not dependency.get("path"):
-            raise ConfigError("Dependency unavailable or unresolved")
-        path = config.source_file(dependency["path"])
+            raise ConfigError("Dependency unavailable or unresolved: " + str(dependency.get('reference') or dependency.get('path'))
+                              + (" — " + dependency['error'] if dependency.get('error') else ''))
+        from .dependency_resolution import dependency_file
+        path = dependency_file(config, dependency)
         if not dependency.get("sha256") or file_hash(path) != dependency["sha256"]:
             raise ConfigError("Dependency content is stale: " + dependency["path"])
         checked.append({"path": dependency["path"], "sha256": dependency["sha256"]})
@@ -119,6 +124,8 @@ def source_check(config, record):
     if technical.get("inspected_path"):
         if file_hash(config.source_file(technical["inspected_path"])) != technical["inspected_sha256"]:
             raise ConfigError("Inspection source is stale")
+    if record.get('identity_version') == 'subasset-v1':
+        checked.append({'parent': record['parent_asset_id'], 'selector': record['subasset']})
     return digest(checked)
 
 
@@ -295,8 +302,11 @@ def indexed_vectors(config, db, fingerprint):
 
 
 def validate_filters(filters):
-    if set(filters) - {"pack", "format", "max_triangles", "rigged"}:
+    if set(filters) - {"pack", "format", "max_triangles", "rigged", "asset_type"}:
         raise ConfigError("Unknown/unverified filter")
+    from .asset_structure import ASSET_TYPES
+    if 'asset_type' in filters and filters['asset_type'] not in ASSET_TYPES:
+        raise ConfigError('Unknown asset type filter')
     if "max_triangles" in filters and (type(filters["max_triangles"]) is not int or filters["max_triangles"] < 0):
         raise ConfigError("Triangle filter must be a nonnegative integer")
     if "rigged" in filters and type(filters["rigged"]) is not bool:
@@ -307,6 +317,9 @@ def validate_filters(filters):
 
 
 def matches(record, filters):
+    from .asset_structure import asset_type
+    if 'asset_type' in filters and filters['asset_type'] != asset_type(record):
+        return False
     if filters.get("pack", record["pack_id"]) != record["pack_id"]:
         return False
     if "format" in filters and not any(f["format"] == filters["format"] for f in record["files"]):
@@ -480,6 +493,7 @@ class SearchEngine:
                 except (OSError, ValueError):
                     continue
             results.append({"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
+                            "asset_type": asset_type(record),
                             "excerpt": excerpt, "formats": sorted({f["format"] for f in record["files"]}),
                             "preview": preview, "availability": "available", "matching_channels": matching,
                             "score": candidate["score"], "match_status": "keyword_match" if "keyword" in matching else "weak_unvalidated",
@@ -538,14 +552,16 @@ def resolved_detail(config, identifier, source_format=None):
     # Preserve all known logical-asset dependency paths, each with its referring source.
     for item in record.get("dependencies", []):
         try:
-            path = str(config.source_file(item["path"]))
+            from .dependency_resolution import dependency_file
+            path = str(dependency_file(config, item))
             dependencies.append({**item, "resolved_path": path})
         except (ConfigError, OSError) as exc:
             if item.get("required_for_render") is not False:
                 raise
             dependencies.append({**item, "resolved_path": None, "fault": str(exc)})
-    overrides = [{**{k:b[k] for k in ('image','original_path','path','sha256','role','preserve_supplied_alpha') if k in b},
-                  'resolved_path': str(config.source_file(b['path'])),
+    overrides = [{**{k:b[k] for k in ('image','original_path','path','sha256','role','preserve_supplied_alpha',
+                                    'dependency_resolution','from') if k in b},
+                  'resolved_path': str(dependency_file(config, b)),
                   'material_users': next((t['render_users'] for t in (record.get('technical') or {}).get('textures', [])
                                           if t['name'] == b['image']), [])}
                  for b in (record.get('texture_repair') or {}).get('bindings', [])]
@@ -554,4 +570,6 @@ def resolved_detail(config, identifier, source_format=None):
             "dependencies": dependencies, "record": record,
             "limitations": ["All known logical-asset dependencies listed with referring-source evidence; binary/alternate dependency inspection may remain incomplete.",
                             "Visual descriptions are provisional; suggested uses remain a separate field."] +
-                           (["Preview uses library texture overrides. Apply the supplied overrides when importing the unchanged original source."] if overrides else [])}
+                           (["Preview uses library texture overrides. Apply the supplied overrides when importing the unchanged original source."] if overrides else []) +
+                           (["This is the parent source package. Sub-asset extraction and playback are not implemented."] if record.get('parent_asset_id') else []) +
+                           (["Audio bytes are verified; decoding, playback and audio inference are not implemented."] if asset_type(record) == 'audio' else [])}

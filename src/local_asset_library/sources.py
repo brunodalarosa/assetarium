@@ -275,6 +275,8 @@ def import_outcome(record, embedding_failed=None):
     stage states to pending. ``embedding_failed`` reports image-vector faults.
     """
     stages = record["processing"]
+    from .asset_structure import applicable_stages
+    applicable = applicable_stages(record)
     faults = {stage for stage, value in stages.items()
               if stage != "caption" and value in {"failed", "unsupported", "partial"}}
     # Image vectors are complete; only the optional description vector is missing or failed.
@@ -286,9 +288,11 @@ def import_outcome(record, embedding_failed=None):
     pending = set()
     if "inventory" not in faults:
         for stage, prerequisites in (("inspection", ()), ("previews", ("inspection",))):
+            if stage not in applicable:
+                continue
             if stages.get(stage) != "complete" and stage not in faults and not faults.intersection(prerequisites):
                 pending.add(stage)
-        if stages.get("embeddings") not in {"complete", "partial"} and not optional_only and "embeddings" not in faults:
+        if 'embeddings' in applicable and stages.get("embeddings") not in {"complete", "partial"} and not optional_only and "embeddings" not in faults:
             if record.get("previews") or record.get("description") or not faults:
                 pending.add("embeddings")
     return {"state": "pending" if pending else "failed" if faults else "complete",
@@ -299,10 +303,13 @@ def description_state(record):
     """complete, failed, missing (inputs ready to describe) or unavailable (no usable renders yet)."""
     stages = record["processing"]
     caption = stages.get("caption")
+    from .asset_structure import description_supported
     if caption == "complete":
         return "complete"
-    if caption in {"failed", "unsupported", "partial"}:
+    if caption in {"failed", "partial"} or caption == 'unsupported' and description_supported(record):
         return "failed"
+    if not description_supported(record):
+        return 'unavailable'
     if stages.get("inventory") in {"failed", "unsupported"} or stages.get("inspection") != "complete":
         return "unavailable"
     if stages.get("previews") == "complete":

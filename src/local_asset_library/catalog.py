@@ -57,6 +57,8 @@ def parse_record(identifier,pack,name,payload):
                 or any(not isinstance(p,dict) for p in record['previews'])
                 or record.get('technical') is not None and not isinstance(record['technical'],dict)):
             raise ValueError('Invalid catalog record structure or identity')
+        from .asset_structure import validate_record
+        validate_record(record)
         return record
     except (ValueError,UnicodeError,TypeError) as exc:
         fault={'status':'faulty','kind':'catalog_metadata','error':str(exc),'raw_record_sha256':hashlib.sha256(raw).hexdigest(),
@@ -247,7 +249,7 @@ def group_models(pack, model_rows):
             for identity, files in sorted(groups.items())]
 
 
-def dependencies(config, row, inventory):
+def dependencies(config, row, inventory, shared=None):
     """Measured text/GLB references only; binary FBX/Blend remain uninspected."""
     path = row["path"]
     extension = PurePosixPath(path).suffix.lower()
@@ -328,6 +330,8 @@ def dependencies(config, row, inventory):
                 dep.update(status="available", sha256=inventory[relative]["sha256"])
             from .dependency_overrides import apply_override
             apply_override(config, row, dep, inventory, extra[0] if extra else None)
+            if shared is not None:
+                shared.resolve(row, dep, extra[0] if extra else None)
         except (ConfigError, ValueError, OSError) as exc:
             dep.update(status="rejected", error=str(exc))
         result.append(dep)
@@ -410,6 +414,8 @@ def relevant_license_evidence(record):
 
 def build_inventory(config):
     rows = walk_source(config)
+    from .dependency_resolution import SharedDependencies
+    shared = SharedDependencies(config)
     inventory = {row["path"]: row for row in rows}
     for row in rows:
         if row["role"] != "boundary_exclusion":
@@ -454,7 +460,7 @@ def build_inventory(config):
                 if file["path"] in visited:
                     continue
                 visited.add(file["path"])
-                deps, issues, state = dependencies(config, file, inventory)
+                deps, issues, state = dependencies(config, file, inventory, shared)
                 asset["dependency_inspection"].append({"path": file["path"], "method": "reference-parser-v1", "status": state, "issues": issues})
                 asset["dependencies"].extend(deps)
                 for dep in deps:
@@ -462,6 +468,8 @@ def build_inventory(config):
                         pending.append(inventory[dep["path"]])
             from .dependency_overrides import repair_recipe
             recipe = repair_recipe(config, asset)
+            from .dependency_resolution import repair_recipe as shared_recipe
+            recipe = shared_recipe(config, asset) or recipe
             if recipe:
                 asset['texture_repair'] = recipe
             # Match exact names only in recognized preview trees at the matching export anchor.
@@ -521,6 +529,8 @@ def search_text(asset):
 
 
 def write_database(config, rows, assets, metadata):
+    from .asset_structure import validate_collection
+    validate_collection(assets)
     from .publication import generation
     if config.catalog_generation is None and generation(config)!='legacy':
         raise ConfigError('Published catalogs are immutable; stage updates through the library coordinator')
@@ -529,8 +539,16 @@ def write_database(config, rows, assets, metadata):
     with closing(sqlite3.connect(path)) as db, db:
         check_fts5(db)
         version = db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in {0, 1}:
+        if version not in {0, 1, 2}:
             raise ConfigError(f"Unknown SQLite schema version: {version}")
+        # Check before any DDL: refusing an overwrite must not change the old DB.
+        if version:
+            for (payload,) in db.execute("SELECT record FROM assets"):
+                old = json.loads(payload)
+                if old.get("owner_overlay") or old.get("technical") or old.get("description") or old.get("embeddings"):
+                    raise ConfigError("Catalog contains later-stage work or owner corrections; step 2 scan cannot overwrite it")
+        if version == 1:
+            db.execute('DROP TABLE files')
         db.execute("PRAGMA foreign_keys=ON")
         db.executescript("""
             CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -539,22 +557,17 @@ def write_database(config, rows, assets, metadata):
                 identity TEXT NOT NULL, name TEXT NOT NULL, availability TEXT NOT NULL, record TEXT NOT NULL,
                 UNIQUE(source_id,pack_id,identity));
             CREATE TABLE IF NOT EXISTS inventory (path TEXT PRIMARY KEY, role TEXT NOT NULL, record TEXT NOT NULL);
-            CREATE TABLE IF NOT EXISTS files (path TEXT PRIMARY KEY, asset_id TEXT NOT NULL REFERENCES assets(asset_id),
-                format TEXT NOT NULL, sha256 TEXT, availability TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS files (path TEXT NOT NULL, asset_id TEXT NOT NULL REFERENCES assets(asset_id),
+                format TEXT NOT NULL, sha256 TEXT, availability TEXT NOT NULL, PRIMARY KEY(asset_id,path));
             CREATE VIRTUAL TABLE IF NOT EXISTS asset_fts USING fts5(asset_id UNINDEXED, keywords, tokenize='unicode61');
-            PRAGMA user_version=1;
+            PRAGMA user_version=2;
         """)
-        # Rebuild only step 2 inventory; refuse to erase downstream work/corrections.
-        for (payload,) in db.execute("SELECT record FROM assets"):
-            old = json.loads(payload)
-            if old.get("owner_overlay") or old.get("technical") or old.get("description") or old.get("embeddings"):
-                raise ConfigError("Catalog contains later-stage work or owner corrections; step 2 scan cannot overwrite it")
         db.execute("DELETE FROM files")
         db.execute("DELETE FROM assets")
         db.execute("DELETE FROM inventory")
         db.execute("DELETE FROM asset_fts")
         db.execute("DELETE FROM metadata")
-        db.executemany("INSERT INTO metadata VALUES (?,?)", [(k, encoded(v)) for k, v in sorted(metadata.items())])
+        db.executemany("INSERT INTO metadata VALUES (?,?)", [(k, encoded(v)) for k, v in sorted(dict(metadata, schema_version=2).items())])
         db.executemany("INSERT INTO inventory VALUES (?,?,?)", [(r["path"], r["role"], encoded(r)) for r in rows])
         for asset in assets:
             db.execute("INSERT INTO assets VALUES (?,?,?,?,?,?,?)", (asset["asset_id"], asset["source_id"], asset["pack_id"],
@@ -569,6 +582,10 @@ def read_database(config):
     if not path.is_file():
         raise ConfigError("Catalog missing; run scan first")
     db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    version = db.execute('PRAGMA user_version').fetchone()[0]
+    if version not in (1, 2):
+        db.close()
+        raise ConfigError(f'Unknown SQLite schema version: {version}')
     metadata = dict((key, json.loads(value)) for key, value in db.execute("SELECT key,value FROM metadata"))
     root_matches = (metadata.get('source_key', config.source_key) == config.source_key
                     if config.sources_registry and config.source_key else metadata.get('source_root') == str(config.source_root))

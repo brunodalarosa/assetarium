@@ -125,6 +125,15 @@ inference lease with semantic search. Browsing and keyword search remain availab
 
 ## Storage and identity
 
+Expansion step 1 adds a backward-compatible shared asset structure. Existing
+sources/3D IDs and saved results remain unchanged; it does not enroll images or
+audio. New candidate catalog databases use schema 2, allowing explicit parent and
+child records to share original paths. Old catalogs remain readable without a
+startup migration. Generic images, unsupported audio, file roles, relationships
+and adapter capabilities are documented in the
+[catalog contract](catalog-contract.md#expansion-step-1-shared-asset-foundation).
+Actual image enrollment, processing choices and full image browsing are step 2.
+
 The local registry is `data/library/sources.json`. Each source's
 `metadata-lal/source.json` stores its persistent identifier and catalog key.
 Directories must be separate and must not overlap LAL, shared model storage or
@@ -203,3 +212,14 @@ explicit reserves on legacy command-line jobs still bound those jobs. Processing
 reads the setting at its storage checks, including between stages, and preserves
 completed work when it stops at the limit. Raise the budget and explicitly choose
 **Process assets** to continue pending work. Unchanged asset faults remain skipped.
+
+## Shared project dependencies
+
+Split exports can register their model and shared-texture folders separately.
+Missing external glTF/GLB images resolve across enabled sources when the complete
+project-relative directory layout matches and all candidates have identical bytes.
+The texture source need not contain models. Originals stay read-only; conflicting,
+missing, changed or disabled providers remain visible faults. New registrations
+with the same convention use this feature automatically during normal scans.
+See [shared dependency behavior](dependency-path-overrides.md) and the binding
+[capability policy](decisions/0009-general-capabilities.md).

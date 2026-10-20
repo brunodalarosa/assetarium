@@ -1,29 +1,30 @@
 # Assetarium v2 expansion
 
-Prepared October 18, 2026. Status: proposed roadmap; implementation has not started under this plan.
+Prepared October 18, 2026. Status: step 1 approved and technically complete;
+owner acceptance remains pending. Steps 2–8 remain proposed. See
+[current evidence](../asset-foundation-verification.json) and [progress](../progress.md).
 
 ## Purpose and authority
 
 Expand Assetarium from a 3D-model catalog into a local catalog for sprites, icons, other 2D images, audio, textures/materials, shaders, and 3D animation clips. Deliver eight bounded milestones, each usable through the Windows app and the shared agent-facing backend.
 
-This document is the expansion reference for Codex, Claude Code, and future agents. It replaces the original numbered prompts, not the existing application. [PROJECT.md](PROJECT.md) remains a historical v1 proposal; its old status, setup instructions, and step numbers are not the expansion workflow. Current implementation evidence lives in [progress.md](../progress.md). Do not infer current completion from either roadmap.
+This document is the expansion reference for Codex, Claude Code, and future agents. It replaces the original numbered prompts, not the existing application. Earlier v1 proposals, setup instructions, and step numbers are historical context rather than the expansion workflow. Current implementation evidence lives in [progress.md](../progress.md). Do not infer current completion from this roadmap.
 
 The owner requested this documentation package. Creating it does not approve implementation, dependency installation, model downloads, source enrollment, bulk processing, or a change to an owner-approved decision. Follow the current root [AGENTS.md](../../AGENTS.md), [decisions](../decisions/README.md), [caption policy](../caption-quality.md), and [storage policy](../storage.md). If this proposal conflicts with them, surface the conflict before implementation; do not silently change the policy.
 
-Before implementation, use the two checkpoints in order, recognizing any explicit approval already given for the same unchanged scope:
+Before implementation, confirm scope and implementation plan together in one checkpoint, recognizing any explicit approval already given for the same unchanged scope and plan:
 
-1. Restate the selected milestone's scope in one sentence, identify inclusions, exclusions, and ambiguities, ask **"Does this scope match what you want?"**, and wait for the owner's answer.
-2. Explain changes, ownership, risks, verification, estimated duration, and additional peak/retained disk space with assumptions and uncertainty. Ask **"Is this implementation plan clear, and do you approve proceeding?"**, and wait for the owner's answer.
+Restate the selected milestone's scope in one sentence, identify inclusions, exclusions, and ambiguities, then explain changes, ownership, risks, verification, estimated duration, and additional peak/retained disk space with assumptions and significant uncertainty. Ask **"Do this scope and implementation plan match what you want, and do you approve proceeding?"**, then stop and wait for the owner's answer. Do not edit implementation files before explicit approval.
 
-Read-only investigation may prepare these checkpoints. Reconfirm the affected checkpoint after a material change. Each prompt covers one milestone. Steps 1 and 2 may be bundled only when that combined scope and plan are explicitly approved. Do not proceed automatically to the next step or spawn subagents without authorization. A milestone may require several chats; retain a resumable handoff.
+Read-only investigation may prepare this checkpoint. Confirm it again if the scope or plan changes materially. Each prompt covers one milestone. Expansion steps 1 and 2 may be bundled only when that combined scope and plan are explicitly approved. Do not proceed automatically to the next step or spawn subagents without authorization. A milestone may require several chats; retain a resumable handoff.
 
 ## Paths and ownership
 
 | Item | Location or responsibility |
 | --- | --- |
 | Existing repository | `C:\BrunoOS\Local-Asset-Library` |
-| This reference | `docs/plan/Project_v2_expansion.md` |
-| Expansion launch prompts | `docs/plan/prompts/01-asset-foundation.md` through `08-shaders.md` |
+| This reference | `docs/next version plan/Project_v2_expansion.md` |
+| Expansion launch prompts | `docs/next version plan/prompts/01-asset-foundation.md` through `08-shaders.md` |
 | Source originals | Existing configured source roots; read only |
 | Source-generated results | The corresponding source's existing `metadata-lal` storage |
 | Combined indexes, caches, settings, reports | Existing project-local configured storage |
@@ -38,7 +39,7 @@ Preserve the existing project and neighboring projects. Do not recreate the repo
 Read-only planning inspection on October 18, 2026 found:
 
 - The catalog and processing pipeline are centered on logical 3D models. Inventory recognizes texture and preview images, but generic images are not yet first-class searchable assets. Format-selection settings are also model-oriented.
-- The current pipeline has inspection, caption, and embedding stages, with immutable publication generations, source-side generated results, owner overlays, fault records, and shared desktop/MCP retrieval.
+- The current pipeline has inspection, caption, and embedding stages, with immutable publication generations, source-side generated results, owner overlays, fault records, and shared desktop/MCP retrieval. Under decisions 0007-0008, **Process assets** performs inspection/previews and image search vectors, then publishes; optional **Generate descriptions** separately batches missing descriptions, builds description vectors, then publishes. Importing never generates descriptions.
 - `blender_worker.py` enumerates armatures/actions and explicitly does not play or behaviorally validate them. Enumeration is not animation support.
 - Captioning uses `Qwen/Qwen3-VL-2B-Instruct`, pinned in `docs/caption-model.json`. The active adapter consumes actual images. Video support advertised by the publisher has not been validated in Assetarium.
 - Embeddings use `google/embeddinggemma-2`, pinned in `docs/embedding-model.json`, with normalized 768-dimensional vectors. `embedding_backend.py` explicitly disables audio using `audio_config=None`; its current contract accepts text and image only.
@@ -58,7 +59,21 @@ Asset type describes what someone selects. File role describes how a source file
 
 Represent relationships explicitly: alternate export, contains frame/clip, depends on map/rig/include, and variant. One texture may serve several assets without duplicating source bytes. Group only with evidence. Preserve existing IDs; design a versioned identity rule for sub-assets, including source linkage, region/clip identity, and explicit rename/change handling. Do not merge unrelated same-name files.
 
-Keep shared fields stable and put type-specific facts in versioned metadata. Define applicable stages so an audio item does not need Blender and an intentionally optional caption does not appear as an impossible pending job. Agree on schema/status changes at the plan checkpoint; never relabel an actual failed stage as successful or optional after failure.
+Keep shared fields stable and put type-specific facts in versioned metadata. Define applicable stages so an audio item does not need Blender. Descriptions are optional extra data: missing descriptions are optional work, and failed descriptions retain their actual failure state without becoming import work or import failures. Agree on schema/status changes at the scope/plan checkpoint; never erase an actual failure or relabel it successful. New media types must validate their own direct-media search path rather than assuming the existing image-vector path accepts audio or video.
+
+### Optional descriptions and notifications
+
+Preserve the separation in [decision 0008](../decisions/0008-optional-descriptions-and-notifications.md). **Process assets** prepares usable assets and their applicable direct-media vectors, then publishes without caption generation. For existing image-based processing, only image-vector failures affect the embedding part of the import outcome; an overall embedding `partial`/`failed` state caused only by description vectors does not make the import incomplete. Asset names and image vectors already enable search without descriptions. Extend this separation to new types through their approved stage contracts.
+
+**Generate descriptions** in **Settings → Asset sources** is a separate per-source `describe` operation. It processes assets with ready renders and `description_state == 'missing'`, then builds description vectors and publishes. Reuse the operation lease, progress, Cancel, storage budget, and current batching. New audio/temporal adapters must validate their own input-readiness and inference contracts before extending this operation. Recorded failures are never retried without an explicit owner request. Cancel, GPU-memory stops, and storage stops still publish completed descriptions.
+
+Keep missing/failed descriptions out of main-view source cards and **Importing failures report**. Preserve failures in asset detail and each source's description counts. Default `combined` search still uses valid descriptions; a missing, stale, or invalid description silently removes only the description channel, without excluding the asset or reporting an exclusion fault in desktop or MCP. Source/dependency/media faults remain subject to the normal fault policy.
+
+Reuse the existing notification bell, panel, toasts, and `data/library/notifications.json`: one **Descriptions ready to generate** notice per source after processing leaves missing descriptions, plus the first-launch notice for existing sources; **Not now** stays quiet until more descriptions are missing. Record a report per describe run (finished / with failures / cancelled / stopped / interrupted). Notices arrive with `sources()` and the file participates in `changes()`; closing the panel marks notices read. Offer only actions that can change the displayed state. Notifications report facts and optional work; they never start processing themselves.
+
+For existing Qwen image descriptions, preserve [decision 0007](../decisions/0007-batched-description-generation.md): reuse `caption_batching.py`, left padding, and the pinned model/revision/prompt/input preparation/sampling/seed, 1,100-token limit, and 120-second generation limit. **Settings → General → Description batch size** offers 1, 2, 4, or 8 (default 8), stored as `caption_batch_size` in `data/library/settings.json`. Each asset is validated, saved, published, and checkpointed individually. Invalid inputs/outputs fail only their asset; a batch-wide runtime fault fails its assets without retry.
+
+Out of GPU memory during description generation is a machine limit, not an asset fault: stop, tell the user to lower the batch size, and leave unfinished assets pending without recording them failed or automatically retrying a smaller batch. Cancel waits for the current batch. Overnight `inflight.json` lists all batch members; interruption records each as interrupted without regenerating it in that run. Keep existing description fingerprints and recorded generation modes (`sequential` when absent); new batched outputs record `generation_mode: batched-v1` and batch size/assets/position. Batch size is provenance only and never re-queues results. Batched wording can depend on the other assets in that batch, so exact wording on a rerun is not guaranteed. Do not change `caption_backend.py` or invalidate existing sequential descriptions without explicit approval. New image-specific prompts and future audio/video generation require separately validated contracts; the current image batch sizes and settings are not proof of support for another model or modality.
 
 ### Facts, descriptions, and evidence
 
@@ -66,7 +81,7 @@ Separate extracted facts, supplied metadata, AI observations, suggested uses, an
 
 Apply the current caption severity policy to supported description/review workflows. Use `review_note` for minor uncertainty, `warning` for meaningful errors that could mislead selection, and `caption_faulty` only for failed/incomplete or unusable generation. New review findings carry severity, evidence, and reason. Preserve raw responses and owner states. A technically valid output is not owner approval. Any audio/motion extension of the review schema must preserve these distinctions and be reviewed explicitly.
 
-For actual source, decode, dependency, preview, timeout, or runtime faults: mark the affected item/stage faulty, preserve evidence and usable partial results, and move on. No unchanged automatic retries, repairs, guessed replacements, or edits to originals. Fixing application/test defects is allowed normally. Notes, warnings, or pending owner review alone do not require regeneration. Changed embedded content invalidates affected vectors; severity-only changes do not.
+For actual source, decode, dependency, preview, timeout, or runtime faults: mark the affected item/stage faulty, preserve evidence and usable partial results, and move on. Description GPU-memory exhaustion follows the machine-limit handling above. Failed descriptions remain optional-data failures, separately visible without becoming import failures. No unchanged automatic retries, repairs, guessed replacements, or edits to originals. Fixing application/test defects is allowed normally. Notes, warnings, or pending owner review alone do not require regeneration. Changed embedded content invalidates affected vectors; severity-only changes do not.
 
 ### Search and interfaces
 
@@ -80,12 +95,14 @@ Never silently reuse vectors across changed model/runtime/preprocessing contract
 
 ### Existing decisions remain binding
 
-- **0001:** New entry points use the local-config precedence helpers.
-- **0002:** Background startup scans discover changes without model inference or rendering. Preserve cheap change tokens, stable cards, and explicit processing; do not reintroduce heavy polling or obsolete manual Scan/Status controls.
-- **0003:** Reuse per-publication read caches. Add necessary list/filter fields to slim records without mutating shared cached objects.
-- **0004:** Route runtime hashes through the shared verified-hash mechanism. Fresh byte audits remain fresh; do not introduce another hash cache.
-- **0005:** Ranking and verification stay in the caller. Worker startup loads libraries only; semantic requests load the model under the GPU lease. Preserve idle unloading/heartbeats. Audio/video worker operations require an owner-approved amendment to the current text/image request contract.
-- **0006:** Retain the active publication plus two older generations and the documented audit retention. Do not broaden cleanup or delete evidence under this roadmap.
+- **[0001](../decisions/0001-config-local-precedence.md):** New entry points use `load_project_config` or `project_config_path`: ignored `config.local.toml` takes precedence over tracked `config.example.toml`.
+- **[0002](../decisions/0002-startup-scan-and-change-detection.md):** Scan enabled sources in the background at every launch without models or rendering. Unchanged content, including timestamp-only refreshes, must not rewrite scan/status files or bump views. Poll cheap stat tokens through `changes()` every 1.5 s; fetch data on changed tokens or while source operations run. Preserve visible cards through `refreshContext`. Do not add heavy periodic polls or manual Scan/Status controls; **Refresh published view** and **Importing failures report** remain.
+- **[0003](../decisions/0003-per-publication-read-caches.md):** Reuse publication-identity read caches and per-file-stat digests/classification reads. Add required list/filter fields to `library_cache.slim` without mutating shared records; detail reads full records. Processing/indexing must read fresh full records through `membership.records`, never cached slim records.
+- **[0004](../decisions/0004-stat-identity-hash-reuse.md):** Route runtime hashes through `verified_hash` and the shared `cache/file-hashes.sqlite`; scans seed it. Reuse requires unchanged file identity; missing/busy/corrupt cache data means hashing bytes again. Changed/replaced/missing required source or preview files still cause the appropriate exclusion/fault; unusable descriptions follow 0008 instead. Fresh byte audits and removal checks stay fresh. Preserve source/link boundaries, preview-identity thumbnail caching, and source verification in detail/`get_asset`; do not add another hash cache.
+- **[0005](../decisions/0005-embedding-worker-and-prestart.md):** Keep the worker protocol to `contract`/`text`/`image`, with embedding requests returning vectors; catalog verification, validated vector matrices, keyword search, and ranking stay in the caller. Desktop pre-starts libraries at launch without a model/GPU lease; MCP starts its worker on the first semantic query. Load the model only for semantic requests under the GPU lease, unload after 10 idle minutes or immediately for a processing/peer GPU request, and retain 5 s busy heartbeats/90 s silence fault handling. Busy-queue/stopped-worker `TransientFault` errors are not retained per-query faults; keyword search never contacts the worker. Keep stdout protocol-only and settings/source actions/`changes()` outside the presentation lock. Audio/video operations require an owner-approved amendment.
+- **[0006](../decisions/0006-retention.md):** After each combined publication, retain the active generation plus the two newest older `v_*` generations centrally and in each source; remove shortcuts to retired generations, leave work/scan folders alone, and do not fail publication on a retention fault. Keep the ten newest launch audits in `data/gui/runs`; do not touch other GUI evidence or MCP runs. Reuse `scratch/pytest`; old scratch needs the explicit cleanup plan/apply workflow. Removal uses `maintenance_files`, fresh hashes, link containment/refusal rules, changed-file faults, and receipts under `data/maintenance/`. This roadmap does not broaden those exact cleanup locations or authorize other evidence deletion.
+- **[0007](../decisions/0007-batched-description-generation.md):** Preserve image-description batching, per-asset outcomes, completed fingerprints and generation provenance. GPU-memory exhaustion stops with assets pending and no smaller-batch retry. Changing the batch-size preference never re-queues descriptions. Validate new modality contracts separately.
+- **[0008](../decisions/0008-optional-descriptions-and-notifications.md):** Importing never generates descriptions. Reuse separate per-source **Generate descriptions**, description vectors, and notifications. Missing/failed descriptions neither gate usable imports nor appear as import failures; unusable descriptions silently leave only their search channel. Retain failure evidence and never retry recorded failures without an explicit request.
 
 ## Milestone sequence
 
@@ -104,17 +121,17 @@ The recommended execution order is 1-8. Dependencies describe actual prerequisit
 
 ### Step 1 - Establish the shared asset structure
 
-Implement the minimum catalog/schema extension for asset types, file roles, relationships, preview capabilities, and applicable stages. Preserve 3D IDs, overlays, successful generated results, source boundaries, and retrieval behavior. Plan identity/schema migrations explicitly; do not use destructive in-place rewriting of active generations.
+Implement the minimum catalog/schema extension for asset types, file roles, relationships, preview capabilities, and applicable stages. Preserve 3D IDs, overlays, successful generated results, source boundaries, and retrieval behavior. Keep import/direct-media stages separate from optional description generation and description vectors, including outcome counts, search fallback, and notification readiness. Plan identity/schema migrations explicitly; do not use destructive in-place rewriting of active generations.
 
 Use small synthetic records for existing models, one image, one audio item, and parent/child relationships to validate the design. Only enough image dispatch to prove the boundary belongs here; real image-pack processing and the complete image UI belong in step 2. Extend format eligibility, coverage, caches, and API validation only as needed for this foundation.
 
-Done when: existing 3D fixtures and a captured representative baseline still work; synthetic non-model assets no longer require irrelevant model stages; IDs/relationships and unknown metadata survive publication/reload; old catalog compatibility or migration is demonstrated; the next step has a concrete small implementation surface.
+Done when: existing 3D fixtures and a captured representative baseline still work; synthetic non-model assets no longer require irrelevant model stages; optional missing/failed descriptions stay separate from import outcomes without losing faults; IDs/relationships and unknown metadata survive publication/reload; old catalog compatibility or migration is demonstrated; the next step has a concrete small implementation surface.
 
 ### Step 2 - Static sprites, icons, and images
 
 Start with PNG, JPEG, and WebP, subject to verified decoding. Add first-class image records, measured dimensions/alpha, thumbnails, zoom, type filters, source details, and shared retrieval. Handle native-size/pixel-art viewing and transparent art on useful backgrounds. Preserve originals; record any derived display/model-input transformation.
 
-Reuse Qwen3-VL for descriptions from actual images with an image-appropriate prompt, and EmbeddingGemma for direct image and description search. Test tiny sprites, white/black transparent icons, wide art, duplicates, and damaged images. Decide the small-image preprocessing contract explicitly; nearest-neighbor enlargement is a candidate, not a preapproved default. Keep query/index preprocessing compatible and prevent derived backgrounds becoming invented source colors.
+Use EmbeddingGemma for direct image search during **Process assets**, without waiting for descriptions. Offer Qwen3-VL descriptions from actual images through separate **Generate descriptions**, with an image-appropriate versioned prompt and validated reuse of existing batching, provenance, controls, and notifications. Add description search when valid results exist; missing/stale/failed descriptions must not block import or exclude an otherwise usable image. Preserve existing 3D description contracts and fingerprints when adding the new prompt. Test tiny sprites, white/black transparent icons, wide art, duplicates, and damaged images. Decide the small-image preprocessing contract explicitly; nearest-neighbor enlargement is a candidate, not a preapproved default. Keep query/index preprocessing compatible and prevent derived backgrounds becoming invented source colors.
 
 Proposed pilot: 30-50 owner-selected images covering sprites, icons, pixel art, UI artwork, and backgrounds. Unknown purpose remains a generic image rather than a guessed subtype. Initially defer authoring formats, SVG, automatic atlas slicing, and animation playback.
 
@@ -136,7 +153,7 @@ Support individual texture records and linked material sets. Record resolution, 
 
 Generate bounded, reproducible plane/sphere previews for supported mappings, with renderer/version, lighting, geometry, map bindings, and any substitutions stated. Do not silently fill missing required maps or change normal/channel conventions. Preserve usable individual images when assembly fails. Do not feed normal/roughness maps to Qwen as if they directly depict the final surface.
 
-Search appearance using appropriate color maps and assembled previews plus separate metadata. A rendered sample demonstrates that setup, not physical correctness or universal engine compatibility. Proposed pilot: about 20 varied material sets, including incomplete and packed-channel examples. Begin with conventional image-based materials; defer procedural authoring graphs such as Substance until a separate adapter is approved.
+Search appearance using direct vectors from appropriate color maps and assembled previews plus separate metadata. Optional Qwen appearance descriptions use the separate per-source generation operation; their absence/failure does not gate usable materials or become an import failure. Reuse applicable batching/notification behavior while validating material-specific prompts and inputs. A rendered sample demonstrates that setup, not physical correctness or universal engine compatibility. Proposed pilot: about 20 varied material sets, including incomplete and packed-channel examples. Begin with conventional image-based materials; defer procedural authoring graphs such as Substance until a separate adapter is approved.
 
 Done when: a query such as "stylized cracked stone" finds useful reviewed candidates; a person can inspect maps and assembled appearance; app/MCP return the complete known set and honest unresolved dependencies; originals stay unchanged.
 
@@ -167,7 +184,7 @@ Candidates researched October 18:
 
 Descriptions should capture audible events, timbre/texture, rhythm, energy, instrumentation where supported, speech presence, and uncertainty. Separate perceptual mood and suggested uses from measured metadata. Tempo/key are estimates unless supplied/measured with provenance; loop suitability requires evidence. A transcription-only model is insufficient for describing non-speech SFX or instrumental BGM.
 
-Retain segment timestamps, sample coverage, raw responses, generation settings, and review evidence. Compare keyword/direct-audio search with and without caption retrieval on held-out SFX and BGM queries. Keep optional ungenerated captions distinct from failed generation. Do not make audio playback or direct search depend on caption availability.
+Retain segment timestamps, sample coverage, raw responses, generation settings, and review evidence. Compare keyword/direct-audio search with and without caption retrieval on held-out SFX and BGM queries. Integrate audio descriptions as optional extra data through the separate per-source operation, with validated audio readiness, generation settings, batch capability, description vectors, and notifications. Do not assume the image model's batch sizes or input settings suit the selected audio model. Keep optional ungenerated captions distinct from failed generation; retain faults in detail/counts rather than import-failure reporting, and silently omit unusable descriptions from search. Do not make audio imports, playback, or direct search depend on caption availability, or retry recorded failures without an explicit request.
 
 Done when: a bounded study supports a justified model decision; the approved model produces reviewed descriptions from actual audio; caption retrieval adds demonstrated value or is honestly recorded as not yet justified; faults, warnings, and owner review remain distinct. A failed feasibility study is a documented partial outcome, not implementation completion or permission for unbounded model trials.
 
@@ -177,7 +194,7 @@ Catalog clips as selectable children of their original source model/animation fi
 
 Provide clip selection and play/pause/scrub/loop controls plus bounded offline previews. Record rig/skeleton references, known bone data, clip range, evaluated timing, root transform/motion measurements, and dependencies. Animation-only files may retain usable metadata when no compatible preview mesh/rig is available; record the preview limitation/fault instead of claiming animated success.
 
-Use ordered timestamped frames/video for descriptions and evaluate motion-aware embeddings before exposing motion-search claims. Qwen video support is a candidate beyond the existing image adapter. EmbeddingGemma's default video sampling is one frame per second, so validate sampling for fast game motions. Single thumbnails or unordered frame averages are insufficient evidence for temporal distinctions such as movement direction.
+Evaluate motion-aware direct embeddings before exposing motion-search claims. Optional descriptions use ordered timestamped frames/video through separate **Generate descriptions**, after validating temporal inputs, batching, and provenance; missing/failed descriptions neither gate clip processing/playback nor exclude usable clips from search. Qwen video support is a candidate beyond the existing image adapter. EmbeddingGemma's default video sampling is one frame per second, so validate sampling for fast game motions. Single thumbnails or unordered frame averages are insufficient evidence for temporal distinctions such as movement direction.
 
 Proposed pilot: 10-20 clips covering idle, locomotion, jumps, attacks, short actions, root motion, in-place motion, and animation-only cases. Do not automatically retarget, repair rigs, rewrite originals, or claim target-game compatibility. Morph/baked/vertex animation support is a later adapter unless explicitly selected.
 
@@ -191,7 +208,7 @@ Godot canvas shaders are the proposed first preview candidate because of the own
 
 A preview needs a recorded engine build, scene/object, parameter values, textures, lighting where relevant, time sampling, and camera. Use a controlled temporary preview project, approved bounded inputs, and generated results outside originals. Do not execute arbitrary pack projects or their editor/tool scripts. Record compilation/runtime faults and partial static results; do not repair shader source automatically.
 
-Use code/metadata retrieval first, with a distinct validated code-query contract if introduced. Use Qwen for actual rendered appearance and EmbeddingGemma for screenshots/temporal previews after validation. Do not claim behavior based only on plausible code interpretation. Supplied screenshots remain supplied evidence unless linkage to the selected source/setup is established.
+Use code/metadata retrieval first, with a distinct validated code-query contract if introduced. Use EmbeddingGemma for screenshots/temporal previews after validation. Offer Qwen descriptions of actual rendered appearance through separate optional generation with validated inputs/batching and the existing notification workflow; their absence/failure does not block cataloging, previews, or other search channels. Do not claim behavior based only on plausible code interpretation. Supplied screenshots remain supplied evidence unless linkage to the selected source/setup is established.
 
 Proposed pilot: about 10 shader assets covering static and animated effects plus missing dependencies/compilation failures. Bound preview time, size, and retained video volume. Additional engines, graph exporters, universal conversion, and automatic source fixes are separate work.
 
@@ -207,7 +224,7 @@ Each handoff must report:
 2. Actual technical checks and evidence paths, including relevant existing 3D preservation and GUI/MCP parity.
 3. Real media/inference demonstrations separately from mocks, schema validity, and model loading.
 4. A fixed evaluation sample and held-out queries, with useful top-five matches, negative/near-match behavior, and per-channel comparisons. Agree on relevance criteria before seeing results; do not invent a universal score threshold.
-5. Coverage by asset type and stage: success, pending work, unsupported content, actual faults, partial results, caption notes/warnings, and owner-review state.
+5. Coverage by asset type and stage: success, pending import work versus optional missing descriptions, unsupported content, actual faults, partial results, caption notes/warnings, and owner-review state. Verify description failures remain in detail/source counts without becoming import failures, unusable descriptions leave other search channels usable, notifications report actionable states without starting work, and completed descriptions survive cancellation/resource stops. For image-description batching changes, verify per-asset fault isolation, GPU-memory stops leaving assets pending, provenance, and no re-queue when batch size changes. Check relevant startup/change-token/cache/worker/retention preservation when those paths are touched.
 6. Cold/warm latency where relevant, peak GPU/RAM observations, and unique allocated peak/retained storage with original/model exclusions stated.
 7. Owner review still required, known limitations, whether the milestone is technically complete, and the next runnable scope. Do not equate technical completion with owner acceptance.
 
@@ -232,7 +249,7 @@ Total rough effort is 32-59 working days, approximately 6-12 working weeks. Audi
 
 Recalculate every selected milestone from actual samples at its plan checkpoint. Existing full embedding weights appear to include audio; this is not a promise of zero decoder/dependency growth. A new caption model or runtime needs exact download, installed unique allocation, transient peak, and alternatives stated before installation. Do not extrapolate the generated-output allowance to the full collection or treat prior source-specific budgets as expansion approval.
 
-Follow `AGENTS.md` and `docs/storage.md`: use existing wrappers and `cache/uv` hard links, independently pinned runtimes where necessary, and immutable dependency files. Explain any projected growth of at least 500 MiB, another runtime, or crossing the existing pilot target. Save new base-Python `scripts/storage-report.py` receipts under `data/storage/` before/after installations or bulk work, and include source-side generated allocation in combined accounting. Keep shared revisions in configured model storage. Apply documented cache cleanup only after verification; retain fault/evidence/results and approved generations.
+Follow `AGENTS.md` and `docs/storage.md`: use existing wrappers and `cache/uv` hard links, independently pinned runtimes where necessary, and immutable dependency files. Explain any projected growth of at least 500 MiB, another runtime, or crossing the existing pilot target. Save new base-Python `scripts/storage-report.py` receipts under `data/storage/` before/after installations or bulk work, and include source-side generated allocation in combined accounting. Keep shared revisions in configured model storage. Apply documented cache cleanup only after verification and decision 0006 retention only in its exact locations; keep receipts, faults, protected evidence, and usable active results.
 
 ## Decisions still open
 

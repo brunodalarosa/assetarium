@@ -92,6 +92,12 @@ def checkpoint(db, identifier, stage, fingerprint, status, evidence):
 
 
 def inspection_input(config, record, resolution=640, content_only=False, formats=None, recorded=None):
+    from .asset_structure import asset_type
+    if asset_type(record) == 'image':
+        from .image_inspection import inspection_input as image_input
+        return image_input(config, record)
+    if asset_type(record) != 'model_3d':
+        raise ConfigError('No inspection adapter for this asset type')
     asset = {"asset_id": record["asset_id"], "pack": record["pack_id"], "name": record["display_name"], "files": record["files"]}
     from .settings import inspected_path, processing_formats
     path = inspected_path(record) if record['processing'].get('inspection') != 'pending' else None
@@ -107,7 +113,8 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
     for item in [source] + deps:
         path = item.get("path")
         try:
-            actual = file_hash(config.source_file(path))
+            from .dependency_resolution import dependency_file
+            actual = file_hash(dependency_file(config, item))
         except (OSError, ValueError, TypeError) as exc:
             actual = {"missing": path, "reason": str(exc)}
         content.append({"path": path, "actual": actual, "expected": item.get("sha256")})
@@ -123,7 +130,8 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
         "worker": file_hash(files["worker"]), "render_math": file_hash(files["render_math"]),
         "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None}
     if repair:
-        files['repair_worker'] = code / 'blender_repair_worker.py'
+        files['repair_worker'] = code / ('blender_shared_dependency_worker.py' if repair.get('kind') == 'shared_dependency_paths'
+                                        else 'blender_repair_worker.py')
         settings['repair_worker'] = file_hash(files['repair_worker'])
     return asset, source, reason, recorded_fingerprint(settings, files, recorded)
 
@@ -216,11 +224,16 @@ def seed(config):
                 evidence = {"adopted": True, "original": deepcopy(old),'fault_content':stage_content(config,record,stage)}
                 try:
                     if stage == "inspection" and state == "complete":
-                        path = config.output_path("data", old["result_path"].removeprefix("data/"))
-                        result = json.loads(path.read_text(encoding="utf-8"))
-                        source = next(f for f in record["files"] if f["path"] == result["source_path"])
-                        validate_result(config, {"asset_id": identifier, "source_path": source["path"],
-                            "format": source["format"], "output": str(path.parent)}, result)
+                        from .asset_structure import asset_type
+                        if asset_type(record) == 'image':
+                            from .image_inspection import validate_result as validate_image
+                            validate_image(config, record)
+                        else:
+                            path = config.output_path("data", old["result_path"].removeprefix("data/"))
+                            result = json.loads(path.read_text(encoding="utf-8"))
+                            source = next(f for f in record["files"] if f["path"] == result["source_path"])
+                            validate_result(config, {"asset_id": identifier, "source_path": source["path"],
+                                "format": source["format"], "output": str(path.parent)}, result)
                     if stage == "caption" and state == "complete":
                         image_inputs(config, record)
                 except (OSError, ValueError, KeyError) as exc:
@@ -302,6 +315,10 @@ def refresh(config, dry_run=False):
 
 
 def run_inspection(config, record, fingerprint, resolution=640, timeout=180, formats=None):
+    from .asset_structure import asset_type
+    if asset_type(record) == 'image':
+        from .image_inspection import run
+        return run(config, record, fingerprint)
     from .inspection import publish
     asset, source, reason, _ = inspection_input(config, record, resolution, formats=formats)
     key = (str(config.blender), config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None)
@@ -320,6 +337,10 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
         from .texture_repair import validate_recipe
         job['texture_repair'] = validate_recipe(config, record)
         worker = 'blender_repair_worker.py'
+        if job['texture_repair'].get('kind') == 'shared_dependency_paths':
+            from .dependency_resolution import worker_files
+            job['dependency_files'] = worker_files(config, job['texture_repair'])
+            worker = 'blender_shared_dependency_worker.py'
     task = output / "job.json"
     result_path = output / "result.json"
     if result_path.exists():
@@ -389,6 +410,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
     # asset_ids narrows the caption/inspection selection; vectors cover the whole source.
     selected = [record for record in selected if processing_eligible(record, formats)
                 and (asset_ids is None or stage == "embeddings" or record["asset_id"] in asset_ids)]
+    from .asset_structure import supported_stage
+    selected = [record for record in selected if supported_stage(record, stage)]
     if stage == "embeddings":
         from .library_index import index_library
         return index_library(work, backend, limit, dry_run, cancelled=cancelled, progress=progress)
@@ -417,6 +440,10 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                         if stage == 'caption':
                             image_inputs(work, record)
                         else:
+                            from .asset_structure import asset_type
+                            if asset_type(record) == 'image':
+                                from .image_inspection import validate_result as validate_image
+                                validate_image(work, record)
                             run = record.get('inspection_run') or {}
                             if run.get('result_path'):
                                 path = work.output_path('data',run['result_path'].removeprefix('data/'))
@@ -527,9 +554,15 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
 def coverage(config):
     from .retrieval import pilot_records
     selected = pilot_records(config)
+    from .asset_structure import asset_type
+    types = defaultdict(lambda: {'assets': 0, 'stages': {s: Counter() for s in COVERAGE_STAGES}})
     packs = defaultdict(lambda: {"assets": 0, "stages": {s: Counter() for s in COVERAGE_STAGES}, "captions": Counter(), "owner_review": Counter(),
         'usable_partial_results':0,'source_faults':0,'stage_faults':0,'caption_ai_review':Counter()})
     for record in selected:
+        typed = types[asset_type(record)]
+        typed['assets'] += 1
+        for stage in COVERAGE_STAGES:
+            typed['stages'][stage][record['processing'].get(stage, 'pending')] += 1
         pack = packs[record["pack_id"]]
         pack["assets"] += 1
         pack['usable_partial_results'] += bool(record.get('technical') or record.get('description') or record.get('previews'))
@@ -545,7 +578,7 @@ def coverage(config):
             pack["owner_review"][(current_overlay(config, record) or {}).get("caption_review", "pending")] += 1
         except (ValueError, OSError):
             pack["owner_review"]["faulty_overlay"] += 1
-    return {"membership": len(selected), "generation": generation(config), "packs": dict(packs)}
+    return {"membership": len(selected), "generation": generation(config), "packs": dict(packs), 'asset_types': dict(types)}
 
 
 def publish(config):
@@ -564,6 +597,8 @@ def publish(config):
     from .publication import snapshot as publication_snapshot
     with publication_snapshot(work):
         current = {r['asset_id']:r for r in records(work)}
+        from .asset_structure import validate_collection
+        validate_collection(list(current.values()))
         sources = {}
         for row in vectors:
             checked_vector(row, meta['contract_fingerprint'])

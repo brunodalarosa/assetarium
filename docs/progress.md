@@ -1,5 +1,136 @@
 # Progress
 
+## October 19 — Shared project dependencies are a general processing capability
+
+The owner approved a global fix and restoration plan with a 4 GiB growth ceiling
+within the configured 24 GiB library budget. [Decision 0009](decisions/0009-general-capabilities.md)
+requires every fix/capability to be reusable and independent of named sources;
+[decision 0010](decisions/0010-shared-project-dependencies.md) defines shared paths.
+
+`dependency_resolution.py` recognizes missing external glTF/GLB images at the same
+complete project-relative path in another enabled source, including texture-only
+providers without a model catalog. Healthy local files and explicit mappings win.
+Different matching contents remain ambiguous; equivalent copies retain evidence.
+Separate dependency reads verify the referring model, provider identity, contents,
+enabled state, path containment and current conflicts. Ordinary source-file access
+keeps its original restrictions. Rendering, byte audits, retrieval and interactive
+preview use these verified bindings; originals and material/alpha settings remain
+unchanged. The existing renderer and legacy repair worker remain byte-identical.
+
+The live audit found 3,467 blocked models among 3,468 imported models: 5,266 missing
+references all matched 16 supplied textures. Their bytes match the inventory;
+no missing file was found for those failures. The same folder convention now works
+without pack-specific mappings or code. Representative verification passed for
+17 real models covering all 16 textures, including static renders, agent detail
+with previews, four source keyword queries and a native WebView2 textured preview.
+Owner appearance/selection approval remains pending.
+
+The regression suite passed **488 tests**, with one privileged file-symlink case
+skipped; Windows directory-junction boundaries passed separately. An earlier
+restricted run retained five Windows permission failures, then passed with normal
+permissions. Final combined-inventory/audit integration checks are recorded beside
+that full run (**124 passed**, one file-symlink case skipped; overlapping counts
+are not added). Disabled-consumer browsing compatibility is verified separately.
+UI harness pagination/publication selection faults were corrected
+with their earlier evidence retained; they were not asset processing faults.
+
+At the owner's request, bulk restoration was **gracefully stopped** after the
+current asset, with **128 of 3,467 targets rendered** and **3,339 remaining**.
+No new processing failures were recorded. The first source's completed partial
+results were published; no source processing operation remains active. Image
+indexing for the newly rendered results has not started. Normal **Process assets**
+can resume the remaining stages overnight and reuses completed inspections.
+
+The stopped restoration is checkpointed under `data/verification/shared-dependencies/`:
+`before.json` records 7,028 original hashes and 24,901 prior generated file hashes;
+`plan.json`, sample reports, `api-report.json`, `ui-working-publication/report.json`,
+regression XML, `processing.log`, `embedding.log` and `run.json` retain evidence.
+The run reuses successful stages, preserves historical failures, generates no
+descriptions and installs no runtimes/models. Unique allocation receipts cover
+the project and source metadata. Full restoration/preservation completion must
+be checked after a resumed run; this intentional stop is not full restoration.
+
+## October 18 — Expansion step 1: shared asset foundation technically complete
+
+The owner approved step 1's scope and implementation plan in this chat. This is
+the expansion workflow in `docs/next version plan/`, independent of the historical
+v1 step numbers. Owner acceptance remains pending; step 2 has not started.
+
+- New candidate catalogs use SQLite schema 2, with `(asset_id, path)` file keys
+  so parent/child records share originals. Readers retain v1 compatibility. No
+  live catalog was migrated or republished for this work.
+- `asset_structure.py` defines versioned model/image/audio types, explicit file
+  roles, preview capabilities, stage applicability and relationships. Existing
+  ordinary IDs stay identical; deterministic child IDs bind parent/source and an
+  explicit stable selector. Unknown metadata and original evidence survive round
+  trips. Candidate validation rejects broken parent/source links and relationships.
+- An explicit working-copy migration sizes its reserve before copying, validates
+  the candidate, switches only the working DB and retains failure receipts and
+  candidates. Active-generation targets are refused. Tests cover budget refusal,
+  successful migration, unchanged model fingerprints and interrupted replacement.
+- The bounded PNG proof adapter decodes actual tiny synthetic images without
+  Blender or original/image copies. Malformed inputs, decoder limits and changed
+  or missing dependencies retain isolated faults and partial results. Audio and
+  child extraction/playback/inference remain explicitly unsupported. Image
+  captioning and real image-source enrollment belong to step 2.
+- Shared GUI/MCP services expose type filters, bounded structure/relationship
+  metadata, an image still view and type-aware preview defaults. Unsupported
+  adapters report unsupported previews. No complete image browsing UI was added.
+- Process assets still excludes captions. Missing/failed model descriptions with
+  successful image vectors stay outside import work/failures, while description
+  failure detail/counts and search fallback remain. Unsupported description
+  capabilities do not generate ready notifications or start work. Existing
+  batching, fingerprints, caches, worker ownership, GPU coordination, startup
+  scanning and retention decisions remain intact.
+
+Verification: **469 passed** in **205.23 seconds**, including **20** foundation
+cases and existing synthetic/Blender/Windows link regression checks. The final
+API subset also passed before the added decoder-limit case; these overlapping
+counts are not added together. Eight enabled real sources passed read-only
+keyword/type-filter queries through both desktop and MCP services, without a
+model. Synthetic direct-image vectors demonstrate plumbing, not real semantic
+relevance. Native UI/owner acceptance and new-media inference are not claimed.
+
+The first preservation comparison passed for **2,985** publication, job,
+settings and owner-correction files across the ten registered sources, plus
+source/inspection/caption/description fingerprints in eleven representative
+scopes (combined plus each source). The combined publication held **2,926**
+assets. During the final recheck, **five Cartoon City sources appeared
+concurrently**, changing `sources.json` and `asset-sources.json`. Those changes
+were preserved. The final comparison records them explicitly: **2,983 original
+files**, all baseline catalog counts and all sampled fingerprints still match.
+Those five new sources are outside this step's validation; the final raw
+whole-scope comparison therefore reports a difference rather than an unchanged
+whole library.
+
+Measured final unique allocation for the dedicated evidence/read cache and the
+reusable regression directory was **169,885,176 bytes (about 162 MiB)**, within
+the approved 100–250 MiB estimate. Of that, **2,933,048 bytes (about 2.8 MiB)**
+belong to dedicated reports/read cache and **166,952,128 bytes** to reusable
+synthetic regression fixtures. Continuous peak was not sampled, and this is not
+a fresh whole-library storage audit or accounting for concurrent source work.
+No dependency/runtime/model installation, original copy, bulk processing or
+unrelated cleanup was performed. Existing runtime wrappers and retention apply.
+Changing orchestration files changes the existing overnight plan code contract;
+pre-update plans remain subject to that contract's normal validation.
+
+Early verification faults were corrected with their evidence retained: two
+compatibility defects, an initially nonmatching synthetic search fixture, and a
+Windows helper stdin issue. The restricted link check passed with normal Windows
+permissions. The final preservation helper records newly registered sources
+without creating missing catalogs or starting work.
+
+Evidence and reproducible commands: [foundation verification](asset-foundation-verification.json),
+`data/verification/asset-foundation/`, `scripts/verify-asset-foundation.py`, and
+`data/storage/asset-foundation-*-20261018.json`. The current structure, migration,
+publication and recovery contract is in [catalog contract](catalog-contract.md).
+The existing planning-document moves were preserved. No commit, push or PR.
+
+Next runnable scope: `docs/next version plan/prompts/02-static-2d-images.md`, with
+its own approval for representative images, enrollment, image preferences,
+captioning/preprocessing contracts and full browsing. Later audio/clip adapters
+remain separate milestones.
+
 ## October 18 — Descriptions are optional; Generate descriptions and notifications
 
 Name and image search already find assets without descriptions, so descriptions
@@ -493,7 +624,7 @@ text/image support, model license/revision/device needs and human visual relevan
 remain untested and belong to later stages. Technical checks do not imply owner
 visual approval.
 
-Next runnable stage: [step 2 — catalog and baseline](plan/PROJECT.md).
+Next runnable stage: step 2 — catalog and baseline.
 Start the next chat in this repository and use the versioned plan. Step 2 has not
 been implemented: inventory, grouping, 40-asset pilot and keyword baseline remain
 pending. No further stage is authorized by this run.
@@ -639,7 +770,7 @@ bounds, counts, physical units, animations, materials or artistic suitability ar
 claimed as inspected. Search checks current path existence but does not hash files
 on every query; content staleness needs verification/rescan until step 8.
 
-Next: execute [step 3 — inspect and render](plan/PROJECT.md)
+Next: execute step 3 — inspect and render
 from this repository, after its scope/plan approvals with duration and disk
 estimates. Use the existing catalog and 40-asset manifest. Validate representative
 GLB, OBJ/MTL, FBX and Blender pilot cases first; disable embedded-script execution,
@@ -802,7 +933,7 @@ Pilot manifest: `C:\BrunoOS\Local-Asset-Library\data\pilot\selection-manifest.js
 Actual inspection choices/faults:
 `C:\BrunoOS\Local-Asset-Library\data\inspection\processed-manifest.json`.
 See [inspection report](inspection-report.md) for images and actual measurements.
-Next: [step 4 — local visual descriptions](plan/PROJECT.md).
+Next: step 4 — local visual descriptions.
 Confirm its scope/plan with duration and disk estimates; verify one small local
 vision model's official license, exact revision, image input, device support and
 remaining budget before download. Calibrate on approximately ten varied pilot
@@ -941,7 +1072,7 @@ Step 4 code/technical pilot is complete with visible schema and visual failures.
 No further automatic retry or model download is needed. Bruno owns corrections,
 final caption review and artistic approval. A later choice of a better caption
 model or broader quality evaluation needs a separately authorized scope/budget.
-Next numbered stage is [step 5](plan/PROJECT.md), requiring
+Next numbered stage is step 5, requiring
 its own scope/plan approval and actual embedding-model capability checks. No
 embedding, full-library processing, remote, push or publication occurred here.
 

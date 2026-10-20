@@ -1,4 +1,143 @@
-# Catalog contract v1
+# Catalog contract
+
+## Expansion step 1: shared asset foundation
+
+New catalog databases use **SQLite schema 2** (`PRAGMA user_version=2`). Readers
+accept schemas 1 and 2 and reject unknown versions. Existing schema-1 catalogs
+remain readable without rewriting them. One schema-2 database may retain legacy
+JSON records at version 1 alongside explicit media records at version 2.
+
+The `assets`, inventory, FTS5 and membership identities remain unchanged. The
+`files` primary key is now `(asset_id, path)`: a parent and its explicit children
+can reference the same original file without duplicating bytes. Each asset still
+has only one entry for a given path. SQLite/FTS5, NumPy, source binding and the
+configured membership boundary are unchanged.
+
+### Record structure and identity
+
+`asset_structure.py` defines the small versioned contract. Missing type fields in
+a legacy v1 record mean `model_3d`, including inventoried unsupported model
+formats. Reading a legacy record does not add fields to it or mutate a shared
+cache. Explicit `upgrade_record` preserves unknown fields and the exact existing
+file/dependency lists, outputs, faults, provenance and overlay contents.
+
+| Version-2 field | Contract |
+| --- | --- |
+| `schema_version` | 2; independent of the SQLite container version |
+| `structure_version` | 1; selects these concrete type/stage/capability definitions |
+| `asset_type` | `model_3d`, generic `image`, or `audio`; supplied explicitly, never guessed from a filename |
+| `identity_version` | `asset-v1` for ordinary assets; `subasset-v1` for explicit children |
+| `type_metadata` | Object with `version: 1`; unknown fields retained; maximum 32,768 JSON characters |
+| `file_roles` | Map covering the record's `files` paths; `primary`, `alternate_export`, `dependency`, or `supplied_preview` |
+| `relationships` | Up to 64 entries: `kind` (`alternate_export`, `contains`, `depends_on`, `variant`), target `asset_id`, and nonempty evidence up to 2,048 characters |
+| `parent_asset_id`, `subasset` | Required for children; selector contains an explicit `kind` (`frame`, `clip`, `region`) and a stable nonempty `key` of at most 256 characters |
+
+Ordinary model IDs keep the exact algorithm documented below. New ordinary
+media assets use that same source/pack-relative identity rule. Changing content
+does not change the ID; renames remain deletion plus addition. No new approval,
+overlay, or equivalent-export claim is transferred from matching names/bytes.
+
+Child algorithm `subasset-v1` is `asset_` plus the first 32 hex characters of
+SHA-256 over compact, sorted-key, UTF-8 JSON:
+`["subasset-v1", parent.source_id, parent.pack_id, parent.asset_id, kind, key]`.
+Its catalog identity is `@subasset/<child-id>`. A renamed key creates a new ID.
+Additional selector evidence is retained; changes enter the child's source
+fingerprint, without changing existing model fingerprints. Later frame/clip
+adapters must bind their exact region/time/clip inputs before creating vectors.
+
+Candidate validation rejects dangling relationships, self-links, invalid IDs,
+missing evidence, duplicate asset IDs and cyclic containment. Parent/child source
+and pack must agree; the parent must explicitly contain the child, and child
+files must be a subset of its parent's file paths. Relationships do not replace
+hash-bound `dependencies`: required maps/includes still need their recorded
+paths, hashes and discovery evidence. Unknown type-specific metadata survives
+catalog and publication round trips.
+
+### Applicable work and capabilities
+
+Capabilities are derived through `structure(record)` from the versioned type
+contract. They describe supported adapters, not successful processing or measured
+per-format availability. Actual `processing`, previews, source checks and faults
+remain authoritative. Supported image-based types use the existing **image**
+vector channel, with no embedding model/runtime/contract change.
+
+| Type | Foundation behavior |
+| --- | --- |
+| Legacy/current `model_3d` | Existing Blender inspection/previews, optional image descriptions and image/description vectors remain unchanged |
+| Explicit generic `image` | Bounded PNG inspection and supplied still-image reference (`view_label: image`); no Blender or image copy; image vectors use the existing verified backend contract |
+| `audio` | Structural/keyword record only; decoding, previews, playback, descriptions and direct audio vectors are explicitly unsupported; no audio inference claim |
+| Explicit child | Structural/keyword identity and parent linkage only; slicing/extraction, playback and direct-media vectors remain unsupported until their later adapter |
+
+`not_applicable` is an additional stage state, distinct from `unsupported` and
+`failed`. In this step the image caption stage is not applicable: image captioning
+belongs to step 2. Generic inspection/preview/vector stages for audio remain
+explicitly unsupported, with evidence that no adapter was attempted. Existing
+failures are never relabeled successful or erased by applicability. Failed
+description generation remains visible even when its type currently lacks a
+description adapter; unsupported unattempted description capabilities are
+unavailable rather than runnable missing descriptions.
+
+The PNG proof adapter decodes actual PNG bytes with the existing Pillow runtime,
+limits input to 16 MiB and 16 million pixels, verifies source/dependencies before
+and after decoding, and keeps width, height and mode separate from model facts.
+Its preview references the verified original; it creates no duplicate original
+or image conversion. Malformed/stale/missing inputs retain faults and partial
+results without unchanged retries. No image input means no successful vector
+claim. New image metadata stays available in the slim read cache, while processing
+and indexing continue to read fresh full `membership.records`.
+
+The inventory scanner still enrolls only its existing model formats. Explicit
+PNG records are an internal foundation boundary, not new source enrollment or
+image-pack browsing. Their processing honors the existing empty-format pause;
+model format preferences do not select an image subtype. Step 2 must add image
+enrollment and its processing preference/UI deliberately.
+
+Decisions 0007-0008 remain binding. Process assets excludes caption generation;
+Generate descriptions remains the separate source operation. Missing/failed
+model descriptions and description vectors never become import work/failures
+when direct image vectors succeeded. Original description failures remain in
+detail/source counts; keyword/direct-media search stays usable. Unsupported image,
+audio and child description capabilities do not raise a ready notification or
+start inference. Existing batching, fingerprints, GPU coordination, resource-stop
+handling and notifications are unchanged.
+
+### Migration, publication and recovery
+
+No live-library migration is automatic or required for this foundation. Startup,
+list/detail/search and `initialize` do not upgrade catalogs. Fresh candidate
+catalogs use SQLite schema 2; normal scans retain unchanged legacy record bytes
+and do not regenerate results just to add structure fields.
+
+`catalog_migration.migrate_working_catalog(config, max_additional_bytes)` is an
+explicit working-data operation for use under the coordinator's existing writer
+lease. It refuses active-generation targets and unknown versions. Before copying,
+it requires an explicit budget and free-space reserve of three catalog sizes
+plus 64 KiB for the candidate, journal and expansion. It copies through SQLite
+backup, converts the child file table and JSON structure, checks relationships,
+integrity and foreign keys, verifies that the old working file has not changed,
+then replaces only that working catalog. The index, jobs, originals, owner files
+and active manifest are untouched. Already-v2 working catalogs are a no-op.
+Receipts and failed candidates are retained under the source/project's existing
+generated storage (`library/migrations/` and the working catalog directory).
+An interrupted switch leaves the old working file and active publication usable;
+the retained candidate can be inspected before an explicit retry. No automatic
+retry or evidence cleanup is introduced.
+
+Publication validates the complete candidate relationships as well as existing
+membership, vector and input checks, copies the matching catalog/index into a new
+generation, and atomically switches one active manifest. Failure leaves the prior
+active generation intact. Existing request pinning, no-change publication,
+per-publication caches and decision-0006 retention remain unchanged. Rollback uses
+the retained earlier generation, never an in-place edit of a published database.
+
+Shared desktop/MCP validation accepts the bounded `asset_type` filter, explicit
+`png`/`wav` source formats and the `image` still view. Detail metadata exposes the
+structure, type facts and relationships under existing response caps; optional
+metadata omission remains explicit. Source bytes being usable do not prove clip
+extraction, playback or media inference; unsupported audio/child detail states
+that limitation. No full image/audio browsing UI is delivered in step 1.
+
+## Historical v1 catalog and pilot contracts
 
 Step 2 implements the inventory and keyword portion of this contract in SQLite
 schema version 1. SQLite FTS5 and NumPy remain the selected approach. Downstream

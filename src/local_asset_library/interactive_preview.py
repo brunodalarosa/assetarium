@@ -95,6 +95,9 @@ class InteractivePreviewService:
                     'fingerprint': digest({'asset_id': asset_id, 'format': source_format,
                         'files': record['files'], 'dependencies': record.get('dependencies', []),
                         'texture_repair': record.get('texture_repair')})}
+        if any(d.get('dependency_resolution') for d in record.get('dependencies', [])):
+            from .sources import revision
+            identity['fingerprint'] = digest({'inputs': identity['fingerprint'], 'source_revision': revision(self.config)})
         if identity['fingerprint'] in self.faults:
             return dict(self.faults[identity['fingerprint']], retained=True)
         try:
@@ -137,7 +140,8 @@ class InteractivePreviewService:
             files, aliases, by_path = [], {}, {}
             total = 0
             for entry in entries:
-                path = self.config.source_file(entry['path'])
+                from .dependency_resolution import dependency_file
+                path = dependency_file(self.config, entry)
                 size = path.stat().st_size
                 if size > MAX_FILE_BYTES:
                     raise ConfigError('Interactive preview file exceeds the 64 MiB limit: ' + path.name)
@@ -149,7 +153,8 @@ class InteractivePreviewService:
                         raise ConfigError('Interactive preview package exceeds the 128 MiB limit')
                     by_path[entry['path']] = len(files)
                     files.append({'path': entry['path'], 'sha256': entry['sha256'],
-                                  'size': size, 'aliases': []})
+                                  'size': size, 'aliases': [],
+                                  **{k:entry[k] for k in ('dependency_resolution', 'from') if k in entry}})
                 item = files[by_path[entry['path']]]
                 for alias in entry['aliases']:
                     if not alias or len(alias) > 255:
@@ -196,7 +201,8 @@ class InteractivePreviewService:
             raise ConfigError('Invalid interactive preview file index')
         entry = item['files'][index]
         try:
-            with self.config.open_source(entry['path']) as stream:
+            from .dependency_resolution import dependency_file
+            with dependency_file(self.config, entry).open('rb') as stream:
                 content = stream.read(MAX_FILE_BYTES + 1)
             if len(content) != entry['size'] or hashlib.sha256(content).hexdigest() != entry['sha256']:
                 raise ConfigError('Interactive preview source changed after publication: ' + basename(entry['path']))

@@ -130,6 +130,7 @@ class DesktopService(AssetService):
                 owner_review = 'faulty'
                 faults.append(self._record_fault(identifier, 'owner_correction', exc))
             items.append({'asset_id': identifier, 'name': record['display_name'], 'pack': record['pack_id'],
+                'asset_type': record.get('asset_type', 'model_3d'),
                 'formats': sorted({f['format'] for f in record['files']}),
                 'views': [v for v in VIEWS if any(p.get('view_label') == v for p in record['previews'])],
                 'availability': 'available' if available else 'faulty', 'faults': faults,

@@ -47,6 +47,13 @@ def inspected_path(record):
 
 
 def processing_eligible(record, formats):
+    from .asset_structure import asset_type
+    if asset_type(record) == 'audio' or record.get('identity_version') == 'subasset-v1':
+        return False  # Recognized content, without an implemented processing adapter.
+    if asset_type(record) == 'image':
+        # The scanner does not enroll images in step 1. Explicit PNG records use
+        # this adapter; the existing empty selection still pauses all work.
+        return bool(formats) and any(f['format'] == 'png' for f in record['files'])
     # Downstream work belongs to the source actually inspected, even when the
     # inventory also contains an enabled alternate. Settings never replace it.
     path = inspected_path(record) if record['processing'].get('inspection') != 'pending' else None

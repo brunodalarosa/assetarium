@@ -70,7 +70,7 @@ def repair_recipe(config, record):
 
 def synchronize_recipe(kept, fresh):
     recipe = fresh.get('texture_repair') or {}
-    if recipe.get('kind') == 'gltf_dependency_paths':
+    if recipe.get('kind') in {'gltf_dependency_paths', 'shared_dependency_paths'}:
         kept['texture_repair'] = recipe
-    elif (kept.get('texture_repair') or {}).get('kind') == 'gltf_dependency_paths':
+    elif (kept.get('texture_repair') or {}).get('kind') in {'gltf_dependency_paths', 'shared_dependency_paths'}:
         kept.pop('texture_repair')

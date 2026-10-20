@@ -15,7 +15,8 @@ from .publication import generation, snapshot_key
 # load the full record, so nothing is hidden from the owner.
 DROPPED = frozenset({'variants', 'grouping', 'dependency_inspection', 'provenance',
                      'texture_repair_history', 'license_evidence', 'effective_caption'})
-TECHNICAL = ('inspected_path', 'inspected_sha256', 'inspected_format', 'evaluated_instance_totals', 'armatures')
+TECHNICAL = ('inspected_path', 'inspected_sha256', 'inspected_format', 'evaluated_instance_totals', 'armatures',
+             'kind', 'width', 'height', 'mode', 'adapter', 'version')
 _lock = threading.Lock()
 _records = OrderedDict()
 _digests = {}

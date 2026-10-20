@@ -1,9 +1,35 @@
-# Explicit shared texture paths
+# Shared texture dependencies and explicit paths
 
 Some publisher packs distribute models and shared textures in separate folders.
 Their glTF/GLB image URIs can consequently point to a missing location even when
-the supplied texture exists elsewhere in the same registered source. The library
-does not move originals, copy textures, search other sources, or guess by basename.
+the supplied texture exists elsewhere in the supplied folders. The library never
+moves originals, copies textures, or guesses by basename.
+
+## Automatic shared project layouts
+
+Missing external glTF/GLB images can use a matching complete project-relative path
+inside another **enabled registered source**. For example, `Town/Textures/map.png`
+in one source can supply that exact missing path in a separately registered model
+source. The source folder names do not matter. Texture-only sources work without
+model imports or prior processing. No unrelated disk directories are searched.
+
+Healthy local files and explicit mappings win. Conflicting contents at the same
+relative path stay ambiguous faults; byte-identical duplicates retain all candidate
+evidence. Records retain the original reference/location, model hash, provider ID,
+texture hash and resolution method. Disabling/removing a provider, changing bytes,
+adding a conflict or restoring the original local file invalidates the resolution
+until rescanning. Ordinary source-file boundaries remain strict; a separate checked
+dependency API serves rendering, desktop previews and agent retrieval.
+
+Bindings apply to the temporary Blender scene and viewer package. Original model
+bytes and material/alpha settings stay intact. External consumers must apply the
+returned bindings. Additional resource kinds need a processing adapter; this
+feature currently handles external glTF/GLB image references.
+
+See [general capability policy](decisions/0009-general-capabilities.md) and
+[shared dependency decision](decisions/0010-shared-project-dependencies.md).
+
+## Explicit mappings within a source
 
 After owner authorization, a source can have
 `metadata-lal/library/dependency-overrides.json`:
