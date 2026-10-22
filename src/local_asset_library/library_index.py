@@ -45,14 +45,16 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                 break
             if not dry_run and progress:
                 progress(identifier, position, len(selected))
-            if asset_type(record) == 'image' and not record['previews']:
+            # A 2D image is embedded from its recorded model input only; its original,
+            # display raster and thumbnail are presentation, not extra vectors.
+            views = ([p for p in record['previews'] if p.get('role') == 'model_input']
+                     if asset_type(record) == 'image' else record['previews'])
+            if asset_type(record) == 'image' and not views:
                 # No direct-media input exists yet. Do not manufacture either a
                 # vector failure or a successful empty image index.
                 continue
             counts = {"complete": 0, "failed": 0, "pending": 0, "deferred": 0}
-            # Image descriptions are a later adapter. Retain any existing failed
-            # jobs/evidence, but do not manufacture description work for images.
-            channels = ([] if asset_type(record) == 'image' else [("description", None)]) + [("image", p) for p in record["previews"]]
+            channels = [("description", None)] + [("image", p) for p in views]
             for channel, preview in channels:
                 ref = None if preview is None else {k: preview[k] for k in ("path", "source_path", "sha256", "view_label", "origin") if k in preview}
                 job = digest({"asset": identifier, "channel": channel, "preview": ref and {k: v for k, v in ref.items() if k != "sha256"}})

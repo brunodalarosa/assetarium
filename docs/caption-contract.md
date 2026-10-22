@@ -47,6 +47,19 @@ over the renderer's gray background, converts to RGB and downsizes to a maximum
 pixel tensors and nonzero image tokens. Token counts, grids, original/processed
 sizes and elapsed time are saved with each attempt.
 
+**2D images (expansion step 2)** use the separately versioned prompt
+`prompts/caption-image-v1.txt` (`prompt_version: image-v1`) with the same JSON
+fields and validator. The single input is the image's derived `model_input`
+PNG under project data (see the [catalog contract](catalog-contract.md)); its view
+label tells the model which flat backdrop fills transparent pixels and that the
+backdrop is not part of the image. No filename, folder, pack or measured fact
+enters the prompt. The unchanged `caption_backend.py` preparation then applies
+(≥32 px check, gray composite of an already opaque input, 448 px Lanczos edge).
+A batch never mixes prompts: 3D views and 2D images are split into their own
+model calls, each asset keeping `batched-v1` provenance, its own outcome and raw
+output. Existing 3D prompt versions, fingerprints and generation modes are
+unchanged and never re-queued by this addition.
+
 Only a malformed response can receive one corrective generation, with an
 explicit validation error and a larger token cap. The failed response is kept.
 Runtime errors, OOM, corrupt/missing images, unsupported input and timeout are

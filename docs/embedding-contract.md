@@ -45,6 +45,19 @@ No contact sheets/textures are indexed as individual asset views. Image queries
 use the same preprocessing as indexed images. Source/project relative reference
 paths only; URLs, traversal and external absolute paths are rejected.
 
+**2D image assets (expansion step 2)** are embedded from exactly one recorded
+`model_input` preview: the derived `image-model-input-b-v1` PNG described in the
+[catalog contract](catalog-contract.md) (nearest-neighbour enlargement to at least
+256 px, flat rgb(82,82,82) behind transparent pixels, Lanczos reduction above
+1,024 px). This file then passes through the unchanged preprocessing above, so
+the embedding contract, adapter hash, capability receipt and every existing
+vector are unchanged; tiny sprites no longer reach the 16 px rejection. Originals,
+SVG display rasters and thumbnails are presentation, never extra vectors. A
+reference query on an image asset uses that same `model_input` file, so query and
+index preparation are identical. Images also get a description vector once a
+valid description exists; a missing or failed one leaves only that channel
+(decision 0008).
+
 All vectors retain 768 dimensions and are checked for finite, nonzero output,
 converted to FP32 and L2 normalized. Stored vectors must already be unit length;
 search refuses corrupt/checksum-mismatched, nonfinite, zero or nonunit vectors.

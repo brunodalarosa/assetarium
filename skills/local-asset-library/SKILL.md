@@ -1,6 +1,6 @@
 ---
 name: local-asset-library
-description: Find, compare, inspect, and select existing 3D assets through the local_asset_library MCP tools for game projects. Use when a task needs a model or prop from the local library, including checking a known candidate. Library administration, asset generation, and engine importing are separate workflows.
+description: Find, compare, inspect, and select existing 3D assets and 2D images (sprites, icons, tiles, SVG) through the local_asset_library MCP tools for game projects. Use when a task needs a model, prop, icon or sprite from the local library, including checking a known candidate. Library administration, asset generation, and engine importing are separate workflows.
 ---
 
 # Local Asset Library
@@ -32,12 +32,12 @@ Use natural-language visual descriptions rather than guessed filenames. For exam
 ```
 
 - Modes: `combined` (default), `keyword_description`, `keyword`, `description`, `image`, and `reference`. `image` matches text against indexed image evidence. `keyword` is useful for names and literal terms and does not require semantic inference.
-- Filters: `pack`, `format`, `max_triangles`, and `rigged`. Use a returned/catalog pack identifier, never a folder path. Technical filters require inspected evidence for the requested format, so unknown properties can exclude a candidate.
-- Formats: `blend`, `dae`, `fbx`, `glb`, `gltf`, `obj`, and `stl`. Availability of a format does not establish engine compatibility or technical inspection of that alternate export.
+- Filters: `asset_type` (`model_3d`, `image`), `pack`, `format`, `max_triangles`, `rigged`, and for 2D images `transparent` and `size_class` (`tiny`, `small`, `medium`, `large`). Use a returned/catalog pack identifier, never a folder path. Technical filters require inspected evidence for the requested format, so unknown properties can exclude a candidate.
+- Formats: `blend`, `dae`, `fbx`, `glb`, `gltf`, `obj`, `stl`, and images `png`, `jpg`, `jpeg`, `webp`, `bmp`, `gif`, `tga`, `tif`, `tiff`, `avif`, `svg`. Availability of a format does not establish engine compatibility or technical inspection of that alternate export.
 - Limits: 1-40 candidates; omitted limit is 5. Larger responses cost more context and may still be truncated. Request more only when the task benefits.
 - Reference search: set `mode: "reference"` and use a returned `reference_asset_id`, optionally `reference_view`. Omit `query`; text and reference arguments cannot mix. Arbitrary image paths, URLs, and uploads are unsupported.
 
-`get_asset` requires the exact returned asset ID. Its optional fields are `source_format`, `include_metadata`, `include_preview`, and `preview_view`. Preview views are `three_quarter` (default), `front`, and `side`. A missing or faulty view is not automatically replaced.
+`get_asset` requires the exact returned asset ID. Its optional fields are `source_format`, `include_metadata`, `include_preview`, and `preview_view`. Preview views are `three_quarter` (default), `front`, and `side` for models, and `image` (default) for 2D images. A missing or faulty view is not automatically replaced. An image preview is the original pixels with transparency kept (small art enlarged with hard pixel edges; see `native_dimensions` and `scale`) or, for SVG, a raster of the vector source. An image's `suggested_purpose` comes from folder names and is not verified; its purpose is recorded as a generic image.
 
 If the MCP tools are unavailable, report the limitation. Do not install or reconfigure the server, scan source folders, rebuild indexes, or start processing as a substitute. These operations require their own authorized task.
 

@@ -128,19 +128,28 @@ def test_png_dispatch_no_blender_and_audio_remains_explicitly_unsupported(media,
     work = incremental.working(config)
     item = catalog.detail(work, image['asset_id'])
     assert item['technical']['width'] == 24 and item['technical']['height'] == 32
-    assert item['processing']['caption'] == 'not_applicable'
-    assert description_state(item) == 'unavailable'
-    assert incremental.process(config, 'caption', dry_run=True)['pending'] == 0
+    # Step 2: images have optional descriptions from their derived model input.
+    assert item['processing']['caption'] == 'pending'
+    assert description_state(item) == 'missing'
+    for path in ('src/local_asset_library/caption_backend.py', 'src/local_asset_library/caption_batching.py',
+                 'runtime/caption/uv.lock', 'prompts/caption-image-v1.txt'):
+        target = config.project_root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('synthetic contract')
+    catalog.save_json(config.project_root / 'docs/caption-model.json', {'revision': 'synthetic'})
+    assert incremental.process(config, 'caption', dry_run=True)['pending'] == 1
     assert incremental.process(config, 'inspection', dry_run=True)['pending'] == 0
     assert catalog.detail(work, audio['asset_id']) == audio
     assert import_outcome(audio, False)['state'] == 'failed'
     assert not import_outcome(audio, False)['pending_stages']
     assert not structure(audio)['preview_capabilities']['playback']
     result = index_library(work, backend)
-    assert result['processed'] == 1 and result['deferred_descriptions'] == 0
+    assert result['processed'] == 1 and result['deferred_descriptions'] == 1
     item = catalog.detail(work, image['asset_id'])
     assert import_outcome(item, False)['state'] == 'complete'
-    assert not any(config.output_path('data', 'inspection').glob('**/*.png'))
+    # Only bounded derived files are written; the original is never copied.
+    derived = sorted(p.name for p in config.output_path('data', 'inspection').glob('**/*.png'))
+    assert derived == ['model-input.png', 'thumbnail.png']
 
 
 def test_media_publication_reload_shared_api_and_notifications(media):
@@ -164,9 +173,10 @@ def test_media_publication_reload_shared_api_and_notifications(media):
     unsupported, audio_bytes, faults = mcp.execute('get_asset', {'asset_id': audio['asset_id'], 'include_preview': True})
     assert unsupported['preview']['status'] == 'unsupported' and audio_bytes is None and not faults['excluded']
     summary = processing_summary(records(work), {r['asset_id']: r for r in records(config)}, ['gltf'], set())
-    assert summary['pending'] == 0 and summary['descriptions']['missing'] == 0
+    assert summary['pending'] == 0 and summary['descriptions']['missing'] == 1
     status = {'id': 'synthetic', 'key': 'media', 'name': 'Media', 'enabled': True, 'scanned': True, **summary}
-    assert not notifications.reconcile(config, [status])['items']
+    # The image's optional description is ready to generate; audio stays unsupported and silent.
+    assert len(notifications.reconcile(config, [status])['items']) == 1
     assert incremental.coverage(config)['asset_types']['audio']['stages']['inspection']['unsupported'] == 1
     assert incremental.publish(config)['no_change']
 
@@ -226,8 +236,8 @@ def test_image_faults_retain_partial_results_without_unchanged_retry(media, monk
     assert incremental.process(config, 'inspection')['pending'] == 0
     item = catalog.detail(work, image['asset_id'])
     assert item['technical'] and item['previews'] and item['stage_faults']['inspection']
-    assert item['processing']['caption'] == 'not_applicable'
-    assert index_library(work, backend)['outcomes'][0]['status'] == 'failed'
+    assert item['processing']['caption'] == 'pending'
+    assert [o['status'] for o in index_library(work, backend)['outcomes'] if o['channel'] == 'image'] == ['failed']
     assert not AssetService(config).execute('search_assets', {'query': 'hero', 'mode': 'keyword'})[0]['results']
 
 

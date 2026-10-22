@@ -26,6 +26,8 @@ from .inspection import choose_source, discover_blender, environment, run_proces
 STAGES = ("inspection", "caption", "embeddings")
 COVERAGE_STAGES = ('inventory','inspection','previews','caption','embeddings')
 CAPTION_PROMPT_VERSION = 'v4'
+IMAGE_CAPTION_PROMPT_VERSION = 'image-v1'
+PROMPT_VERSIONS = {'v1', 'v2', 'v3', 'v4', IMAGE_CAPTION_PROMPT_VERSION}
 WORK = "work"
 _blender_runtime = {}
 
@@ -95,7 +97,7 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
     from .asset_structure import asset_type
     if asset_type(record) == 'image':
         from .image_inspection import inspection_input as image_input
-        return image_input(config, record)
+        return image_input(config, record, content_only=content_only, recorded=recorded)
     if asset_type(record) != 'model_3d':
         raise ConfigError('No inspection adapter for this asset type')
     asset = {"asset_id": record["asset_id"], "pack": record["pack_id"], "name": record["display_name"], "files": record["files"]}
@@ -165,6 +167,11 @@ def prompt_hash(config, version, recorded=None):
     return current
 
 
+def default_prompt_version(record):
+    from .asset_structure import asset_type
+    return IMAGE_CAPTION_PROMPT_VERSION if asset_type(record) == 'image' else CAPTION_PROMPT_VERSION
+
+
 def caption_input(config, record, prompt_version=None, generation=None, recorded=None):
     # Model/runtime contracts and prompt affect inference. Severity/owner review do not.
     # Completed captions retain their generation prompt and mode for cache validation;
@@ -172,8 +179,8 @@ def caption_input(config, record, prompt_version=None, generation=None, recorded
     from .caption_batching import MODE, POLICY
     provenance = (record.get('caption_provenance') or {}) if record['processing'].get('caption') == 'complete' else {}
     if prompt_version is None:
-        prompt_version = provenance.get('prompt_version') or CAPTION_PROMPT_VERSION
-    if prompt_version not in {'v1', 'v2', 'v3', 'v4'}:
+        prompt_version = provenance.get('prompt_version') or default_prompt_version(record)
+    if prompt_version not in PROMPT_VERSIONS:
         raise ConfigError('Unsupported caption prompt version')
     if generation is None:
         generation = provenance.get('generation_mode', 'sequential') if provenance else MODE
@@ -374,17 +381,25 @@ def run_captions(config, batch, backend, batch_size=None):
     """
     from .captions import infer_captions, publish
     from .caption_batching import MODE
-    prompt_path = config.project_root / f'prompts/caption-{CAPTION_PROMPT_VERSION}.txt'
-    prompt = prompt_path.read_text(encoding="utf-8")
-    outcomes = infer_captions(backend, [inputs for _, _, inputs in batch], prompt, batch_size=batch_size)
+    # A model batch never mixes prompts: 3D views and 2D images use separate versioned prompts.
+    groups = {}
+    for index, (record, _, _) in enumerate(batch):
+        groups.setdefault(default_prompt_version(record), []).append(index)
+    outcomes, members = [None] * len(batch), {}
+    for version, indices in groups.items():
+        prompt = (config.project_root / f'prompts/caption-{version}.txt').read_text(encoding="utf-8")
+        for index, outcome in zip(indices, infer_captions(backend, [batch[i][2] for i in indices], prompt, batch_size=batch_size)):
+            outcomes[index], members[index] = outcome, (version, len(indices), indices.index(index))
     results = []
-    for position, ((record, fingerprint, inputs), outcome) in enumerate(zip(batch, outcomes)):
+    for index, ((record, fingerprint, inputs), outcome) in enumerate(zip(batch, outcomes)):
+        version, assets, position = members[index]
+        prompt_path = config.project_root / f'prompts/caption-{version}.txt'
         try:
             image_inputs(config, record)
             relative = f"captions/library/{record['asset_id']}/{fingerprint}.json"
             provenance = {"fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
-                "prompt_version": CAPTION_PROMPT_VERSION, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
-                "generation_mode": MODE, "batch": {"size": batch_size or len(batch), "assets": len(batch), "position": position},
+                "prompt_version": version, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
+                "generation_mode": MODE, "batch": {"size": batch_size or len(batch), "assets": assets, "position": position},
                 "attempts": outcome["attempts"], "ai_review": "pending", "owner_caption_review": "pending",
                 "owner_artistic_suitability": "pending", "result_path": "data/" + relative}
             save_json(config.output_path("data", relative), {"asset_id": record["asset_id"], **outcome, "provenance": provenance})
@@ -434,6 +449,9 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
             if old and old[1] in {'failed','unsupported'} and json.loads(old[2]).get('fault_content')==stage_content(work,record,stage):
                 retained[old[1]]+=1
                 continue  # Changing settings alone is not authorization to retry a source/input fault.
+            if (stage == 'inspection' and old and old[1] == 'complete' and record.get('asset_type') == 'image'
+                    and record['processing'].get('inspection') == 'pending' and not record.get('technical')):
+                old = None  # A re-enrolled image without its result is inspected again (cheap), not a fault.
             if old and old[0] == fp and old[1] in {"complete", "failed", "unsupported"}:
                 if old[1] == 'complete':
                     try:
@@ -461,7 +479,7 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                 retained[old[1]] += 1
                 continue
             if stage == 'caption':
-                fp = caption_input(work, record, prompt_version=CAPTION_PROMPT_VERSION)
+                fp = caption_input(work, record, prompt_version=default_prompt_version(record))
             pending.append((record, fp))
         report = {"stage": stage, "pending": len(pending), "selected": min(limit, len(pending)), "retained": dict(retained), "dry_run": dry_run, "outcomes": []}
         report['pending_ids'] = [r['asset_id'] for r, _ in pending]

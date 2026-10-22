@@ -25,7 +25,7 @@ file/dependency lists, outputs, faults, provenance and overlay contents.
 | --- | --- |
 | `schema_version` | 2; independent of the SQLite container version |
 | `structure_version` | 1; selects these concrete type/stage/capability definitions |
-| `asset_type` | `model_3d`, generic `image`, or `audio`; supplied explicitly, never guessed from a filename |
+| `asset_type` | `model_3d`, generic `image`, or `audio`. Images are enrolled only in sources that opt in (step 2); their purpose is never guessed from a filename |
 | `identity_version` | `asset-v1` for ordinary assets; `subasset-v1` for explicit children |
 | `type_metadata` | Object with `version: 1`; unknown fields retained; maximum 32,768 JSON characters |
 | `file_roles` | Map covering the record's `files` paths; `primary`, `alternate_export`, `dependency`, or `supplied_preview` |
@@ -64,13 +64,13 @@ vector channel, with no embedding model/runtime/contract change.
 | Type | Foundation behavior |
 | --- | --- |
 | Legacy/current `model_3d` | Existing Blender inspection/previews, optional image descriptions and image/description vectors remain unchanged |
-| Explicit generic `image` | Bounded PNG inspection and supplied still-image reference (`view_label: image`); no Blender or image copy; image vectors use the existing verified backend contract |
+| Generic `image` | Step 2 adapter (see *Static 2D images* below): decoded facts, derived thumbnail/model input, optional descriptions; no Blender or original copy; image vectors use the existing verified backend contract |
 | `audio` | Structural/keyword record only; decoding, previews, playback, descriptions and direct audio vectors are explicitly unsupported; no audio inference claim |
 | Explicit child | Structural/keyword identity and parent linkage only; slicing/extraction, playback and direct-media vectors remain unsupported until their later adapter |
 
 `not_applicable` is an additional stage state, distinct from `unsupported` and
-`failed`. In this step the image caption stage is not applicable: image captioning
-belongs to step 2. Generic inspection/preview/vector stages for audio remain
+`failed`. In step 1 the image caption stage was not applicable; step 2 makes it
+applicable (see below). Generic inspection/preview/vector stages for audio remain
 explicitly unsupported, with evidence that no adapter was attempted. Existing
 failures are never relabeled successful or erased by applicability. Failed
 description generation remains visible even when its type currently lacks a
@@ -136,6 +136,89 @@ structure, type facts and relationships under existing response caps; optional
 metadata omission remains explicit. Source bytes being usable do not prove clip
 extraction, playback or media inference; unsupported audio/child detail states
 that limitation. No full image/audio browsing UI is delivered in step 1.
+
+### Static 2D images (expansion step 2)
+
+Step 2 supersedes the PNG proof adapter above; the type table's `image` row now
+reads as follows. Images are first-class **generic images** in sources that opt
+in, with measured facts, derived display/model inputs, optional descriptions and
+the same retrieval as models.
+
+**Enrollment.** `metadata-lal/source.json` may hold `import_types`
+(`["model_3d"]` by default, `["model_3d", "image"]` when the owner ticks
+**Include 2D images** for that source). Existing sources keep their bytes and
+records unchanged. In an image-enabled source the scanner (no decoding) makes
+one `image` record per folder + stem, with these files left out as visible
+inventory roles: files a model references as a dependency or preview
+(`model_dependency_image`), pack `Preview*`/`Sample*` overviews
+(`pack_contact_sheet`/`pack_sample`), images in a `texture(s)` folder
+(`deferred_texture`, step 4) and images described by an atlas/tileset sidecar
+(same-stem `.xml/.json/.atlas/.plist/.tsx/.tmx`, or a `.tsx/.tmx` `<image source>`;
+`deferred_sprite_sheet`, step 3). Same folder + stem in several formats are one
+asset with `alternate_export` file roles (raster preferred as primary); visual
+equivalence is unverified. Identity is the preserved asset-v1 algorithm over
+`image:<folder>/<stem>`, so it is independent of the formats present. Byte-identical
+files in different assets are recorded as `type_metadata.identical_content`, never
+merged. Filename-prefix variant suggestions are not made for images.
+
+**Purpose.** `type_metadata.purpose` is always `generic_image`. A keyword in the
+nearest folder name (source path or relative folders: icon(s), tile(s)/tileset,
+sprite(s)/character(s), ui/gui/hud/button(s)/cursor(s), background(s)/bg/sky…)
+becomes `suggested_purpose` with its basis and evidence. It is a suggestion,
+never a filter or fact; no publisher or pack name is consulted (decision 0009).
+
+**Formats.** Raster PNG, JPEG, WebP, BMP, GIF, TGA, TIFF and AVIF are decoded
+by the MCP runtime's Pillow 12.1 with the decoder pinned to the extension's
+format (a mismatch is a fault). Self-contained SVG is rasterized by `resvg-py`
+0.5.0 (MIT; resvg Apache-2.0 OR MIT) in an isolated `python -I` child process
+with a 30 s timeout, 8 MiB file cap and 2,048 px render cap; XML entities and any
+non-`#`/non-`data:` `href`/`src`/`url()`/`@import` reference are refused before
+rendering (resvg would otherwise read absolute local paths). Scripts never run.
+An SVG without width/height/viewBox gets a measured content-bounds canvas
+(`canvas_basis: content-bounds-v1`). Text elements render with system fonts and
+say so. Animated/multi-frame files, external SVG resources and declared entities
+are `unsupported` (recorded, not failed); damaged/truncated/oversized files fail
+only their asset. DDS/EXR/HDR, PSD/Aseprite, atlas slicing and playback are not
+enrolled in step 2.
+
+**Inspection** (`image_inspection.py`, adapter `image-inspection-v2`, no Blender)
+records `technical`: format, width/height (SVG: canvas units), source mode,
+`alpha` (`none` / `binary` cut-out / `partial` soft), visible-pixel coverage and
+bounds, colour count (up to 4,096), `size_class` (tiny ≤32, small ≤128,
+medium ≤1,024 px, large), aspect and a `pixel_art_candidate` display hint. It
+writes bounded derived PNGs under the source's generated data:
+`thumbnail.png` (nearest-neighbour integer enlargement for ≤160 px art, else
+320 px Lanczos), `display.png` for SVG (1,024 px raster) and `model-input.png`.
+`previews` roles: `original` (raster source reference, never copied), `display`,
+`thumbnail` and `model_input`, each hash-verified before reuse. The inspection
+fingerprint covers source checks, chosen file, the model-input policy, the
+pixel-producing code (`image_media.py`, `svg_worker.py`) and the SVG renderer
+version (LF/CRLF-tolerant). Editing those two files therefore re-inspects images
+and re-queues their vectors and descriptions; scanner rules (`image_catalog.py`)
+and orchestration (`image_inspection.py`, whose `VERSION` marks semantic changes)
+can change without that cost. A model-input
+fault keeps facts and thumbnail, marks previews `partial` and the image vector
+`failed` with the reason.
+
+**Model input contract** `image-model-input-b-v1`: Lanczos reduction to fit
+1,024 px, then nearest-neighbour integer enlargement until the long edge is at
+least 256 px and the short edge at least 32 px (bounded at 4,096 px / 16 MP),
+then transparent pixels composited over flat rgb(82,82,82); opaque images get no
+backdrop. The derivation (policy, scale, resample, backdrop, sizes and a note that
+the backdrop is not a source colour) is stored on the preview. It was chosen by
+the preregistered evaluation in `data/verification/image-preprocessing-eval-20261020/`
+(candidates a: min 32 px gray; b; c: b with a contrast backdrop) and is pending
+owner review. Both unchanged model backends read this file, so
+`embedding_backend.py`, `caption_backend.py` and every existing 3D fingerprint
+are unchanged; the old <16 px and gray-composite behaviour now only applies to
+already-prepared inputs.
+
+**Stages.** Images now have the caption stage (`applicable_stages` returns all
+stages). Process assets runs image inspection and image vectors; Generate
+descriptions describes images whose model input exists (decisions 0007-0008
+unchanged). An unchanged re-enrolled asset resumes from its published record,
+and a ledger-complete inspection whose record lost its result is inspected
+again instead of being recorded as corrupt output.
 
 ## Historical v1 catalog and pilot contracts
 

@@ -27,7 +27,7 @@ def asset_type(record):
 
 
 def applicable_stages(record):
-    return tuple(stage for stage in STAGES if not (asset_type(record) == 'image' and stage == 'caption'))
+    return STAGES
 
 
 def supported_stage(record, stage):
@@ -37,7 +37,7 @@ def supported_stage(record, stage):
 
 
 def description_supported(record):
-    return asset_type(record) == 'model_3d' and supported_stage(record, 'caption')
+    return asset_type(record) in ('model_3d', 'image') and supported_stage(record, 'caption')
 
 
 def file_roles(record):
@@ -80,6 +80,31 @@ def upgrade_record(record):
     value.setdefault('type_metadata', {'version': 1})
     value.setdefault('file_roles', file_roles(record))
     value.setdefault('relationships', [])
+    validate_record(value)
+    return value
+
+
+def image_record(pack, identity, name, files, grouping, purpose, license_rows):
+    """Scanner-enrolled static image; purpose stays generic unless the owner labels it."""
+    from .catalog import SOURCE_ID, asset_id
+    paths = [f['path'] for f in files]
+    value = {'schema_version': CATALOG_VERSION, 'asset_id': asset_id(pack, identity), 'source_id': SOURCE_ID,
+             'pack_id': pack, 'source_relative_identity': identity, 'display_name': name,
+             'availability': 'available' if any(f['status'] == 'available' for f in files) else 'missing',
+             'files': [{'path': f['path'], 'format': PurePosixPath(f['path']).suffix[1:].lower(), 'sha256': f['sha256'],
+                        'availability': f['status']} for f in files],
+             'grouping': {'evidence': [grouping], 'unresolved_ambiguities': []},
+             'dependencies': [], 'dependency_inspection': [], 'previews': [], 'variants': [],
+             'technical': None, 'description': None, 'caption_provenance': None, 'embeddings': [],
+             'owner_overlay': {}, 'license_evidence': license_rows, 'provenance': {'scanner': 'inventory-v1+images-v1'},
+             'processing': {s: 'pending' for s in STAGES}, 'structure_version': STRUCTURE_VERSION,
+             'asset_type': 'image', 'identity_version': 'asset-v1', 'relationships': [],
+             'type_metadata': {'version': 1, 'purpose': 'generic_image', 'suggested_purpose': purpose},
+             'file_roles': {path: 'primary' if i == 0 else 'alternate_export' for i, path in enumerate(paths)},
+             'primary_inspection_path': paths[0]}
+    value['processing']['inventory'] = 'complete'
+    from .catalog import relevant_license_evidence
+    value['license_evidence'] = relevant_license_evidence(value)
     validate_record(value)
     return value
 

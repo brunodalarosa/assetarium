@@ -302,8 +302,12 @@ def indexed_vectors(config, db, fingerprint):
 
 
 def validate_filters(filters):
-    if set(filters) - {"pack", "format", "max_triangles", "rigged", "asset_type"}:
+    if set(filters) - {"pack", "format", "max_triangles", "rigged", "asset_type", "transparent", "size_class"}:
         raise ConfigError("Unknown/unverified filter")
+    if "transparent" in filters and type(filters["transparent"]) is not bool:
+        raise ConfigError("Transparency filter must be boolean")
+    if "size_class" in filters and filters["size_class"] not in ("tiny", "small", "medium", "large"):
+        raise ConfigError("Unknown image size class")
     from .asset_structure import ASSET_TYPES
     if 'asset_type' in filters and filters['asset_type'] not in ASSET_TYPES:
         raise ConfigError('Unknown asset type filter')
@@ -324,6 +328,15 @@ def matches(record, filters):
         return False
     if "format" in filters and not any(f["format"] == filters["format"] for f in record["files"]):
         return False
+    if "transparent" in filters or "size_class" in filters:
+        # Measured image facts only; unprocessed or non-image assets never match.
+        technical = record.get("technical") or {}
+        if asset_type(record) != "image" or record["processing"].get("inspection") != "complete" or technical.get("kind") != "image":
+            return False
+        if "transparent" in filters and (technical.get("alpha") in (None, "none")) == filters["transparent"]:
+            return False
+        if "size_class" in filters and technical.get("size_class") != filters["size_class"]:
+            return False
     if "max_triangles" in filters or "rigged" in filters:
         technical = record.get("technical")
         if not technical or record["processing"]["inspection"] != "complete":

@@ -10,7 +10,7 @@ In one checkpoint, restate scope in one sentence, identify inclusions, exclusion
 
 ## Implement after approval
 
-Support PNG, JPEG, and WebP after verifying local decoding. Make sprites, icons, and generic images selectable assets, without promoting every model preview/dependency into an unrelated duplicate. Use supplied evidence or owner labels for purpose; keep unknown purpose as a generic image. Preserve originals and stable IDs.
+Support PNG, JPEG, and WebP and other common image formats after verifying local decoding. Make sprites, icons, and generic images selectable assets, without promoting every model preview/dependency into an unrelated duplicate. Use supplied evidence or owner labels for purpose; keep unknown purpose as a generic image. Preserve originals and stable IDs.
 
 Add measured dimensions/transparency, thumbnails, native-size/pixel-art viewing, zoom, useful background controls, type/technical filters, source details, and app/MCP retrieval parity. Reuse the shared backend and bounded responses; verify actual image delivery to clients before claiming visual inspection.
 

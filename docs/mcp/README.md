@@ -53,8 +53,17 @@ characters. Modes include keyword, description, text-to-image (`image`), combine
 and reference. Reference search takes `reference_asset_id` plus a known
 `reference_view`, never a path/URL/upload. Text/reference arguments cannot mix.
 
-Filters are only pack, source format, nonnegative maximum measured triangle
-count, and boolean rigged. Unknown filter keys/types/formats or path-like pack
+Filters are only `asset_type` (`model_3d`, `image`, `audio`), pack, source
+format, nonnegative maximum measured triangle count, boolean rigged, and for 2D
+images boolean `transparent` and `size_class` (`tiny` ≤32, `small` ≤128,
+`medium` ≤1,024 px, `large`); image filters match processed images only. Image
+formats are png, jpg, jpeg, webp, bmp, gif, tga, tif, tiff, avif and svg.
+`get_asset` on an image returns view `image` as PNG ImageContent with alpha kept:
+the original source pixels (enlarged with hard pixel edges below 256 px, with
+`native_dimensions`, `scale` and `resample` stated) or, for SVG, a raster from the
+recorded renderer. `include_metadata` adds measured image facts and
+`type_metadata` (generic purpose, folder-name suggestion, identical copies).
+A reference search from an image uses its recorded model input, as indexed. Unknown filter keys/types/formats or path-like pack
 names are rejected. Technical filters require inspected evidence for the
 requested format. Every source and required dependency is boundary-resolved and
 hash-verified; stale/unavailable inputs are excluded. Index/model/input contract

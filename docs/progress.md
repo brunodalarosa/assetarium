@@ -1,5 +1,147 @@
 # Progress
 
+## October 20 — Expansion step 2: static 2D images technically complete
+
+The owner approved step 2 in this chat, with these choices: per-source image opt-in
+with folder-name purpose *suggestions*; SVG support (added by the owner, via
+`resvg-py`); preprocessing chosen by Claude from a preregistered evaluation and
+recorded for owner review; a three-folder Kenney pilot; descriptions for a fixed
+40-image evaluation set only. Owner visual, relevance and description approval
+remain pending. No commit, push or PR; step 3 not started.
+
+- **Enrollment.** *Settings → Asset sources → Include 2D images* (per source,
+  `import_types` in `metadata-lal/source.json`). The scanner (`image_catalog.py`, no
+  decoding) makes one generic `image` record per folder + stem. Model dependencies
+  and previews, pack `Preview`/`Sample` sheets, texture folders and
+  atlas/tileset sheets stay out with visible inventory roles. Byte-identical
+  copies are recorded, never merged. The purpose is always `generic_image`; a
+  nearest folder keyword is only a suggestion. An unchanged image that returns after
+  the setting is switched off/on resumes its published record.
+- **Formats.** PNG, JPEG, WebP, BMP, GIF, TGA, TIFF and AVIF are decoded with
+  Pillow 12.1, verified locally in every runtime, with the decoder pinned to the extension.
+  Self-contained SVG renders with **`resvg-py==0.5.0`** (MIT; resvg Apache-2.0 OR
+  MIT), added to `runtime/mcp` only (one 1.2 MiB wheel, no dependencies; +2.7 MiB
+  installed) in an isolated 30 s child process. External `href`/`url()`/`@import`
+  and XML entities are refused first; a probe showed resvg would otherwise read absolute local
+  image paths. SVGs without a declared canvas get measured content bounds.
+  Animated or multi-frame files are recorded `unsupported`; damaged files fail only
+  their own asset.
+- **Processing** (`image_inspection.py`, no Blender) measures size, alpha kind and
+  coverage, colours, size class and aspect, plus a pixel-art display hint. It writes
+  a thumbnail, an SVG display raster and a **model input** (`image-model-input-b-v1`:
+  nearest-neighbour enlargement to at least 256 px, transparent pixels on flat
+  rgb(82,82,82)). Both unchanged backends read that file, so `embedding_backend.py`,
+  `caption_backend.py`, `caption_batching.py` and every 3D fingerprint stay byte-identical.
+  The <16 px rejection no longer applies to tiny sprites. Only `image_media.py` and
+  `svg_worker.py` are fingerprinted, so editing scanner rules never re-queues work.
+- **Descriptions** use the new versioned prompt `prompts/caption-image-v1.txt`.
+  A model batch never mixes 3D and 2D prompts; batching, GPU-memory stops,
+  per-asset outcomes and notifications follow decisions 0007-0008.
+- **Search and interfaces.** New `transparent` and `size_class` filters plus all
+  image formats in shared validation; desktop and MCP agree. An image reference
+  query uses the same model input as the index. MCP `get_asset` returns the original
+  pixels as PNG with alpha kept; art under 256 px is enlarged with hard edges and
+  says so. App: type badges, a mid-gray checkerboard (white and black icons both
+  visible), and an image viewer with Fit / 1:1 / zoom / backgrounds / hard pixel
+  edges (SVG re-rendered at the zoom level). Image detail lists facts, purpose,
+  copies, the derivation and faults.
+
+**Pilot** (read-only originals; Kenney All-in-1 3.7.0): `Icons/Game Icons/PNG`
+(420 white and black transparent icons, 1x/2x), `2D assets/Tiny Dungeon/Tiles` (132
+16-px tiles) and `Icons/Board Game Icons/Vector/Icons` (255 SVGs without declared
+size). Process assets ran through the app's own operation path:
+- Run 1: **807 images, 0 failures**, in 160 / 100 / 280 s.
+- Run 2: the fingerprint narrowing reprocessed all 807, demonstrating invalidation.
+- Run 3: unchanged; no inspection or vector work, about 50 s per source of runtime
+  startup and no-change publication.
+
+Rasters inspect at about 43 ms each, SVGs at about 0.6 s, and image vectors take
+about 0.11 s each at 0.98 GB peak GPU memory. Each source raised one *Descriptions
+ready to generate* notice; none started work.
+
+**Preprocessing evaluation** (`data/verification/image-preprocessing-eval-20261020/`).
+Thirty held-out queries were labeled before any result: Tiny Dungeon tiles from a
+viewed contact sheet, icons from filenames the image channel never sees. Image-channel
+MRR@10 was a 0.919, **b 0.911**, c 0.928. The preregistered rule (prefer b within
+0.02 of the best) chose **b**. Candidate c (contrast backdrop) did better on tiny
+tiles (0.909 vs 0.864), which is worth the owner's review.
+
+**Descriptions (40-image set, real Qwen3-VL).** 39 valid, 1 recorded invalid
+(empty `parts` for a plain floor tile; not retried), at about 1.4 s per image and
+5.9 GB peak GPU memory. The AI review (Claude, against the viewed model-input pixels) recorded 54
+findings and **no caption faults**:
+- **Systematic:** the gray model-input backdrop is described as an asset colour or
+  background in most icon descriptions (warning).
+- **Identity errors (warnings):** white trophy → robot, blue potion and barrel →
+  human figure, vial → microphone, axe → sword, chest → book, SVG bow/sword → "X".
+
+An offline benchmark of a firmer wording barely helped (33/38 vs 35/39 still
+mention gray or a background). The leakage comes from the opaque input, so changing
+it needs an input-side decision; image-v1 remains active.
+
+**Per-channel retrieval** (`data/verification/image-pilot-search-eval-20261020/`,
+807 images, same labels):
+
+| Channel | MRR@10 | Success@5 |
+| --- | --- | --- |
+| Filename keyword | 0.333 | 0.333 |
+| Image | 0.911 | 0.967 |
+| Description (39 described images only) | 0.796 | 0.900 |
+| Combined (default) | 0.967 | 0.967 |
+
+On the described subset, image (0.923) still beats description. Warm queries take
+0.24 s; a cold model load takes 7.3 s. Real STDIO MCP and desktop agree on six
+image queries plus a 3D query (`data/gui/image-search-agreement-20261020/`).
+"blue potion icon" ranks the blue potion tile first, and the delivered MCP
+ImageContent decodes to a 256×256 RGBA PNG whose SHA-256 matches the payload. That proves client delivery, not
+any particular agent's visual inspection.
+
+**3D preservation.** Read-only stage dry runs with the original code (git worktree
+at `6a128ae`) and the new code are **identical for all 15 3D sources**: pending
+work, retained results, pending IDs and embedding outcomes
+(`data/verification/image-pilot-20261020/preservation-*.json`). Editing
+`incremental.py` changes the overnight code contract; none was active.
+
+Verification:
+- Full suite **498 tests: 497 passed, 1 skipped** (privileged file symlink), 153 s
+  (`data/verification/image-pilot-20261020/pytest-full.xml`). New tests are in
+  `tests/test_images.py`; step 1 foundation tests were updated for applicable image descriptions.
+- WebView2 `verify-image-browser.py` passed 9 checks
+  (`data/gui/image-browser-20261020g/`); earlier attempts a–f retain the harness
+  and UX defects found and fixed.
+- `verify-source-browser`, `verify-notifications`, `verify-source-ui` and
+  `verify-general-settings` still pass.
+
+Harness and UX fixes made along the way:
+- Lazy thumbnails needed scrolling in the check.
+- The light checkerboard hid white icons.
+- A damaged image showed "no substitute" and claimed pixel search; it now names the fault.
+- Switching images off and on dropped processed images; returning assets now resume.
+
+**Storage** (unique allocation; originals and shared models excluded):
+- Project: 8,485,596,984 → 8,694,134,016 bytes after the pilot (+208.5 MB). This
+  includes about 100 MB in the three retained publications, 24 MB of evaluation
+  inputs and an 18 MB uv download cache kept for offline reinstalls (prune found
+  no unused entries). A 22 MB baseline worktree was then removed.
+- The final receipt (8,854,949,656 bytes) also counts reusable `scratch/pytest`
+  and runtime temp.
+- Pilot sources' generated data: 92.9 MB, including superseded run-1 derived
+  images (a cleanup target, not removed).
+- Receipts: `data/storage/step2-images-{before,before-pilot,after-pilot,final}-20261020.json`
+  and `step2-images-pilot-sources-20261020.json`.
+
+Known limitations:
+- Pilot source keys are folder names ("PNG", "Tiles", "Icons"); source naming is
+  existing behaviour.
+- No license file sits inside the pilot folders (license evidence: unknown).
+- Qwen3-VL 2B is weak on 16-px pixel art.
+
+Next runnable scope:
+- Owner review of pilot visuals, relevance labels, preprocessing choice b vs c,
+  and the backdrop-leakage remedy for descriptions.
+- Then `docs/next version plan/prompts/03-sprite-sheets-and-animation.md` with its
+  own approval; the deferred sprite sheets already have visible inventory roles.
+
 ## October 19 — Shared project dependencies are a general processing capability
 
 The owner approved a global fix and restoration plan with a 4 GiB growth ceiling

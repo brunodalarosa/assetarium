@@ -161,6 +161,9 @@ class DesktopBridge:
         if action == 'add':
             source = sources.add(self._config, directory)
             return self._start_source_operation('scan', source['key'])
+        if action == 'images':
+            sources.set_import_types(self._config, key, enabled)
+            return self._start_source_operation('scan', key)
         if action == 'enabled':
             source = sources.set_enabled(self._config, key, enabled)
             if enabled:
@@ -205,6 +208,9 @@ class DesktopBridge:
     def source_thumbnail(self, key, asset_id, expected_version=None):
         return self._wait(self._present(self._source_browser.call, 'thumbnail', key, asset_id, expected_version))
 
+    def source_image_view(self, key, asset_id, edge=None, expected_version=None):
+        return self._wait(self._present(self._source_browser.call, 'image_view', key, asset_id, edge, expected_version))
+
     def source_preview_prepare(self, key, asset_id, source_format, expected_version):
         return self._wait(self._present(self._source_browser.call, 'prepare', key,
                                       asset_id, source_format, expected_version))
@@ -223,6 +229,9 @@ class DesktopBridge:
 
     def thumbnail(self, asset_id, expected_version=None):
         return self._wait(self._present(self._service.thumbnail, asset_id, expected_version))
+
+    def image_view(self, asset_id, edge=None, expected_version=None):
+        return self._wait(self._present(self._service.image_view, asset_id, edge, expected_version))
 
     def preview_shell(self):
         from .interactive_preview import viewer_shell

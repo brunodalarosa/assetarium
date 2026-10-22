@@ -24,7 +24,7 @@ class SourceBrowser:
         return source, session
 
     def call(self, operation, key, *args):
-        if operation not in {'browse', 'asset', 'thumbnail', 'prepare', 'file', 'fault', 'release'}:
+        if operation not in {'browse', 'asset', 'thumbnail', 'image_view', 'prepare', 'file', 'fault', 'release'}:
             raise ConfigError('Unknown source browsing operation')
         source, (service, preview) = self.session(key)
         if operation == 'browse':
@@ -37,5 +37,5 @@ class SourceBrowser:
                          if saved.get('scanned') else 'Scan and process this source from the library to browse its assets.')}
             result = service.browse({}, *args)
             return dict(result, source=source, available=True)
-        target = service if operation in {'asset', 'thumbnail'} else preview
+        target = service if operation in {'asset', 'thumbnail', 'image_view'} else preview
         return getattr(target, operation)(*args)

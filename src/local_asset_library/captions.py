@@ -76,9 +76,29 @@ def parse_caption(text):
     return validate_caption(json.loads(clean, object_pairs_hook=unique_pairs))
 
 
+def caption_views(record):
+    """Rendered 3D views, or a 2D image's derived model input."""
+    return [p for p in record["previews"] if p.get("origin") == "rendered" or p.get("role") == "model_input"]
+
+
+def image_view_label(preview):
+    color = (preview.get("derivation") or {}).get("background")
+    return ("2D image" + (f"; transparent pixels are shown on a flat rgb({color[0]},{color[1]},{color[2]}) "
+                          "backdrop that is not part of the image" if color else ""))
+
+
 def image_inputs(config, record):
     if record["processing"]["inspection"] != "complete" or not record.get("technical"):
         raise ConfigError("No successful inspector result")
+    if record.get("asset_type") == "image":
+        selected = [p for p in record["previews"] if p.get("role") == "model_input"]
+        if len(selected) != 1 or not selected[0]["path"].startswith("data/"):
+            raise ConfigError("Require exactly one derived model-input image")
+        path = config.output_path("data", selected[0]["path"][5:])
+        if not path.is_file() or file_hash(path) != selected[0]["sha256"]:
+            raise ConfigError("Input image missing or hash mismatch")
+        return [{"path": selected[0]["path"], "view_label": image_view_label(selected[0]),
+                 "sha256": selected[0]["sha256"], "coordinate_convention": "2d-image"}]
     selected = [p for p in record["previews"] if p.get("origin") == "rendered"]
     labels = [p["view_label"] for p in selected]
     if not {"front", "side", "three_quarter"}.issubset(labels) or len(labels) != len(set(labels)):
@@ -100,9 +120,7 @@ def image_inputs(config, record):
 def input_state(config, record):
     """Include current bytes/missing state so unchanged failures stay retained."""
     state = []
-    for preview in record["previews"]:
-        if preview.get("origin") != "rendered":
-            continue
+    for preview in caption_views(record):
         row = {"preview": preview}
         try:
             if not preview["path"].startswith("data/"):

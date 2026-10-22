@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src'))
 parser = argparse.ArgumentParser()
 parser.add_argument('--run-name', required=True)
+parser.add_argument('--query-set', choices=('models', 'images'), default='models')
 args = parser.parse_args()
 if not re.fullmatch(r'[A-Za-z0-9_-]{1,80}', args.run_name):
     raise SystemExit('Invalid run name')
@@ -25,6 +26,14 @@ OUT.mkdir(parents=True, exist_ok=False)
 QUERIES = [{'query': 'red car'}, {'query': 'wooden house', 'limit': 10}, {'query': 'green tree'},
            {'query': 'barrel', 'mode': 'keyword'}, {'query': 'small round table', 'mode': 'description'},
            {'query': 'street lamp', 'mode': 'image'}]
+IMAGE = {'asset_type': 'image'}
+# 2D images: type/technical filters, every channel, and a mixed-type query.
+IMAGE_QUERIES = [{'query': 'blue potion icon', 'filters': IMAGE}, {'query': 'trophy', 'filters': dict(IMAGE, transparent=True)},
+                 {'query': 'six-sided die', 'mode': 'image', 'filters': IMAGE},
+                 {'query': 'tile', 'mode': 'keyword', 'filters': dict(IMAGE, size_class='tiny')},
+                 {'query': 'treasure chest', 'mode': 'description', 'filters': IMAGE}, {'query': 'red car'}]
+if args.query_set == 'images':
+    QUERIES = IMAGE_QUERIES
 
 
 class Wire:
@@ -62,6 +71,10 @@ class Wire:
         response = self.send('tools/call', {'name': 'search_assets', 'arguments': arguments})['result']
         return json.loads(response['content'][0]['text']), bool(response.get('isError'))
 
+    def get(self, arguments):
+        response = self.send('tools/call', {'name': 'get_asset', 'arguments': arguments})['result']
+        return response['content'], bool(response.get('isError'))
+
     def close(self):
         self.process.stdin.close()
         code = self.process.wait(timeout=30)
@@ -92,8 +105,26 @@ try:
         report['searches'].append({'arguments': arguments, 'gui_seconds': round(gui_seconds, 2), 'mcp_seconds': round(mcp_seconds, 2),
             'agree': gui_ids == mcp_ids and gui['payload'].get('truncated') == mcp.get('truncated'),
             'count': len(gui_ids), 'gui_error': gui['is_error'], 'mcp_error': mcp_error,
-            'top': [r['name'] for r in gui['payload'].get('results', [])[:3]], 'worker_phase': bridge._gateway.worker_phase})
+            'top': [r['name'] for r in gui['payload'].get('results', [])[:3]], 'top_ids': gui_ids[:3],
+            'top_types': [r.get('asset_type') for r in gui['payload'].get('results', [])[:5]], 'worker_phase': bridge._gateway.worker_phase})
         assert not gui['is_error'] and not mcp_error and gui_ids == mcp_ids and gui_ids, report['searches'][-1]
+    if args.query_set == 'images':
+        # Actual delivery to an MCP client: decode the received ImageContent and compare it with the payload.
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        top = next(s for s in report['searches'] if s['arguments']['query'] == 'blue potion icon')
+        content, error = wire.get({'asset_id': top['top_ids'][0], 'include_preview': True, 'include_metadata': True})
+        payload = json.loads(next(c['text'] for c in content if c['type'] == 'text'))
+        blob = base64.b64decode(next(c['data'] for c in content if c['type'] == 'image'))
+        image = Image.open(BytesIO(blob))
+        import hashlib
+        report['image_delivery'] = {'asset_id': top['top_ids'][0], 'name': payload['name'], 'error': error,
+            'mime': next(c['mimeType'] for c in content if c['type'] == 'image'), 'decoded_size': list(image.size),
+            'decoded_mode': image.mode, 'payload_preview': payload['preview'],
+            'sha256_matches_payload': hashlib.sha256(blob).hexdigest() == payload['preview']['sha256'],
+            'boundary': 'Bytes reached a real STDIO MCP client and decode as the stated PNG; model inspection by a given agent is separate.'}
+        assert not error and report['image_delivery']['sha256_matches_payload'] and list(image.size) == payload['preview']['dimensions']
     report['mcp_exit_code'] = wire.close(); wire = None
     assert report['mcp_exit_code'] == 0
     report['status'] = 'passed'

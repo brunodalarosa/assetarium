@@ -100,6 +100,26 @@ semantic search. Pack, source format, maximum triangles and rigged filters reuse
 the existing verified backend policy. Technical filters require inspected facts
 for the requested format; unknowns do not qualify.
 
+**2D images** (expansion step 2) appear as cards with a **2D image** or
+**SVG image** badge on a mid-gray checkerboard, so white and black transparent
+art both stay visible; small-palette art keeps hard pixel edges. **Asset type**,
+**Image transparency** and **Image size** filters use measured facts only, so
+unprocessed images and 3D models never match them. Selecting an image opens an
+image viewer instead of the 3D viewer: **Fit**, **1:1** native size, **−**/**+**
+zoom steps (12.5–3,200%), **Background** (checkerboard, light, dark, mid gray;
+remembered for the session) and **Hard pixel edges**; with the image focused,
+`+`, `-`, `0` (fit) and `1` (native) work too. Raster images show original source
+pixels (reduced only above 2,048 px, and saying so); SVGs are re-rendered by the
+recorded renderer at the zoom level for sharp edges. Detail lists measured facts
+(format, size or SVG canvas units, transparency kind and visible coverage,
+colours, size class, shape), the generic purpose with any folder-name suggestion,
+byte-identical copies, the derived search/description input with its backdrop
+note, optional descriptions and faults. Damaged, animated or externally linked
+images keep their cards and explain the recorded reason instead of a preview.
+**Settings → Asset sources → Include 2D images** is a per-source checkbox; changing
+it saves the choice and rescans that source without deleting results.
+Native verification: `scripts/verify-image-browser.py --run-name <unique-name>`.
+
 **Filters & search options** exposes the existing keyword, description, image,
 combined and reference modes. Reference search uses an existing library asset ID
 and a known view; there is no upload or arbitrary path input. Keyword + description + image (`combined`) is the default. Its reciprocal rank

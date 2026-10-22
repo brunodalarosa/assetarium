@@ -13,9 +13,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument("phase", choices=["calibration-v1", "calibration-v2", "pilot-v2",'library'])
 parser.add_argument("--notes", type=Path, required=True)
 parser.add_argument("--approve-prompt", choices=["v2"])
+parser.add_argument("--source", help="Registered asset source key (library phase); default is the legacy pilot")
+parser.add_argument("--reviewer", default="Codex AI")
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 config = load_config(root / "config.example.toml", root)
+if args.source:
+    if args.phase != 'library':
+        raise ValueError('--source applies to the library phase only')
+    from local_asset_library import sources
+    from local_asset_library.config import load_project_config
+    project = load_project_config(root)
+    config = sources.bound(project, sources.get_source(project, args.source))
 if args.phase=='library':
     if args.approve_prompt:
         raise ValueError('Prompt approval belongs to its existing calibration gate')
@@ -49,7 +58,7 @@ if args.phase=='library':
             prepared.append(record)
             receipts.append({'asset_id':identifier,'result_sha256':file_hash(result_path),'caption_fingerprint':provenance['fingerprint'],
                 'findings':findings,'original_provenance':provenance})
-        receipt={'status':'prepared','reviewer':'Codex AI; not owner approval','scope':notes['scope'],
+        receipt={'status':'prepared','reviewer':args.reviewer+'; not owner approval','scope':notes['scope'],
             'utc':datetime.now(timezone.utc).isoformat(),'receipts':receipts,'owner_states_modified':False,'original_results_modified':False}
         path=config.output_path('data','library/reviews/'+uuid.uuid4().hex+'.json')
         save_json(path,receipt)

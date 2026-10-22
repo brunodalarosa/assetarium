@@ -12,9 +12,13 @@ from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detai
 
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, search_character_cap
 from .asset_structure import ASSET_TYPES, structure, supported_stage
+from .image_media import FORMATS as IMAGE_FORMATS
 
 ID_PATTERN = r"asset_[0-9a-f]{32}"
-FORMATS = ["blend", "dae", "fbx", "glb", "gltf", "obj", "stl", "png", "wav"]
+FORMATS = ["blend", "dae", "fbx", "glb", "gltf", "obj", "stl", *sorted(IMAGE_FORMATS), "wav"]
+SIZE_CLASSES = ["tiny", "small", "medium", "large"]
+IMAGE_FACTS = ("width", "height", "alpha", "alpha_coverage", "visible_bounds", "color_count", "size_class", "aspect",
+               "pixel_art_candidate", "mode", "format", "frames", "vector")
 VIEWS = ["three_quarter", "front", "side", "image"]
 MODES = [DEFAULT_MODE, "keyword_description", "keyword", "description", "image", "reference"]
 SEARCH_CAP = 6000
@@ -25,7 +29,10 @@ FILTER_SCHEMA = {"type": "object", "additionalProperties": False, "properties": 
     "pack": {"type": "string", "pattern": r"^[A-Za-z0-9_-]{1,128}$"},
     "format": {"type": "string", "enum": FORMATS},
     "max_triangles": {"type": "integer", "minimum": 0, "maximum": 1000000000},
-    "rigged": {"type": "boolean"}}}
+    "rigged": {"type": "boolean"},
+    "transparent": {"type": "boolean", "description": "Images only: measured alpha below 255 anywhere."},
+    "size_class": {"type": "string", "enum": SIZE_CLASSES,
+                   "description": "Images only, by longest edge: tiny <=32, small <=128, medium <=1024, large."}}}
 SCHEMAS = {
     "search_assets": {"type": "object", "additionalProperties": False, "properties": {
         "query": {"type": "string", "maxLength": 1024},
@@ -196,7 +203,9 @@ class AssetService:
         if mode == "reference":
             record = self.record(args["reference_asset_id"])
             resolved_detail(self.config, record["asset_id"])
-            preview, _ = self.preview(record, args.get("reference_view", default_view(record)))
+            view = args.get("reference_view", default_view(record))
+            # A 2D image query uses the same derived model input as its index vector.
+            preview, _ = self.preview(record, 'model_input' if record.get('asset_type') == 'image' and view == 'image' else view)
             reference = preview.get("path") or "source/" + preview["source_path"]
         try:
             # Keyword search never touches the embedding runtime or its contract.
@@ -245,8 +254,10 @@ class AssetService:
         payload['generation'] = generation(self.config)
         if args.get("include_metadata", False):
             technical = record.get("technical") or {}
+            keys = ("inspected_path", "inspected_sha256", "inspected_format") + (
+                IMAGE_FACTS if record.get('asset_type') == 'image' else ("evaluated_instance_totals", "unit_settings"))
             payload["metadata"] = {"formats": sorted({f["format"] for f in record["files"]}),
-                "technical": {k: technical.get(k) for k in ("inspected_path", "inspected_sha256", "inspected_format", "evaluated_instance_totals", "unit_settings")},
+                "technical": {k: technical.get(k) for k in keys},
                 "description": record.get("description"), "suggested_uses": record.get("suggested_uses"),
                 "processing": record["processing"], "license_evidence": relevant_license_evidence(record),
                 'stage_faults':record.get('stage_faults',{}), 'inspection_run':record.get('inspection_run'),
@@ -286,16 +297,27 @@ class AssetService:
                     raise ConfigError("Preview exceeds pixel cap")
                 source.load()
                 output = ImageOps.exif_transpose(source).convert("RGBA")
+                native = list(output.size)
+                scaling = {}
+                if record.get('asset_type') == 'image' and max(output.size) < size // 2:
+                    # Small art is enlarged with hard pixel edges so a client can see it; alpha is kept.
+                    factor = (size // 2) // max(output.size)
+                    output = output.resize((output.width * factor, output.height * factor), Image.Resampling.NEAREST)
+                    scaling = {'scale': factor, 'resample': 'nearest'}
                 output.thumbnail((size, size), Image.Resampling.LANCZOS)
                 stream = BytesIO()
                 output.save(stream, format="PNG", optimize=optimize)
             blob = stream.getvalue()
             if len(blob) > IMAGE_CAP:
                 raise ConfigError("Derived PNG exceeds 512 KiB cap")
-            return ({"status": "image_content", "view": preview["view_label"], "mime_type": "image/png",
-                     "bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest(), "source_sha256": preview["sha256"],
-                     "dimensions": list(output.size), "delivery": "MCP ImageContent base64; client/model inspection must be verified separately"},
-                    base64.b64encode(blob).decode("ascii"), [])
+            content = {"status": "image_content", "view": preview["view_label"], "mime_type": "image/png",
+                       "bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest(), "source_sha256": preview["sha256"],
+                       "dimensions": list(output.size), "delivery": "MCP ImageContent base64; client/model inspection must be verified separately"}
+            if record.get('asset_type') == 'image':
+                content.update(native_dimensions=native, transparency='preserved as PNG alpha', **scaling,
+                               pixels='original source pixels' if preview.get('role') == 'original' else
+                               'rasterized from the SVG source by ' + (preview.get('derivation') or {}).get('renderer', 'the recorded renderer'))
+            return content, base64.b64encode(blob).decode("ascii"), []
         except (OSError, ValueError) as exc:
             return ({"status": "faulty", "reason": str(exc)[:400]}, None,
                     [{"asset_id": record["asset_id"], "channel": "preview", "reason": str(exc)}])

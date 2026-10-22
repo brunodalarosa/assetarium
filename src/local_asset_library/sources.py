@@ -134,6 +134,39 @@ def import_formats(config):
     return validate_formats(value['import_formats'])
 
 
+IMPORT_TYPES = ('model_3d', 'image')
+
+
+def import_types(config):
+    """Asset types a source enrolls. Images are an explicit per-source choice."""
+    if config.metadata_root is None:
+        return ('model_3d',)
+    path = config.output_path('data', 'source.json')
+    value = read_json(path) if path.exists() else {}
+    types = value.get('import_types', ['model_3d'])
+    if not isinstance(types, list) or not set(types) <= set(IMPORT_TYPES) or 'model_3d' not in types:
+        raise ConfigError('Invalid saved source asset types; choose them again in Settings → Asset sources')
+    return tuple(t for t in IMPORT_TYPES if t in types)
+
+
+def set_import_types(config, key, images):
+    """Save whether a source enrolls images; existing results are never deleted."""
+    from .gpu_queue import lease
+    from .source_operations import active_operation
+    if type(images) is not bool:
+        raise ConfigError('Images must be a checkbox value')
+    source = get_source(config, key)
+    scoped = bound(config, source)
+    if active_operation(scoped):
+        raise ConfigError("Wait for this source's operation to finish before changing its asset types")
+    with lease(config, 'source-settings', resource='sources'):
+        path = scoped.output_path('data', 'source.json')
+        value = read_json(path)
+        value['import_types'] = ['model_3d', 'image'] if images else ['model_3d']
+        atomic_json(path, value)
+    return source
+
+
 @lru_cache(maxsize=8)
 def _owner_map(path, stamp, size):
     return read_json(Path(path)).get("assets", {})
@@ -376,7 +409,8 @@ def source_status(config, source):
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():
         status = dict(status, **read_json(fault_path), needs_processing=True)
-    return {**source, **status, 'import_formats': import_formats(scoped), "operation": operation_status(scoped)}
+    return {**source, **status, 'import_formats': import_formats(scoped), 'import_types': list(import_types(scoped)),
+            "operation": operation_status(scoped)}
 
 
 def processing_summary(current, published, formats, vector_faults=None):
@@ -490,8 +524,17 @@ def scan_source(config, source):
     # Isolate file failures to their assets; other assets in the source continue.
     rejected = [r for r in rows if r.get("status") == "rejected"]
     merged, changed = [], set()
+    published = None
     for record in fresh:
         prior = old.get(record["asset_id"])
+        if prior is None:
+            # An asset that returns unchanged (for example after its type was switched
+            # off and on again) resumes from its published record instead of starting over.
+            if published is None:
+                published = {r["asset_id"]: r for r in read_records(scoped)}
+            candidate = published.get(record["asset_id"])
+            if candidate and candidate["files"] == record["files"]:
+                prior = candidate
         if prior:
             same = prior["files"] == record["files"] and [d for d in prior["dependencies"] if not d.get("inspection_version")] == record["dependencies"]
             kept = deepcopy(prior)

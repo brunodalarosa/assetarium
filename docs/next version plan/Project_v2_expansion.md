@@ -1,7 +1,8 @@
 # Assetarium v2 expansion
 
-Prepared October 18, 2026. Status: step 1 approved and technically complete;
-owner acceptance remains pending. Steps 2–8 remain proposed. See
+Prepared October 18, 2026. Status: steps 1 and 2 approved and technically complete
+(step 2 on October 20, including SVG); owner acceptance of both remains pending.
+Steps 3–8 remain proposed. See
 [current evidence](../asset-foundation-verification.json) and [progress](../progress.md).
 
 ## Purpose and authority

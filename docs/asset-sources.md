@@ -132,7 +132,15 @@ child records to share original paths. Old catalogs remain readable without a
 startup migration. Generic images, unsupported audio, file roles, relationships
 and adapter capabilities are documented in the
 [catalog contract](catalog-contract.md#expansion-step-1-shared-asset-foundation).
-Actual image enrollment, processing choices and full image browsing are step 2.
+Expansion step 2 adds image enrollment as a per-source choice: tick **Include
+2D images** in *Settings → Asset sources* (stored as `import_types` in that
+source's `metadata-lal/source.json`). The source is rescanned; existing results
+are never deleted, and an unchanged image that returns later resumes its saved
+results. Model textures, previews, pack overview sheets, texture folders and
+atlas/tileset sheets stay out of the image assets with a visible inventory role.
+**Process assets** measures each image and writes its thumbnail, model input and
+image vector; **Generate descriptions** then works for images too. See the
+[catalog contract](catalog-contract.md#static-2d-images-expansion-step-2).
 
 The local registry is `data/library/sources.json`. Each source's
 `metadata-lal/source.json` stores its persistent identifier and catalog key.

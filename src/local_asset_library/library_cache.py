@@ -16,7 +16,7 @@ from .publication import generation, snapshot_key
 DROPPED = frozenset({'variants', 'grouping', 'dependency_inspection', 'provenance',
                      'texture_repair_history', 'license_evidence', 'effective_caption'})
 TECHNICAL = ('inspected_path', 'inspected_sha256', 'inspected_format', 'evaluated_instance_totals', 'armatures',
-             'kind', 'width', 'height', 'mode', 'adapter', 'version')
+             'kind', 'width', 'height', 'mode', 'adapter', 'version', 'alpha', 'size_class', 'pixel_art_candidate')
 _lock = threading.Lock()
 _records = OrderedDict()
 _digests = {}

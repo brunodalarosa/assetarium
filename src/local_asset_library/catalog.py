@@ -487,6 +487,12 @@ def build_inventory(config):
                                               "origin": "supplied", "association": "exact stem with directional suffix in Isometric layout" if directional else "exact stem under pack preview layout"})
             asset["provenance"]["inventory_fingerprint"] = digest(asset["files"])
             assets.append(asset)
+    from .sources import import_types
+    if 'image' in import_types(config):
+        from .image_catalog import image_assets
+        licenses = {}
+        assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
+            pack, license_evidence(config, pack, inventory))))
     # Never merge remaining same names; report within-pack collisions and cross-pack repeated names.
     by_name = defaultdict(list)
     for asset in assets:
@@ -500,10 +506,12 @@ def build_inventory(config):
                 asset["grouping"]["unresolved_ambiguities"].append(case)
     # Variants are filename suggestions, not verified visual relationships, and never merged.
     for asset in assets:
+        if asset.get("asset_type") == "image":
+            continue  # Filename prefixes are not image variant evidence; identical bytes are recorded instead.
         parts = re.split(r"[-_]", asset["display_name"])
         if len(parts) > 1:
             base = parts[0].casefold()
-            related = [a for a in assets if a["pack_id"] == asset["pack_id"] and a["asset_id"] != asset["asset_id"]
+            related = [a for a in assets if a["pack_id"] == asset["pack_id"] and a["asset_id"] != asset["asset_id"] and a.get("asset_type") != "image"
                        and a["grouping"]["evidence"][0].get("anchor") == asset["grouping"]["evidence"][0].get("anchor")
                        and re.split(r"[-_]", a["display_name"])[0].casefold() == base]
             asset["variants"] = [{"asset_id": a["asset_id"], "relationship": "filename_variant_candidate",

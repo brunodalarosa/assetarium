@@ -7,13 +7,18 @@ from .catalog import read_database, relevant_license_evidence
 from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .library_cache import file_digest
-from .mcp_assets import AssetService, FORMATS, MODES, VIEWS, error_payload, validate
+from .mcp_assets import AssetService, FORMATS, IMAGE_FACTS, MODES, VIEWS, error_payload, validate
 from .retrieval import current_overlay, matches, observations, pilot_records, source_check
 from .publication import pinned, generation,read_json
 
 
 THUMBNAIL_SIZE = 320  # Cards are at most 175 px tall; 320 px stays sharp on 2x displays.
 THUMBNAIL_CACHE = 400
+IMAGE_VIEW_EDGE = 2048  # Native-size viewing cap; larger images are reduced and say so.
+
+
+def card_view(record):
+    return 'thumbnail' if record.get('asset_type') == 'image' else 'three_quarter'
 
 
 class DesktopService(AssetService):
@@ -146,31 +151,35 @@ class DesktopService(AssetService):
         version=self.synchronize()
         if expected_version and version!=expected_version:
             return {'status':'stale','generation':version,'reason':'Published library changed; refresh this view.'}
-        retained=self.preview_faults.get((identifier,'three_quarter'))
         validate('get_asset',{'asset_id':identifier})
         # A card shows the verified preview image only; detail still resolves and verifies sources.
         record=self.record(identifier)
+        view=card_view(record)
+        retained=self.preview_faults.get((identifier,view))
         payload,image={'asset_id':identifier,'name':record['display_name'],'pack':record['pack_id']},None
         if retained:
             payload['preview']=retained
         else:
             payload['preview'],image=self._thumbnail(record)
         if not retained and payload['preview'].get('status')=='faulty':
-            self.preview_faults[(identifier,'three_quarter')]=payload['preview']
-            self.preview_bindings[(identifier,'three_quarter')]=self.preview_binding(identifier,'three_quarter')
+            self.preview_faults[(identifier,view)]=payload['preview']
+            self.preview_bindings[(identifier,view)]=self.preview_binding(identifier,view)
+        if record.get('asset_type')=='image':
+            payload['pixel_art_candidate']=bool((record.get('technical') or {}).get('pixel_art_candidate'))
         return {'payload':payload,'image':image,'generation':version}
 
     def _thumbnail(self, record):
-        view=next((p for p in record['previews'] if p.get('view_label')=='three_quarter'),None)
+        label=card_view(record)
+        view=next((p for p in record['previews'] if p.get('view_label')==label),None)
         key=view and (view.get('path'),view.get('source_path'),view.get('sha256'))
         if key and key in self.thumbnails:
             try:
-                self.preview(record,'three_quarter')  # Same stat-identity verification as uncached delivery.
+                self.preview(record,label)  # Same stat-identity verification as uncached delivery.
                 self.thumbnails.move_to_end(key)
                 return self.thumbnails[key]
             except (OSError,ValueError):
                 self.thumbnails.pop(key,None)
-        preview,image,_=self.preview_content(record,'three_quarter',size=THUMBNAIL_SIZE,optimize=False)
+        preview,image,_=self.preview_content(record,label,size=THUMBNAIL_SIZE,optimize=False)
         if key and image:
             self.thumbnails[key]=(preview,image)
             while len(self.thumbnails)>THUMBNAIL_CACHE:
@@ -190,6 +199,8 @@ class DesktopService(AssetService):
             args['source_format'] = source_format
         validate('get_asset', args)
         record = self.record(identifier)
+        if record.get('asset_type') == 'image':
+            view = args['preview_view'] = 'image'  # A 2D image has one view; the viewer zooms it.
         cache_key = (identifier, view)
         retained = self.preview_faults.get(cache_key)
         if retained:
@@ -223,14 +234,57 @@ class DesktopService(AssetService):
             'owner_artistic_approval': owner.get('artistic_suitability', 'pending'),
             **caption_summary(self.config, record),
             'caption_quality': caption_quality(self.config, record),
-            'technical': {k: technical.get(k) for k in ('inspected_path', 'inspected_format', 'inspected_sha256',
-                'original_geometry_totals', 'evaluated_instance_totals', 'unit_settings', 'armatures', 'actions',
-                'world_bounds', 'objects', 'meshes', 'materials')},
+            'asset_type': record.get('asset_type', 'model_3d'),
+            'technical': {k: technical.get(k) for k in ('inspected_path', 'inspected_format', 'inspected_sha256') + (
+                IMAGE_FACTS if record.get('asset_type') == 'image' else ('original_geometry_totals', 'evaluated_instance_totals',
+                'unit_settings', 'armatures', 'actions', 'world_bounds', 'objects', 'meshes', 'materials'))},
+            'type_metadata': record.get('type_metadata') if record.get('asset_type') == 'image' else None,
+            'model_input': next(({'derivation': p.get('derivation'), 'path': p.get('path')} for p in record['previews']
+                                 if p.get('role') == 'model_input'), None),
             'processing': record['processing'], 'license_evidence': relevant_license_evidence(record),
             'source_faults': (record.get('inspection_run') or {}).get('source_faults', []),
             'stage_faults':record.get('stage_faults',{}),
             'caption_faults': (record.get('caption_provenance') or {}).get('visual_faults', []),
             'dependencies': record.get('dependencies', []),
             'faults': [f for (asset, _), f in self.item_faults.items() if asset == identifier],
-            'scale': 'Unknown physical scale; measurements apply only to the inspected format.'}
+            'scale': ('Pixel measurements describe the inspected file; SVG sizes are canvas units.'
+                      if record.get('asset_type') == 'image' else 'Unknown physical scale; measurements apply only to the inspected format.')}
         return {'payload': payload, 'image': image, 'evidence': evidence, 'generation': version, 'elapsed_seconds': time.perf_counter() - started}
+
+    @pinned
+    def image_view(self, identifier, edge=None, expected_version=None):
+        """Full-resolution pixels for the image viewer: native raster or an SVG render at ``edge``."""
+        version = self.synchronize()
+        if expected_version and version != expected_version:
+            return {'status': 'stale', 'generation': version, 'reason': 'Published library changed; refresh this view.'}
+        validate('get_asset', {'asset_id': identifier})
+        record = self.record(identifier)
+        if record.get('asset_type') != 'image' or record['processing'].get('inspection') != 'complete':
+            return {'status': 'unavailable', 'reason': 'Only processed 2D images have a zoomable image view.'}
+        if edge is not None and (type(edge) is not int or not 16 <= edge <= IMAGE_VIEW_EDGE):
+            raise ConfigError(f'Image view edge must be 16–{IMAGE_VIEW_EDGE} pixels')
+        import base64
+        from .image_media import decode_svg, png_bytes
+        technical = record.get('technical') or {}
+        try:
+            source_check(self.config, record)
+            if technical.get('format') == 'svg':
+                image, measured = decode_svg(self.config.source_file(technical['inspected_path']), edge or 1024)
+                note = 'Rendered from the SVG source by ' + measured['vector']['renderer']
+            else:
+                from PIL import Image, ImageOps
+                _, path = self.preview(record, 'image')
+                with Image.open(path) as source:
+                    source.load()
+                    image = ImageOps.exif_transpose(source).convert('RGBA')
+                note = 'Original source pixels'
+                if max(image.size) > IMAGE_VIEW_EDGE:
+                    image.thumbnail((IMAGE_VIEW_EDGE, IMAGE_VIEW_EDGE), Image.Resampling.LANCZOS)
+                    note = f'Reduced to {IMAGE_VIEW_EDGE} px for viewing; the original file is unchanged'
+        except (OSError, ValueError) as exc:
+            self._record_fault(identifier, 'image_view', exc)
+            return {'status': 'faulty', 'reason': str(exc)[:400], 'generation': version}
+        return {'status': 'image', 'image': base64.b64encode(png_bytes(image)).decode('ascii'), 'size': list(image.size),
+                'native_size': [technical.get('width'), technical.get('height')], 'note': note,
+                'vector': technical.get('format') == 'svg', 'pixel_art_candidate': bool(technical.get('pixel_art_candidate')),
+                'generation': version}
