@@ -9,7 +9,7 @@ import time
 import traceback
 
 ROOT=Path(__file__).resolve().parents[1]
-sys.path.insert(0,str(ROOT/'src'))
+sys.path[:0]=[str(ROOT/'src'),str(ROOT/'tests')]
 parser=argparse.ArgumentParser()
 parser.add_argument('--run-name',required=True)
 parser.add_argument('--synthetic',action='store_true')
@@ -40,59 +40,40 @@ report={'status':'running','synthetic':args.synthetic,'checks':[],'faults':[],'o
 
 def save():
     (OUT/'report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
-def js(script,timeout=40):
-    done,result=threading.Event(),[]
-    window.evaluate_js(script,lambda value:(result.append(value),done.set()))
-    if not done.wait(timeout):raise RuntimeError('JavaScript completion timeout')
-    return result[0]
+from gui_harness import Harness
+ui=Harness(window,OUT,report)
+js=ui.js
 def wait(expression,timeout=30):
-    deadline=time.monotonic()+timeout
-    while time.monotonic()<deadline:
-        if window.evaluate_js(expression):return
-        time.sleep(.1)
-    raise RuntimeError('Condition timeout: '+expression)
+    ui.js('until(()=>(%s),%d)'%(expression,timeout*1000),timeout+5)
 def capture(name):
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form=window.gui.BrowserView.instances[window.uid]
-    stream,done,faults=MemoryStream(),threading.Event(),[]
-    def capture_ui():
-        task=form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream)
-        def finish(task):
-            if task.IsFaulted:faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish),form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(capture_ui))
-    assert done.wait(15) and not faults
-    (OUT/name).write_bytes(bytes(stream.ToArray()));stream.Dispose()
-
+    ui.capture(name)
 def verify():
     wire=None
     try:
-        wait("Boolean(state.context && state.items.length===40 && $('grid').getAttribute('aria-busy')==='false')")
-        wait("document.querySelectorAll('.thumb img').length>0")
+        ui.wait_ready()
+        js("(async()=>{await lal.submitSearch();return true})()")
+        wait("lal.state.library.items.length===40&&$('grid').getAttribute('aria-busy')==='false'")
+        wait("document.querySelectorAll('#grid .thumb img').length>0")
         assert not bridge._gateway.model_requested
-        initial=window.evaluate_js("({count:state.context.pilot_count,cards:state.items.length,images:document.querySelectorAll('.thumb img').length,workers:state.thumbWorkers,offset:state.offset})")
+        initial=js("({count:lal.state.context.pilot_count,cards:lal.state.library.items.length,images:document.querySelectorAll('#grid .thumb img').length,workers:lal.thumbnailWorkers(),offset:lal.state.library.offset})")
         assert initial['count']>300 and initial['cards']==40 and initial['images']<40 and initial['workers']<=3
         report['initial']=initial
         report['checks'].append('Bounded 40-card page, visible-only thumbnails, <=3 thumbnail requests, no model load on startup')
         capture('browse.png')
-        started=time.perf_counter();js("(async()=>{state.offset=40;await browse(false);return state.items.map(x=>x.asset_id);})()")
+        started=time.perf_counter();js("(async()=>{await lal.pageBrowse(1);return lal.state.library.items.map(x=>x.asset_id);})()")
         report['page_seconds']=time.perf_counter()-started
-        assert window.evaluate_js('state.offset===40 && state.items.length===40')
-        keyboard=window.evaluate_js("(()=>{const cards=[...$('grid').querySelectorAll('.card')];cards[0].focus();cards[0].dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));return document.activeElement===cards[1];})()")
+        assert js('lal.state.library.offset===40 && lal.state.library.items.length===40')
+        keyboard=js("(async()=>{await frame();const cards=[...$('grid').querySelectorAll('.card')];cards[0].focus();cards[0].dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));return document.activeElement===cards[1];})()")
         assert keyboard
-        js("selectAsset(state.items[0].asset_id,null,'three_quarter').then(()=>true)")
-        selected=window.evaluate_js('state.selected')
-        assert window.evaluate_js("Boolean($('detail').querySelector('h2'))")
-        js("browse(false).then(()=>true)")
-        assert window.evaluate_js('state.selected')==selected
+        js("lal.selectAsset('library',lal.state.library.items[0].asset_id,null,'three_quarter').then(()=>true)")
+        selected=js('lal.state.library.selected')
+        wait("Boolean($('detail').querySelector('h2'))")
+        js("lal.browse(false).then(()=>true)")
+        assert js('lal.state.library.selected')==selected
         report['checks'].append('Next page, stable selection, arrow keyboard handler, responsive detail')
         capture('detail.png')
         window.resize(680,760);wait('innerWidth<761')
-        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        assert js("$('library-view').scrollWidth<=$('library-view').clientWidth+1")
         capture('narrow.png')
         report['checks'].append('Actual native resize and narrow layout without horizontal overflow')
         if args.synthetic:
@@ -104,12 +85,12 @@ def verify():
                 before=bridge.search(request)['payload']
                 assert wire.search(request)==before
                 comparisons.append({'arguments':request,'before_ids':[r['asset_id'] for r in before['results']],'before_generation':before['generation']})
-            old=window.evaluate_js('state.context.generation')
+            old=js('lal.state.context.generation')
             item=records(work)[0];item['display_name']='Published update fixture';update_record(work,item)
             fresh=publish(config)
-            js('refreshContext().then(()=>true)')
-            assert window.evaluate_js('state.context.generation')==fresh['generation']!=old
-            assert window.evaluate_js('state.selected')==selected
+            js('lal.refreshContext().then(()=>true)')
+            assert js('lal.state.context.generation')==fresh['generation']!=old
+            assert js('lal.state.library.selected')==selected
             assert bridge.asset(selected,None,'three_quarter',old)['status']=='stale'
             for comparison in comparisons:
                 after=bridge.search(comparison['arguments'])['payload']
@@ -134,7 +115,7 @@ def verify():
         report['status']='passed'
     except BaseException as exc:
         try:
-            report['ui_failure_state']=window.evaluate_js("({error:$('error').textContent,status:$('status').textContent,context:state.context,items:state.items.length})")
+            report['ui_failure_state']=window.evaluate_js("({error:lal.state.search.error,status:lal.state.search.status,items:lal.state.library.items.length})")
             capture('fault.png')
         except Exception as capture_error:
             report['capture_error']=str(capture_error)

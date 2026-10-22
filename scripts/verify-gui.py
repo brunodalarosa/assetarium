@@ -12,7 +12,7 @@ import time
 import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'src'))
+sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from local_asset_library.config import load_project_config
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 
@@ -94,51 +94,25 @@ class Wire:
 
 
 def js(script, timeout=110):
-    done, result = threading.Event(), []
-    def callback(value):
-        result.append(value)
-        done.set()
-    window.evaluate_js(script, callback)
-    if not done.wait(timeout):
-        raise RuntimeError('GUI JavaScript bridge completion timed out')
-    return result[0]
+    return ui.js(script, timeout)
 
 
 def wait_js(expression, timeout=25):
-    deadline = time.perf_counter() + timeout
-    while time.perf_counter() < deadline:
-        if window.evaluate_js(expression):
-            return
-        time.sleep(.15)
-    raise RuntimeError('GUI condition timed out: ' + expression)
+    ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
 
 
 def screenshot(name):
     # Capture the actual running WebView2 control, using its supported renderer API.
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form = window.gui.BrowserView.instances[window.uid]
-    stream, done, faults = MemoryStream(), threading.Event(), []
-    def capture():
-        task = form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream)
-        def finished(task):
-            if task.IsFaulted:
-                faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finished), form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(capture))
-    assert done.wait(15), 'CapturePreview did not complete'
-    assert not faults, faults
-    (OUT / name).write_bytes(bytes(stream.ToArray()))
-    stream.Dispose()
+    ui.capture(name)
 
 
-# The library is paged (40 cards) and thumbnails load only near the viewport.
-PAGE = 'Math.min(40,state.context.pilot_count)'
-THUMBNAILS_SETTLED = "document.querySelectorAll('.thumb img').length>0&&state.thumbQueue.length===0&&state.thumbWorkers===0"
+# Home browses (Enter on an empty search) 40-card pages; thumbnails load only near the viewport.
+PAGE = 'Math.min(40,lal.state.context.pilot_count)'
+THUMBNAILS_SETTLED = "document.querySelectorAll('#grid .thumb img').length>0&&lal.thumbnailWorkers()===0"
 
+
+def select(identifier):
+    js("(async()=>{await lal.selectAsset('library'," + json.dumps(identifier) + ");await until(()=>!lal.state.library.detail.loading&&$('detail').querySelector('h2'));return true})()")
 
 def all_items(filters=None):
     """Every library member across browse pages (the first page alone is not representative)."""
@@ -152,29 +126,29 @@ def all_items(filters=None):
 
 
 def search_script(arguments):
-    values = {'query': arguments.get('query', ''), 'mode': arguments['mode'], 'limit': str(arguments['limit']),
-              'pack': '', 'format': '', 'triangles': '', 'rigged': ''}
+    filters = {'asset_type': '', 'pack': '', 'format': '', 'triangles': '', 'rigged': '', 'transparent': '', 'size_class': '',
+               'mode': arguments['mode'], 'limit': str(arguments['limit'])}
     for key, value in arguments['filters'].items():
-        values[{'max_triangles': 'triangles'}.get(key, key)] = str(value).lower() if isinstance(value, bool) else str(value)
+        filters[{'max_triangles': 'triangles'}.get(key, key)] = str(value).lower() if isinstance(value, bool) else str(value)
     if arguments['mode'] == 'reference':
-        values.update({'reference-asset': arguments['reference_asset_id'], 'reference-view': arguments['reference_view']})
-    # Invoke the packaged form search path; capture the result from its real Python bridge call.
-    return """(async()=>{const original=state.api;let captured;
-      state.api={...original,search:async args=>{captured=await original.search(args);return captured;}};
-      try { for(const [key,value] of Object.entries(VALUES))$(key).value=value;
-        $('mode').onchange();await search();
-        return {captured,settings:state.lastSettings,ids:state.items.map(x=>x.asset_id),error:$('error').hidden?null:$('error').textContent};
-      } finally {state.api=original;}})()""".replace('VALUES', json.dumps(values))
-
+        filters.update({'reference_asset': arguments['reference_asset_id'], 'reference_view': arguments['reference_view']})
+    # Run the app's own search action; capture the result from its real Python bridge call.
+    return """(async()=>{const original=lal.state.api;let captured;
+      lal.setState({api:Object.assign(Object.create(original),{search:async args=>{captured=await original.search(args);return captured;}})});
+      try { lal.setState({filters:{...lal.state.filters,...FILTERS}});lal.setQuery(QUERY);await lal.search();
+        return {captured,settings:lal.state.search.lastSettings,ids:lal.state.library.items.map(x=>x.asset_id),error:lal.state.search.error};
+      } finally {lal.setState({api:original});}})()""".replace('FILTERS', json.dumps(filters)).replace('QUERY', json.dumps(arguments.get('query', '')))
 
 def verify():
     wire = None
     try:
-        wait_js(f"Boolean(state.context && state.items.length==={PAGE})")
+        ui.wait_ready()
+        js("(async()=>{await lal.submitSearch();return true})()")
+        wait_js(f"lal.state.library.items.length==={PAGE}")
         assert not bridge._gateway.model_requested, 'Browsing must not load a model'
         wait_js(THUMBNAILS_SETTLED)
-        report['browse'] = {'context': bridge.context(), 'cards': window.evaluate_js('state.items.length'),
-                            'thumbnails': window.evaluate_js("document.querySelectorAll('.thumb img').length"),
+        report['browse'] = {'context': bridge.context(), 'cards': js('lal.state.library.items.length'),
+                            'thumbnails': js("document.querySelectorAll('#grid .thumb img').length"),
                             'model_requested': False}
         assert window.gui.renderer == 'edgechromium'
         report['checks'].append('Library counts, first browse page, visible three-quarter thumbnails, WebView2, no browse model load')
@@ -184,14 +158,17 @@ def verify():
                 records = all_items()
                 expected = {level: sum(r['caption_status'] == level for r in records)
                             for level in ('warning', 'fault', 'review_note', 'clear')}
-                actual_badges = window.evaluate_js("({warning:document.querySelectorAll('.card .caption-quality-badge.warning').length,fault:document.querySelectorAll('.card .caption-quality-badge.fault').length})")
-                assert actual_badges == {k: expected[k] for k in ('warning', 'fault')}, actual_badges
+                # Badges are compared on the cards actually shown: the first browse page.
+                shown = bridge.browse({}, 0, 40)['items']
+                page_expected = {level: sum(r['caption_status'] == level for r in shown) for level in ('warning', 'fault')}
+                actual_badges = js("({warning:document.querySelectorAll('.card .caption-quality-badge.warning').length,fault:document.querySelectorAll('.card .caption-quality-badge.fault').length})")
+                assert actual_badges == {'warning': page_expected['warning'], 'fault': 0}, (actual_badges, page_expected)
                 report['caption_counts'] = expected
                 wire = Wire()
                 for level in ('review_note', 'warning', 'fault'):
                     item = next(r for r in records if r['caption_status'] == level)
                     identifier = item['asset_id']
-                    js('selectAsset(' + json.dumps(identifier) + ')')
+                    select(identifier)
                     arguments = {'asset_id': identifier, 'include_metadata': True}
                     mcp = wire.send('tools/call', {'name': 'get_asset', 'arguments': arguments})['result']
                     assert not mcp.get('isError'), mcp
@@ -200,21 +177,28 @@ def verify():
                     quality = detail['presentation']['caption_quality']
                     assert quality == mcp_payload['metadata']['caption_quality']
                     assert detail['caption_status'] == mcp_payload['caption_status'] == level
-                    rendered = window.evaluate_js("(()=>{const sections=[...$('detail').querySelectorAll('.evidence')];const find=name=>sections.find(s=>s.querySelector('h3').textContent===name);const notes=find('Caption warnings and notes'),faults=find('Recorded faults');return {notes:[...notes.querySelectorAll(':scope > ul > li')].map(li=>li.textContent),faults:[...faults.querySelectorAll('.fault-list li')].map(li=>li.textContent),evidence:notes.querySelector('pre').textContent};})()")
-                    assert rendered['notes'] == [('Warning: ' if i['severity'] == 'warning' else 'Note: ') + i['reason']
+                    # Evidence tab: open the original-evidence disclosure, then read notes, faults and raw evidence.
+                    rendered = js("""(async()=>{$('inspector-tab-evidence').click();await frame();
+                      const sections=[...$('detail').querySelectorAll('.evidence')];const find=name=>sections.find(s=>s.querySelector('h3').textContent===name);
+                      const notes=find('Caption warnings & notes'),faults=find('Recorded faults');
+                      [...notes.querySelectorAll('button[aria-expanded=false]')].find(b=>b.textContent.includes('Original caption review evidence'))?.click();
+                      await until(()=>notes.querySelector('pre'));
+                      return {notes:[...notes.querySelectorAll('ul > li')].map(li=>li.querySelector('span').textContent+': '+li.querySelector('p').textContent),
+                        faults:[...faults.querySelectorAll('.fault-list li')].map(li=>li.textContent),evidence:notes.querySelector('pre').textContent};})()""")
+                    assert rendered['notes'] == [('Warning: ' if i['severity'] == 'warning' else 'Review note: ') + i['reason']
                                                  for i in quality['issues'] if i['severity'] != 'fault']
                     for issue in quality['issues']:
                         if issue['severity'] == 'fault': assert issue['evidence'] in rendered['faults']
                         else: assert issue['evidence'] not in rendered['faults']
                         assert issue['evidence'] in rendered['evidence']
-                    window.evaluate_js("(()=>{const section=[...$('detail').querySelectorAll('.evidence')].find(s=>s.querySelector('h3').textContent==='Caption warnings and notes');$('detail').scrollTop=section.offsetTop-$('detail').offsetTop-20;})()")
+                    js("(()=>{const section=[...$('detail').querySelectorAll('.evidence')].find(s=>s.querySelector('h3').textContent==='Caption warnings & notes');$('detail').scrollTop=section.offsetTop-$('detail').offsetTop-20;return true})()")
                     screenshot('caption-' + level + '.png')
                     search_args = {'query': item['name'], 'mode': 'keyword', 'filters': {}, 'limit': 5}
                     gui = js(search_script(search_args))
                     mcp_search, _ = wire.search(search_args)
                     assert not gui['error'] and gui['captured']['payload'] == mcp_search
                     report['searches'].append({'arguments': search_args, 'asset_ids': gui['ids'], 'caption_level': level})
-                    js('browse()')
+                    js('lal.browse()')
                     wait_js(THUMBNAILS_SETTLED)
                 wire.close()
                 wire = None
@@ -222,11 +206,11 @@ def verify():
             gui = js(search_script({'query': 'apple', 'mode': 'keyword', 'filters': {}, 'limit': 5}))
             assert not gui['error'] and gui['ids']
             wait_js(THUMBNAILS_SETTLED)
-            js('selectAsset(' + json.dumps(gui['ids'][0]) + ')')
+            select(gui['ids'][0])
             screenshot('detail.png')
             window.resize(680, 760)
             wait_js('innerWidth<761')
-            assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+            assert js("$('library-view').scrollWidth<=$('library-view').clientWidth+1")
             screenshot('narrow.png')
             report['checks'].append('Final concise cards and evidence detail rendered in the actual shell; narrow layout; keyword only; no model load')
             report['status'] = 'passed'
@@ -263,35 +247,37 @@ def verify():
         assert len(set(worker_pids)) == 1
         report['checks'].append('Ten packaged-form → pywebview-bridge searches exactly match actual STDIO MCP payloads/order/truncation; one retained GUI worker')
         # Packaged keyboard handlers and actual native resizing, without OS-input claims.
-        key_result = window.evaluate_js("(()=>{const cards=[...$('grid').querySelectorAll('.card')];cards[0].focus();cards[0].dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));return document.activeElement===cards[1];})()")
+        key_result = js("(async()=>{await frame();const cards=[...$('grid').querySelectorAll('.card')];cards[0].focus();cards[0].dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));return document.activeElement===cards[1];})()")
         assert key_result
-        assert js("selectAsset(state.items[0].asset_id).then(()=>({title:$('detail').querySelector('h2').textContent,images:$('detail').querySelectorAll('img').length}))")['images'] == 1
+        select(js('lal.state.library.items[0].asset_id'))
+        assert js("$('detail').querySelectorAll('img').length") == 1
         screenshot('detail.png')
         window.resize(680, 760)
         wait_js('innerWidth<761')
-        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        assert js("$('library-view').scrollWidth<=$('library-view').clientWidth+1")
         screenshot('narrow.png')
         window.resize(1280, 860)
         report['checks'].append('Actual native resize, narrow layout without horizontal overflow, arrow-navigation handler, detail/source/view controls and real PNG rendering')
         # Bounded synthetic UI transport faults/races. No real source or backend fault is introduced.
-        synthetic = js("""(async()=>{const real=state.api;const item=name=>({asset_id:name,name,pack:'synthetic_fixture',caption_owner_review:'pending'});
-          state.api={...real,asset:async()=>({payload:{preview:{status:'faulty',reason:'Synthetic missing preview fixture'}}}),
-            search:args=>new Promise(resolve=>setTimeout(()=>resolve({arguments:args,elapsed_seconds:0.01,payload:{generation:state.context.generation,results:[item(args.query)],fault_count:0,truncated:true}}),args.query==='old'?60:10))};
-          try {$('mode').value='keyword';$('query').value='old';const first=search();$('query').value='new';const second=search();await Promise.all([first,second]);
-            const latest=state.items[0].asset_id==='new';const truncated=$('status').textContent.includes('truncated');
-            state.api.search=async()=>({is_error:true,payload:{status:'faulty',reason:'Synthetic embedding runtime failure; no fallback'}});
-            await search();const visible=$('error').textContent.includes('Synthetic embedding runtime failure');const partial=state.items[0].asset_id==='new';
-            return {latest,truncated,visible,partial};}finally{state.api=real;}})()""")
+        synthetic = js("""(async()=>{const real=lal.state.api;const item=name=>({asset_id:name,name,pack:'synthetic_fixture',caption_owner_review:'pending'});
+          const stub=Object.assign(Object.create(real),{asset:async()=>({payload:{preview:{status:'faulty',reason:'Synthetic missing preview fixture'}}}),
+            search:args=>new Promise(resolve=>setTimeout(()=>resolve({arguments:args,elapsed_seconds:0.01,payload:{generation:lal.state.context.generation,results:[item(args.query)],fault_count:0,truncated:true}}),args.query==='old'?60:10))});
+          lal.setState({api:stub});
+          try {lal.setState({filters:{...lal.state.filters,mode:'keyword'}});lal.setQuery('old');const first=lal.search();lal.setQuery('new');const second=lal.search();await Promise.all([first,second]);await frame();
+            const latest=lal.state.library.items[0].asset_id==='new';const truncated=$('status').textContent.includes('truncated');
+            stub.search=async()=>({is_error:true,payload:{status:'faulty',reason:'Synthetic embedding runtime failure; no fallback'}});
+            await lal.search();await frame();const visible=$('error').textContent.includes('Synthetic embedding runtime failure');const partial=lal.state.library.items[0].asset_id==='new';
+            return {latest,truncated,visible,partial};}finally{lal.setState({api:real});}})()""")
         assert all(synthetic.values()), synthetic
         report['synthetic_ui_checks'] = synthetic
         report['checks'].append('Synthetic older-result suppression, explicit truncation, runtime-error visibility and preservation of earlier cards without fallback')
         copied = bridge.copy_text(json.dumps(report['searches'][0]['arguments'], indent=2))
         assert copied['status'] == 'copied'
         report['checks'].append('Native clipboard accepted exact reproducible MCP argument JSON')
-        js("(async()=>{$('clear').click();await new Promise(resolve=>setTimeout(resolve,400));return true;})()")
-        wait_js(f'state.items.length==={PAGE}')
+        js("(async()=>{$('clear').click();await until(()=>lal.state.search.phase==='idle'&&!$('grid'));await lal.submitSearch();return true;})()")
+        wait_js(f'lal.state.library.items.length==={PAGE}')
         assert state_free_resources(window)
-        report['checks'].append('Clear restores the first library page; all app-loaded resource URLs are local/data')
+        report['checks'].append('Clear returns Home to its idle search; browsing again restores the first page; all app-loaded resource URLs are local/data')
         wire.close()
         wire = None
         report['status'] = 'passed'
@@ -318,6 +304,8 @@ config = load_project_config(ROOT)
 bridge = DesktopBridge(config)
 window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)
+from gui_harness import Harness
+ui = Harness(window, OUT, report)
 import webview
 save()
 try:

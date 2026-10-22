@@ -19,7 +19,7 @@ from test_mcp_assets import update
 from local_asset_library.captions import file_hash
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 from PIL import Image, ImageChops
-from ui_text import assert_ui_text
+from gui_harness import Harness
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
@@ -112,44 +112,29 @@ profile = profile_path(config,bridge,window)
 report = {'status':'running','checks':[],'synthetic_only':not args.real_assets,'owner_usability_approval':'pending'}
 
 
+ui = Harness(window, OUT, report)
+js = ui.js
+
+
 def wait(expression, timeout=30):
-    deadline = time.perf_counter()+timeout
-    while not window.evaluate_js(expression):
-        if time.perf_counter()>deadline:
-            detail = window.evaluate_js("({error:$('error').textContent,warning:LALPreview.current?.warning.textContent,loading:LALPreview.current?.loadingText})")
-            raise RuntimeError('UI condition timed out: '+expression+' '+json.dumps(detail))
-        time.sleep(.1)
-
-
-def js(script):
-    event, values = threading.Event(), []
-    window.evaluate_js(script,lambda value:(values.append(value),event.set()))
-    if not event.wait(40):
-        raise RuntimeError('UI operation timed out: '+script[:100])
-    return values[0]
+    try:
+        ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
+    except RuntimeError as exc:
+        detail = window.evaluate_js("({error:lal.state.search.error,warning:LALPreview.current?.warning.textContent,loading:LALPreview.current?.loadingText})")
+        raise RuntimeError('UI condition timed out: '+expression+' '+json.dumps(detail)) from exc
 
 
 def capture(name):
-    assert_ui_text(window, name, report)
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form = window.gui.BrowserView.instances[window.uid]
-    stream, done, faults = MemoryStream(),threading.Event(),[]
-    def start():
-        task=form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream)
-        def finish(task):
-            if task.IsFaulted: faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish),form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(start))
-    assert done.wait(15) and not faults
-    path=OUT/name
-    path.write_bytes(bytes(stream.ToArray()))
-    stream.Dispose()
-    return path
+    ui.capture(name, settle=.2)
+    return OUT / name
 
+
+def select(identifier, fmt=None):
+    """Select through the store, then wait until the inspector has mounted that asset's preview."""
+    target = json.dumps(identifier)
+    js(f"(async()=>{{await lal.selectAsset('library',{target},{json.dumps(fmt)});return true;}})()")
+    wait(f"lal.state.library.detail&&!lal.state.library.detail.loading&&LALPreview.current?.item.assetId==={target}"
+         + (f"&&LALPreview.current.item.sourceFormat==={json.dumps(fmt)}" if fmt else ''))
 
 def check(name):
     report['checks'].append(name)
@@ -183,18 +168,17 @@ def verify():
     if args.real_assets:
         return verify_real()
     try:
-        wait('Boolean(state.context && state.items.length===40)')
-        assert window.gui.renderer=='edgechromium'
-        window.evaluate_js('closeDetail()')
-        assert window.evaluate_js("$('page-info').textContent") == '1\u201340 of 40'
-        assert window.evaluate_js("$('detail').querySelector('.detail-empty span').textContent") == '\u25c7'
-        assert ' \u00b7 ' in window.evaluate_js("$('coverage').textContent")
+        ui.wait_ready()
+        js("(async()=>{await lal.submitSearch();await until(()=>lal.state.library.items.length===40);lal.closeDetail('library');lal.setInspectorOpen(true);await until(()=>$('detail'));return true})()")
+        assert js("$('page-info').textContent") == '1\u201340 of 40'
+        assert js("$('detail').querySelector('.detail-empty h2').textContent") == 'No asset selected'
+        assert ' \u00b7 ' in js('lal.state.coverage')
         capture('00-library-text.png')
         identifier=json.dumps(record['asset_id'])
-        js(f"(async()=>{{await selectAsset({identifier});return true;}})()")
-        assert window.evaluate_js("$('detail').querySelector('.detail-header h2').textContent") == record['display_name']
-        assert window.evaluate_js("$('detail').querySelector('.close-detail').textContent") == '\u00d7'
-        assert window.evaluate_js("$('detail').querySelector('.pack').textContent") == 'Kenney \u00b7 even'
+        select(record['asset_id'])
+        assert js("$('detail').querySelector('.detail-header h2').textContent") == record['display_name']
+        assert js("document.querySelector('#inspector .close-detail').getAttribute('aria-label')") == 'Hide asset inspection'
+        assert js("$('detail').querySelector('.pack').textContent") == 'Kenney \u00b7 even'
         window.evaluate_js("LALPreview.current.launch.click()")
         wait("Boolean(LALPreview.current.loadingText)")
         capture('01-loading.png')
@@ -241,7 +225,8 @@ def verify():
         for _ in range(12):
             browser_input('Input.dispatchKeyEvent',dict(type='keyDown',key='Tab',code='Tab',windowsVirtualKeyCode=9))
             browser_input('Input.dispatchKeyEvent',dict(type='keyUp',key='Tab',code='Tab',windowsVirtualKeyCode=9))
-            assert window.evaluate_js('LALPreview.current.dialog.contains(document.activeElement)')
+            assert window.evaluate_js('LALPreview.current.dialog.contains(document.activeElement)'), window.evaluate_js(
+                "(()=>{const a=document.activeElement;return a?a.tagName+'#'+a.id+'.'+a.className+' '+(a.getAttribute('aria-label')||a.textContent.slice(0,40)):'none'})()")
         browser_input('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'reduce'}]})
         assert window.evaluate_js("getComputedStyle(LALPreview.current.spinner).animationName==='none'")
         browser_input('Emulation.setEmulatedMedia',{'features':[]})
@@ -274,7 +259,7 @@ def verify():
         assert not bridge._interactive_preview.tickets
         check('Escape exits fullscreen; Back to image releases the frame and file ticket')
         # A different selected export must load that source, never silently reuse OBJ.
-        js(f"(async()=>{{await selectAsset({identifier},'glb');return true;}})()")
+        select(record['asset_id'],'glb')
         window.evaluate_js('LALPreview.current.launchFull.click()')
         wait('Boolean(LALPreview.current?.ready)',60)
         assert window.evaluate_js('LALPreview.current.manifest.format')=='glb'
@@ -286,7 +271,7 @@ def verify():
         window.evaluate_js('LALPreview.current.launchFull.click()')
         wait('LALPreview.current.fullscreen && Boolean(LALPreview.current.loadingText)')
         capture('07-fullscreen-loading.png')
-        js(f"(async()=>{{await selectAsset({json.dumps(records[1]['asset_id'])});return true;}})()")
+        js(f"(async()=>{{await lal.selectAsset('library',{json.dumps(records[1]['asset_id'])});return true;}})()")
         bridge.unblock.set()
         wait('LALPreview.current.item.assetId!=='+identifier)
         time.sleep(.3)
@@ -294,7 +279,7 @@ def verify():
         assert not window.evaluate_js('Boolean(document.querySelector("dialog:modal"))')
         check('Leaving during a delayed fullscreen load ignores obsolete results')
         bridge.delay=False
-        js(f"(async()=>{{await selectAsset({json.dumps(records[2]['asset_id'])});return true;}})()")
+        select(records[2]['asset_id'])
         window.evaluate_js('LALPreview.current.launch.click()')
         wait('Boolean(LALPreview.current.retainedFault)',45)
         assert 'meshes' in window.evaluate_js('LALPreview.current.warning.textContent').lower()
@@ -302,7 +287,7 @@ def verify():
         capture('08-retained-fault.png')
         faults_before=bridge._interactive_preview.fault_path.read_text()
         bad_id=json.dumps(records[2]['asset_id'])
-        js(f"(async()=>{{await selectAsset({bad_id});return true;}})()")
+        select(records[2]['asset_id'])
         window.evaluate_js('LALPreview.current.launch.click()')
         wait('Boolean(LALPreview.current.retainedFault)')
         assert not window.evaluate_js('Boolean(LALPreview.current.frame)')
@@ -322,7 +307,8 @@ def verify():
 
 def verify_real():
     try:
-        wait('Boolean(state.context && state.items.length)',45)
+        ui.wait_ready(45)
+        js("(async()=>{await lal.submitSearch();await until(()=>lal.state.library.items.length>0);return true})()")
         targets=[]
         def choose(pack=None,name=None,fmt='glb',repair=False):
             item=next(r for r in records if (not pack or r['pack_id']==pack)
@@ -344,7 +330,7 @@ def verify_real():
                     protected[str(path)]=file_hash(path)
         report['assets']=[]
         for index,(item,fmt) in enumerate(targets):
-            js(f"(async()=>{{await selectAsset({json.dumps(item['asset_id'])},{json.dumps(fmt)});return true;}})()")
+            select(item['asset_id'],fmt)
             window.evaluate_js('LALPreview.current.launchFull.click()')
             wait('Boolean(LALPreview.current?.ready || LALPreview.current?.retainedFault)',60)
             result=window.evaluate_js("({ready:LALPreview.current.ready,fault:LALPreview.current.retainedFault,summary:LALPreview.current.summary.textContent,source:LALPreview.current.manifest?.source_name,files:LALPreview.current.fileReads})")

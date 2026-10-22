@@ -24,7 +24,7 @@ from local_asset_library.incremental import working, update_record
 from local_asset_library.library_index import index_library
 from local_asset_library.membership import records
 from local_asset_library.source_operations import publish_source, state, cancelled
-from ui_text import assert_ui_text
+from gui_harness import Harness
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
@@ -108,130 +108,108 @@ profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True, 'owner_usability_approval': 'pending'}
 
 
+ui = Harness(window, OUT, report)
+
+
 def wait(expression, timeout=30):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if window.evaluate_js(expression):
-            return
-        time.sleep(.1)
-    raise RuntimeError('UI condition timed out: ' + expression + ' ' + str(window.evaluate_js(
-        "({main:$('error').textContent,sources:$('sources-message').textContent})")))
+    try:
+        ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
+    except RuntimeError as exc:
+        raise RuntimeError(f'UI condition timed out: {expression} ' + str(ui.js(
+            "({main:$('error')?.textContent,sources:$('sources-message')?.textContent})"))) from exc
 
 
-def js(script):
-    if '(async' not in script:
-        return window.evaluate_js(script)
-    done, result = threading.Event(), []
-    window.evaluate_js(script, lambda value: (result.append(value), done.set()))
-    if not done.wait(40):
-        raise RuntimeError('UI action timed out: ' + script[:150])
-    return result[0]
-
-
-def capture(name):
-    assert_ui_text(window, name, report)
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form = window.gui.BrowserView.instances[window.uid]
-    stream, done, faults = MemoryStream(), threading.Event(), []
-    def start():
-        task = form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream)
-        def finish(task):
-            if task.IsFaulted:
-                faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish), form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(start))
-    assert done.wait(15) and not faults
-    (OUT / name).write_bytes(bytes(stream.ToArray()))
-    stream.Dispose()
+js = ui.js
+capture = ui.capture
 
 
 def text(selector):
-    return window.evaluate_js(f"document.querySelector({json.dumps(selector)})?.textContent||''")
+    return js(f"document.querySelector({json.dumps(selector)})?.textContent||''")
 
 
 def verify():
     try:
-        wait('state.context&&state.items.length===6&&state.sources.length===2&&state.notificationKeys!==null')
-        assert window.evaluate_js("document.querySelectorAll('.source-warning').length===0&&$('source-warnings').hidden")
-        cards = window.evaluate_js("[...$('grid').querySelectorAll('.card')].map(c=>c.textContent).join('|')")
+        ui.wait_ready(extra='lal.state.sources.length===2')
+        # Browsing (Enter on an empty search) shows every library card.
+        js("(async()=>{await lal.submitSearch();await until(()=>document.querySelectorAll('#grid .card').length===6);return true})()")
+        assert js("!lal.state.sources.some(s=>s.needs_processing||s.scan_fault)&&!$('nav-processing').getAttribute('aria-label').includes('attention')")
+        cards = js("[...$('grid').querySelectorAll('.card')].map(c=>c.textContent).join('|')")
         assert 'Caption fault' not in cards and cards.count('Review pending') == 3, cards
-        report['checks'].append('Missing and failed descriptions raise no source card and no card badges; described assets keep review badges')
+        report['checks'].append('Missing and failed descriptions raise no processing attention and no card badges; described assets keep review badges')
         # First launch seeds one notice for the source with missing descriptions; no toast for earlier notices.
-        wait("$('notifications-count').textContent==='1'&&!$('notifications-count').hidden")
-        assert window.evaluate_js("$('toasts').children.length===0&&$('open-notifications').getAttribute('aria-label')==='Notifications, 1 unread'")
-        js("$('open-notifications').click();true")
-        wait("!$('notifications-panel').hidden&&document.activeElement===$('notifications-title')")
+        wait("$('notifications-count')?.dataset.count==='1'")
+        assert js("$('toasts').children.length===0&&$('open-notifications').getAttribute('aria-label')==='Notifications, 1 unread'")
+        js("$('open-notifications').click()")
+        wait("$('notifications-panel')&&document.activeElement===$('notifications-title')")
         body = text('#notifications-list .notification')
         assert 'Descriptions ready to generate' in body and '2 assets have no description yet' in body and 'one' in body, body
-        assert window.evaluate_js("[...document.querySelectorAll('#notifications-list button')].map(b=>b.textContent).join()==='Generate descriptions,Not now'")
-        assert window.evaluate_js("$('open-notifications').getAttribute('aria-expanded')==='true'")
-        assert window.evaluate_js("$('open-settings').getAttribute('aria-label')==='Settings'&&Boolean($('open-settings').querySelector('svg'))")
+        assert js("[...document.querySelectorAll('#notifications-list button')].map(b=>b.textContent).join()==='Generate descriptions,Not now'")
+        assert js("$('open-notifications').getAttribute('aria-expanded')==='true'")
+        assert js("$('nav-settings').getAttribute('aria-label')==='Settings'&&Boolean($('nav-settings').querySelector('svg'))")
         capture('01-ready-notice.png')
-        js("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));true")
-        wait("$('notifications-panel').hidden&&document.activeElement===$('open-notifications')&&$('notifications-count').hidden")
+        js("document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))")
+        wait("!$('notifications-panel')&&document.activeElement===$('open-notifications')&&!$('notifications-count')")
         assert notifications.load(config)['items'][0]['read']
         report['checks'].append('Bell shows the seeded ready notice; Escape closes the panel, returns focus and marks it read')
         # A notice that arrives while the app is open also shows a toast.
         notifications.notify_report(config, two, 'synthetic-stop', 'stopped', written=1, failed=0, remaining=2,
                                     reason='Not enough GPU memory for description batch size 8. Lower it in Settings → General.')
-        wait("$('toasts').children.length===1&&$('notifications-count').textContent==='1'")
+        wait("$('toasts').children.length===1&&$('notifications-count')?.dataset.count==='1'")
         toast = text('#toasts .toast')
-        assert 'Description run stopped' in toast and 'still missing' in toast and 'Continue' in toast, toast
+        assert 'Description run stopped' in toast and 'still missing' in toast and 'Continue' in toast and 'View report' in toast, toast
         capture('02-toast.png')
-        js("document.querySelector('#toasts .toast > .notification-dismiss').click();true")
+        js("document.querySelector('#toasts .toast > .notification-dismiss').click()")
         wait("$('toasts').children.length===0")
-        report['checks'].append('A new report pops a dismissible toast with its action while the bell counts it')
-        js("$('open-settings').click();$('asset-sources-tab').click();true")
-        wait("!$('settings-view').hidden&&document.querySelectorAll('.source-descriptions').length===2")
-        summary = window.evaluate_js("[...document.querySelectorAll('.source-descriptions-summary')].map(x=>x.textContent)")
+        report['checks'].append('A new report pops a dismissible toast with its actions while the bell counts it')
+        js("$('nav-processing').click()")
+        wait("$('processing-view')&&document.querySelectorAll('.source-descriptions').length===2")
+        summary = js("[...document.querySelectorAll('.source-descriptions-summary')].map(x=>x.textContent)")
         assert summary == ['Descriptions 2 missing · 1 failed', 'Descriptions 3 descriptions written'], summary
-        assert window.evaluate_js("[...document.querySelectorAll('[data-action=describe]')].map(b=>b.disabled).join()==='false,true'")
-        capture('03-settings-descriptions.png')
-        report['checks'].append('Each source shows written/missing/failed counts; Generate is enabled only where descriptions are missing')
-        js("$('close-settings').click();true")
-        wait("!$('library-view').hidden")
-        js("$('open-notifications').click();true")
-        wait("!$('notifications-panel').hidden")
-        js("[...document.querySelectorAll('#notifications-list button')].find(b=>b.textContent==='Generate descriptions').click();true")
-        wait("document.querySelector('#notifications-running .notification.running progress')!==null")
+        assert js("[...document.querySelectorAll('[data-action=describe]')].map(b=>b.disabled).join()==='false,true'")
+        capture('03-processing-descriptions.png')
+        report['checks'].append('Asset processing shows written/missing/failed counts; Generate is enabled only where descriptions are missing')
+        js("$('nav-home').click()")
+        wait("$('library-view')")
+        js("$('open-notifications').click()")
+        wait("$('notifications-panel')")
+        js("[...document.querySelectorAll('#notifications-list button')].find(b=>b.textContent==='Generate descriptions').click()")
+        wait("document.querySelector('#notifications-running .notification.running [role=progressbar]')!==null")
         running = text('#notifications-running')
         assert 'Generating descriptions' in running and 'Cancel' in running, running
-        assert window.evaluate_js("!document.querySelector('[data-notification=\"ready-" + one['id'] + "\"]')")
-        assert window.evaluate_js("document.querySelectorAll('.source-warning').length===0")
+        assert js("!document.querySelector('[data-notification=\"ready-" + one['id'] + "\"]')")
+        assert js("!$('nav-processing').getAttribute('aria-label').includes('attention')||lal.state.sources.some(s=>s.operation?.operation==='describe')")
         capture('04-running.png')
-        report['checks'].append('Generate starts the background run; the panel shows live progress with Cancel and the main view gets no warning card')
+        report['checks'].append('Generate starts the background run; the panel shows live progress with Cancel')
         wait("[...document.querySelectorAll('#notifications-list h3')].some(h=>h.textContent.includes('Descriptions finished'))", 60)
         wait("!document.querySelector('#notifications-running .notification')")
         finished = text('#notifications-list .notification')
-        assert '2 descriptions written' in finished and 'View source' in finished, finished
-        assert window.evaluate_js("$('toasts').children.length===0")  # The open panel already shows it.
+        assert '2 descriptions written' in finished and 'View in Asset processing' in finished, finished
+        assert js("$('toasts').children.length===0")  # The open panel already shows it.
         capture('05-report.png')
         report['checks'].append('Finished run reports written count in the open panel without a duplicate toast')
-        js("[...document.querySelectorAll('#notifications-list button')].find(b=>b.textContent==='View source').click();true")
-        # Generate is disabled now, so focus lands on the source name in its settings row.
-        wait("!$('settings-view').hidden&&!$('asset-sources-panel').hidden&&document.activeElement?.dataset.action==='browse'&&document.activeElement?.dataset.source===" + json.dumps(one['key']))
-        wait("document.querySelector('.source-descriptions-summary').textContent==='Descriptions 2 descriptions written · 1 failed'")
-        assert window.evaluate_js("document.querySelector('[data-action=describe]').disabled&&document.querySelector('.source-descriptions .hint').textContent.includes('Failed descriptions are recorded and not retried')")
-        assert window.evaluate_js("document.querySelector('.source-descriptions').textContent.includes('Last run finished.')")
-        capture('06-settings-after-run.png')
-        report['checks'].append('View source opens the source settings; nothing left to generate and failures are not retried')
-        js("$('close-settings').click();true")
-        wait("!$('library-view').hidden")
+        js("[...document.querySelectorAll('#notifications-list button')].find(b=>b.textContent==='View in Asset processing').click()")
+        # Processing notices lead to Asset processing, focused on their source.
+        wait("$('processing-view')&&lal.state.history[lal.state.historyIndex].focus===" + json.dumps(one['key'])
+             + "&&document.activeElement?.dataset.source===" + json.dumps(one['key']))
+        wait("document.querySelector('[data-source=" + json.dumps(one['key']) + "] .source-descriptions-summary').textContent==='Descriptions 2 descriptions written · 1 failed'")
+        card = "document.querySelector('article[data-source=" + json.dumps(one['key']) + "]')"
+        assert js(card + ".querySelector('[data-action=describe]').disabled&&" + card + ".querySelector('.source-descriptions .hint').textContent.includes('Failed descriptions are recorded and not retried')")
+        assert js(card + ".querySelector('.source-descriptions').textContent.includes('Last run finished.')")
+        capture('06-processing-after-run.png')
+        report['checks'].append('View in Asset processing opens the source; nothing left to generate and failures are not retried')
+        js("$('nav-home').click()")
+        wait("$('library-view')")
         window.resize(680, 800)
         wait('innerWidth<761')
-        js("$('open-notifications').click();true")
-        wait("!$('notifications-panel').hidden")
-        assert window.evaluate_js("document.documentElement.scrollWidth<=innerWidth&&$('notifications-panel').getBoundingClientRect().right<=innerWidth")
+        js("$('open-notifications').click()")
+        wait("$('notifications-panel')")
+        assert js("$('notifications-panel').getBoundingClientRect().right<=innerWidth&&$('notifications-panel').getBoundingClientRect().left>=0")
         capture('07-narrow-panel.png')
-        js("document.querySelector('#notifications-list .notification-dismiss').click();true")
+        js("document.querySelector('#notifications-list .notification-dismiss').click()")
         wait("document.querySelectorAll('#notifications-list .notification').length===1")
         report['checks'].append('Narrow layout keeps the panel in view without horizontal overflow; dismiss removes a report')
-        js("document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));true")
-        wait("$('notifications-panel').hidden")
+        js("document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))")
+        wait("!$('notifications-panel')")
         assert not bridge._gateway.model_requested
         changed = [p for p, digest in saved.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest() != digest]
         assert not changed, changed
@@ -247,7 +225,6 @@ def verify():
         (OUT / 'verification.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
         bridge._close()
         window.destroy()
-
 
 window.events.loaded += lambda: threading.Thread(target=verify, daemon=True).start()
 webview.start(gui='edgechromium', debug=False, private_mode=True, storage_path=str(profile))

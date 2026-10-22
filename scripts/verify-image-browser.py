@@ -20,7 +20,7 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from test_images import art, ready_images
 from local_asset_library import sources
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
-from ui_text import assert_ui_text
+from gui_harness import Harness
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
@@ -60,57 +60,38 @@ profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True, 'owner_usability_approval': 'pending'}
 
 
+ui = Harness(window, OUT, report)
+
+
 def wait(expression, timeout=30):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if window.evaluate_js(expression):
-            return
-        time.sleep(.1)
-    raise RuntimeError('UI condition timed out: ' + expression + ' ' + str(window.evaluate_js(
-        "({main:$('error').textContent,status:$('status').textContent,sources:$('sources-message').textContent})")))
+    try:
+        ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
+    except RuntimeError as exc:
+        raise RuntimeError('UI condition timed out: ' + expression + ' ' + str(ui.js(
+            "({main:$('error')?.textContent,status:$('status')?.textContent,sources:$('sources-message')?.textContent})"))) from exc
 
 
-def js(script):
-    return window.evaluate_js(script)
-
-
-def capture(name):
-    assert_ui_text(window, name, report)
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form = window.gui.BrowserView.instances[window.uid]
-    stream, done, faults = MemoryStream(), threading.Event(), []
-    def start():
-        task = form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream)
-        def finish(task):
-            if task.IsFaulted:
-                faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish), form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(start))
-    assert done.wait(15) and not faults
-    (OUT / name).write_bytes(bytes(stream.ToArray()))
-    stream.Dispose()
+js = ui.js
+capture = ui.capture
+ZOOM_IN = "$('detail').querySelector('[aria-label=\"Zoom in\"]').click()"
 
 
 def open_card(name):
-    js(f"[...$('grid').querySelectorAll('.card')].find(c=>c.querySelector('.card-name').textContent==={json.dumps(name)}).click();true")
-    wait(f"$('detail').querySelector('h2')?.textContent==={json.dumps(name)}")
+    js(f"[...$('grid').querySelectorAll('.card')].find(c=>c.querySelector('.card-name').textContent==={json.dumps(name)}).click()")
+    wait(f"$('detail').querySelector('h2')?.textContent==={json.dumps(name)}&&!lal.state.library.detail.loading")
 
 
-def browse(asset_type='', transparent='', size=''):
-    js(f"$('asset-type').value={json.dumps(asset_type)};$('transparent').value={json.dumps(transparent)};"
-       f"$('size-class').value={json.dumps(size)};$('query').value='';$('mode').value='keyword';search();true")
+def browse(asset_type='', transparent='', size='', query=''):
+    js(f"""(async()=>{{lal.setState({{filters:{{...lal.state.filters,asset_type:{json.dumps(asset_type)},transparent:{json.dumps(transparent)},
+       size_class:{json.dumps(size)},mode:'keyword'}}}});lal.setQuery({json.dumps(query)});await lal.submitSearch();return true}})()""")
 
 
 def scroll_cards():
     # Thumbnails load as cards become visible.
     for index in range(js("$('grid').querySelectorAll('.card').length")):
-        js(f"$('grid').querySelectorAll('.card')[{index}].scrollIntoView({{block:'center'}});true")
+        js(f"$('grid').querySelectorAll('.card')[{index}].scrollIntoView({{block:'center'}})")
         time.sleep(.15)
-    js("window.scrollTo(0,0);true")
+    js("$('library-view').scrollTop=0")
 
 
 def names():
@@ -119,12 +100,11 @@ def names():
 
 def verify():
     try:
-        wait('state.context&&state.items.length>0&&state.sources.length===1')
-        js("$('search-options').open=true;true")
+        ui.wait_ready(extra='lal.state.sources.length===1')
         browse('image')
         wait("[...$('grid').querySelectorAll('.card')].length===11")
         assert names() == sorted(['arrow', 'arrow', 'bare', 'banner', 'blink', 'box', 'copy', 'damaged', 'glow', 'linked', 'potion']), names()
-        assert js("[...$('grid').querySelectorAll('.badge.type')].length===11")
+        assert js("[...$('grid').querySelectorAll('.badges .type')].length===11")
         scroll_cards()
         wait("[...$('grid').querySelectorAll('.thumb img')].length===8")
         assert js("[...$('grid').querySelectorAll('.card')].filter(c=>c.querySelector('.card-name').textContent==='potion')[0].querySelector('.thumb img').classList.contains('pixelated')")
@@ -147,28 +127,28 @@ def verify():
         assert '16 × 16 px' in detail and 'Cut-out' in detail and 'enlarged 16×' in detail and 'not a colour of this image' in detail, detail
         assert 'icon — Folder name' in detail and 'Byte-identical to 1 other image' in detail, detail
         wait("$('detail').querySelector('.image-note').textContent.startsWith('Original source pixels')")
-        assert js("$('detail').querySelector('.image-pixelated input').checked")
-        js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='1:1').click();true")
+        assert js("$('detail').querySelector('.image-pixelated [role=checkbox]').getAttribute('aria-checked')==='true'")
+        js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='1:1').click()")
         wait("$('detail').querySelector('.image-stage img').getBoundingClientRect().width===16")
         for _ in range(4):
-            js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='+').click();true")
+            js(ZOOM_IN)
         wait("$('detail').querySelector('.image-zoom').textContent==='600%'&&$('detail').querySelector('.image-stage img').getBoundingClientRect().width===96")
-        js("const s=$('detail').querySelector('.image-background select');s.value='dark';s.dispatchEvent(new Event('change'));true")
+        js("pick('image-background','dark')")
         assert js("$('detail').querySelector('.image-stage').classList.contains('bg-dark')")
         capture('02-pixel-art-zoom-dark.png')
-        js("$('detail').querySelector('.image-stage').focus();$('detail').querySelector('.image-stage').dispatchEvent(new KeyboardEvent('keydown',{key:'0',bubbles:true}));true")
+        js("$('detail').querySelector('.image-stage').focus();$('detail').querySelector('.image-stage').dispatchEvent(new KeyboardEvent('keydown',{key:'0',bubbles:true}))")
         wait("$('detail').querySelector('.image-zoom').textContent==='Fit'")
         report['checks'].append('Pixel-art detail shows measured facts, purpose suggestion, duplicate evidence and backdrop note; 1:1 is 16 px, zoom steps, dark background, keyboard fit')
         browse('image')
         wait("[...$('grid').querySelectorAll('.card')].length===11")
         open_card('box')
         wait("$('detail').querySelector('.image-note')?.textContent.includes('Rendered from the SVG source')")
-        assert js("$('detail').querySelector('.image-background select').value==='dark'")  # Remembered for this session.
+        assert js("$('image-background').dataset.value==='dark'")  # Remembered for this session.
         for _ in range(4):
-            js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='+').click();true")
-        js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='1:1').click();true")
+            js(ZOOM_IN)
+        js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='1:1').click()")
         for _ in range(3):
-            js("[...$('detail').querySelectorAll('.image-toolbar button')].find(b=>b.textContent==='+').click();true")
+            js(ZOOM_IN)
         wait("$('detail').querySelector('.image-zoom').textContent==='400%'")
         # Re-rendered for the zoom and the display's pixel ratio, not just stretched.
         wait("$('detail').querySelector('.image-note').textContent.includes(`showing ${Math.round(160*devicePixelRatio)} × ${Math.round(80*devicePixelRatio)} px`)", 20)
@@ -185,34 +165,34 @@ def verify():
         assert 'recognized but not supported yet' in js("$('detail').textContent")
         capture('04-image-fault.png')
         report['checks'].append('Damaged and animated images keep their cards with recorded fault/unsupported reasons and no fake preview')
-        js("$('asset-type').value='';$('transparent').value='';$('size-class').value='';$('query').value='arrow';$('mode').value='keyword';search();true")
+        browse(query='arrow')
         wait("$('grid').querySelectorAll('.card').length===2")
         report['checks'].append('Keyword search finds both arrow images by name')
-        js("$('open-settings').click();$('asset-sources-tab').click();true")
-        wait("!$('settings-view').hidden&&document.querySelector('[data-action=images]')!==null")
-        assert js("document.querySelector('[data-action=images]').checked")
+        js("(async()=>{$('nav-settings').click();await until(()=>$('asset-sources-tab'));$('asset-sources-tab').click();return true})()")
+        wait("$('settings-view')&&document.querySelector('.source-images [role=checkbox]')!==null")
+        assert js("document.querySelector('.source-images [role=checkbox]').getAttribute('aria-checked')==='true'")
         assert 'Model textures, previews and sprite sheets are left out' in js("document.querySelector('.source-images').parentElement.textContent")
         capture('05-source-images-setting.png')
         for expected in (('model_3d',), ('model_3d', 'image')):
-            js("document.querySelector('[data-action=images]').click();true")
+            js("document.querySelector('.source-images [role=checkbox]').click()")
             deadline = time.monotonic() + 30
             while sources.import_types(sources.bound(config, source)) != expected:
                 assert time.monotonic() < deadline, 'Image import setting was not saved'
                 time.sleep(.1)
-            wait(f"document.querySelector('[data-action=images]')?.checked==={json.dumps(len(expected) == 2)}")
+            wait(f"document.querySelector('.source-images [role=checkbox]')?.getAttribute('aria-checked')==={json.dumps(str(len(expected) == 2).lower())}")
         wait("[...document.querySelectorAll('.source-format-counts')].some(p=>p.textContent.includes('PNG'))")
         report['checks'].append('Include 2D images is a per-source checkbox; changing it saves the choice and rescans without deleting results')
-        js("$('close-settings').click();true")
-        wait("!$('library-view').hidden")
+        js("$('nav-home').click()")
+        wait("$('library-view')")
         browse('image')
         wait("[...$('grid').querySelectorAll('.card')].length===11")
         open_card('banner')
         window.resize(680, 900)
         wait('innerWidth<761')
         wait("$('detail').querySelector('.image-stage img')?.naturalWidth>0")
-        assert js("document.documentElement.scrollWidth<=innerWidth")
+        assert js("$('library-view').scrollWidth<=$('library-view').clientWidth+1&&$('detail').scrollWidth<=$('detail').clientWidth+1")
         capture('06-narrow-detail.png')
-        report['checks'].append('Narrow layout keeps the image viewer and toolbar in view without horizontal page overflow')
+        report['checks'].append('Narrow layout keeps the image viewer and toolbar in view without horizontal overflow')
         assert not bridge._gateway.model_requested
         changed = [p for p, digest in saved.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest() != digest]
         assert not changed, changed
@@ -228,7 +208,6 @@ def verify():
         (OUT / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
         bridge._close()
         window.destroy()
-
 
 window.events.loaded += lambda: threading.Thread(target=verify, daemon=True).start()
 webview.start(gui='edgechromium', debug=False, private_mode=True, storage_path=str(profile))

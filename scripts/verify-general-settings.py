@@ -16,6 +16,7 @@ from local_asset_library.desktop import DesktopBridge, create_window, profile_pa
 from local_asset_library.publication import atomic_json
 from local_asset_library.settings import GIB, general_settings, settings_path
 from local_asset_library import sources
+from gui_harness import Harness
 
 name = 'general-settings-' + uuid.uuid4().hex[:10]
 OUT = ROOT / 'data/gui' / name
@@ -56,88 +57,71 @@ profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 
 
+ui = Harness(window, OUT, report)
+
+
 def wait(expression, timeout=30):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if window.evaluate_js(expression):
-            return
-        time.sleep(.1)
-    raise RuntimeError('UI condition timed out: ' + expression)
+    ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
 
 
 def capture(name):
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form = window.gui.BrowserView.instances[window.uid]
-    stream, done, faults = MemoryStream(), threading.Event(), []
-    def start():
-        task = form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream)
-        def finish(task):
-            if task.IsFaulted:
-                faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish), form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(start))
-    assert done.wait(15) and not faults
-    (OUT / name).write_bytes(bytes(stream.ToArray()))
-    stream.Dispose()
+    ui.capture(name)
 
 
 def verify():
     try:
-        wait('state.context&&state.items.length===6&&state.sources.length===2')
-        window.evaluate_js("$('open-settings').click()")
-        wait("!$('general-panel').hidden&&!$('storage-budget').disabled&&$('storage-budget').value==='10'")
-        assert window.evaluate_js("$('asset-sources-panel').hidden&&$('general-tab').getAttribute('aria-selected')==='true'")
+        ui.wait_ready(extra='lal.state.sources.length===2')
+        ui.js("$('nav-settings').click()")
+        wait("$('general-panel')&&!$('general-panel').hidden&&$('storage-budget')&&!$('storage-budget').disabled&&$('storage-budget').value==='10'")
+        assert ui.js("$('asset-sources-panel').hidden&&$('general-tab').getAttribute('aria-selected')==='true'")
         assert not settings_path(config).exists()
-        assert window.evaluate_js("[...$('processing-formats').querySelectorAll('input')].every(input=>input.checked)")
-        assert window.evaluate_js("$('caption-batch-size').value==='8'&&!$('caption-batch-size').disabled")
+        assert ui.js("[...$('processing-formats').querySelectorAll('[role=checkbox]')].every(box=>box.getAttribute('aria-checked')==='true')")
+        assert ui.js("$('caption-batch-size').dataset.value==='8'&&!$('caption-batch-size').querySelector('[aria-haspopup=listbox]').disabled")
         report['checks'].append('General opens by default and shows the historical limit and default batch size 8 without writing them')
-        window.evaluate_js("$('storage-budget').value='24';$('processing-format-fbx').checked=false;$('processing-format-obj').checked=false;$('caption-batch-size').value='4';$('save-general-settings').click()")
+        ui.js("""(async()=>{type('storage-budget','24');$('processing-format-fbx').click();$('processing-format-obj').click();
+          await frame();await pick('caption-batch-size','4');$('save-general-settings').click();return true})()""")
         wait("$('general-settings-message').textContent.startsWith('Saved.')")
         assert general_settings(config)['storage_budget_gib'] == 24
         assert general_settings(config)['processing_formats'] == ['gltf']
         assert general_settings(config)['caption_batch_size'] == 4
-        assert window.evaluate_js("$('general-settings-message').textContent.includes('Description batch size: 4')")
+        assert ui.js("$('general-settings-message').textContent.includes('Description batch size: 4')")
         report['checks'].append('Save persists description batch size 4 and names it in the confirmation')
-        wait("state.sources.find(s=>s.key===" + json.dumps(one['key']) + ").pending===2")
+        wait("lal.state.sources.find(s=>s.key===" + json.dumps(one['key']) + ").pending===2")
         capture('01-general-saved.png')
         report['checks'].append('Save persists the budget and glTF-only selection; pending counts refresh immediately without processing')
         saved = settings_path(config).read_bytes()
-        window.evaluate_js("$('storage-budget').value='0';$('save-general-settings').click()")
-        assert not window.evaluate_js("$('storage-budget').checkValidity()")
+        ui.js("(async()=>{type('storage-budget','0');await frame();$('save-general-settings').click();return true})()")
+        assert not ui.js("$('storage-budget').checkValidity()")
         assert settings_path(config).read_bytes() == saved
         assert bridge.save_general_settings('invalid')['status'] == 'faulty'
         assert settings_path(config).read_bytes() == saved
         assert bridge.save_general_settings('24', ['gltf'], '3')['status'] == 'faulty'
         assert settings_path(config).read_bytes() == saved
         report['checks'].append('Browser and backend reject invalid values without replacing the saved limit')
-        window.evaluate_js("$('close-settings').click();$('open-settings').click()")
-        wait("$('storage-budget').value==='24'&&!$('storage-budget').disabled&&$('caption-batch-size').value==='4'")
-        assert window.evaluate_js("$('processing-format-gltf').checked&&!$('processing-format-fbx').checked&&!$('processing-format-obj').checked")
-        window.evaluate_js("$('processing-format-gltf').checked=false;$('save-general-settings').click()")
+        ui.js("(async()=>{$('nav-home').click();await until(()=>$('library-view'));$('nav-settings').click();return true})()")
+        wait("$('storage-budget')&&$('storage-budget').value==='24'&&!$('storage-budget').disabled&&$('caption-batch-size').dataset.value==='4'")
+        assert ui.js("['gltf','fbx','obj'].map(f=>$('processing-format-'+f).getAttribute('aria-checked')).join()==='true,false,false'")
+        ui.js("(async()=>{$('processing-format-gltf').click();await frame();$('save-general-settings').click();return true})()")
         wait("$('general-settings-message').textContent.includes('Processing is paused')")
-        wait("state.sources.every(source=>source.processing_paused&&!source.needs_processing)")
+        wait("lal.state.sources.every(source=>source.processing_paused&&!source.needs_processing)")
         assert bridge.source_action('process', one['key'])['status'] == 'faulty'
         report['checks'].append('All unchecked saves a visible paused state, removes pending warnings and starts no source worker')
-        window.evaluate_js("$('processing-format-gltf').checked=true;$('save-general-settings').click()")
+        ui.js("(async()=>{$('processing-format-gltf').click();await frame();$('save-general-settings').click();return true})()")
         wait("$('general-settings-message').textContent.startsWith('Saved.')&&!$('processing-formats').disabled")
-        window.evaluate_js("$('general-tab').focus();$('general-tab').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}))")
-        assert window.evaluate_js("$('general-panel').hidden&&!$('asset-sources-panel').hidden&&document.activeElement===$('asset-sources-tab')&&$('general-tab').tabIndex===-1")
-        assert window.evaluate_js("[...document.querySelectorAll('.source-format-counts')].some(row=>row.textContent==='FBX: 1 · glTF / GLB: 2 · OBJ: 3 · BLEND: 1')")
+        ui.js("(async()=>{$('general-tab').focus();$('general-tab').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await until(()=>$('asset-sources-panel')&&!$('asset-sources-panel').hidden);await frame();return true})()")
+        assert ui.js("$('general-panel').hidden&&!$('asset-sources-panel').hidden&&document.activeElement===$('asset-sources-tab')&&$('general-tab').tabIndex===-1")
+        wait("[...document.querySelectorAll('.source-format-counts')].some(row=>row.textContent==='FBX: 1 · glTF / GLB: 2 · OBJ: 3 · BLEND: 1')")
         capture('02-asset-sources.png')
         report['checks'].append('Asset Sources shows every inventoried format, including disabled FBX/OBJ and unsupported BLEND')
-        window.evaluate_js("$('asset-sources-tab').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}))")
-        assert window.evaluate_js("!$('general-panel').hidden&&document.activeElement===$('general-tab')")
+        ui.js("(async()=>{$('asset-sources-tab').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));await until(()=>!$('general-panel').hidden);await frame();return true})()")
+        assert ui.js("!$('general-panel').hidden&&document.activeElement===$('general-tab')")
         report['checks'].append('Reopening reloads the saved value; keyboard navigation and selected tab state work')
         window.resize(680, 800)
         wait('innerWidth<761')
-        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        assert ui.js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
         capture('03-general-narrow.png')
-        window.evaluate_js("$('asset-sources-tab').click()")
-        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        ui.js("(async()=>{$('asset-sources-tab').click();await until(()=>!$('asset-sources-panel').hidden);await frame();return true})()")
+        assert ui.js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
         capture('04-sources-narrow.png')
         assert not bridge._gateway.model_requested
         assert original_hashes == {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in preserved}
@@ -154,7 +138,6 @@ def verify():
         atomic_json(OUT / 'verification.json', report)
         bridge._close()
         window.destroy()
-
 
 window.events.loaded += lambda: threading.Thread(target=verify, daemon=True).start()
 webview.start(gui='edgechromium', debug=False, private_mode=True, storage_path=str(profile))

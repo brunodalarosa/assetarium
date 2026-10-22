@@ -36,22 +36,26 @@ function Card({ tone, title, meta, children, unread, className, onDismiss, dismi
   );
 }
 
-function NotificationItem({ item }: { item: Json }) {
-  const content = notificationContent(item);
+/** The same actions in the panel and in toasts; each one can change the state it reports. */
+function NotificationActions({ item, onAct }: { item: Json; onAct?: () => void }) {
   const exists = useApp((s) => s.sources.some((source) => source.key === item.source_key));
-  const actions: ReactNode[] = [];
+  if (!exists) return null;
   const action = (label: string, name: string, variant: "primary" | "secondary" | "quiet") => (
-    <Button key={name} variant={variant} className="h-9 px-4 text-[12.5px]" data-notification={item.id} data-action={name} onClick={() => void notificationAction(name, item)}>
+    <Button key={name} variant={variant} className="h-9 px-4 text-[12.5px]" data-notification={item.id} data-action={name} onClick={() => { onAct?.(); void notificationAction(name, item); }}>
       {label}
     </Button>
   );
-  if (exists) {
-    if (item.kind === "descriptions_ready") actions.push(action("Generate descriptions", "generate", "primary"), action("Not now", "dismiss", "quiet"));
-    else {
-      if (item.remaining && ["cancelled", "stopped", "interrupted"].includes(item.outcome)) actions.push(action("Continue", "generate", "primary"));
-      actions.push(["stopped", "interrupted", "complete_with_failures"].includes(item.outcome) ? action("View report", "report", "secondary") : action("View in Asset processing", "view", "secondary"));
-    }
+  const buttons: ReactNode[] = [];
+  if (item.kind === "descriptions_ready") buttons.push(action("Generate descriptions", "generate", "primary"), action("Not now", "dismiss", "quiet"));
+  else {
+    if (item.remaining && ["cancelled", "stopped", "interrupted"].includes(item.outcome)) buttons.push(action("Continue", "generate", "primary"));
+    buttons.push(["stopped", "interrupted", "complete_with_failures"].includes(item.outcome) ? action("View report", "report", "secondary") : action("View in Asset processing", "view", "secondary"));
   }
+  return <div className="notification-actions mt-1 flex flex-wrap gap-2">{buttons}</div>;
+}
+
+function NotificationItem({ item }: { item: Json }) {  const content = notificationContent(item);
+  const actions = <NotificationActions item={item} />;
   return (
     <li>
       <Card
@@ -63,7 +67,7 @@ function NotificationItem({ item }: { item: Json }) {
         dismissLabel={`Dismiss: ${content.title}, ${item.source_name}`}
       >
         <p className="notification-body text-[12.5px] leading-relaxed text-muted-foreground">{content.body}</p>
-        {actions.length > 0 && <div className="notification-actions mt-1 flex flex-wrap gap-2">{actions}</div>}
+        {actions}
       </Card>
     </li>
   );
@@ -170,7 +174,6 @@ function ToastView({ toast }: { toast: Toast }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const item = toast.notification;
-  const exists = useApp((s) => !item || s.sources.some((source) => source.key === item.source_key));
   return (
     <motion.div
       layout
@@ -186,17 +189,7 @@ function ToastView({ toast }: { toast: Toast }) {
     >
       <Card tone={toast.tone} title={toast.title} className="flex-1 bg-transparent">
         <p className="notification-body text-[12.5px] leading-relaxed text-muted-foreground">{toast.body}</p>
-        {item && exists && (
-          <div className="notification-actions mt-1 flex gap-2">
-            {item.kind === "descriptions_ready" ? (
-              <Button className="h-9 px-4 text-[12.5px]" onClick={() => { dismissToast(toast.id); void notificationAction("generate", item); }}>Generate descriptions</Button>
-            ) : (
-              <Button variant="secondary" className="h-9 px-4 text-[12.5px]" onClick={() => { dismissToast(toast.id); void notificationAction(["stopped", "interrupted", "complete_with_failures"].includes(item.outcome) ? "report" : "view", item); }}>
-                {["stopped", "interrupted", "complete_with_failures"].includes(item.outcome) ? "View report" : "View in Asset processing"}
-              </Button>
-            )}
-          </div>
-        )}
+        {item && <NotificationActions item={item} onAct={() => dismissToast(toast.id)} />}
       </Card>
       <button type="button" aria-label="Close" onClick={() => dismissToast(toast.id)} className="notification-dismiss mt-3 mr-3 grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-2">
         <X className="size-3.5" />

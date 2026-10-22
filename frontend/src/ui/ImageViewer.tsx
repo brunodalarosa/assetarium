@@ -93,7 +93,7 @@ export function ImageViewer({ assetId, name, image, api, version, native, pixelA
           <span className="image-zoom min-w-12 text-center text-[12px] tabular-nums" aria-live="polite">{zoom === "fit" ? "Fit" : Math.round(zoom * 100) + "%"}</span>
           <IconButton label="Zoom in" onClick={() => step(1)} className="size-8 rounded-full"><Plus className="size-3.5" /></IconButton>
         </div>
-        <SelectField label="Background" value={background} onChange={(value) => setState({ imageBackground: value })} options={BACKGROUNDS} className="image-background w-40" />
+        <SelectField id="image-background" label="Background" value={background} onChange={(value) => setState({ imageBackground: value })} options={BACKGROUNDS} className="image-background w-40" />
         <Checkbox className="image-pixelated mb-3 text-[12px]" label="Hard pixel edges" checked={!smooth} onCheckedChange={(checked) => setSmooth(!checked)} />
       </div>
       <p className="image-note text-[12px] leading-relaxed text-muted-foreground">{note}</p>

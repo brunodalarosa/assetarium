@@ -183,10 +183,13 @@ function EvidenceTab({ result, image }: { result: Json; image: boolean }) {
         )}
         <EvidenceBlock title="Full fault & processing evidence" value={image ? { stages: info.stage_faults, caption: quality, runtime: info.faults, processing: info.processing } : { source: info.source_faults, caption: quality, runtime: info.faults, processing: info.processing }} />
       </Section>
-      <Section title="Measurements & observations">
-        <EvidenceBlock title={image ? "Measurement evidence" : "Measurement & inspected-source evidence"} value={info.technical} />
-        {info.observations && <EvidenceBlock title="Structured generated observations" value={info.observations} />}
-      </Section>
+      {(!image || info.technical?.width != null || info.observations) && (
+        <Section title="Measurements & observations">
+          {/* Unmeasured images have no measurement evidence to show. */}
+          {(!image || info.technical?.width != null) && <EvidenceBlock title={image ? "Measurement evidence" : "Measurement & inspected-source evidence"} value={info.technical} />}
+          {info.observations && <EvidenceBlock title="Structured generated observations" value={info.observations} />}
+        </Section>
+      )}
       {image && (
         <Section title="Search and description input">
           <Text className="text-muted-foreground">

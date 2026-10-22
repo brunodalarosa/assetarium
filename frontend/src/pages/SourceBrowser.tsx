@@ -22,8 +22,17 @@ export function SourceBrowser({ sourceKey }: { sourceKey: string }) {
   const back = () => {
     const s = getState();
     const previous = s.history[s.historyIndex - 1];
-    if (previous?.page === "settings") goBack();
+    if (previous?.page === "settings" && previous.tab === "asset-sources") goBack();
     else navigate({ page: "settings", tab: "asset-sources" });
+    // Keyboard focus returns to the link that opened this source.
+    const selector = `[data-action=browse][data-source="${CSS.escape(sourceKey)}"]`;
+    const started = Date.now();
+    const focus = () => {
+      const link = document.querySelector<HTMLElement>(selector);
+      if (link) link.focus();
+      else if (Date.now() - started < 2000) requestAnimationFrame(focus);
+    };
+    requestAnimationFrame(focus);
   };
   return (
     <div id="source-browser-view" ref={scroller} onScroll={maybeLoad} className="h-full overflow-y-auto overscroll-contain px-8 pb-12 scroll-thin">

@@ -17,7 +17,7 @@ from local_asset_library.source_operations import publish_source
 from local_asset_library import sources
 from local_asset_library.source_operations import state,cancel,cancelled
 from local_asset_library.desktop import DesktopBridge,create_window,profile_path,record_profile_outcome
-from ui_text import assert_ui_text
+from gui_harness import Harness
 
 run=uuid.uuid4().hex[:10]
 OUT=ROOT/'data/gui'/('source-settings-'+run);OUT.mkdir(parents=True)
@@ -69,106 +69,88 @@ profile=profile_path(config,bridge,window)
 report={'status':'running','checks':[],'fixture':str(fixture),'renderer':'edgechromium','owner_approval':'pending'}
 
 
+ui=Harness(window,OUT,report)
+
+
 def wait(expression,timeout=35):
-    deadline=time.monotonic()+timeout
-    while time.monotonic()<deadline:
-        if window.evaluate_js(expression):return
-        time.sleep(.1)
-    raise RuntimeError('UI condition timed out: '+expression)
+    ui.js('until(()=>(%s),%d)'%(expression,timeout*1000),timeout+5)
 
 
-def js(script):
-    if '.then(' not in script:
-        return window.evaluate_js(script)
-    done=threading.Event();result=[]
-    window.evaluate_js(script,lambda value:(result.append(value),done.set()))
-    if not done.wait(35):raise RuntimeError('UI action timed out')
-    return result[0]
-
-
-def capture(name):
-    assert_ui_text(window, name, report)
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form=window.gui.BrowserView.instances[window.uid];stream=MemoryStream();done=threading.Event();faults=[]
-    def on_ui():
-        task=form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,stream)
-        def finish(task):
-            if task.IsFaulted:faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish),form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(on_ui));assert done.wait(15) and not faults
-    (OUT/name).write_bytes(bytes(stream.ToArray()));stream.Dispose()
+js=ui.js
+capture=ui.capture
+PROCESS="document.querySelectorAll('#processing-view [data-action=process]').length"
 
 
 def verify():
     try:
-        wait("state.context&&state.context.pilot_count===6&&state.items.length===6")
-        wait("document.querySelectorAll('.source-warning').length===1")
+        ui.wait_ready(extra='lal.state.context.pilot_count===6')
+        js("$('nav-processing').click()")
+        wait(PROCESS+"===1")
+        assert js("$('nav-processing').getAttribute('aria-label').includes('needs attention')")
         assert not bridge._gateway.model_requested
-        report['checks'].append('Startup scan detects a file added since the previous scan without model loading')
-        assert window.evaluate_js("![...document.querySelectorAll('button')].some(x=>['Process pending','Publish ready work'].includes(x.textContent))")
-        js("(()=>{$('query').value='item0';$('mode').value='keyword';return search().then(()=>true);})()")
-        wait('state.items.length===2&&!state.browsing')
-        js("$('open-settings').click();true")
-        js("$('asset-sources-tab').click();true")
-        wait("!$('settings-view').hidden&&document.querySelectorAll('.source-row').length===2")
-        assert window.evaluate_js("$('asset-sources-tab').getAttribute('aria-selected')==='true'")
-        capture('settings.png');report['checks'].append('Settings button, sidebar tab and both registered sources')
-        js("document.querySelector('.source-enabled input').click();true")
-        wait('state.context.pilot_count===3&&state.items.length===1&&!state.browsing')
+        report['checks'].append('Startup scan detects a file added since the previous scan without model loading; Asset processing offers it')
+        assert js("![...document.querySelectorAll('button')].some(x=>['Process pending','Publish ready work'].includes(x.textContent))")
+        js("(async()=>{lal.setState({filters:{...lal.state.filters,mode:'keyword'}});lal.setQuery('item0');await lal.submitSearch();return true})()")
+        wait("lal.state.library.items.length===2&&lal.state.search.phase==='search'")
+        js("$('nav-settings').click()")
+        js("(async()=>{await until(()=>$('asset-sources-tab'));$('asset-sources-tab').click();return true})()")
+        wait("$('settings-view')&&document.querySelectorAll('.source-row').length===2")
+        assert js("$('asset-sources-tab').getAttribute('aria-selected')==='true'")
+        capture('settings.png');report['checks'].append('Settings button, sources tab and both registered sources')
+        js("document.querySelector('.source-enabled [role=switch]').click()")
+        wait("lal.state.context.pilot_count===3&&lal.state.library.items.length===1&&lal.state.search.phase==='search'")
         report['checks'].append('Disabled-source cached cards disappear even when the replacement search is busy')
-        js("document.querySelector('.source-enabled input').click();true")
-        wait('state.context.pilot_count===6&&state.items.length===2&&!state.browsing')
-        assert window.evaluate_js("state.lastSettings.query==='item0'")
-        report['checks'].append('Live checkbox reruns the active search, preserving the query, without restart or model loading')
-        js("$('clear').click();true")
-        wait('state.items.length===6&&state.browsing')
-        # Each changed source receives its own card after a scan.
+        js("document.querySelector('.source-enabled [role=switch]').click()")
+        wait("lal.state.context.pilot_count===6&&lal.state.library.items.length===2&&lal.state.search.phase==='search'")
+        assert js("lal.state.search.lastSettings.query==='item0'")
+        report['checks'].append('Live switch reruns the active search, preserving the query, without restart or model loading')
+        js("(async()=>{lal.clearSearch();await lal.submitSearch();return true})()")
+        wait("lal.state.library.items.length===6&&lal.state.search.phase==='browse'")
+        # Each changed source is offered for processing after a scan.
         for source in (one,two):(Path(source['path'])/'added.obj').write_text('v 0 0 0\n')
-        js("sourceAction('scan').then(()=>true)")
-        js("$('close-settings').click();true")
-        wait("document.querySelectorAll('.source-warning').length===2")
-        capture('pending-sources.png');report['checks'].append('One card per source after newly added files are scanned')
-        js("document.querySelector('.source-warning .primary').click();true")
-        wait("!document.querySelector('.source-warning progress').hidden")
+        js("lal.sourceAction('scan').then(()=>true)")
+        js("$('nav-processing').click()")
+        wait(PROCESS+"===2")
+        capture('pending-sources.png');report['checks'].append('Each source with newly scanned files offers Process assets')
+        js("document.querySelector('#processing-view [data-action=process]').click()")
+        wait("document.querySelector('#processing-view article [role=progressbar]')")
         capture('processing.png')
-        js("document.querySelector('.source-warning button[data-action=cancel]').click();true")
-        wait("state.sources.some(x=>x.operation.status==='cancelled')")
-        assert window.evaluate_js("document.querySelectorAll('.source-warning').length===2")
-        report['checks'].append('Progress bar, cancel action and retained warning after cancellation')
-        js("document.querySelector('.source-warning .primary').click();true")
-        wait("document.querySelectorAll('.source-warning').length===1")
-        wait('state.context.pilot_count===8')
-        report['checks'].append('Card disappears only after processed results are published and scanned')
+        js("document.querySelector('#processing-view [data-action=cancel]').click()")
+        wait("lal.state.sources.some(x=>x.operation.status==='cancelled')")
+        wait(PROCESS+"===2")
+        report['checks'].append('Progress bar, cancel action and retained pending work after cancellation')
+        js("document.querySelector('#processing-view [data-action=process]').click()")
+        wait(PROCESS+"===1")
+        wait('lal.state.context.pilot_count===8')
+        report['checks'].append('Pending work disappears only after processed results are published and scanned')
         window.resize(680,760);wait('innerWidth<761')
-        js("$('open-settings').click();true")
-        js("$('asset-sources-tab').click();true")
-        wait("!$('settings-view').hidden")
-        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        js("$('nav-settings').click()")
+        js("(async()=>{await until(()=>$('asset-sources-tab'));$('asset-sources-tab').click();await frame();return true})()")
+        wait("$('settings-view')&&!$('asset-sources-panel').hidden")
+        assert js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
         capture('settings-narrow.png');report['checks'].append('Narrow settings view has no horizontal overflow')
         # Failed attempts remain inspectable without presenting a futile action.
         work=working(sources.bound(config,one));record=records(work)[0]
         original=json.loads(json.dumps(record));failed_previews(work,record)
         publish_source(sources.bound(config,one));sources.aggregate(config);sources.scan_source(config,one)
-        js("$('close-settings').click();true")
-        wait("state.sources.some(x=>x.failed===1&&!x.needs_processing)&&document.querySelectorAll('.source-warning').length===1")
-        report['checks'].append('A published retained failure creates no pending-import card; the other unfinished source keeps its card')
-        js("$('open-import-failures').click();true")
-        wait("!$('import-failures-view').hidden&&document.querySelectorAll('#import-failures-list li').length>0")
+        js("$('nav-processing').click()")
+        wait("lal.state.sources.some(x=>x.failed===1&&!x.needs_processing)&&"+PROCESS+"===1")
+        report['checks'].append('A published retained failure offers no futile processing action; the other unfinished source keeps its action')
+        wait("$('import-failures-summary').textContent.includes('1 asset with recorded failures')")
+        js("[...document.querySelectorAll('#processing-view button')].find(b=>b.textContent.startsWith('Show ')).click()")
+        wait("document.querySelectorAll('#import-failures-list li').length>0")
         expected=sources.importing_failures(config)['paths']
-        assert window.evaluate_js("[...$('import-failures-list').children].map(x=>x.textContent)")==expected
-        assert window.evaluate_js("getComputedStyle($('import-failures-list')).overflowY==='auto'&&document.documentElement.scrollWidth<=innerWidth")
+        assert js("[...$('import-failures-list').children].map(x=>x.textContent)")==expected
+        assert js("getComputedStyle($('import-failures-list')).overflowY==='auto'&&$('processing-view').scrollWidth<=$('processing-view').clientWidth+1")
         capture('import-failures-narrow.png')
         report['checks'].append('Failure report displays original paths as selectable text in a scrollable list without narrow-screen overflow')
-        js("$('close-import-failures').click();true")
-        wait("!$('library-view').hidden&&document.activeElement.id==='open-import-failures'")
-        report['checks'].append('Back to library preserves the current library view and returns keyboard focus')
+        js("lal.goBack()")
+        wait("$('settings-view')")
+        assert js("!document.querySelector('[aria-label=Forward]').disabled")
+        report['checks'].append('Back returns to the previous view; Forward is available again')
         update_record(work,original);sources.scan_source(config,one)
-        js("$('open-import-failures').click();true")
-        wait("!$('import-failures-empty').hidden&&$('import-failures-list').hidden")
+        js("lal.goForward()")
+        wait("$('import-failures-empty')&&!$('import-failures-list')")
         capture('import-failures-empty.png')
         report['checks'].append('Empty failure report has an explicit empty state')
         report['status']='passed'
@@ -177,7 +159,6 @@ def verify():
     finally:
         (OUT/'report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
         bridge._close();window.destroy()
-
 
 try:
     import webview

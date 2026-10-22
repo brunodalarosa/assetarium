@@ -350,6 +350,8 @@ async function loadReferenceOptions() {
 
 const thumbQueue: { id: CollectionId; item: Json; generation: number; version: string | null }[] = [];
 let thumbWorkers = 0;
+/** Concurrent thumbnail requests (at most 3); read by verification scripts. */
+export const thumbnailWorkers = () => thumbWorkers;
 const requested = new Set<string>();
 export function requestThumb(id: CollectionId, item: Json) {
   const c = state[id];

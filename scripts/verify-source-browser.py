@@ -14,7 +14,7 @@ sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from test_sources import managed, ready_source
 from local_asset_library import sources
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
-from ui_text import assert_ui_text
+from gui_harness import Harness
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--run-name', required=True)
@@ -88,89 +88,63 @@ profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True, 'owner_usability_approval': 'pending'}
 
 
+ui = Harness(window, OUT, report)
+
+
 def wait(expression, timeout=30):
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if window.evaluate_js(expression):
-            return
-        time.sleep(.1)
-    raise RuntimeError('UI condition timed out: ' + expression + ' ' + str(window.evaluate_js(
-        "({main:$('error').textContent,source:$('source-browser-error').textContent})")))
+    try:
+        ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
+    except RuntimeError as exc:
+        raise RuntimeError('UI condition timed out: ' + expression + ' ' + str(ui.js(
+            "({main:$('error')?.textContent,source:$('source-browser-error')?.textContent})"))) from exc
 
 
-def js(script):
-    if '(async' not in script:
-        return window.evaluate_js(script)
-    done, result = threading.Event(), []
-    window.evaluate_js(script, lambda value: (result.append(value), done.set()))
-    if not done.wait(40):
-        raise RuntimeError('UI action timed out: ' + script[:150])
-    return result[0]
-
-
-def capture(name):
-    assert_ui_text(window, name, report)
-    from System import Action
-    from System.IO import MemoryStream
-    from System.Threading.Tasks import Task
-    from Microsoft.Web.WebView2.Core import CoreWebView2CapturePreviewImageFormat
-    form = window.gui.BrowserView.instances[window.uid]
-    stream, done, faults = MemoryStream(), threading.Event(), []
-    def start():
-        task = form.browser.webview.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, stream)
-        def finish(task):
-            if task.IsFaulted:
-                faults.append(str(task.Exception))
-            done.set()
-        task.ContinueWith(Action[Task](finish), form.browser.syncContextTaskScheduler)
-    form.Invoke(Action(start))
-    assert done.wait(15) and not faults
-    path = OUT / name
-    path.write_bytes(bytes(stream.ToArray()))
-    stream.Dispose()
-    return path
+js = ui.js
+capture = ui.capture
+SOURCE_READY = "$('source-browser-view')&&lal.state.source.items.length===40&&!lal.state.source.loading"
 
 
 def verify():
     try:
-        wait('state.context&&state.items.length===3&&state.sources.length===3')
+        ui.wait_ready(extra='lal.state.sources.length===3')
+        js("(async()=>{await lal.submitSearch();await until(()=>lal.state.library.items.length===3);return true})()")
         if args.kaykit_regressions:
             selector = '#grid .card[data-id="' + pending_id + '"]'
             wait('Boolean(document.querySelector(' + json.dumps(selector) + ')?.textContent.includes("Preview pending"))')
-            assert not window.evaluate_js('document.querySelector(' + json.dumps(selector) + ').textContent.includes("Preview fault")')
+            assert not js('document.querySelector(' + json.dumps(selector) + ').textContent.includes("Preview fault")')
             report['checks'].append('Never-generated preview is labeled pending without a false preview-fault badge')
-        js("(async()=>{$('query').value='item0';$('mode').value='keyword';await search();window.savedLibraryCards=[...$('grid').children];return true;})()")
-        js("$('open-settings').click();true")
-        js("$('asset-sources-tab').click();true")
-        wait("!$('settings-view').hidden&&document.querySelectorAll('.source-browse-link').length===3")
+        js("""(async()=>{lal.setState({filters:{...lal.state.filters,mode:'keyword'}});lal.setQuery('item0');await lal.submitSearch();
+          window.savedLibraryIds=[...$('grid').children].map(c=>c.dataset.id);return true})()""")
+        js("(async()=>{$('nav-settings').click();await until(()=>$('asset-sources-tab'));$('asset-sources-tab').click();return true})()")
+        wait("$('settings-view')&&document.querySelectorAll('.source-browse-link').length===3")
         capture('01-source-links.png')
-        assert window.evaluate_js("document.querySelector('.source-browse-link').getAttribute('aria-label').includes('Browse assets')")
+        assert js("document.querySelector('.source-browse-link').getAttribute('aria-label').includes('Browse assets')")
         # Clicking the label and icon follows the same button action.
-        js("document.querySelector('.source-browse-link span:first-child').click();true")
-        wait("!$('source-browser-view').hidden&&state.sourceBrowse.items.length===40&&!state.sourceBrowse.loading")
+        js("document.querySelector('.source-browse-link span:first-child').click()")
+        wait(SOURCE_READY)
         wait("document.querySelectorAll('#source-grid .thumb img').length>=4")
-        assert window.evaluate_js("$('source-browser-status').textContent.includes('51 saved assets')&&$('source-browser-status').textContent.includes('Disabled')")
-        assert window.evaluate_js("$('search-form').closest('[hidden]')!==null")
-        assert window.evaluate_js("$('source-collection').scrollHeight>$('source-collection').clientHeight")
+        assert js("$('source-browser-status').textContent.includes('51 saved assets')&&$('source-browser-status').textContent.includes('Disabled')")
+        assert js("!$('search-form')")
+        assert js("$('source-browser-view').scrollHeight>$('source-browser-view').clientHeight")
         capture('02-disabled-source-grid.png')
-        report['checks'].append('Name opens disabled source with 51 saved assets, independent scroll area and no search form')
-        js("$('source-collection').scrollTop=$('source-collection').scrollHeight;true")
-        wait('state.sourceBrowse.items.length===51&&!state.sourceBrowse.loading')
-        assert window.evaluate_js("new Set([...$('source-grid').children].map(x=>x.dataset.id)).size===51&&$('source-load-more').hidden")
+        report['checks'].append('Name opens disabled source with 51 saved assets, its own scroll area and no search form')
+        js("$('source-browser-view').scrollTop=$('source-browser-view').scrollHeight")
+        wait('lal.state.source.items.length===51&&!lal.state.source.loading')
+        assert js("new Set([...$('source-grid').children].map(x=>x.dataset.id)).size===51&&!$('source-load-more')")
         report['checks'].append('Scrolling loads the final batch without duplicates or losing earlier cards')
-        js("$('source-collection').scrollTop=0;document.querySelector('#source-grid .card').click();true")
-        wait("Boolean(document.querySelector('#source-detail .detail-header')&&LALPreview.current)")
+        js("$('source-browser-view').scrollTop=0;document.querySelector('#source-grid .card').click()")
+        wait("Boolean(document.querySelector('#inspector .detail-header')&&window.LALPreview.current&&!lal.state.source.detail.loading)")
         if args.kaykit_regressions:
-            assert window.evaluate_js('!LALPreview.current.launch.disabled&&Boolean(LALPreview.current.item.image)')
-            assert not window.evaluate_js("$('source-detail').textContent.includes('deterministic cap')||$('source-detail').textContent.includes('No verified source')")
+            assert js('!LALPreview.current.launch.disabled&&Boolean(LALPreview.current.item.image)')
+            assert not js("$('detail').textContent.includes('deterministic cap')||$('detail').textContent.includes('No verified source')")
             report['checks'].append('Large optional metadata preserves detail image, verified source and enabled interactive preview')
-        assert not window.evaluate_js("Boolean(document.querySelector('#detail .detail-header'))")
-        js('LALPreview.current.launch.click();true')
+        assert js("lal.state.library.selected===null&&lal.state.source.selected!==null")
+        js('LALPreview.current.launch.click()')
         wait('Boolean(LALPreview.current?.ready)', 60)
         capture('03-source-inspection-3d.png')
-        assert '4 triangles' in window.evaluate_js('LALPreview.current.summary.textContent')
+        assert '4 triangles' in js('LALPreview.current.summary.textContent')
         js("(()=>{const preview=LALPreview.current;preview.message({source:preview.frame.contentWindow,data:{kind:'lal-3d',session:preview.session,type:'search'}});return true;})()")
-        assert window.evaluate_js("document.activeElement===$('source-grid')")
+        assert js("document.activeElement===$('source-grid')")
         js('(async()=>{await LALPreview.current.enterFullscreen();return true;})()')
         wait('LALPreview.current.fullscreen&&!LALPreview.current.loadingText')
         capture('04-source-fullscreen.png')
@@ -178,34 +152,34 @@ def verify():
         report['checks'].append('Source cards reuse inspection, rendered 3D geometry and fullscreen preview; viewer find shortcut focuses the source grid')
         window.resize(680, 800)
         wait('innerWidth<761')
-        assert window.evaluate_js('document.documentElement.scrollWidth<=innerWidth')
+        assert js("$('source-browser-view').scrollWidth<=$('source-browser-view').clientWidth+1")
         capture('05-source-narrow.png')
-        report['checks'].append('Narrow source layout has no horizontal overflow')
-        js("$('close-source-browser').click();true")
-        wait("!$('settings-view').hidden&&document.activeElement?.dataset.action==='browse'")
-        assert not window.evaluate_js('Boolean(document.querySelector(".model-viewport iframe"))')
+        report['checks'].append('Narrow source layout has no horizontal overflow; inspection floats over the grid')
+        js("$('close-source-browser').click()")
+        wait("$('settings-view')&&document.activeElement?.dataset.action==='browse'&&document.activeElement?.dataset.source===" + json.dumps(one['key']))
+        assert not js('Boolean(document.querySelector(".model-viewport iframe"))')
         assert not bridge._source_browser.sessions[one['key']][1].tickets
-        js("document.querySelector('.source-browse-icon').click();true")
-        wait("!$('source-browser-view').hidden&&state.sourceBrowse.items.length===40&&!state.sourceBrowse.loading")
+        js("document.querySelector('.source-browse-icon').click()")
+        wait(SOURCE_READY)
         bridge.delay = True
-        js("document.querySelector('#source-grid .card').click();true")
+        js("document.querySelector('#source-grid .card').click()")
         assert bridge.entered.wait(10)
-        js("$('close-source-browser').click();true")
-        wait("!$('settings-view').hidden")
+        js("$('close-source-browser').click()")
+        wait("$('settings-view')")
         bridge.delay = False
         bridge.unblock.set()
         time.sleep(.5)
-        assert not window.evaluate_js('Boolean(LALPreview.current)')
+        assert not js('Boolean(LALPreview.current)')
         report['checks'].append('Icon navigation returns focus to source and releases preview; late detail cannot reopen it')
-        js(f"(async()=>{{await openSourceBrowser({json.dumps(empty['key'])});return true;}})()")
-        assert window.evaluate_js("!$('source-empty').hidden&&$('source-empty').textContent.includes('Scan and process')&&$('source-load-more').hidden")
+        js(f"(async()=>{{lal.navigate({{page:'source',key:{json.dumps(empty['key'])}}});await until(()=>$('source-empty'));return true;}})()")
+        assert js("$('source-empty').textContent.includes('Scan and process')&&!$('source-load-more')")
         capture('06-unprocessed-source.png')
         report['checks'].append('Unprocessed source explains availability without scanning or offering a futile load action')
-        js("$('close-source-browser').click();true")
-        wait("!$('settings-view').hidden")
-        js("$('close-settings').click();true")
-        wait("!$('library-view').hidden")
-        assert window.evaluate_js("$('query').value==='item0'&&state.lastSettings.query==='item0'&&savedLibraryCards.every((card,i)=>card===$('grid').children[i])")
+        js("$('close-source-browser').click()")
+        wait("$('settings-view')")
+        js("$('nav-home').click()")
+        wait("$('library-view')&&document.querySelectorAll('#grid .card').length===savedLibraryIds.length")
+        assert js("$('query').value==='item0'&&lal.state.search.lastSettings.query==='item0'&&savedLibraryIds.every((id,i)=>id===$('grid').children[i].dataset.id)")
         assert not bridge._gateway.model_requested
         changed = [p for p, digest in saved.items() if hashlib.sha256(Path(p).read_bytes()).hexdigest() != digest]
         assert not changed, changed
@@ -222,7 +196,6 @@ def verify():
         (OUT / 'verification.json').write_text(json.dumps(report, indent=2) + '\n')
         bridge._close()
         window.destroy()
-
 
 window.events.loaded += lambda: threading.Thread(target=verify, daemon=True).start()
 webview.start(gui='edgechromium', debug=False, private_mode=True, storage_path=str(profile))
