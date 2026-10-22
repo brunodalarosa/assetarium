@@ -111,6 +111,34 @@ def test_ungenerated_preview_is_pending_and_does_not_retain_a_fault(indexed):
     assert not service.preview_faults and not service.item_faults
 
 
+def test_card_facts_are_measured_values_or_absent(indexed):
+    config, _, records = indexed
+    record = deepcopy(records[0])
+    record['technical'] = {**(record.get('technical') or {}), 'inspected_format': 'glb',
+                           'evaluated_instance_totals': {'triangles': 1248, 'vertices': 864}}
+    update(config, record)
+    card = DesktopService(config).thumbnail(record['asset_id'])['payload']['card']
+    assert card == {'format': 'glb', 'triangles': 1248, 'width': None, 'height': None}
+    bare = deepcopy(records[1])
+    bare['technical'] = {}
+    update(config, bare)
+    assert DesktopService(config).thumbnail(bare['asset_id'])['payload']['card'] == {
+        'format': None, 'triangles': None, 'width': None, 'height': None}
+
+
+def test_desktop_bridge_round_trips_interface_preferences(indexed):
+    config, _, _ = indexed
+    bridge = DesktopBridge(config, prestart_worker=False)
+    try:
+        assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440}
+        assert bridge.save_interface_settings('dark', None)['appearance'] == 'dark'
+        assert bridge.save_interface_settings(None, 610)['inspector_width'] == 610
+        assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'dark', 'inspector_width': 610}
+        assert bridge.save_interface_settings('sepia', None)['status'] == 'faulty'
+    finally:
+        bridge._close()
+
+
 def test_unattempted_disabled_format_is_excluded_without_a_preview_fault(indexed):
     from local_asset_library.settings import save_general_settings
     config, _, records = indexed

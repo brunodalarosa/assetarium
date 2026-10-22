@@ -6,3 +6,7 @@ docs/mcp/*.json -text
 src/local_asset_library/ui/vendor/** -text linguist-vendored whitespace=-trailing-space conflict-marker-size=32
 src/local_asset_library/ui/vendor/README.md text linguist-vendored=false
 src/local_asset_library/ui/vendor/manifest.json text linguist-vendored=false
+
+# Built React bundle (frontend/ → npm run build): byte-for-byte, collapsed in diffs.
+src/local_asset_library/ui/build/** -text -diff linguist-generated=true
+

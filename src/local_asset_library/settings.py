@@ -108,3 +108,41 @@ def save_general_settings(config, storage_budget_gib, processing_formats=None, c
                  caption_batch_size=batch)
     atomic_json(path, value)
     return dict(general_settings(config), status='saved')
+
+
+# Presentation preferences live apart from settings.json so they never touch budget validation.
+APPEARANCES = ('system', 'light', 'dark')
+INSPECTOR_WIDTH = (320, 960, 440)  # minimum, maximum, default in CSS pixels
+
+
+def interface_path(config):
+    return config.storage_root('data') / 'library/interface.json'
+
+
+def interface_settings(config):
+    path = interface_path(config)
+    try:
+        value = read_json(path) if path.exists() else {}
+    except Exception:
+        value = {}  # A damaged preference file only resets presentation, never library data.
+    appearance = value.get('appearance')
+    width = value.get('inspector_width')
+    low, high, default = INSPECTOR_WIDTH
+    return {'status': 'ready', 'appearance': appearance if appearance in APPEARANCES else 'system',
+            'inspector_width': width if type(width) is int and low <= width <= high else default}
+
+
+def save_interface_settings(config, appearance=None, inspector_width=None):
+    current = interface_settings(config)
+    if appearance is not None:
+        if appearance not in APPEARANCES:
+            raise ConfigError('Choose Match Windows, Light or Dark in Settings → General')
+        current['appearance'] = appearance
+    if inspector_width is not None:
+        low, high, _ = INSPECTOR_WIDTH
+        if isinstance(inspector_width, bool) or not isinstance(inspector_width, (int, float)):
+            raise ConfigError('Inspector width must be a number of pixels')
+        current['inspector_width'] = int(min(high, max(low, round(inspector_width))))
+    atomic_json(interface_path(config), {'schema_version': 1, 'appearance': current['appearance'],
+                                         'inspector_width': current['inspector_width']})
+    return dict(current, status='saved')

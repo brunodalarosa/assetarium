@@ -166,6 +166,11 @@ class DesktopService(AssetService):
             self.preview_bindings[(identifier,view)]=self.preview_binding(identifier,view)
         if record.get('asset_type')=='image':
             payload['pixel_art_candidate']=bool((record.get('technical') or {}).get('pixel_art_candidate'))
+        # Measured card facts only; missing measurements stay absent rather than guessed.
+        technical=record.get('technical') or {}
+        payload['card']={'format':technical.get('inspected_format'),
+                         'triangles':(technical.get('evaluated_instance_totals') or {}).get('triangles'),
+                         'width':technical.get('width'),'height':technical.get('height')}
         return {'payload':payload,'image':image,'generation':version}
 
     def _thumbnail(self, record):

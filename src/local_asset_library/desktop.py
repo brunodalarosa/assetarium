@@ -130,6 +130,15 @@ class DesktopBridge:
         return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
                                         caption_batch_size, guarded=False))
 
+    def interface_settings(self):
+        from .settings import interface_settings
+        return self._wait(self._present(interface_settings, self._config, guarded=False))
+
+    def save_interface_settings(self, appearance=None, inspector_width=None):
+        from .settings import save_interface_settings
+        return self._wait(self._present(save_interface_settings, self._config, appearance, inspector_width,
+                                        guarded=False))
+
     def importing_failures(self):
         from .sources import importing_failures
         return self._wait(self._present(importing_failures, self._config, guarded=False))
@@ -365,18 +374,49 @@ class DesktopBridge:
             self._thread.join(timeout=15)
 
 
+WINDOW_BACKGROUND = {'light': '#f1f5f9', 'dark': '#10151e'}
+
+
+def windows_prefers_dark():
+    """Read-only check of the Windows app theme, so the first frame matches it."""
+    if os.name != 'nt':
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize') as key:
+            return winreg.QueryValueEx(key, 'AppsUseLightTheme')[0] == 0
+    except OSError:
+        return False
+
+
+def page_html(config):
+    """The built React bundle inlined into the CSP-restricted shell, themed before first paint."""
+    from .settings import interface_settings
+    ui = Path(__file__).resolve().parent / 'ui'
+    interface = interface_settings(config)
+    resolved = interface['appearance'] if interface['appearance'] != 'system' else (
+        'dark' if windows_prefers_dark() else 'light')
+    boot = {'appearance': interface['appearance'], 'inspector_width': interface['inspector_width']}
+    # "</" cannot close the inline script; JSON keeps every other character literal.
+    boot_json = json.dumps(boot, ensure_ascii=False).replace('</', '<\\/')
+    html = (ui / 'index.html').read_text(encoding='utf-8')
+    html = html.replace('data-theme="light"', f'data-theme="{resolved}" data-appearance="{interface["appearance"]}"', 1)
+    html = html.replace('/* BOOT_DATA */', 'window.LAL_BOOT=' + boot_json + ';')
+    html = html.replace('/* BUNDLED_STYLE */', (ui / 'build/app.css').read_text(encoding='utf-8'))
+    html = html.replace('/* INTERACTIVE_PREVIEW_SCRIPT */', (ui / 'interactive-preview.js').read_text(encoding='utf-8'))
+    html = html.replace('/* BUNDLED_SCRIPT */', (ui / 'build/app.js').read_text(encoding='utf-8'))
+    return html, resolved
+
+
 def create_window(config, bridge):
     """Shared shell construction for the normal launcher and real bridge verification."""
     import webview
     webview.settings.update({'ALLOW_DOWNLOADS': False, 'ALLOW_FILE_URLS': False,
         'OPEN_EXTERNAL_LINKS_IN_BROWSER': False, 'SHOW_DEFAULT_MENUS': False})
-    ui = Path(__file__).resolve().parent / 'ui'
-    html = (ui / 'index.html').read_text(encoding='utf-8')
-    html = html.replace('/* BUNDLED_STYLE */', (ui / 'style.css').read_text(encoding='utf-8'))
-    html = html.replace('/* BUNDLED_SCRIPT */', (ui / 'app.js').read_text(encoding='utf-8'))
-    html = html.replace('/* INTERACTIVE_PREVIEW_SCRIPT */', (ui / 'interactive-preview.js').read_text(encoding='utf-8'))
-    window = webview.create_window('Local Asset Library', html=html, js_api=bridge,
-        width=1280, height=860, min_size=(640, 480), resizable=True, background_color='#f4f3ef')
+    html, theme = page_html(config)
+    window = webview.create_window('Assetarium', html=html, js_api=bridge,
+        width=1280, height=860, min_size=(640, 480), resizable=True, background_color=WINDOW_BACKGROUND[theme])
     bridge._window = window
     return window
 

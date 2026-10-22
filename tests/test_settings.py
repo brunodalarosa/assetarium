@@ -159,3 +159,29 @@ def test_gpu_memory_reason_from_stage_worker_reaches_the_source_card(config, mon
 def test_cancelling_caption_stage_names_the_batch():
     assert operations.finishing('caption') == 'Finishing the current batch before stopping'
     assert operations.finishing('inspection') == 'Finishing the current asset before stopping'
+
+
+def test_interface_preferences_default_validate_and_never_touch_budget_settings(config):
+    from local_asset_library.settings import interface_path, interface_settings, save_interface_settings
+    assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440}
+    saved = save_interface_settings(config, appearance='dark')
+    assert saved == {'status': 'saved', 'appearance': 'dark', 'inspector_width': 440}
+    assert save_interface_settings(config, inspector_width=5000)['inspector_width'] == 960  # clamped
+    assert save_interface_settings(config, inspector_width=12)['inspector_width'] == 320
+    assert interface_settings(config)['appearance'] == 'dark'  # width saves keep the appearance
+    with pytest.raises(ConfigError, match='Match Windows'):
+        save_interface_settings(config, appearance='sepia')
+    with pytest.raises(ConfigError, match='pixels'):
+        save_interface_settings(config, inspector_width=True)
+    # Presentation lives apart from settings.json, so budget validation never sees it.
+    assert not settings_path(config).exists() and interface_path(config).exists()
+    assert general_settings(config)['storage_budget_gib'] == 10
+
+
+def test_damaged_interface_preferences_reset_presentation_only(config):
+    from local_asset_library.settings import interface_path, interface_settings
+    interface_path(config).parent.mkdir(parents=True, exist_ok=True)
+    interface_path(config).write_text('{not json', encoding='utf-8')
+    assert interface_settings(config)['appearance'] == 'system'
+    atomic_json(interface_path(config), {'appearance': 'neon', 'inspector_width': 'wide'})
+    assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440}

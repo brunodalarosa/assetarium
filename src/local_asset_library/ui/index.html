@@ -1,118 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src data: blob:; font-src 'none'; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>Local Asset Library</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src data: blob:; font-src data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Assetarium</title>
   <style>/* BUNDLED_STYLE */</style>
+  <script>/* BOOT_DATA */</script>
 </head>
 <body>
-  <a class="skip" href="#grid">Skip to assets</a>
-  <header>
-    <div class="brand"><span class="mark" aria-hidden="true">◈</span><div><h1>Local Asset Library</h1><p>Prepared assets, close at hand.</p></div></div>
-    <div class="header-actions"><div class="scope"><strong id="scope">Loading library…</strong><span id="inventory">Local · read only</span></div><div class="header-icons"><div class="notifications-anchor"><button id="open-notifications" class="bell" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="notifications-panel" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.5A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.5L18 12.6V9a6 6 0 0 0-6-6Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 19.5a2.6 2.6 0 0 0 5 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="notifications-count" class="bell-count" aria-hidden="true" hidden></span><span id="notifications-running-dot" class="bell-running" aria-hidden="true" hidden></span></button>
-      <section id="notifications-panel" class="notifications-panel" role="dialog" aria-labelledby="notifications-title" hidden>
-        <div class="notifications-head"><h2 id="notifications-title" tabindex="-1">Notifications</h2><button id="notifications-read-all" class="text-button" type="button">Mark all read</button></div>
-        <div id="notifications-running" aria-live="polite"></div>
-        <ul id="notifications-list" aria-label="Notifications"></ul>
-        <p id="notifications-empty" class="notifications-empty" hidden>You’re all caught up.</p>
-      </section></div><button id="open-settings" class="icon-button" type="button" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button></div></div>
-  </header>
-  <main id="library-view">
-    <form id="search-form" aria-label="Search library assets">
-      <label class="sr" for="query">Search the approved library</label>
-      <div class="search-row"><input id="query" type="search" placeholder="Describe an asset, or search its name…" maxlength="1024" autocomplete="off"><button class="primary" type="submit" id="submit">Search</button><button type="button" id="clear">Clear</button></div>
-      <details id="search-options"><summary>Filters &amp; search options</summary>
-        <div class="controls">
-          <label>Asset type<select id="asset-type"><option value="">All types</option><option value="model_3d">3D models</option><option value="image">2D images</option></select></label>
-          <label>Pack<select id="pack"><option value="">All pilot packs</option></select></label>
-          <label>Source format<select id="format"><option value="">Any format</option></select></label>
-          <label>Maximum triangles<input id="triangles" type="number" min="0" max="1000000000" step="1" placeholder="No limit"></label>
-          <label>Rigged<select id="rigged"><option value="">Any / unknown</option><option value="true">Yes</option><option value="false">No</option></select></label>
-          <label>Image transparency<select id="transparent"><option value="">Any</option><option value="true">Has transparency</option><option value="false">Opaque</option></select></label>
-          <label>Image size<select id="size-class"><option value="">Any size</option><option value="tiny">Tiny (up to 32 px)</option><option value="small">Small (up to 128 px)</option><option value="medium">Medium (up to 1024 px)</option><option value="large">Large (over 1024 px)</option></select></label>
-          <label>Search mode<select id="mode"><option value="keyword_description">Keyword + description</option><option value="keyword">Exact keywords</option><option value="description">Visual description</option><option value="image">Text → image</option><option value="combined" selected>Keyword + description + image (default)</option><option value="reference">Pilot preview reference</option></select></label>
-          <label>Shortlist limit<select id="limit"><option>5</option><option>10</option><option selected>20</option><option>30</option><option>40</option></select></label>
-        </div>
-        <div class="controls reference" id="reference-controls" hidden><label>Reference pilot asset<select id="reference-asset"></select></label><label>Reference view<select id="reference-view"><option value="three_quarter">Three-quarter</option><option value="front">Front</option><option value="side">Side</option><option value="image">2D image</option></select></label></div>
-        <p class="hint">Technical filters require measured evidence for the selected format; image filters match processed 2D images only. Enter with an empty query browses the filtered pilot.</p>
-      </details>
-    </form>
-    <section id="source-warnings" aria-label="Asset sources needing attention" tabindex="0" hidden></section>
-    <div class="results-bar"><div><h2 id="results-title">Browse the library</h2><span id="search-busy" hidden role="status" aria-live="polite"><span class="search-spinner" aria-hidden="true"></span>Searching…</span><p id="status" role="status" aria-live="polite">Loading existing records and previews…</p></div><button id="copy-settings" type="button" disabled>Copy search settings</button></div>
-    <p class="hint" id="candidate-note" hidden>Ranked suggestions may include unrelated assets—even when the requested object is absent. Review the previews.</p>
-    <p class="hint" id="reproduce-note" hidden>Copies the completed search. Agents must use the same catalog, index and enabled sources to reproduce this shortlist.</p>
-    <div id="error" role="alert" hidden></div>
-    <div class="workspace">
-      <section class="collection" aria-label="Library assets"><div id="grid" class="grid" tabindex="-1" aria-busy="true"></div><p id="empty" hidden>No assets match these settings.</p></section>
-      <aside id="detail" class="asset-detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p><p class="hint">Source files stay in their original location.</p></div></aside>
-    </div>
-  </main>
-  <section id="settings-view" aria-label="Settings" hidden>
-    <div class="settings-heading"><h2 id="settings-title" tabindex="-1">Settings</h2><button type="button" id="close-settings">Back to library</button></div>
-    <div class="settings-layout">
-      <nav class="settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
-        <button type="button" id="general-tab" role="tab" aria-selected="true" aria-controls="general-panel">General</button>
-        <button type="button" id="asset-sources-tab" role="tab" aria-selected="false" aria-controls="asset-sources-panel" tabindex="-1">Asset sources</button>
-      </nav>
-      <section id="general-panel" role="tabpanel" aria-labelledby="general-tab">
-        <h2>General</h2>
-        <form id="general-settings-form" class="general-settings-form">
-          <label for="storage-budget">Storage budget (GiB)</label>
-          <p id="storage-budget-help" class="hint">Maximum storage for LAL and generated source metadata. Original assets and shared models are excluded. Processing stops at storage checks when the budget is reached and keeps completed work.</p>
-          <input id="storage-budget" type="number" min="1" max="1048576" step="1" required aria-describedby="storage-budget-help" disabled>
-          <fieldset id="processing-formats" aria-describedby="processing-formats-help" disabled>
-            <legend>Formats to process</legend>
-            <p id="processing-formats-help" class="hint">Scanning counts every supported format. New processing batches use only selected formats. Existing results are kept. Uncheck all to pause processing.</p>
-            <div class="processing-format-options">
-              <label><input id="processing-format-fbx" type="checkbox" value="fbx" checked>FBX</label>
-              <label><input id="processing-format-gltf" type="checkbox" value="gltf" checked>glTF / GLB</label>
-              <label><input id="processing-format-obj" type="checkbox" value="obj" checked>OBJ</label>
-            </div>
-          </fieldset>
-          <label for="caption-batch-size">Description batch size</label>
-          <p id="caption-batch-size-help" class="hint">How many assets are described together in one model call. Larger batches finish sooner but use more GPU memory. If processing stops for lack of GPU memory, choose a smaller size. Finished descriptions are never redone.</p>
-          <select id="caption-batch-size" aria-describedby="caption-batch-size-help" disabled>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="4">4</option>
-            <option value="8">8 (default)</option>
-          </select>
-          <button type="submit" id="save-general-settings" class="primary" disabled>Save</button>
-          <p id="general-settings-message" role="status" aria-live="polite"></p>
-        </form>
-      </section>
-      <section id="asset-sources-panel" role="tabpanel" aria-labelledby="asset-sources-tab" hidden>
-        <h2>Asset sources</h2><p class="hint">Enable sources to include them in searches. Removing a source keeps its files and saved metadata. Counts include all scanned formats; assets with alternate formats appear in each applicable count.</p>
-        <div class="source-add"><label for="source-directory">Asset directory</label><div class="source-add-controls"><input id="source-directory" type="text" placeholder="Choose an asset source directory"><button type="button" id="choose-source">Choose folder…</button><button class="primary" type="button" id="add-source">Add source</button></div></div>
-        <p id="sources-message" role="status" aria-live="polite"></p><div id="source-list"></div><p class="hint" id="sources-empty" hidden>No asset sources yet. Add a directory to get started.</p>
-      </section>
-    </div>
-  </section>
-  <section id="source-browser-view" aria-labelledby="source-browser-title" hidden>
-    <div class="settings-heading"><div><p class="source-browser-eyebrow">Asset source contents</p><h2 id="source-browser-title" tabindex="-1"></h2></div><button type="button" id="close-source-browser">Back to asset sources</button></div>
-    <p id="source-browser-path" class="hint"></p>
-    <p id="source-browser-status" role="status" aria-live="polite"></p>
-    <p id="source-browser-error" role="alert" hidden></p>
-    <div class="workspace">
-      <section id="source-collection" class="collection" aria-label="Source assets" tabindex="0">
-        <div id="source-grid" class="grid" tabindex="-1" aria-busy="false"></div>
-        <p id="source-empty" hidden></p>
-        <button id="source-load-more" type="button" hidden>Load more assets</button>
-      </section>
-      <aside id="source-detail" class="asset-detail" aria-label="Asset detail"><div class="detail-empty"><span aria-hidden="true">◇</span><h2>Take a closer look</h2><p>Select an asset to inspect its views, sources, and evidence.</p></div></aside>
-    </div>
-  </section>
-  <section id="import-failures-view" aria-labelledby="import-failures-title" hidden>
-    <div class="settings-heading"><h2 id="import-failures-title" tabindex="-1">Importing failures report</h2><button type="button" id="close-import-failures">Back to library</button></div>
-    <p id="import-failures-summary" role="status" aria-live="polite">Loading recorded failures…</p>
-    <p id="import-failures-error" role="alert" hidden></p>
-    <ul id="import-failures-list" aria-label="Asset paths with recorded importing failures" tabindex="0" hidden></ul>
-    <p id="import-failures-empty" hidden>No importing failures recorded.</p>
-  </section>
-  <div id="toasts" class="toasts" role="region" aria-label="New notifications" aria-live="polite"></div>
-  <footer><span>Local previews &amp; inference</span><span id="version">Catalog / index versions loading</span><span>Read-only originals · manual updates</span></footer>
+  <div id="root"></div>
   <script>/* INTERACTIVE_PREVIEW_SCRIPT */</script>
   <script>/* BUNDLED_SCRIPT */</script>
 </body>
