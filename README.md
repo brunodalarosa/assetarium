@@ -99,7 +99,7 @@ prepared desktop environment; it does not install dependencies or download model
 
 In **Settings → Asset sources**, register your asset directories. Enabled sources
 are scanned at startup to detect changes; scanning does not render assets or run
-models. **Process assets** starts the processing/publication workflow explicitly,
+models. **Process assets** on **Asset processing** starts the processing/publication workflow explicitly,
 using the Blender, runtime, and model setup required by its pending stages.
 
 For the current setup and processing details, read:

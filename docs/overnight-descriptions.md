@@ -1,6 +1,6 @@
 # Overnight asset descriptions
 
-For one source, the app's **Settings → Asset sources → Generate descriptions**
+For one source, the app's **Asset processing → Generate descriptions**
 does the same work in the background with progress, Cancel and a report
 notification ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)).
 This runner remains for unattended runs across the whole library.

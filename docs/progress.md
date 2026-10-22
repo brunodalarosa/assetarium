@@ -1,5 +1,57 @@
 # Progress
 
+## October 22 — Assetarium layout revamp (React UI), branch `layout-revamp`
+
+The owner approved the scope in this chat on October 21: rebuild the desktop UI in
+React to the Assetarium Figma handoff (`data/gui/figma-reference/`, light and dark
+frames), preferring beUI components, with dark mode and **no suggestion chips**
+(an owner correction over the mockup). Owner visual review is pending; nothing is
+pushed and no PR is open. See [decision 0011](decisions/0011-react-desktop-ui.md).
+
+- **Stack.** `frontend/` (React 19, TypeScript, Vite 8, Tailwind 4, motion 14,
+  Lucide, Geist inlined as `data:` fonts). `npm run build` writes the committed
+  `src/local_asset_library/ui/build/` (568 KB JS, 141 KB CSS); `create_window`
+  inlines it, so launches never need Node. The old `ui/app.js`/`style.css` are
+  removed; `ui/interactive-preview.js` and the sandboxed viewer are unchanged.
+  The CSP gains only `font-src data:`. beUI sources are copied with their MIT notice.
+- **Layout.** Rail with view history (Back/Forward), Home, Library and Collections
+  (placeholders), Asset processing and Settings. Home: centred search, filters
+  panel (nine filters, Reset/Apply, reference fields). Right sidebar: inspection
+  only, resizable (remembered), hide/show keeps selection and tab, Overview /
+  Sources / Evidence, floats over results on narrow windows. Notifications panel
+  over any view; toasts share its actions.
+- **Asset processing** (new page): per-source Process assets / Generate
+  descriptions with progress and Cancel, run reports, published-library status and
+  Refresh, and the importing failures report. Processing notices lead there,
+  focused on their source; **View report** opens the run report.
+- **Settings:** Appearance (Match Windows / Light / Dark), general settings, asset
+  sources (Enabled switch, Include 2D images, browse, remove).
+- **Backend (small):** `settings.interface_settings`/`save_interface_settings`
+  (app-owned `data/library/interface.json`, separate from budget validation),
+  `DesktopBridge.interface_settings`/`save_interface_settings`, the theme resolved
+  before first paint (`desktop.page_html`, Windows app-theme registry read), and
+  measured card facts (`format`, `triangles`, `width`, `height`) on thumbnails.
+- **Tests:** full suite **546 passed, 1 skipped** (173 s). New tests cover
+  interface preferences, damaged preference files, the themed packaged shell, card
+  facts and the bridge round trip; the encoding test now covers `frontend/src` and
+  the bundle.
+- **Real WebView2:** new `scripts/verify-layout-revamp.py` passed 19 checks with
+  21 screenshots in both themes (`data/gui/layout-revamp-final-20261022/`).
+  Every DOM-coupled verify script was ported to the new UI through
+  `scripts/gui_harness.py` and `window.lal`, keeping its checks, and passed:
+  search-ui, general-settings, notifications, source-ui, source-browser,
+  image-browser, library-gui `--synthetic`, interactive-preview, gui-truncation,
+  and, read-only on the installed library, kaykit-gltf, gui `--render-only
+  --caption-classification` and source-installed-ui (5,785 assets, 17 sources).
+  Not run: `verify-gui.py` full mode (loads the GPU embedding model). The
+  interactive-preview fullscreen focus check failed once and then passed twice;
+  source-installed-ui failed once while the cold startup scan exceeded 90 s.
+- **Storage.** Receipts `data/storage/layout-revamp-before-20261021.json` →
+  `layout-revamp-after-20261022.json`: **+200.8 MiB unique** (8.205 → 8.401 GiB;
+  the project was already above the 6 GiB pilot target). Mostly
+  `frontend/node_modules` (133 MiB) and new GUI evidence (57 MiB). The npm
+  download cache was cleaned (251 MiB → 0.1 MiB).
+
 ## October 20 — Expansion step 2: static 2D images technically complete
 
 The owner approved step 2 in this chat, with these choices: per-source image opt-in

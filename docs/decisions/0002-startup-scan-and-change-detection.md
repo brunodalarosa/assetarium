@@ -13,7 +13,8 @@
   settings). Library and source data are fetched only when a token changes, or
   while a source operation is running (worker liveness is not a file change).
 - The manual **Scan** and **Status** buttons are removed from the main view.
-  **Refresh published view** and **Importing failures report** remain.
+  **Refresh published view** and **Importing failures report** remain; since
+  [decision 0011](0011-react-desktop-ui.md) both live on **Asset processing**.
 
 **Why.** Startup used to load the library summary three or more times, and every
 unchanged startup scan invalidated and reloaded the whole view. Fixed 1.5 s and

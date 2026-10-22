@@ -62,26 +62,27 @@ Descriptions are optional. Assets are searchable by name and image as soon as
 they are processed; descriptions add a third signal to the default search, and a
 missing, stale or invalid description is skipped without a fault.
 
-Each source in **Settings → Asset sources** shows its description counts
+Each source on **Asset processing** shows its description counts
 (written · missing · failed) and a **Generate descriptions** button. It is enabled
 when the source is enabled, formats are selected, no operation is running for it
 and at least one asset with usable renders lacks a description. The run happens
 in the background: it writes descriptions in batches (decision 0007), builds their
-search vectors and publishes. Its progress and **Cancel** appear in that source
-row and under the notification bell. Recorded description failures are kept and
+search vectors and publishes. Its progress and **Cancel** appear on that source
+in Asset processing and under the notification bell. Recorded description failures are kept and
 not retried. A cancelled or stopped run still publishes what it finished.
 
-Notifications (bell in the header) report two things: a source that finished
+Notifications (bell in the top bar) report two things: a source that finished
 processing with descriptions ready to generate, and the outcome of each
 description run. A new notice also shows a short toast. **Not now** hides a
 ready notice until more descriptions are missing; closing the panel marks notices
-read. They are saved in `data/library/notifications.json`.
+read. Report notices lead to Asset processing. They are saved in
+`data/library/notifications.json`.
 
-## Source cards
+## Pending work on Asset processing
 
-The library shows one warning card for each source that needs processing or
-publication. Missing or failed descriptions never raise a card: descriptions are
-optional extra data ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)). It remains visible through processing, publication, cancellation
+**Asset processing** offers **Process assets** for each source that needs
+processing or publication (the rail item shows a dot). Missing or failed descriptions never count as pending work: descriptions are
+optional extra data ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)). The pending state remains visible through processing, publication, cancellation
 and interruption while actionable work remains. A subsequent scan clears it
 when there is no unattempted work and current results have been published.
 Recorded failures appear in the importing failures report. Description failures,
@@ -106,8 +107,8 @@ its outstanding source operations.
 
 Unchanged faulty assets are retained with evidence and skipped, including on a
 subsequent **Process assets** click. Other usable assets can finish and publish.
-Recorded failures do not keep pending-import cards visible. **Importing failures
-report** opens a scrollable list of original asset paths from all configured
+Recorded failures do not keep import work pending. The **Importing failures
+report** on Asset processing lists the original asset paths from all configured
 sources, including disabled sources. Removed sources retain their metadata but
 are excluded from this view. An asset with several source formats lists each
 original model path. Usable partial results remain available after publication.
@@ -119,7 +120,7 @@ an embeddings outcome that misses only the description vector counts as complete
 file/dependency fingerprint, attempted state and outcome in
 `metadata-lal/library/import-status.json`. New or changed inputs become pending;
 unchanged failures are retained. Unpublished results still require publication
-before their card disappears. Processing is not permission to repair originals
+before the pending state clears. Processing is not permission to repair originals
 or retry unchanged failures. GPU processing shares the existing
 inference lease with semantic search. Browsing and keyword search remain available.
 

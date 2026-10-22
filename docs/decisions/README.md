@@ -16,3 +16,4 @@ ask the owner first, then update the file (do not silently contradict it).
 | [0008](0008-optional-descriptions-and-notifications.md) | Descriptions are optional; Generate descriptions per source; notifications | 2026-10-18 |
 | [0009](0009-general-capabilities.md) | Every fix and processing capability is a reusable system feature | 2026-10-19 |
 | [0010](0010-shared-project-dependencies.md) | Verify shared project-layout dependencies across enabled sources | 2026-10-19 |
+| [0011](0011-react-desktop-ui.md) | React desktop UI: rail navigation, inspection sidebar, Asset processing, themes | 2026-10-21 |

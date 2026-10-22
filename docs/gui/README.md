@@ -1,4 +1,12 @@
-# Windows desktop app — configured library membership
+# Windows desktop app (Assetarium) — configured library membership
+
+Since October 21, 2026 the interface is a React app with the Assetarium layout
+([decision 0011](../decisions/0011-react-desktop-ui.md)); its source and build are
+described in [`frontend/README.md`](../../frontend/README.md). **Using the app**
+below describes the current layout. Later sections keep historical milestone
+evidence; where they name old controls (header gear, footer, warning cards,
+**View source**), the current equivalents are the Settings rail item, Asset
+processing and **View in Asset processing**.
 
 Step 8 extends this same app with bounded pages, lazy thumbnails, manual updates,
 resumable processing and versioned catalog/index publication. Current operations,
@@ -16,149 +24,124 @@ It scans enabled asset sources for file changes in the background.
 
 ## Using the app
 
-**Settings → Asset sources** adds/removes directories and changes their Enabled
-checkboxes. Results refresh live. Source-specific generated information is stored
-in each source's `metadata-lal`. See [asset sources](../asset-sources.md).
+**Layout.** The left rail has **Back**/**Forward** (view history), **Home**,
+**Library**, **Collections** and **Asset processing**, with **Settings** at the
+bottom; every icon has a label and a focus/hover tooltip. Library and Collections
+are reserved for later versions and offer no actions yet. The top bar holds the
+notifications bell and the inspection toggle. Asset processing shows a dot while
+a source needs processing or an operation runs.
 
-Click a source name or its **🔍** icon to browse that source inside LAL, including
-disabled sources. The scrollable grid loads saved published assets in batches of
-forty, with lazy thumbnails and a **Load more assets** keyboard alternative.
-Select any card to use the same inspection panel and interactive 3D preview as
-the main library. This view has no search controls and does not change Enabled,
-scan, process or publish assets. Sources without saved published records explain
-that scanning/processing is needed. **Back to asset sources** restores the source
-list position and focus; the main library's query and result cards are preserved.
-Saved faulty items remain visible with their evidence. An unsupported or faulty
-3D source retains the existing image/evidence behavior.
+**Home and search.** Home is a centred search pill. Type a description or name
+and press **Enter** or the arrow button; results compact the search to the top
+and show the count, the query, the search mode and the status line (candidates,
+seconds, truncation and recorded exclusion faults). Pressing Enter on an empty
+search browses the filtered library forty cards at a time with Previous/Next; the
+**×** in the pill clears the search and returns Home to its idle state (filters
+are kept). The sliders button opens **Filters & search options**: Asset type,
+Pack, Source format, Maximum triangles, Rigged, Image transparency, Image size,
+Search mode and Shortlist limit, with **Reset** and **Apply filters**. Choosing
+**Pilot preview reference** also shows the reference asset and view. Technical
+filters require inspected facts for the requested format; unknowns do not
+qualify, and image filters match processed 2D images only.
 
-Source browsing uses a registered source's own published membership and generation
-through the existing desktop services. Disabled-source inspection is limited to
-this explicit source scope; main library/MCP visibility is unchanged. Removed
-sources and assets from other sources cannot use that scope. Viewer failures
-share the library's retained fault history, and file tickets remain source scoped.
-Native verification: `scripts/verify-source-browser.py --run-name <unique-name>`
-through the existing MCP runtime, using isolated synthetic assets only.
+Search modes keep their backend values: **Name + description + image** is
+`combined`, the default; **Name + description** is `keyword_description`; then
+**Exact keywords**, **Visual description**, **Text → image** and **Pilot preview
+reference**. `combined` uses reciprocal rank fusion with image rank weight 3,
+keyword and description weight 1 each, `k=60`. Shortlist choices are exactly
+**5, 10, 20, 30, 40** (default **20**; MCP's omitted limit remains 5). Both
+interfaces share the request-scaled response cap in `../mcp/README.md`.
+Suggestions can be irrelevant even when the requested object is absent; scores
+are not confidence percentages, and there is no semantic fallback.
 
-The library shows one warning card per source needing processing/publication.
-**Process assets** performs both (inspection/previews and search vectors; no
-descriptions), with a progress bar spanning processing, publication and a final
-verification scan. **Cancel** finishes and saves the current asset before stopping.
-Descriptions are optional ([decision 0008](../decisions/0008-optional-descriptions-and-notifications.md)):
-**Settings → Asset sources → Generate descriptions** runs them per source in the
-background, with progress and **Cancel** in the source row and under the bell;
-**Cancel** waits for the current batch.
-**Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets
-how many assets are described per model call. If a run stops because the GPU
-ran out of memory, its report names the batch size; lower it and choose
-**Continue**. Finished descriptions are never redone.
+**Copy search settings** copies the completed search's exact MCP
+`search_assets` arguments (mode, filters, limit), not later unsent edits; agents
+must use the same catalog/index versions (shown on Asset processing).
 
-The header bell opens **Notifications**: *Descriptions ready to generate* for a
-source (actions **Generate descriptions** / **Not now**) and one report per
-description run (finished, with failures, cancelled, stopped or interrupted;
-**Continue** when descriptions remain, **View source**, dismiss ×). New notices
-also appear as a toast for 8 s (paused while hovered or focused). The bell shows
-the unread count, or a dot while a run is in progress. Escape or a click outside
-closes the panel and marks its notices read. The gear button opens Settings.
-Native verification: `scripts/verify-notifications.py --run-name <unique-name>`
-(synthetic assets; a stand-in run, no model). The card remains until a scan confirms that no
-actionable work remains and current results have been published. Recorded failures
-do not trigger pending cards: **Importing failures report** opens a scrollable list
-of original asset paths, including disabled sources. Saved attempts distinguish
-unchanged failures from new/changed files and unfinished work. The separate Process pending and
-Publish ready work buttons have been removed, and so have the manual **Scan** and
-**Status** buttons: enabled sources are scanned at startup, and the app watches
-cheap file stamps (publication, source status, operation and settings files)
-every 1.5 s, reloading library or source data only when one changes. An unchanged
-scan rewrites nothing, so it never reloads the open view. Processing never starts
-automatically when sources/files are added.
+While a search runs, a spinner with a polite **Searching…** announcement appears
+in the pill, the arrow button is disabled and earlier cards stay visible. The
+status line says when the worker is preparing its runtime or loading the model
+(first semantic search only). Repeated identical submissions are ignored; a
+different request supersedes the old one, and obsolete completions cannot hide a
+newer busy state. Reduced-motion preferences stop the animation.
 
-The initial grid contains a bounded page of the published approved membership, with its actual membership and
-counts supplied by the backend. The full inventory count is context, not browse
-authorization. Names, packs, thumbnails and fault/review flags remain distinct.
-Previous/Next page browse forty cards at a time; existing previews load only near
-the viewport. The app shows published coverage separately from processing work.
-Select a card for a larger preview and source/evidence detail. Preview selection
-is explicit: a missing or faulty requested view produces a reason, not another
-image. Source-format selection verifies that export and shows its original path;
-**Copy source path** copies text only.
+**Asset inspection.** The right sidebar is only for inspection. Clicking a card
+opens it (the card is highlighted); the toggle or **×** hides it and shows it
+again with the same selection and tab. With nothing selected it shows **No asset
+selected**. Drag the grip (or focus it and use ←/→, Home/End) to resize it
+continuously; the width is remembered. Results and inspection scroll
+independently. On narrow windows the panel floats over the results.
 
-Click the inspection image or **Explore in 3D** to interact with the selected
-source directly in the inspection card. **Open fullscreen** opens the same
-preview across the LAL window. Drag to rotate, right-drag to pan, and scroll to
-zoom. The toolbar provides Fit, Reset view, zoom buttons and standard view
-presets; Display options adds perspective/orthographic projection, background,
-edges, up-axis and upright/free-orbit navigation. Fullscreen preserves the
-loaded model and camera, and Escape returns to the inspection card. Back to
-image releases the interactive viewer. See [interactive previews](3d-preview.md)
-for format support, limits and verification evidence.
+- **Overview:** the preview, **Source format** and **Preview view**, **Open
+  interactive 3D preview**, measured facts, generated observations and suggested
+  uses. A missing or faulty requested view produces a reason, not another image.
+- **Sources:** the original path with **Copy source path** (text only) and its
+  SHA-256, dependencies with their referring source, and license evidence.
+- **Evidence:** caption notes and warnings (with the original review evidence),
+  recorded faults with full fault/processing evidence, measurement and
+  structured-observation evidence, and owner review.
 
-Enter a description or filename and press **Enter** or **Search**. The default
-mode is explicitly `combined`. **Clear** resets query, filters and
-mode (combined) and shortlist limit (20), restoring paged library browsing without starting the model. With an empty
-query, Enter browses using the selected filters rather than issuing an empty
-semantic search. Pack, source format, maximum triangles and rigged filters reuse
-the existing verified backend policy. Technical filters require inspected facts
-for the requested format; unknowns do not qualify.
+Click the inspection image or **Open interactive 3D preview** to explore the
+selected source in place; **Fullscreen** opens the same preview across the
+window. Drag to rotate, right-drag to pan, scroll to zoom. The toolbar has Fit,
+Reset view, zoom buttons and view presets; Display options add projection,
+background, edges, up-axis and navigation. Escape returns from fullscreen;
+**Back to image** releases the viewer. See [interactive previews](3d-preview.md).
 
-**2D images** (expansion step 2) appear as cards with a **2D image** or
-**SVG image** badge on a mid-gray checkerboard, so white and black transparent
-art both stay visible; small-palette art keeps hard pixel edges. **Asset type**,
-**Image transparency** and **Image size** filters use measured facts only, so
-unprocessed images and 3D models never match them. Selecting an image opens an
-image viewer instead of the 3D viewer: **Fit**, **1:1** native size, **−**/**+**
-zoom steps (12.5–3,200%), **Background** (checkerboard, light, dark, mid gray;
-remembered for the session) and **Hard pixel edges**; with the image focused,
-`+`, `-`, `0` (fit) and `1` (native) work too. Raster images show original source
-pixels (reduced only above 2,048 px, and saying so); SVGs are re-rendered by the
-recorded renderer at the zoom level for sharp edges. Detail lists measured facts
-(format, size or SVG canvas units, transparency kind and visible coverage,
-colours, size class, shape), the generic purpose with any folder-name suggestion,
-byte-identical copies, the derived search/description input with its backdrop
-note, optional descriptions and faults. Damaged, animated or externally linked
+**2D images** appear with a **2D image** or **SVG image** badge on a checkerboard,
+and small-palette art keeps hard pixel edges. Their Overview shows an image
+viewer instead of the 3D preview: **Fit**, **1:1**, zoom out/in (12.5–3,200%),
+**Background** (checkerboard, light, dark, mid gray; remembered for the session)
+and **Hard pixel edges**; with the image focused, `+`, `-`, `0` and `1` work too.
+SVGs are re-rendered at the zoom level. Damaged, animated or externally linked
 images keep their cards and explain the recorded reason instead of a preview.
-**Settings → Asset sources → Include 2D images** is a per-source checkbox; changing
-it saves the choice and rescans that source without deleting results.
-Native verification: `scripts/verify-image-browser.py --run-name <unique-name>`.
 
-**Filters & search options** exposes the existing keyword, description, image,
-combined and reference modes. Reference search uses an existing library asset ID
-and a known view; there is no upload or arbitrary path input. Keyword + description + image (`combined`) is the default. Its reciprocal rank
-fusion gives image rank weight 3, keyword and description weight 1 each, with
-`k=60`; the explicit Keyword + description mode retains equal weights. Existing
-embeddings are reused without reindexing.
+**Notifications.** The bell opens a panel over any view: *Descriptions ready to
+generate* (**Generate descriptions** / **Not now**) and one report per
+description run (**Continue** when descriptions remain, **View in Asset
+processing**, or **View report** for stopped, interrupted or failed runs;
+dismiss ×). Running description jobs show progress with **Cancel**. New notices
+also appear as a toast with the same actions for 8 s (paused while hovered or
+focused). The bell shows a dot for unread notices or a running job. Escape or a
+click outside closes the panel and marks its notices read.
 
-Shortlist choices are exactly **5, 10, 20, 30, 40**, with **20** selected on
-startup and Clear. The Windows bridge explicitly requests 20 by default; MCP
-omitted limits remain 5. Both response layers use the shared request-scaled
-character budget documented in `../mcp/README.md`, with identical order and
-explicit cap/truncation reporting. Suggestions can
-be irrelevant even when the requested object is absent; scores are not confidence
-percentages and the app has no universal similarity threshold or semantic fallback.
+**Asset processing** lists every source with its import state and optional
+descriptions. **Process assets** (offered only when there is pending work or a
+scan fault) runs inspection/previews and search vectors, then publishes, with
+progress through a final verification scan; **Cancel** finishes and saves the
+current asset first. **Generate descriptions** runs the optional describe
+operation per source with progress and **Cancel** (decision 0008); disabled
+buttons say why. Run reports open as a dialog; a GPU-memory stop suggests lowering
+**Settings → General → Description batch size** (1, 2, 4 or 8; default 8)
+before **Continue**. The page also shows the published library (coverage,
+catalog/index versions, **Refresh published view**) and the **Importing failures
+report**, a list of original asset paths with recorded failures, kept separate
+from pending work.
 
-**Copy search settings** copies the completed search's exact MCP `search_assets`
-argument JSON, including explicit mode, filters and limit. It does not copy later
-unsent edits. An agent must submit that object against the same catalog/index
-version. Full catalog/index/membership SHA-256 values are available in the footer
-description/tooltip and retained verification receipts. Versions are not added
-as invalid extra fields to the tool argument object.
+**Settings.** *General* has **Appearance** (Match Windows, Light, Dark), the
+storage budget, formats to process and the description batch size. *Asset
+sources* adds directories (**Choose folder…**), and per source shows format
+counts, the **Enabled** switch, **Include 2D images** (saves and rescans without
+deleting results) and **Remove** (keeps files and saved metadata). Click a source
+name or its 🔍 icon to browse that source's saved assets, including disabled
+sources, with the same cards and inspection; it loads forty at a time as you
+scroll (**Load more assets** is the keyboard alternative) and never scans,
+processes or publishes. **Back to asset sources** returns focus to that source.
+See [asset sources](../asset-sources.md).
 
-An indeterminate circle and **Searching…** appear immediately. While the worker
-is still preparing its runtime or loading the model (first semantic search only),
-the status line says so. Prior cards remain visible until completion.
-The Search button is disabled while active and repeated identical submissions
-are ignored. A different request supersedes the old one; Clear and a published
-view refresh invalidate it. Obsolete completion cannot hide a newer busy state.
-Success, empty results and errors end the current busy state. The indicator has
-a polite live announcement; reduced-motion preferences stop animation while
-keeping the circle and text visible. There are no percentages or automatic retries.
+Enabled sources are scanned at startup; the app watches cheap file stamps every
+1.5 s and reloads library or source data only when one changes (decision 0002).
+Processing never starts automatically.
 
-Use Tab/Shift+Tab for controls, arrows/Home/End within the grid, Enter/Space to
-activate a card, Ctrl+F to focus text search, and Escape to close detail. Controls
-have accessible names, live status/error announcements, readable contrast and
-visible focus. The layout adapts to narrow windows; details move below the grid.
-Basic native keyboard checks and rendered inspection are separate from a full
-screen-reader/accessibility audit and Bruno's usability approval.
+**Keyboard.** Tab/Shift+Tab move between controls, arrows/Home/End move within
+the grid, Enter/Space activate, Ctrl+F focuses search (from any view), and Escape
+closes the open panel, then hides inspection. Controls have accessible names,
+live status/error announcements and visible focus. Native keyboard checks are
+separate from a full screen-reader audit and Bruno's usability approval.
 
+Native verification of the layout itself, in both themes:
+`scripts/verify-layout-revamp.py --run-name <unique-name>` (synthetic assets;
+screenshots of every handoff state).
 ## UI text encoding checks
 
 Keep UI source reads and writes explicitly UTF-8; Windows' default Python text

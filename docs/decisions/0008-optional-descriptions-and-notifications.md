@@ -13,7 +13,8 @@
 - **Search ignores unusable descriptions silently.** Default `combined` search
   still fuses descriptions. A missing, stale or invalid description leaves only
   the description channel and is not reported as an exclusion fault (app or MCP).
-- **Generate descriptions** in *Settings → Asset sources* starts a per-source
+- **Generate descriptions** on *Asset processing* (moved there from
+  *Settings → Asset sources* by [decision 0011](0011-react-desktop-ui.md)) starts a per-source
   `describe` operation: caption stage (only assets whose renders are ready,
   `description_state == 'missing'`), then description vectors, then publish. It
   reuses the operation lease, progress, Cancel, storage budget and the batching
@@ -26,7 +27,9 @@
   **Not now** stays quiet until more descriptions are missing) and a *report* per
   describe run (finished / with failures / cancelled / stopped / interrupted).
   They arrive with `sources()`; `changes()` stamps the file. Closing the panel
-  marks notices read. Notices only offer actions that can change the state.
+  marks notices read. Notices only offer actions that can change the state;
+  report notices lead to Asset processing (**View in Asset processing**, or
+  **View report** for stopped, interrupted or failed runs).
 
 **Why.** EmbeddingGemma image and name matching already find assets without
 descriptions, while description generation is the slowest stage (a GPU model).

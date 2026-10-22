@@ -2,14 +2,15 @@
 
 Current workflow: **Settings → Asset sources** controls directories and live
 enabled-source membership. The app scans enabled sources on opening; reopening
-or toggling a source checks changes during a session (decision 0002). One warning card per source offers **Process
-assets** (inspection/previews and search vectors; descriptions are optional and
-run separately with **Generate descriptions** in Settings → Asset sources,
+or toggling a source checks changes during a session (decision 0002). **Asset
+processing** offers **Process assets** for each source with pending work
+(inspection/previews and search vectors; descriptions are optional and run
+separately with **Generate descriptions** on the same page,
 [decision 0008](decisions/0008-optional-descriptions-and-notifications.md)), a
-processing/publication progress bar, and graceful **Cancel**. Cards
-clear after a scan verifies that no actionable work remains and current results
-are published. Retained failures appear in **Importing failures report**, a
-scrollable list of original model paths, instead of keeping pending cards open.
+processing/publication progress bar, and graceful **Cancel**. The pending
+state clears after a scan verifies that no actionable work remains and current
+results are published. Retained failures appear in the **Importing failures
+report** on Asset processing, a list of original paths, instead of keeping work pending.
 Generated source information now lives in each directory's `metadata-lal`.
 See [asset sources](asset-sources.md) for storage, cancellation and fault rules.
 
