@@ -4,11 +4,6 @@ Version 1.0 (draft) · Based on the Apache Individual CLA v2.2, with the
 relicensing and outbound-license terms adapted from the Harmony CLA
 ("any licence" option) and the Canonical CLA.
 
-> **Draft, not legal advice.** This text is a template prepared for the
-> project owner. It has not been reviewed by a lawyer. Have it reviewed by
-> qualified counsel in your jurisdiction before asking anyone to sign it.
-> Remove this notice once that review is done.
-
 Thank you for your interest in Assetarium (the "Project"), maintained by
 Bruno Cesar Puli Dala Rosa ("we" or "us"). This agreement clarifies the rights in
 the Contributions you make. It protects you, us and the Project's users.

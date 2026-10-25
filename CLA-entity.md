@@ -5,11 +5,6 @@ v2.2 (CCLA), with the relicensing and outbound-license terms adapted from the
 Harmony CLA ("any licence" option) and the Canonical CLA. Its grants match the
 [Individual CLA](CLA.md).
 
-> **Draft, not legal advice.** This text is a template prepared for the
-> project owner. It has not been reviewed by a lawyer. Have it reviewed by
-> qualified counsel in your jurisdiction before asking anyone to sign it.
-> Remove this notice once that review is done.
-
 This agreement lets a company, university or other organization (the
 "Entity") authorize its employees or contractors to contribute to Assetarium
 (the "Project"), maintained by Bruno Cesar Puli Dala Rosa ("we" or "us"). The
