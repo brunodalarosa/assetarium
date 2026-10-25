@@ -1,0 +1,67 @@
+# Local Python runtimes (the pinned manifests and uv.lock files stay tracked).
+/.venv*/
+
+# Generated catalogs, evidence, models, caches, logs, and temporary processing.
+/data/
+/models/
+/cache/
+/logs/
+/scratch/
+metadata-lal/
+
+# Machine-specific configuration and credentials. Keep example files shareable.
+/config.local.toml
+.env
+.env.*
+!.env.example
+!.env.template
+/secrets/
+/credentials.json
+
+# Python bytecode, packaging, and local verification output.
+__pycache__/
+*.py[cod]
+*.egg-info/
+/.pytest_cache/
+/.mypy_cache/
+/.ruff_cache/
+/.coverage
+/.coverage.*
+/coverage.xml
+/htmlcov/
+/dist/
+/build/
+
+# Local editor and operating-system files.
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Frontend toolchain (dev only; the app runs from the committed bundle in src/local_asset_library/ui/build).
+/frontend/node_modules/
+
+
+# Personal agent settings (shared CLAUDE.md / AGENTS.md / .claude/settings.json stay tracked).
+/.claude/settings.local.json
+/CLAUDE.local.md
+/AGENTS.local.md
+/.mcp.json
+
+# Keys, certificates, and package-registry credentials.
+*.pem
+*.key
+*.p12
+*.pfx
+.npmrc
+/frontend/.npmrc
+
+# Local frontend build output and tool logs.
+/frontend/dist/
+*.log
+npm-debug.log*
+
+# Blender autosave/backup files from local test fixtures.
+*.blend1
+*.blend2

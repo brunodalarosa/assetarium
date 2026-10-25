@@ -1,0 +1,8 @@
+interface:
+  display_name: "Local Asset Library"
+  short_description: "Find and inspect 3D assets in the local library"
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "local_asset_library"
+      description: "Search and inspect the configured local 3D asset library"

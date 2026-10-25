@@ -1,0 +1,25 @@
+schema_version = 2
+
+# Shared default. Copy to the ignored config.local.toml for machine-specific paths;
+# config.local.toml wins when it exists (docs/decisions/0001).
+
+[sources]
+registry = "data/library/sources.json"
+
+[storage]
+data = "data"
+# "models" is the project-local models/ folder. A shared directory needs an
+# absolute path that exists, for example:
+#   models = 'C:\Models'          (Windows)
+#   models = '/home/me/models'    (Linux)
+models = "models"
+cache = "cache"
+logs = "logs"
+scratch = "scratch"
+environment = ".venv"
+
+[tools]
+# Unset: Blender is discovered on PATH and in the usual install locations
+# (`local-assets doctor` lists the candidates). To pin one executable:
+#   blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
+#   blender = '/opt/blender-5.2.2-linux-x64/blender'

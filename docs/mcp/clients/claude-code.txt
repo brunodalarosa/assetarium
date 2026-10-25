@@ -1,0 +1,1 @@
+claude mcp add --scope user local_asset_library -- "C:\path\to\Assetarium\.venv-mcp\Scripts\python.exe" "C:\path\to\Assetarium\scripts\asset-mcp.py"

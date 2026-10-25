@@ -1,0 +1,86 @@
+{
+  "scope": "Expansion step 1 only: shared asset foundation",
+  "date": "2026-10-18",
+  "scope_and_plan_approval": "Explicit owner approval in this chat",
+  "technical_status": "complete",
+  "owner_acceptance": "pending",
+  "versions": {
+    "catalog_sqlite_write": 2,
+    "catalog_sqlite_read": [1, 2],
+    "record_read": [1, 2],
+    "structure": 1,
+    "ordinary_identity": "asset-v1 preserved",
+    "child_identity": "subasset-v1"
+  },
+  "verification": {
+    "full_suite": {"passed": 469, "failed": 0, "seconds": 205.23},
+    "foundation_cases": 20,
+    "final_api_subset_before_decoder_limit_case": {"passed": 61, "failed": 0},
+    "coverage": [
+      "Shared original paths, deterministic child IDs, explicit containment and source linkage",
+      "Invalid relationships rejected before writing a candidate; unknown metadata survives publication/reload",
+      "Old catalog compatibility, explicit working-copy migration, copy budget refusal and interrupted replacement recovery",
+      "Actual tiny PNG decode without Blender or image copies; search vectors are explicit test doubles",
+      "Malformed PNG, decoder limits, changed/missing dependencies and previews retain faults/partial evidence without unchanged retries",
+      "Unsupported audio/child adapters never dispatch to Blender or claim playback/inference",
+      "Missing/failed optional model descriptions retain direct-image/keyword search and complete import outcomes",
+      "Description failure detail/counts, notification readiness, shared type filters and bounded API previews",
+      "Existing Windows links, runtime coordination, cache, worker, batching and notification regression checks"
+    ],
+    "evidence_directory": "data/verification/asset-foundation/",
+    "final_suite_log": "data/verification/asset-foundation/final-regression-tests.txt",
+    "live_keyword_parity": {
+      "passed_enabled_sources": 8,
+      "model_loaded": false,
+      "receipt": "data/verification/asset-foundation/live-keyword-parity.json"
+    },
+    "initial_preservation": {
+      "status": "passed",
+      "checked_files": 2985,
+      "registered_sources": 10,
+      "combined_assets": 2926,
+      "sample_scopes": 11,
+      "receipt": "data/verification/asset-foundation/preservation.json"
+    },
+    "final_preservation": {
+      "comparison_status": "difference recorded",
+      "unchanged_baseline_files": 2983,
+      "baseline_counts_preserved": true,
+      "baseline_samples_preserved": true,
+      "concurrent_changed_files": ["data/library/sources.json", "data/library/asset-sources.json"],
+      "concurrent_added_sources": [
+        "CCMP_Godot_1_Core", "CCMP_Godot_2_Buildings_1-14", "CCMP_Godot_3_Buildings_15-27",
+        "CCMP_Godot_4_Vehicles", "CCMP_Godot_5_Props_Nature_Roads"
+      ],
+      "note": "These sources appeared during final verification and are outside this scope. Their registration/ownership changes were preserved. The raw final comparison correctly reports differences; it is not a whole-library bit-for-bit pass.",
+      "receipt": "data/verification/asset-foundation/final-preservation.json"
+    }
+  },
+  "storage": {
+    "final_measured_unique_allocated_bytes": 169885176,
+    "reusable_regression_fixture_bytes": 166952128,
+    "dedicated_evidence_and_read_cache_bytes": 2933048,
+    "continuous_peak_sampled": false,
+    "measurement_scope": "Endpoint evidence/read-cache/pytest allocation, excluding originals, shared weights, unchanged runtimes, minor source/bytecode edits and concurrent source work.",
+    "receipts": ["data/storage/asset-foundation-verification-20261018.json", "data/storage/asset-foundation-final-20261018.json"],
+    "installs": 0,
+    "live_catalog_migrations": 0,
+    "live_source_processing_started_by_this_work": 0,
+    "live_catalog_publications_started_by_this_work": 0,
+    "original_asset_copies": 0
+  },
+  "retained_verification_issues": [
+    "Initial restricted regression: two compatibility defects fixed; Windows link privilege failure passed under normal permissions.",
+    "Early search fixture used a nonmatching FTS term and orthogonal stand-in vectors; corrected before final passing checks.",
+    "A piped helper entered a Windows Python input loop; stopped that process and successfully used a saved helper script.",
+    "The last full-scope preservation command encountered new sources without published catalogs. The helper now records missing publications and explicit baseline differences without processing or repair."
+  ],
+  "evidence_limits": [
+    "No real image-pack enrollment, image caption inference, audio decoding/inference or sub-asset extraction was demonstrated.",
+    "Synthetic PNG bytes were decoded/serialized for API previews; end-client visual consumption and owner usability/accuracy acceptance remain separate.",
+    "Live retrieval checks were keyword/type-filter reads. Semantic tests used test doubles; no new semantic relevance, GPU/RAM or cold/warm inference benchmark claim.",
+    "No live bulk migration or reprocessing was required. Existing catalog/index/overlay bytes and sampled fingerprints were checked; every external original was not re-audited.",
+    "The five concurrent Cartoon City source additions are preserved and outside the step-1 completion claim."
+  ],
+  "next_runnable_step": "Expansion step 2: docs/next version plan/prompts/02-static-2d-images.md, after its own scope/plan approval."
+}

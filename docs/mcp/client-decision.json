@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-11",
+  "owner": "Bruno",
+  "decision": "Use the verified Codex integration for now",
+  "active_client": "codex",
+  "opencode_work": "on_hold_until_explicit_owner_request",
+  "opencode_required_for_current_use": false,
+  "opencode_verification_status": "Connection and image attachment verified; local image inspection and final selection remain unverified after timeout",
+  "preserve_existing_fault_evidence": true,
+  "retry_or_repair_authorized": false,
+  "trusted_session_evidence": [
+    "For now I don't care if the OpenCode integration isn't working, I'll use it with codex for now.",
+    "Please register this decision."
+  ],
+  "full_library_expansion_approved": false
+}

@@ -1,0 +1,8 @@
+[mcp_servers.local_asset_library]
+command = "C:\\path\\to\\Assetarium\\.venv-mcp\\Scripts\\python.exe"
+args = ["C:\\path\\to\\Assetarium\\scripts\\asset-mcp.py"]
+cwd = "C:\\path\\to\\Assetarium"
+startup_timeout_sec = 30
+tool_timeout_sec = 180
+enabled_tools = ["search_assets", "get_asset", "list_collections", "get_collection", "edit_collection", "tag_assets", "get_setup_status", "validate_blender", "apply_setup", "propose_setup", "finish_setup"]
+

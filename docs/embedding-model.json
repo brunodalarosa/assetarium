@@ -1,0 +1,24 @@
+{
+  "model_id": "google/embeddinggemma-2",
+  "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+  "license": "apache-2.0",
+  "model_budget_bytes": 8589934592,
+  "generated_budget_bytes": 21474836480,
+  "dimensions": 768,
+  "dtype": "bfloat16",
+  "active_modalities": ["text", "image"],
+  "audio_config": null,
+  "query_prompt": "task: search result | query: ",
+  "document_prompt": "title: none | text: ",
+  "image_prompt": "",
+  "max_soft_tokens": 280,
+  "preprocessing": "exif-transpose-rgba-gray82-composite-rgb-native-size-v1",
+  "normalization": "finite-nonzero-float32-l2-v1",
+  "context_limit": 8192,
+  "official_sources": [
+    "https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2",
+    "https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers",
+    "https://ai.google.dev/gemma/docs/embeddinggemma/multimodal-embeddinggemma-with-sentence-transformers",
+    "https://huggingface.co/google/embeddinggemma-2"
+  ]
+}

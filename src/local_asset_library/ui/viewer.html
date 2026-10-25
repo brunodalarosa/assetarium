@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; connect-src data: blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interactive asset preview</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#e9ebe5}canvas{display:block;width:100%;height:100%;touch-action:none}canvas:focus-visible{outline:3px solid #2879c7;outline-offset:-4px}</style>
+</head><body><canvas id="model" tabindex="0" aria-label="3D asset. Drag to rotate, right drag to pan, scroll to zoom. Arrow keys rotate; Shift and arrows pan; plus and minus zoom; F fits the model; Escape returns."></canvas>
+<script>/* VIEWER_LIBRARY */</script>
+<script>/* DRACO_LIBRARY */</script>
+<script>const environmentMap = /* ENVIRONMENT_MAP */; const dracoWasm = /* DRACO_WASM */;</script>
+<script>/* VIEWER_SCRIPT */</script>
+</body></html>

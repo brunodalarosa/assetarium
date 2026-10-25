@@ -1,0 +1,723 @@
+@import "tailwindcss";
+
+/* Theme follows <html data-theme>, set before first paint by desktop.page_html. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/geist/files/geist-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2190-2199, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-display: block;
+  font-weight: 100 900;
+  src: url("@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+/* Light and dark are separate single-mode token sets sampled from the handoff frames. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f1f5f9;
+  --rail: #e6ebf1;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --thumb: #eaf0f5;
+  --border: #dde4ec;
+  --border-strong: #c3ccd8;
+  --fg: #202a38;
+  --muted-fg: #59677b;
+  --subtle-fg: #8b96a6;
+  --primary: #2f6bf2;
+  --primary-hover: #2459d6;
+  --primary-fg: #ffffff;
+  --accent-soft: #e2ebff;
+  --accent-soft-fg: #2f6bf2;
+  --ring: #2f6bf2;
+  --search-a: #feefe3;
+  --search-b: #f5e8fe;
+  --search-c: #e4f1fd;
+  --search-border: #eadff0;
+  --warning-bg: #fff3dc;
+  --warning-fg: #8a5300;
+  --fault-bg: #fde8e7;
+  --fault-fg: #b42318;
+  --danger: #d92d20;
+  --danger-hover: #b42318;
+  --danger-fg: #ffffff;
+  --success-bg: #e2f5e9;
+  --success-fg: #1d7a43;
+  --info-fg: #2f6bf2;
+  --shadow: 0 18px 48px rgb(32 42 56 / 0.14), 0 2px 6px rgb(32 42 56 / 0.06);
+  --checker-a: #cfd6df;
+  --checker-b: #aab3bf;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #10151e;
+  --rail: #171f2b;
+  --surface: #1b2432;
+  --surface-2: #222d3e;
+  --thumb: #252f3d;
+  --border: #2b3647;
+  --border-strong: #3c4a5f;
+  --fg: #ecf1f8;
+  --muted-fg: #a3b0c3;
+  --subtle-fg: #6f7b8d;
+  --primary: #8daeff;
+  --primary-hover: #a5bfff;
+  --primary-fg: #0d1830;
+  --accent-soft: #263c63;
+  --accent-soft-fg: #a9c1ff;
+  --ring: #8daeff;
+  --search-a: #342c34;
+  --search-b: #2b2b46;
+  --search-c: #243948;
+  --search-border: #34324a;
+  --warning-bg: #3a2e1c;
+  --warning-fg: #f0c470;
+  --fault-bg: #3c2329;
+  --fault-fg: #ff9d9a;
+  --danger: #c93136;
+  --danger-hover: #d93a3f;
+  --danger-fg: #ffffff;
+  --success-bg: #1b3829;
+  --success-fg: #7fd4a0;
+  --info-fg: #8daeff;
+  --shadow: 0 18px 48px rgb(0 0 0 / 0.45), 0 2px 6px rgb(0 0 0 / 0.3);
+  --checker-a: #3a4351;
+  --checker-b: #2a313c;
+}
+
+@theme inline {
+  --font-sans: "Geist", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "Cascadia Mono", monospace;
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--fg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-rail: var(--rail);
+  --color-thumb: var(--thumb);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted-fg);
+  --color-subtle: var(--subtle-fg);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-foreground: var(--accent-soft-fg);
+  --color-ring: var(--ring);
+  --color-destructive: var(--fault-fg);
+  --color-warning: var(--warning-fg);
+  --color-warning-bg: var(--warning-bg);
+  --color-fault: var(--fault-fg);
+  --color-fault-bg: var(--fault-bg);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-foreground: var(--danger-fg);
+  --color-success: var(--success-fg);
+  --color-success-bg: var(--success-bg);
+  --color-info: var(--info-fg);
+  --shadow-panel: var(--shadow);
+}
+
+@layer base {
+  /* The shell never scrolls, not even programmatically; each page owns its scroller. */
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: clip;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button,
+  summary,
+  [role="option"],
+  [role="tab"] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  input::placeholder {
+    color: var(--subtle-fg);
+  }
+  [hidden] {
+    display: none !important;
+  }
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+.search-surface {
+  background: linear-gradient(90deg, var(--search-a), var(--search-b) 48%, var(--search-c));
+  border: 1px solid var(--search-border);
+}
+.bg-checker {
+  background-color: var(--checker-a);
+  background-image: conic-gradient(var(--checker-b) 25%, transparent 0 50%, var(--checker-b) 0 75%, transparent 0);
+  background-size: 16px 16px;
+}
+.bg-light {
+  background: #f7f7f2;
+}
+.bg-dark {
+  background: #1d2320;
+}
+.bg-gray {
+  background: #525252;
+}
+.pixelated {
+  image-rendering: pixelated;
+}
+/* Slim overlay-style scrollbars (WebView2 is Chromium; the standard properties would disable these). */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  background-clip: content-box;
+  border: 4px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--subtle-fg);
+}
+/* Loading language (docs/gui/README.md → Loading states): ghosts for content whose shape is
+   known, a sheen over content being refreshed, one comet spinner, and the top-bar activity mark. */
+.search-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: conic-gradient(from 90deg, transparent 0 12%, color-mix(in srgb, currentColor 35%, transparent) 45%, currentColor);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.25px), #000 calc(100% - 2px));
+  animation: search-spin 0.85s linear infinite;
+  flex: none;
+}
+@keyframes search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Kept apart from the other reduced-motion rules so the minifier does not merge them
+   (scripts/verify-search-ui.py inspects this rule on its own). */
+@media (prefers-reduced-motion: reduce) {
+  .search-spinner {
+    animation: none;
+  }
+}
+:root,
+[data-theme="light"] {
+  --skeleton: #e7edf3;
+  --skeleton-shine: rgb(255 255 255 / 0.75);
+  --sheen: rgb(255 255 255 / 0.55);
+}
+[data-theme="dark"] {
+  --skeleton: #263142;
+  --skeleton-shine: rgb(255 255 255 / 0.07);
+  --sheen: rgb(255 255 255 / 0.08);
+}
+/* Every ghost shares one clock (--shimmer-delay, set from the page timeline) and a small
+   per-element offset (--wave), so the light passes across a grid as one diagonal wave. */
+@layer components {
+  /* Layered so size and radius utilities on a ghost win. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--skeleton);
+    border-radius: 6px;
+    isolation: isolate;
+  }
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 20%, var(--skeleton-shine) 50%, transparent 80%) no-repeat;
+  background-size: 60% 100%;
+  animation: skeleton-shimmer 1.9s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+  animation-delay: calc(var(--shimmer-delay, 0ms) + var(--wave, 0ms));
+}
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -160% 0;
+  }
+  65%,
+  100% {
+    background-position: 260% 0;
+  }
+}
+.ghost-enter {
+  animation: ghost-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: var(--enter, 0ms);
+}
+@keyframes ghost-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* Real content arriving where a ghost stood: images resolve from a soft blur. */
+.reveal-img {
+  animation: reveal-img 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes reveal-img {
+  from {
+    opacity: 0;
+    filter: blur(10px) saturate(0.6);
+    transform: scale(1.04);
+  }
+}
+.page-enter {
+  animation: page-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+/* A surface whose results are being replaced: a light band sweeps across it. */
+.sheen {
+  position: relative;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, var(--sheen) 50%, transparent 70%) no-repeat;
+  background-size: 45% 100%;
+  animation: sheen 1.5s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+@keyframes sheen {
+  from {
+    background-position: -120% 0;
+  }
+  to {
+    background-position: 220% 0;
+  }
+}
+/* Results kept on screen while newer ones load. */
+.refreshing .card,
+.refreshing .collection-card {
+  opacity: 0.55;
+  filter: saturate(0.7);
+}
+.card,
+.collection-card {
+  transition-property: border-color, box-shadow, opacity, filter;
+  transition-duration: 0.25s;
+}
+/* The top-bar activity mark: an orbiting comet around a breathing core. */
+.activity-orbit {
+  animation: search-spin 1.4s linear infinite;
+  transform-origin: center;
+}
+.activity-core {
+  animation: activity-breathe 1.8s ease-in-out infinite;
+  transform-origin: center;
+}
+.activity-sweep {
+  animation: activity-sweep 1.3s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+@keyframes activity-sweep {
+  from {
+    left: -35%;
+  }
+  to {
+    left: 100%;
+  }
+}
+@keyframes activity-breathe {
+  50% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after,
+  .sheen::after,
+  .activity-orbit,
+  .activity-core,
+  .activity-sweep,
+  .ghost-enter,
+  .reveal-img,
+  .page-enter {
+    animation: none;
+  }
+  .skeleton::after,
+  .sheen::after {
+    display: none;
+  }
+}
+
+/* Interactive 3D preview (ui/interactive-preview.js renders these classes). */
+.interactive-preview {
+  display: block;
+}
+.preview-still {
+  display: grid;
+  gap: 10px;
+}
+.preview-launch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 14px;
+  background: var(--thumb);
+  color: var(--muted-fg);
+}
+.preview-launch img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+.preview-launch-label {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.preview-launch:hover .preview-launch-label,
+.preview-launch:focus-visible .preview-launch-label {
+  opacity: 1;
+}
+.preview-launch:disabled {
+  cursor: default;
+}
+.preview-launch:disabled .preview-launch-label {
+  display: none;
+}
+.preview-open-fullscreen {
+  display: none;
+}
+.preview-availability {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fault-fg);
+  overflow-wrap: anywhere;
+}
+.preview-availability:empty {
+  display: none;
+}
+.model-preview {
+  position: relative;
+  inset: auto;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: inherit;
+  overflow: hidden;
+}
+.model-preview:not([open]) {
+  display: none;
+}
+.model-preview[open] {
+  display: flex;
+  flex-direction: column;
+}
+.model-preview button,
+.model-preview select {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+}
+.model-preview select {
+  border-radius: 10px;
+  padding-right: 6px;
+}
+.model-preview button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.model-preview button:disabled,
+.model-preview select:disabled {
+  opacity: 0.5;
+}
+.model-preview-header {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.model-preview-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.model-preview-heading h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.preview-format {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-fg);
+  padding: 2px 6px;
+  background: var(--surface-2);
+  border-radius: 6px;
+}
+.model-preview-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.model-viewport {
+  position: relative;
+  height: 300px;
+  min-height: 220px;
+  background: var(--thumb);
+  isolation: isolate;
+  overflow: hidden;
+}
+.model-viewport iframe {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--thumb);
+}
+.model-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted-fg);
+  background: color-mix(in srgb, var(--thumb) 94%, transparent);
+}
+.model-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.model-toolbar label {
+  margin-left: auto;
+}
+.model-toolbar label,
+.model-settings label {
+  font-size: 11px;
+  color: var(--muted-fg);
+  display: grid;
+  gap: 4px;
+}
+.model-options {
+  margin: 0 12px 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.model-options > summary {
+  font-size: 12px;
+  font-weight: 500;
+  min-height: 28px;
+}
+.model-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 0;
+}
+.model-settings label {
+  flex: 1 1 110px;
+}
+.model-settings .model-edges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.model-edges input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.model-help,
+.model-summary {
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted-fg);
+}
+.model-summary:empty {
+  display: none;
+}
+.model-warning {
+  margin: 0 12px 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-height: 120px;
+  overflow: auto;
+}
+.model-fullscreen[open] {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-height: none;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+}
+.model-fullscreen::backdrop {
+  background: var(--bg);
+}
+.model-fullscreen .model-preview-header {
+  padding: 14px 20px;
+  flex-shrink: 0;
+}
+.model-fullscreen .model-viewport {
+  height: auto;
+  flex: 1 1 0;
+  min-height: 120px;
+}
+.model-fullscreen .model-toolbar {
+  padding: 10px 20px;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.model-fullscreen .model-settings {
+  max-height: 140px;
+  overflow: auto;
+}
+
+/* Image viewer stage. */
+.image-stage {
+  border-radius: 14px;
+  height: 300px;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+}
+.image-stage img {
+  display: block;
+  max-height: none;
+  max-width: none;
+  margin: auto;
+  object-fit: fill;
+}
+.image-stage.fit img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@media (forced-colors: active) {
+  .search-surface,
+  .model-preview,
+  .model-warning {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* Collection PDF exports print only the report placed in #print-root (collection_print). */
+#print-root {
+  display: none;
+}
+@media print {
+  html,
+  body {
+    height: auto;
+    overflow: visible;
+    background: #ffffff;
+  }
+  body > *:not(#print-root) {
+    display: none !important;
+  }
+  #print-root {
+    display: block;
+  }
+}

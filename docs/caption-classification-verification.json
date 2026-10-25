@@ -1,0 +1,87 @@
+{
+  "status": "passed",
+  "scope": "Approved pilot caption severity cleanup and future review rules; no actual import or inference retry",
+  "counts": {
+    "fault": 1,
+    "warning": 14,
+    "review_note": 16,
+    "clear": 9
+  },
+  "historical_findings_preserved": 32,
+  "verification": {
+    "shared_suite": {
+      "passed": 80,
+      "seconds": 111.66,
+      "evidence": "data/caption-classification/tests.log"
+    },
+    "final_rules_suite": {
+      "passed": 51,
+      "seconds": 8.07,
+      "evidence": "data/caption-classification/rules-tests-banner.log",
+      "note": "Focused rechecks and new future writer/publication tests; overlaps the shared suite"
+    },
+    "pilot": "data/caption-classification/after.json",
+    "final_preservation": "data/caption-classification/final.json",
+    "native_window_and_stdio": "data/gui/caption-classification/report.json",
+    "actual_render_inspected": [
+      "data/gui/caption-classification/browse.png",
+      "data/gui/caption-classification/caption-review_note.png"
+    ],
+    "protected_inputs": 990,
+    "keyword_queries_with_unchanged_rankings": 40,
+    "real_transport_agreement": "Three representative severity-level details/searches match actual STDIO",
+    "future_processing": "Synthetic writer publishes review_note while retaining complete processing, source facts and pending owner review",
+    "model_inference": false,
+    "actual_new_asset_import": false
+  },
+  "storage": {
+    "before": "data/storage/caption-classification-before.json",
+    "after_checks": "data/storage/caption-classification-after-checks.json",
+    "final": "data/storage/caption-classification-delivery.json",
+    "before_unique_allocated_bytes": 5979705784,
+    "after_checks_unique_allocated_bytes": 6015785440,
+    "final_unique_allocated_bytes": 5982236432,
+    "retained_increase_bytes": 2530648,
+    "temporary_peak_increase_bytes": 36079656,
+    "note": "Retained growth below estimated 20 MiB; temporary synthetic fixtures exceeded that estimate. Below 6 GiB excluding external assets/shared models. No installation.",
+    "cleanup_evidence": [
+      "data/gui/caption-fixture-cleanup/report.json",
+      "data/gui/caption-rules-fixture-cleanup/report.json",
+      "data/gui/caption-banner-fixture-cleanup/report.json"
+    ]
+  },
+  "preparation_faults": [
+    {
+      "item": "Storage permission",
+      "reason": "Sandbox filesystem WinError 5; no receipt written",
+      "resolution": "Permission-enabled execution succeeded"
+    },
+    {
+      "item": "Storage argument",
+      "reason": "Existing report requires filename, not path; no receipt written",
+      "resolution": "Corrected filename; saved receipt"
+    },
+    {
+      "item": "UI patch",
+      "reason": "CSS context mismatch; atomic rejection without edits",
+      "resolution": "Exact bounded replacements; actual render checked"
+    },
+    {
+      "item": "Rule test patch",
+      "reason": "Documentation context mismatch; atomic rejection without edits",
+      "resolution": "Corrected patch; final tests passed"
+    },
+    {
+      "item": "Delivery document patch",
+      "reason": "Progress heading context mismatch; atomic rejection without edits",
+      "resolution": "Separate new receipt and appended progress entry"
+    }
+  ],
+  "remaining_boundaries": [
+    "Pilot membership unchanged",
+    "No full-library/incremental import implementation",
+    "Owner usability/artistic approval separate",
+    "Historical static review receipts unchanged",
+    "Generation schema/model settings unchanged"
+  ]
+}

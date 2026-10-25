@@ -1,0 +1,401 @@
+{
+  "schema_version": 1,
+  "scope": "Approved severity reclassification of existing pilot findings. Original captions and review evidence unchanged; no new visual inspection or owner approval.",
+  "policy": {
+    "review_note": "Minor precision or uncertain detail; shown in asset detail.",
+    "warning": "Meaningful descriptive error or uncertain interpretation that could mislead selection; nonblocking warning.",
+    "fault": "Derived from failed/incomplete caption processing or an unusable description; never downgraded by this file."
+  },
+  "assets": {
+    "asset_bb8f82724d7856f4fa86b9f0759f2791": {
+      "name": "sedan",
+      "review_digest": "d42010c9539d047bccac22b27a70834a98952ed2d50188b651f249e02b7ae293",
+      "issues": []
+    },
+    "asset_18db4ca35f9737b123a769899bfc288e": {
+      "name": "sedan-sports",
+      "review_digest": "7390c32e2075c97b2d1e98940f64a27ecdf3f242057542d9f1336a0abae09674",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "White bumper claim is wrong: bumper is dark gray with a pale plate. Pixel-art style is a loose analogy, not pixel-art evidence; game/icon use belongs in suggestions.",
+          "reason": "A stated component color is wrong; color-based searches or selection could be misleading."
+        }
+      ]
+    },
+    "asset_98cb9d2095606e4e850dcb72823a778f": {
+      "name": "ambulance",
+      "review_digest": "b489b862aff8e38eeab481b055294122b93473c6ba36280c9b058c146ddb5df2",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Cab is predominantly red-orange with pale windshield, rather than a white cab; exact stripe placement is imprecise.",
+          "reason": "The cab's predominant color is described incorrectly, affecting color-based selection."
+        }
+      ]
+    },
+    "asset_5148b2cb0b99c0f6014f00362bc66b80": {
+      "name": "tractor",
+      "review_digest": "34c7ea5c3d25cd830a20d0d45aad33bb06fad6015654eb4e4137d4c65b757b1e",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Driver seat/steering wheel are not clearly visible through the pale windows; do not treat them as observed parts.",
+          "reason": "Tractor identity remains useful; obscured interior details should be treated as uncertain."
+        }
+      ]
+    },
+    "asset_34db2b054e4c4425fa36b0b7b9e00612": {
+      "name": "wheel-default",
+      "review_digest": "a65e0a34258f9d1e9bb67300956663d8db834b84a0abf716ff82440938fffe3e",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Hexagonal cross-section claim is not clearly supported by the visible rounded/faceted outline; color gradient is mainly lighting.",
+          "reason": "Wheel identity remains useful; facet count and lighting terminology are minor detail cautions."
+        }
+      ]
+    },
+    "asset_faae28829d570468ee67eafc79be8aea": {
+      "name": "road-straight",
+      "review_digest": "ef8582261040dd0c702585cf56520cd6b32a7b2eebdecb0fe87659e44b718e63",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Central vertical channel and elevated/raised border interpretation are not clearly supported by the thin flat surface.",
+          "reason": "Road identity remains useful; small channel and edge-height interpretations need qualification."
+        }
+      ]
+    },
+    "asset_b53529150c7b3ca331ed9ad0796458e7": {
+      "name": "road-straight-barrier",
+      "review_digest": "a0b68ddceaf77d5cece0369c7539720fc3db9dad59f366112945aea85b9aedf7",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Standing vertical/facing forward wording confuses image orientation with object pose; bars are flat horizontal pieces in the renderer convention.",
+          "reason": "The two-bar structure is recognized; orientation wording is a minor presentation detail."
+        }
+      ]
+    },
+    "asset_061e14a040e5f441bdf031ddbdd4e795": {
+      "name": "road-crossroad",
+      "review_digest": "7e6d310b52305fa4015af9a4aa23882629fa533234c6e3a817cdde714de0d22f",
+      "issues": []
+    },
+    "asset_2a3226839e4c059a59f91e4ac75b9b81": {
+      "name": "road-bridge",
+      "review_digest": "005bdec36f511580085ec9889f945e35d5afbba682ef8b60d5fb296e9f7068a2",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Bench identity, raised backrest, shelf and plank interpretation are visually misleading; the rendered structure has two broad decks and road markings.",
+          "reason": "The road bridge is described as furniture, a meaningful object-identity error."
+        }
+      ]
+    },
+    "asset_b060467fa5739375588a2b4ee44d2304": {
+      "name": "traffic-light",
+      "review_digest": "2dbefb59e058a20c8cf36b83637abe64d5ccfbd9ff25d74d3d290873723d66d8",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Street-light identity is uncertain; yellow rectangular housing is not a band wrapping a pole. Broad road signal/light possibilities should be uncertain.",
+          "reason": "The light's identity and housing structure are uncertain enough to mislead selection."
+        }
+      ]
+    },
+    "asset_24e2752dbb26ecd19677091f78243709": {
+      "name": "apple",
+      "review_digest": "7e48d610761208845545a97d93bc834f0fcc326148f603ca29768f9da32001d5",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "No-visible-textures wording and color gradient should be read as appearance only; source texture absence is not established. Exact octagonal form is over-specific.",
+          "reason": "Apple identity and main colors agree; polygon count, lighting and texture wording are minor cautions."
+        }
+      ]
+    },
+    "asset_e06205888e91302badebe08dc7197c9b": {
+      "name": "apple-half",
+      "review_digest": "e27897c68de177f375eff57e247ac4d73e1e2e68dd71e4d700b4675874ba5112",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Eyes/eye-like indentations are a misleading interpretation of the seed-like marks; identity omits the important cut/half state.",
+          "reason": "The important cut/half state is omitted and seed marks are misinterpreted as eyes."
+        }
+      ]
+    },
+    "asset_d1fe6328ee90ef8149fcd50d6a1674f0": {
+      "name": "burger",
+      "review_digest": "c3936969955e1ea4d2430b93894f203fb597b8392cd6c196a1d34cf8147d1111",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Upper reddish layer interpreted as meat could be tomato-like; exact octagonal outline and extra patty should remain uncertain.",
+          "reason": "Burger identity remains useful; individual ingredient guesses and exact facet counts are minor cautions."
+        }
+      ]
+    },
+    "asset_13f8c678bc443c5285a0236eb6828f3f": {
+      "name": "burger-cheese-double",
+      "review_digest": "7c4fd13465918f122da9f78822798aac793b25e3c11cc46b1296613bc9f3e842",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Identity label bun is narrower than the complete hamburger visible and described; inferred patty/bread composition remains interpretation.",
+          "reason": "The identity label describes only a bun rather than the whole burger, which can mislead retrieval."
+        }
+      ]
+    },
+    "asset_ae0ecb0785c8a290c0ad88db419ade2e": {
+      "name": "mushroom",
+      "review_digest": "1073c8d2e0dcfa2f49191c7ca3230ae06a4387ea3c2ef670674ab4f512043a88",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Precise octagonal cap and horizontal stem ridges are not clearly supported; the rendered cap appears more sparsely faceted.",
+          "reason": "Mushroom identity remains useful; exact facet count and small stem ridges are uncertain details."
+        }
+      ]
+    },
+    "asset_3bd10e61e57a9face42b8eee053cde92": {
+      "name": "chair",
+      "review_digest": "94e1063ba4fe0635f170bc97e6c81f053077f5aed1f60cd051d4ed2177b55995",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Two legs is a view-dependent count rather than the visible four-leg chair; back has a top rail and one middle bar.",
+          "reason": "The visible chair's leg count and back structure are described incorrectly."
+        }
+      ]
+    },
+    "asset_e21f35d1b80bc6b08cf9d7dffbc85006": {
+      "name": "chairRounded",
+      "review_digest": "d1a1f1a8d39523020a0e6b804913fec9b11ac10b1ccc2eeb45b9cf24bac3e2b0",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Exact two-crossbar count is not accepted from these views; preserve general bracing observation only through future owner correction.",
+          "reason": "Chair identity and main structure agree; an exact crossbar count is a minor uncertain detail."
+        }
+      ]
+    },
+    "asset_64488980e4c88beff7761e2ab0246919": {
+      "name": "tableRound",
+      "review_digest": "0ed7ecbba469fe50378856a84d6417e9e6fe6246a49c8710d8caaf75e37d541d",
+      "issues": []
+    },
+    "asset_8b863f9c1e4819fd167e62485ead09d6": {
+      "name": "bedDouble",
+      "review_digest": "76e46b362e47e48f8995ea15a24bc6ae4e4938e087f3adfdc19fee0aa0800d28",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Wood material/wooden texture are not established; red lower layer is largely shaded pink rather than a proven second bedding layer.",
+          "reason": "Bed identity remains useful; material inference and shaded bedding layers are minor appearance cautions."
+        }
+      ]
+    },
+    "asset_7ca797d61bf6f1824539822214686876": {
+      "name": "kitchenFridge",
+      "review_digest": "3189862449aab1b55d282e410c27e4b29d1f31beef9b0cb8f087314d8e9b10a3",
+      "issues": []
+    },
+    "asset_445e4a2cd327c0e6ac1f60271393c4bc": {
+      "name": "tree",
+      "review_digest": "43c6c833a023d0178614b4d58221b023254722e37391bba9ed62ecdd3d88f448",
+      "issues": []
+    },
+    "asset_c8837d57bde3840055612a0092b965af": {
+      "name": "tree-high",
+      "review_digest": "e075719a1bf8011250f76333e37db88ded6be83e3149ea33307156465723f4d8",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Calling the rounded protrusions spherical branches is an interpretation; exact count and placement should be qualified.",
+          "reason": "Tree identity remains useful; naming and counting rounded canopy forms is interpretive."
+        }
+      ]
+    },
+    "asset_32f538e8713841a3e776a17e1b7bdba1": {
+      "name": "rocks-high",
+      "review_digest": "c42b0b744a53fe95b8f933fad210e06ab9f6df1552a6f27ba1886273d5f763cd",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Four-cylinder/central-column arrangement and octagonal center are over-specific and do not match the clearly separated perimeter cluster.",
+          "reason": "Arrangement, transparency and speculative identity claims can materially mislead selection of this rock cluster."
+        },
+        {
+          "severity": "warning",
+          "evidence": "Mineral deposit or sensor interpretation of a light spot is unsupported and appears in factual description rather than a separate interpretation.",
+          "reason": "Arrangement, transparency and speculative identity claims can materially mislead selection of this rock cluster."
+        },
+        {
+          "severity": "warning",
+          "evidence": "Translucent appearance is not supported by the opaque rendered surfaces.",
+          "reason": "Arrangement, transparency and speculative identity claims can materially mislead selection of this rock cluster."
+        }
+      ]
+    },
+    "asset_1fc6244aab6074afee39946e955288b9": {
+      "name": "plant",
+      "review_digest": "321fd99753aac0367533ab7d4370cc6c73039b81dd1bf195ba0305bb6a9c7e71",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Two primary lobes misses the central upright form; symmetry and mossy material interpretation are not established.",
+          "reason": "The description misses a prominent central form; arrangement and material claims remain uncertain."
+        }
+      ]
+    },
+    "asset_e4ebc981f0c97f2be5bbb0b1f997e88f": {
+      "name": "bridge",
+      "review_digest": "3e4b8bbb7714acfe4d777303351be4a8f63cdb8e1e0cdb3b3d6e61ba544ddadc",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Torii-gate/open-arch interpretation is misleading for the low arched deck with side rails; exact five blocks and hanging vertical posts are unsupported.",
+          "reason": "A bridge is interpreted as a gate, a meaningful object-identity error."
+        }
+      ]
+    },
+    "asset_179bed122930b57bd7a1f575376397f4": {
+      "name": "Apple",
+      "review_digest": "e220bc1e95a9f00f883e970b6c8127b8cebb7f03eca5e42dd40471c1abdc53e4",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Description says stem and leaf are both brown while the leaf is visibly green; glossary/species/material remain unverified.",
+          "reason": "The leaf's stated color is wrong, affecting color-based selection."
+        }
+      ]
+    },
+    "asset_f501133cf46b1b5b0a1a614b4f09c166": {
+      "name": "Apple_Green",
+      "review_digest": "5f3ce44d440c7f1eebaa00d688f2d1d77f72a834cf69aed89056c1a8bddc62e6",
+      "issues": []
+    },
+    "asset_408546ca53f7971de1dadb2a61d0ba3a": {
+      "name": "Burger",
+      "review_digest": "9aa07857f00f552617729d22db2f32795a177fd0b02b8d14bb752e1479e332c4",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Exact hexagonal outline and tomato count are not established; model distinguishes plausible food components rather than measured ingredients.",
+          "reason": "Burger identity remains useful; polygon and ingredient counts are minor uncertain details."
+        }
+      ]
+    },
+    "asset_0d97964f4c9980650972ba11ffca49ef": {
+      "name": "Mushroom",
+      "review_digest": "67f23e0d6a82c50dea1dc604202bbcca0ba4da7748cf04e3733bd7f8f7f5dfac",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Hexagonal cap and octagonal outline in the same description are contradictory and unsupported exact geometry labels.",
+          "reason": "Mushroom identity remains useful; inconsistent exact polygon terminology is a minor precision issue."
+        }
+      ]
+    },
+    "asset_de3c6c27f907cbb82bcc661a5b32bf5f": {
+      "name": "Pizza_Burned",
+      "review_digest": "54c168e29e81ad150b33d20d670c744957bf08cf0d8ef5f4935228a9c2754d54",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Uniformly spaced toppings feature contradicts irregular distribution in prose and images; wood/rubber analogy is speculative.",
+          "reason": "Pizza identity remains useful; topping spacing and material analogies are minor descriptive cautions."
+        }
+      ]
+    },
+    "asset_f4c01ecffff8071ec986e29d5cc69a1c": {
+      "name": "Chair_1",
+      "review_digest": "5b61bad2681c10caef7656f3cb6ec6e605c3eeb3930b4263b63e62042ee8c67c",
+      "issues": []
+    },
+    "asset_b61ec88d53e61f0cd9ce3abffbf35ad7": {
+      "name": "Chair_2",
+      "review_digest": "4090dc3081b477b0b570c47f2605c4413f7923641bce0b4fd7115ed5fc7105f4",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Circular seat with rectangular outline is an inconsistent geometric attribute; actual fabric/wood material and exact slat count are unverified.",
+          "reason": "Contradictory seat geometry can mislead shape-based selection; material and count claims remain uncertain."
+        }
+      ]
+    },
+    "asset_cb1db693fa96e3f329263f25f8c92cd6": {
+      "name": "Bed_King",
+      "review_digest": "88f9d38173faee2ab843246f969bac39e320a8d9e7893a92eeb44e69b9ea07e0",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "No visible posts/support beams is wrong: the frame is visible at the head/foot and sides; headboard/backrest angle should not be inferred.",
+          "reason": "The description denies visible bed-frame supports, a meaningful structural error."
+        }
+      ]
+    },
+    "asset_28fb2577f62c9ee27d2d382919c33b1f": {
+      "name": "Kitchen_Fridge",
+      "review_digest": "40bc24445f21f34f8f6a129e66704395076333538443d8c9b235bc36cd2eb091",
+      "issues": []
+    },
+    "asset_3cbc825b96e959382bdb3f5fee587294": {
+      "name": "Table_RoundSmall",
+      "review_digest": "5964ff72efbdde0987115406ae7df86ec10ca3f3b3de7b1e9cea3e81581ad1d1",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Raised tabletop edge is not clearly established; rounded corners on circular top is imprecise.",
+          "reason": "Round table identity remains useful; edge treatment and corner wording are minor precision issues."
+        }
+      ]
+    },
+    "asset_71e4c417d130dc3da4764c409742305b": {
+      "name": "BirchTree_1",
+      "review_digest": "46ecdfb2892bc3b1f4927d2e28d2861b9bf6f12cb1bc8ba61e8e2f4df2188903",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Symmetrical overall form is too strong for the bent trunk and uneven canopy; no leaves visible means no individually resolved leaves, not absence of foliage.",
+          "reason": "Tree identity and foliage remain useful; symmetry and individually resolved leaf wording need qualification."
+        }
+      ]
+    },
+    "asset_055c798dff9c002a2a32c3ca8da2dd4e": {
+      "name": "BirchTree_Autumn_1",
+      "review_digest": "0186562e487031cc7c8e18aff3570d0231f360e815e06bdc19d15fcfbb2d5fce",
+      "issues": [
+        {
+          "severity": "warning",
+          "evidence": "Thick trunk and two branching supports are not clearly supported; visible trunk is slender. Brown-orange foliage masses are not individual giant leaves.",
+          "reason": "Trunk thickness and branching structure are described incorrectly; foliage masses are misinterpreted."
+        }
+      ]
+    },
+    "asset_e5dcccf28941eeb8ccfb70555da8e033": {
+      "name": "BirchTree_Snow_1",
+      "review_digest": "f27f017453c2b20f5ad41e8806beee5dfd9f0746dd63ae19394092b1dc5a9b8c",
+      "issues": []
+    },
+    "asset_e8a3664d3e67682161fa725312a04cd0": {
+      "name": "PineTree_1",
+      "review_digest": "fb02189795c3be64891687819795b5af499b0cbff6ec40eac0e2ac1c818d1d5d",
+      "issues": []
+    },
+    "asset_bb437d007bad6ef4cf3515b9d6a8630e": {
+      "name": "Rock_Moss_1",
+      "review_digest": "f11b6c97c3dd7d61d87c226b064867c996a3bf2bd1681d89b8f0f7cb9ac7437a",
+      "issues": [
+        {
+          "severity": "review_note",
+          "evidence": "Interior sections listed as observed parts are unsupported; only exterior facets are visible.",
+          "reason": "Rock identity remains useful; unsupported interior details should be treated as uncertain."
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "scope": "AI viewed all 32 actual input views in three labeled mosaics alongside each generated description; technical evidence only.",
+  "assets": {
+    "asset_bb8f82724d7856f4fa86b9f0759f2791": "Broad car identity, red-orange body, gray underside and yellow lights match. View/background boilerplate and generic identity uncertainty add little.",
+    "asset_34db2b054e4c4425fa36b0b7b9e00612": "Wheel, dark outer body and recessed light hub match. Rubber-like appearance is interpretation. Generic identity uncertainty unnecessary.",
+    "asset_faae28829d570468ee67eafc79be8aea": "Flat rectangle with gray surface, pale strips and thin center marking is observed. Broad class not resolved by model; probable certainty conflicts with generic uncertain identity text.",
+    "asset_b53529150c7b3ca331ed9ad0796458e7": "Two separate parallel bars are visible; model correctly does not invent a connecting road surface. Identity/use remains ambiguous.",
+    "asset_24e2752dbb26ecd19677091f78243709": "Apple with red-orange body, green angular leaf and short stem matches. Generic identity uncertainty and no-depth statement should be removed.",
+    "asset_13f8c678bc443c5285a0236eb6828f3f": "Stacked burger layers and yellow slices match; exact patty/material naming and middle-bun interpretation deserve caution. Absence-of-texture wording must not imply inspector facts.",
+    "asset_e21f35d1b80bc6b08cf9d7dffbc85006": "Pale chair with arched back and braces matches. Two back slats is too specific: one horizontal bar is obvious inside the arch. Wooden material is an appearance inference.",
+    "asset_32f538e8713841a3e776a17e1b7bdba1": "Purple-gray faceted column cluster matches; unknown identity is appropriate. Four-column count and larger central pillar are unsupported by the visible cluster. Avoid precise counts.",
+    "asset_0d97964f4c9980650972ba11ffca49ef": "Mushroom-like cap and stem, muted brown-gray surfaces and faceted silhouette match. Exact species/material unknown; boilerplate identity uncertainty unnecessary.",
+    "asset_e5dcccf28941eeb8ccfb70555da8e033": "Tree class, green lobed canopy and pale trunk match. Pale patches occur at several heights, not just top; locate color features more specifically. Species and snow interpretation remain uncertain."
+  },
+  "prompt_change": "v2 removes presentation boilerplate, locates colors, asks for geometric shape attributes, discourages unsupported counts/material facts, and distinguishes broad-class certainty from specific unresolved details.",
+  "owner_caption_review": "pending",
+  "owner_artistic_suitability": "pending"
+}

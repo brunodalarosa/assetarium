@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "local_asset_library": {
+      "command": "C:\\path\\to\\Assetarium\\.venv-mcp\\Scripts\\python.exe",
+      "args": [
+        "C:\\path\\to\\Assetarium\\scripts\\asset-mcp.py"
+      ],
+      "cwd": "C:\\path\\to\\Assetarium"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "faults": [
+    {
+      "item": "desktop SDK adapter",
+      "status": "faulty",
+      "reason": "CallToolResult exposes its error flag through the SDK serialization alias rather than a direct isError attribute.",
+      "evidence": "data/gui/unit-checks/report.json and preserved synthetic desktop-faults audit; 59 checks passed and one failed.",
+      "correction": "Read the SDK's by-alias serialized error flag. unit-fixed passed 60 checks; unit-final passed 61 after adding the live-owner-overlay check."
+    },
+    {
+      "item": "JavaScript-to-Python search bridge",
+      "status": "faulty",
+      "reason": "A public Python parameter named arguments shadowed the generated JavaScript function's arguments object, producing a missing-argument TypeError.",
+      "evidence": "data/gui/actual-window/report.json; successful browse/thumbnail and usable partial evidence retained.",
+      "correction": "Use settings as the public parameter name. bridge-fixed and final-window passed actual GUI/STDIO agreement."
+    },
+    {
+      "item": "synthetic truncation harness query",
+      "status": "faulty",
+      "reason": "The literal synthetic keyword item was not indexed as a standalone term and returned no matches; the truncation assertion was faulty.",
+      "evidence": "data/gui/synthetic-truncation/report.json and synthetic fixture call audits.",
+      "correction": "Use the known indexed obj term; cap-verified returned one identical truncated candidate over both actual transports."
+    },
+    {
+      "item": "display-only source-edit command preparation",
+      "status": "faulty",
+      "reason": "A PowerShell quoting attempt to remove optional card excerpts raised ParserError before editing the file.",
+      "evidence": "No source edit occurred in the failed invocation.",
+      "correction": "Applied a checked patch; final-presentation verifies concise cards."
+    },
+    {
+      "item": "read-only MCP SDK source probe",
+      "status": "faulty",
+      "reason": "The installed SDK uses a types package directory rather than the probed mcp/types.py file.",
+      "evidence": "Source probe reported a nonexistent file; the package was not altered."
+    },
+    {
+      "item": "first focused-test evidence capture",
+      "status": "faulty",
+      "reason": "Tee-Object could not open logs/gui-policy-tests.log because its parent folder did not yet exist; test output was not retained.",
+      "evidence": "No passing test count is claimed for this invocation.",
+      "retry_authorization": "Bruno approved corrected GUI/test-harness verification, then clarified that the no-retry rule applies only to asset investigation/export."
+    },
+    {
+      "item": "Windows inspection helper",
+      "status": "faulty",
+      "reason": "Window discovery succeeded, but the screenshot/accessibility request reported Computer Use app approval timed out.",
+      "evidence": "The exact Local Asset Library window was discovered. No native keyboard or visual inspection is claimed from that failed request.",
+      "alternative": "App-level tests capture actual WebView2 rendering and test packaged UI handlers; owner usability approval remains separate."
+    },
+    {
+      "item": "pre-install storage report under restricted execution",
+      "status": "faulty",
+      "reason": "Path.resolve(strict=True) raised PermissionError WinError 5 for the project root before a receipt could be written.",
+      "evidence": "Initial storage-report invocation exited 1; no gui-before.json was created.",
+      "retry_authorization": "Bruno explicitly approved the permission-enabled storage-report retry.",
+      "separate_result": "Permission-enabled invocation passed and saved data/storage/gui-before.json."
+    },
+    {
+      "item": "optional online pywebview API documentation lookup",
+      "status": "faulty",
+      "reason": "The requested /guide/api.html URL returned HTTP 404.",
+      "evidence": "The installation, usage and web-engine documentation were available; installed package source will supply exact API signatures.",
+      "retry": false
+    }
+  ]
+}

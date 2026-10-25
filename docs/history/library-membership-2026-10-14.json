@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "approved": true,
+  "approval": "Bruno approved Step 8 and the City Kit addition on October 12, 2026. On October 14, 2026, Bruno approved importing synty-part1, craftpix-free-packs, and POLYGON_Generic_SourceFiles_v3, generating previews and image indexes, then launching descriptions in the background; no new runtime/model or original copies; 10 GiB total and 3 GiB additional storage allowance for the import and overnight run combined. Later on October 14, Bruno approved texture/material repairs for the 648 blocked models using existing supplied textures and library overrides, with regenerated previews, descriptions and search data; originals remain unchanged; no unrelated caption-fault retries, new textures, remodeling or unsupported Godot effects; a separate 2 GiB repair-growth limit and the same 10 GiB total ceiling.",
+  "packs": ["kenney_car-kit", "kenney_city-kit-roads", "kenney_food-kit", "kenney_furniture-kit", "kenney_mini-forest", "quaternius_ultimate-food-pack", "quaternius_ultimate-house-interior-pack", "quaternius_ultimate-nature-pack", "City_Kit_Suburban", "City_Kit_Commercial", "synty-part1", "craftpix-free-packs", "POLYGON_Generic_SourceFiles_v3"],
+  "initial_catalog_assets": 883,
+  "maximum_assets": 1901,
+  "budget": {"peak_additional_allocated_bytes": 3221225472, "total_allocated_bytes": 10737418240},
+  "no_new_runtime_or_model": true
+}

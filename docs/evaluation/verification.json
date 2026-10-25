@@ -1,0 +1,36 @@
+{
+  "status": "pass",
+  "complete_searches": 328,
+  "channel_rankings_checked": 520,
+  "finite_normalized_persisted_vectors": 208,
+  "reference_parent_exclusion_queries": 4,
+  "review_image_links_checked": 1444,
+  "unchanged_catalog_index_pilot": {
+    "catalog_sha256": "ecdd5690fba9870f330e947752cc7ca4d89896f9d05f3ed7c1b51ae91490a506",
+    "index_sha256": "c061ba1d70685270b1110b7aae37049ab6124accc3343c759b266cb507acac09",
+    "pilot_sha256": "844d495098a7442e481ac2a3b703f312f38804460d15d353e0a9b116f0f75459"
+  },
+  "source": {
+    "verified": true,
+    "entries_before": 4938,
+    "entries_after": 4938,
+    "changed_paths": [],
+    "method": "Full SHA-256/size/mtime comparison with scan baseline",
+    "verified_utc": "2026-10-11T16:29:38.858027+00:00"
+  },
+  "area_bytes": {
+    "models": 5792432361,
+    "data": 65848857,
+    "cache": 5207538807,
+    "logs": 0,
+    "scratch": 109322578,
+    ".venv": 50570014,
+    ".venv-caption": 4718328020,
+    ".venv-embedding": 4876966567
+  },
+  "total_managed_bytes": 20821007204,
+  "generated_budget_remaining_bytes": 6446261637,
+  "model_budget_remaining_bytes": 2797502231,
+  "owner_quality_approval": "pending",
+  "step7_authorized": false
+}

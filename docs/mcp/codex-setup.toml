@@ -1,0 +1,8 @@
+
+[mcp_servers.local_asset_library]
+command = "C:\\BrunoOS\\Local-Asset-Library\\.venv-mcp\\Scripts\\python.exe"
+args = ["C:\\BrunoOS\\Local-Asset-Library\\scripts\\asset-mcp.py"]
+cwd = "C:\\BrunoOS\\Local-Asset-Library"
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+enabled_tools = ["search_assets", "get_asset", "list_collections", "get_collection", "edit_collection", "tag_assets"]

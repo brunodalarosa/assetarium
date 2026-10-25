@@ -1,0 +1,24 @@
+[project]
+name = "local-asset-library"
+version = "0.1.0"
+description = "Local, read-only asset catalog tooling"
+license = "AGPL-3.0-only"
+requires-python = ">=3.13,<3.14"
+dependencies = ["numpy==2.3.4"]
+
+[project.scripts]
+local-assets = "local_asset_library.cli:main"
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest==8.4.2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -p no:cacheprovider"
+
+[tool.uv]
+cache-dir = "cache/uv"

@@ -1,0 +1,23 @@
+{
+  "model_id": "Qwen/Qwen3-VL-2B-Instruct",
+  "revision": "89644892e4d85e24eaac8bacfd4f463576704203",
+  "license": "Apache-2.0",
+  "verified_date": "2026-10-11",
+  "repository_bytes": 4266648961,
+  "weight_bytes": 4255140312,
+  "prior_model_download_bytes": 0,
+  "model_budget_bytes": 8589934592,
+  "generated_budget_bytes": 21474836480,
+  "prior_generated_data_bytes": 49432673,
+  "disk_free_gib_before": 94.02,
+  "gpu_before": "RTX 5070; 12227 MiB total, 5277 MiB used; driver 616.64",
+  "compatibility_plan": "Windows CPython 3.13, PyTorch 2.10.0 CUDA 12.8 with Blackwell support; BF16, SDPA, explicit CUDA device; prove actual kernels before model download. No shared-runtime changes.",
+  "image_support": "Official model card and Transformers Qwen3-VL documentation show image-text inference and multi-image inputs. Actual consumption must be verified separately.",
+  "sources": [
+    "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct",
+    "https://huggingface.co/api/models/Qwen/Qwen3-VL-2B-Instruct?blobs=true",
+    "https://huggingface.co/docs/transformers/model_doc/qwen3_vl",
+    "https://raw.githubusercontent.com/huggingface/transformers/v4.57.6/src/transformers/models/qwen3_vl/__init__.py",
+    "https://pytorch.org/get-started/previous-versions/"
+  ]
+}

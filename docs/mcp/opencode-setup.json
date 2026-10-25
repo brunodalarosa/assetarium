@@ -1,0 +1,13 @@
+{
+  "mcp": {
+    "local_asset_library": {
+      "type": "local",
+      "command": [
+        "C:\\BrunoOS\\Local-Asset-Library\\.venv-mcp\\Scripts\\python.exe",
+        "C:\\BrunoOS\\Local-Asset-Library\\scripts\\asset-mcp.py"
+      ],
+      "enabled": true,
+      "timeout": 120000
+    }
+  }
+}
