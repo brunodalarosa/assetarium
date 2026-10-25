@@ -110,3 +110,14 @@ the changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - Choose a new version number, release, or tag (`vX.Y.Z`) only when the owner asks. A
   release updates every version field together: `pyproject.toml`, `runtime/*/pyproject.toml`
   and `frontend/package.json`.
+
+## Branching (git flow)
+
+- `main` holds released versions only; each merge into it is tagged `vX.Y.Z`.
+- `develop` is the integration branch. Start work from it and open pull requests into it.
+- `feature/<name>` and `bugfix/<name>` branch from `develop` and merge back into it.
+- `release/X.Y.Z` branches from `develop` to prepare a release (version fields, changelog),
+  then merges into `main` (tagged) and back into `develop`.
+- `hotfix/X.Y.Z` branches from `main` for urgent fixes, then merges into `main` (tagged) and
+  `develop`.
+- Never commit directly to `main` or `develop`, and never force-push them.
