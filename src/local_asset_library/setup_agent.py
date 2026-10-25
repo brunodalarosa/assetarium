@@ -22,10 +22,11 @@ SESSION_MINUTES = 60
 PROPOSAL_STATES = ('pending', 'applied', 'rejected', 'superseded', 'failed')
 OPENED_FROM = ('app', 'cli')
 APPLY_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
-              'description_engine', 'description_server', 'engine_hint')
+              'description_engine', 'description_server', 'search_device', 'engine_hint')
 LABELS = {'storage_budget_gib': 'storage budget', 'processing_formats': 'formats', 'caption_batch_size': 'batch size',
           'descriptions_enabled': 'descriptions', 'description_engine': 'description engine',
-          'description_server': 'model server', 'engine_hint': 'target engine', 'blender': 'Blender'}
+          'description_server': 'model server', 'search_device': 'search device', 'engine_hint': 'target engine',
+          'blender': 'Blender'}
 PRIVACY = ('This status goes to the model your agent uses. If that model runs in the cloud, the OS, GPU, free '
            'space and Blender paths leave this computer.')
 SETUP_PROMPT = ('Set up Assetarium (Local Asset Library) for this computer with its MCP tools. Start with '
@@ -38,7 +39,8 @@ PROCEDURE = (
     '2. Ask the user which game engine they target and whether they want AI descriptions (optional). '
     '3. Work out a setup that runs on this computer: descriptions use the built-in engine on NVIDIA GPUs with BF16, '
     'otherwise a vision model in an OpenAI-compatible server on this computer (llama.cpp, Ollama, LM Studio) through '
-    'description_engine "local-server". For each next_actions item, run the command yourself only after the user '
+    'description_engine "local-server". Search uses search_device "cuda" on NVIDIA GPUs with BF16, otherwise "cpu". '
+    'For each next_actions item, run the command yourself only after the user '
     'approves; without a shell, give the user the exact command. Assetarium never installs or downloads anything. '
     '4. validate_blender on the best candidate, then propose_setup and ask the user to click Apply in the app. '
     '5. apply_setup with values that fit (formats from the engine hint, budget and batch size from the recommendations). '
@@ -158,7 +160,7 @@ def apply_setup(config, args, now=None):
         merged['description_server'] = {**current['description_server'], **server}
     saved = save_general_settings(config, merged['storage_budget_gib'], merged['processing_formats'], merged['caption_batch_size'],
                                   merged['descriptions_enabled'], merged['description_engine'], merged['description_server'],
-                                  actor='agent')
+                                  merged['search_device'], actor='agent')
     changed = [key for key in SETTING_KEYS if current.get(key) != saved.get(key)]
     if hint is not None:
         record, _ = setup_core.load_record(config)

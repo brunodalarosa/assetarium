@@ -163,8 +163,9 @@ report**, a list of original asset paths with recorded failures, kept separate
 from pending work.
 
 **Setup** ([decision 0014](../decisions/0014-setup-wizard.md)). A full-window
-overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions,
-Batch size, Review and finish), **Back** / **Skip step** / **Next**, and **Skip setup**
+overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions and
+search, Batch size, Review and finish; the descriptions step also chooses **Where search
+runs**, NVIDIA GPU or CPU, with its own checklist, [decision 0018](../decisions/0018-cpu-search-embedder.md)), **Back** / **Skip step** / **Next**, and **Skip setup**
 at any time. It opens by itself only on a genuinely fresh install (no setup record, no
 saved settings, no source); otherwise **Settings → General → Run setup** opens it
 pre-filled. Nothing is saved until **Save** on the review step, and setup never

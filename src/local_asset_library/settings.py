@@ -73,6 +73,20 @@ def description_engine_settings(config):
     return {'engine': engine, 'server': server}
 
 
+SEARCH_DEVICES = ('cuda', 'cpu')
+
+
+def validate_search_device(value):
+    if value not in SEARCH_DEVICES:
+        raise ConfigError('Choose where search runs (NVIDIA GPU or CPU) in Settings → General')
+    return value
+
+
+def search_device(config):
+    """Device of the search embedder (decision 0018); unset stays CUDA, as before the setting existed."""
+    return validate_search_device(_saved(config).get('search_device', 'cuda'))
+
+
 def format_group(extension):
     return 'gltf' if extension == 'glb' else extension
 
@@ -121,7 +135,7 @@ def storage_budget(config, fallback=None):
 
 
 SETTING_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
-                'description_engine', 'description_server')
+                'description_engine', 'description_server', 'search_device')
 
 
 def general_settings(config):
@@ -129,7 +143,7 @@ def general_settings(config):
     return {'status': 'ready', 'storage_budget_gib': storage_budget(config)['total_allocated_bytes'] / GIB,
             'processing_formats': processing_formats(config), 'caption_batch_size': caption_batch_size(config),
             'descriptions_enabled': descriptions_enabled(config), 'description_engine': engine['engine'],
-            'description_server': engine['server']}
+            'description_server': engine['server'], 'search_device': search_device(config)}
 
 
 def validate_budget_gib(value):
@@ -145,7 +159,7 @@ def validate_budget_gib(value):
 
 
 def checked_general(config, storage_budget_gib, processing_formats=None, caption_batch_size=None,
-                    descriptions_enabled=None, description_engine=None, description_server=None):
+                    descriptions_enabled=None, description_engine=None, description_server=None, search_device=None):
     """Validated settings.json content; omitted values keep what is saved. Writes nothing."""
     limit = validate_budget_gib(storage_budget_gib)
     path = settings_path(config)
@@ -159,16 +173,18 @@ def checked_general(config, storage_budget_gib, processing_formats=None, caption
     engine, server = validate_engine(description_engine if description_engine is not None else
                                      value.get('description_engine', 'builtin'),
                                      description_server if description_server is not None else value.get('description_server'))
+    device = validate_search_device(search_device if search_device is not None else value.get('search_device', 'cuda'))
     value.update(schema_version=1, storage_budget_bytes=limit * GIB, processing_formats=formats,
                  caption_batch_size=batch, descriptions_enabled=enabled, description_engine=engine,
-                 description_server=server)
+                 description_server=server, search_device=device)
     return value
 
 
 def save_general_settings(config, storage_budget_gib, processing_formats=None, caption_batch_size=None,
-                          descriptions_enabled=None, description_engine=None, description_server=None, actor='user'):
+                          descriptions_enabled=None, description_engine=None, description_server=None,
+                          search_device=None, actor='user'):
     value = checked_general(config, storage_budget_gib, processing_formats, caption_batch_size,
-                            descriptions_enabled, description_engine, description_server)
+                            descriptions_enabled, description_engine, description_server, search_device)
     path = settings_path(config)
     try:
         before = general_settings(config)

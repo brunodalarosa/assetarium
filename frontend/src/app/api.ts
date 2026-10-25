@@ -10,7 +10,7 @@ export interface Bridge {
   changes(): Promise<Json>;
   general_settings(): Promise<Json>;
   save_general_settings(budget: string | number, formats: string[], batch: string | number, descriptionsEnabled?: boolean | null,
-    engine?: string | null, server?: { url: string; model: string } | null): Promise<Json>;
+    engine?: string | null, server?: { url: string; model: string } | null, searchDevice?: string | null): Promise<Json>;
   setup_state(): Promise<Json>;
   setup_environment(): Promise<Json>;
   setup_blender(): Promise<Json>;

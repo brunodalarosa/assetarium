@@ -135,11 +135,12 @@ class DesktopBridge:
         return self._wait(self._present(general_settings, self._config, guarded=False))
 
     def save_general_settings(self, storage_budget_gib, processing_formats=None, caption_batch_size=None,
-                              descriptions_enabled=None, description_engine=None, description_server=None):
+                              descriptions_enabled=None, description_engine=None, description_server=None,
+                              search_device=None):
         from .settings import save_general_settings
         return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
-                                        guarded=False))
+                                        search_device, guarded=False))
 
     # Setup wizard (decision 0014): thin calls into setup_core; nothing here starts at launch.
     def setup_state(self):

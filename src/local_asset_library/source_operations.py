@@ -240,6 +240,8 @@ def publish_source(scoped):
     return target.catalog_generation
 
 
+SEARCH_CHECK = ("Search data is waiting for the one-time search check. Run it in a terminal in the Assetarium folder: "
+                "{command} Then process this source again; previews and other finished work are kept.")
 BUDGET_REACHED = ("Storage budget reached. Increase it in Settings → General, then process this source again; "
                   "completed work is preserved")
 
@@ -264,15 +266,30 @@ def check_budget(config, label, base):
         raise ConfigError(BUDGET_REACHED)
 
 
+def stage_runtime(config, stage):
+    """(environment wrapper, runtime project) for a stage, following the engine and search device settings.
+
+    A local model server needs no Torch, so its descriptions run in the app environment (decision 0018);
+    CPU search uses the CPU-only lock installed into the same search environment.
+    """
+    from . import engines
+    runtime = RUNTIMES[stage]
+    if stage == 'caption' and engines.active(config)['engine'] == engines.SERVER:
+        return 'mcp', 'mcp'
+    if stage == 'embeddings' and engines.search_device(config) == 'cpu':
+        return runtime, 'embedding-cpu'
+    return runtime, runtime
+
+
 def run_stages(config, source, scoped, token, operation, base):
     """Run each stage in its own locked runtime; returns False when cancelled."""
     for stage in OPERATION_STAGES[operation]:
         if cancelled(scoped, token):
             return False
         state(scoped, status="processing", phase=STAGE_LABELS[stage], stage=stage, progress=stage_progress(operation, stage))
-        runtime = RUNTIMES[stage]
+        runtime, project = stage_runtime(config, stage)
         command = [*runtime_command(config.project_root, runtime),
-                   'run','--locked','--no-sync','--offline','--project',str(config.project_root/'runtime'/runtime),
+                   'run','--locked','--no-sync','--offline','--project',str(config.project_root/'runtime'/project),
                    'python',str(config.project_root / "scripts/source-operation.py"), "stage", "--source", source["key"],
                    "--stage", stage, "--token", token]
         env = os.environ.copy()
@@ -369,6 +386,21 @@ def describe_source(config, source, token):
     state(scoped, status=status, phase=phase, progress=1, current_asset=None, reason=reason)
 
 
+def require_search_check(config, scoped, token):
+    """Stop the search stage with the search check's command while its receipt is missing or for the other device.
+
+    Setup, not an asset fault: assets stay pending and finished stages are kept.
+    """
+    from . import engines
+    device = engines.search_device(config)
+    if engines.capability_ready(config, device)["ready"]:
+        return
+    check = next(i for i in engines.search_readiness(config, device=device) if i["id"] == "embedding_capability")
+    reason = SEARCH_CHECK.format(command=check["command"])
+    atomic_json(stage_fault_path(scoped, token), {"reason": reason, "utc": now()})
+    raise ConfigError(reason)
+
+
 def worker_stage(config, source, stage, token):
     from .incremental import process
     from .library_index import index_library
@@ -398,7 +430,12 @@ def worker_stage(config, source, stage, token):
             # Turned off while running: stop after the finished batch; its descriptions are kept.
             atomic_json(stage_fault_path(scoped, token), {"reason": DESCRIPTIONS_STOPPED, "utc": now()})
             raise ConfigError(DESCRIPTIONS_STOPPED)
-        preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
+        try:
+            preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
+        except (ConfigError, OSError, ValueError):
+            if stage == "embeddings":
+                require_search_check(config, scoped, token)
+            raise
         if not preview.get("pending"):
             return
         from . import engines

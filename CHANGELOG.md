@@ -6,12 +6,28 @@ All notable changes to Assetarium are listed here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- Search by description and by image can run on the CPU: choose **Where search runs** in
+  Settings → General, the setup wizard, `local-assets settings set --search-device cpu` or
+  the agent's `apply_setup`. It uses the same EmbeddingGemma model and precision with a
+  CPU-only search runtime (`runtime/embedding-cpu`, about 1 GB). Indexing is slower than on an
+  NVIDIA GPU; searching feels the same (decision 0018).
+- `scripts/record-embedding-capability.py`, the one-time search check on two of your own
+  processed assets. Setup lists it, and Process assets names it when it is missing.
+
+### Changed
+
+- Descriptions from a local model server no longer need the description runtime
+  (`.venv-caption`); only the built-in engine does.
+- The setup wizard's descriptions step is now "Descriptions and search".
+
 ### Fixed
 
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
-
-### Changed
+- A fresh install could not build search data: the search check only worked with the original
+  pilot assets, and the first search stage stopped with "Verified embedding contract missing".
 
 - README: the setup welcome screenshots now show the current page with the
   "Set up with your AI agent" and "Set it up yourself" choices, and the README explains both.

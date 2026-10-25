@@ -37,7 +37,7 @@ recorded faults or still running, `2` refused or invalid.
 | Command | Same as in the app |
 | --- | --- |
 | `process --asset-source KEY` | Asset processing → Process assets: previews and search data, then publish |
-| `describe --asset-source KEY` | Generate descriptions (needs the caption runtime and an NVIDIA CUDA GPU) |
+| `describe --asset-source KEY` | Generate descriptions (built-in engine: the caption runtime and an NVIDIA CUDA GPU; local model server: only the running server) |
 | `cancel --asset-source KEY` | Cancel |
 | `process --asset-source KEY --follow` | Watch an operation that is already running |
 | `refresh --asset-source KEY` | Refresh published view (publishes usable partial results) |
@@ -62,6 +62,7 @@ settings set --batch-size 4            # 1, 2, 4 or 8 (built-in engine only)
 settings set --descriptions off        # on/off; off keeps existing descriptions
 settings set --engine local-server --server-url http://127.0.0.1:8080/v1 --server-model qwen3-vl-2b
 settings set --engine builtin
+settings set --search-device cpu       # cuda or cpu: where search by description and image runs
 ```
 
 Changing settings never deletes results or retries faults. Server addresses must be on

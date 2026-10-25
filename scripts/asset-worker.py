@@ -31,8 +31,7 @@ def send(value):
 
 with contextlib.redirect_stdout(sys.stderr):
     from local_asset_library.config import load_project_config, ConfigError
-    from local_asset_library.embedding_backend import runtime_contract
-    from local_asset_library.engines import embedder
+    from local_asset_library.engines import embedder, embedder_contract as runtime_contract
     from local_asset_library.mcp_assets import error_payload
     from local_asset_library.gpu_queue import lease, batch_requested, peer_requested
     config = load_project_config(root)

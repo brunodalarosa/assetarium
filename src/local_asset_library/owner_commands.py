@@ -47,7 +47,8 @@ def parser():
     change.add_argument('--engine', choices=['builtin', 'local-server'], help='How descriptions are generated')
     change.add_argument('--server-url', help='Local model server address, e.g. http://127.0.0.1:8080/v1')
     change.add_argument('--server-model', help='Model name the local server lists')
-    setup = commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
+    change.add_argument('--search-device', choices=['cuda', 'cpu'], help='Where semantic and image search run (switching re-indexes)')
+    setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
     agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium (interactive terminal only)')
@@ -190,10 +191,11 @@ def settings_command(args, config):
     from .settings import general_settings, save_general_settings
     current = general_settings(config)
     if args.action == 'set':
-        options = (args.formats, args.budget_gib, args.batch_size, args.descriptions, args.engine, args.server_url, args.server_model)
+        options = (args.formats, args.budget_gib, args.batch_size, args.descriptions, args.engine, args.server_url,
+                   args.server_model, args.search_device)
         if all(value is None for value in options):
             raise ConfigError('Give at least one of --formats, --budget-gib, --batch-size, --descriptions, --engine, '
-                              '--server-url or --server-model')
+                              '--server-url, --server-model or --search-device')
         formats = None if args.formats is None else (
             [] if args.formats.strip().lower() == 'none' else [f.strip().lower() for f in args.formats.split(',') if f.strip()])
         server = None if args.server_url is None and args.server_model is None else {
@@ -201,7 +203,7 @@ def settings_command(args, config):
             'model': args.server_model if args.server_model is not None else current['description_server']['model']}
         save_general_settings(config, args.budget_gib if args.budget_gib is not None else current['storage_budget_gib'],
                               formats, args.batch_size, None if args.descriptions is None else args.descriptions == 'on',
-                              args.engine, server)
+                              args.engine, server, args.search_device)
         current = general_settings(config)
         say(args, 'Saved. Changing settings never deletes results or retries faults.')
     engine = current['description_engine']
@@ -210,7 +212,8 @@ def settings_command(args, config):
               f"Descriptions: {'on' if current['descriptions_enabled'] else 'off (existing descriptions are kept)'}\n"
               f"Description engine: {engine}" + (f" ({current['description_server']['url']}, model "
                                                  f"{current['description_server']['model'] or 'not set'})" if engine == 'local-server' else '')
-              + f"\nDescription batch size: {current['caption_batch_size']}" + (' (not used by a local server)' if engine == 'local-server' else ''))
+              + f"\nDescription batch size: {current['caption_batch_size']}" + (' (not used by a local server)' if engine == 'local-server' else '')
+              + f"\nSearch runs on: {'CPU' if current['search_device'] == 'cpu' else 'NVIDIA GPU (CUDA)'}")
     return current
 
 
@@ -248,7 +251,7 @@ def ask(question, default=''):
 
 def wizard(args, config):
     """The desktop wizard's steps in a terminal; the same setup_core rules decide everything."""
-    from . import setup_core
+    from . import engines, setup_core
     from .settings import general_settings
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise ConfigError('Guided setup needs an interactive terminal; use setup status / setup blender / settings set instead')
@@ -303,6 +306,11 @@ def wizard(args, config):
             recommended = status['environment']['recommended_batch']
             choices['caption_batch_size'] = int(ask('5. Description batch size (1, 2, 4, 8)', recommended['size'] if recommended
                                                     else current['caption_batch_size']))
+    nvidia = bool(engines.gpu_bf16(status['environment']['gpu']))
+    say(args, '\nSearch by description and by image runs EmbeddingGemma on an NVIDIA GPU (cuda) or on the CPU (cpu, '
+              'slower to index, same results).' + ('' if nvidia else ' No NVIDIA GPU with BF16 was found, so cpu is suggested.'))
+    choices['search_device'] = ask('Search device (cuda/cpu)', current['search_device'] if nvidia or current['search_device'] == 'cpu'
+                                   else 'cpu').lower()
     say(args, '\nReview:\n' + json.dumps({k: v for k, v in choices.items() if k != 'confirm_rerender'}, indent=2, ensure_ascii=False))
     if ask('Save these choices? (yes/no)', 'yes').lower() != 'yes':
         say(args, 'Nothing was saved.')

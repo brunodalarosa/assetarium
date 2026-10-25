@@ -87,6 +87,8 @@ SCHEMAS = {
         "description_server": {"type": "object", "additionalProperties": False, "properties": {
             "url": {"type": "string", "maxLength": 256, "description": "Loopback only, e.g. http://127.0.0.1:8080/v1."},
             "model": {"type": "string", "maxLength": 256}}},
+        "search_device": {"type": "string", "enum": ["cuda", "cpu"],
+                          "description": "Where semantic and image search run: cuda (NVIDIA GPU with BF16) or cpu (any x86-64 CPU; slower first index)."},
         "engine_hint": {"type": "string", "enum": [hint["id"] for hint in ENGINE_HINTS]}}},
     "propose_setup": {"type": "object", "required": ["blender_path"], "additionalProperties": False, "properties": {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},

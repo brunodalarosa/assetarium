@@ -7,11 +7,11 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/beui/tabs";
 import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
-import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, setupRecordText, sourceMessage } from "../app/format";
+import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, SEARCH_HELP, setupRecordText, sourceMessage } from "../app/format";
 import {
   chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, saveGeneralSettings, setAppearance, type SettingsTab, sourceAction, useApp,
 } from "../app/store";
-import { EngineFields } from "../ui/EngineFields";
+import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
 import { Banner, Button, Card, SelectField, TextField } from "../ui/primitives";
 
@@ -78,6 +78,7 @@ function SetupCard() {
 function General() {
   const general = useApp((s) => s.general);
   const engines = useApp((s) => s.setup.info?.engines) || [];
+  const devices = useApp((s) => s.setup.info?.search_devices) || [];
   const [budget, setBudget] = useState("");
   const [formats, setFormats] = useState<string[]>([]);
   const [batch, setBatch] = useState("8");
@@ -85,6 +86,7 @@ function General() {
   const [engine, setEngine] = useState("builtin");
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("");
+  const [device, setDevice] = useState("cuda");
   useEffect(() => {
     if (!general.values) return;
     setBudget(String(general.values.storage_budget_gib));
@@ -94,12 +96,13 @@ function General() {
     setEngine(general.values.description_engine);
     setUrl(general.values.description_server.url);
     setModel(general.values.description_server.model);
+    setDevice(general.values.search_device);
   }, [general.values]);
   const disabled = general.loading || general.busy || !general.values;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
-    void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } });
+    void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } }, device);
   };
   return (
     <div className="grid gap-5">
@@ -141,6 +144,9 @@ function General() {
             <SelectField id="caption-batch-size" label="Assets per model call" value={batch} onChange={setBatch} disabled={disabled} options={[["1", "1"], ["2", "2"], ["4", "4"], ["8", "8 (default)"]]} className="w-48" />
           </Card>
         )}
+        <Card id="search-card" title="Search" help={SEARCH_HELP}>
+          <SearchDeviceField value={device} onChange={setDevice} devices={devices} disabled={disabled} idPrefix="settings" />
+        </Card>
         <div className="flex flex-wrap items-center gap-4">
           <Button type="submit" id="save-general-settings" disabled={disabled}>Save</Button>
           <p id="general-settings-message" role="status" aria-live="polite" className="text-[12.5px] leading-relaxed text-muted-foreground">{general.message}</p>

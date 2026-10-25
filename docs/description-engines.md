@@ -11,7 +11,7 @@ one place.
 | Composition root | `engines.py` | `description_engine(config)`, `embedder(config)`, `batch_size`, `generation`; the engine table setup reads; static readiness checks |
 | Built-in description engine | `engine_transformers.py` | Wraps `QwenBackend` + `caption_batching` (unchanged; CUDA, BF16) |
 | Local server engine (experimental) | `engine_server.py` | OpenAI-compatible server on this computer |
-| Embedders | `embedding_backend.EmbeddingBackend`, `mcp_server.RemoteBackend` | EmbeddingGemma in process, or through the worker |
+| Embedders | `embedding_backend.EmbeddingBackend` (CUDA), `embedding_cpu.EmbeddingCpuBackend` (CPU), `mcp_server.RemoteBackend` | EmbeddingGemma in process on the saved search device, or through the worker |
 | Test adapters | `tests/test_engines.py`, `tests/test_incremental.py` | Fake engines and a fake HTTP server |
 
 ## Contracts
@@ -63,8 +63,37 @@ Faults: an unreachable server, unknown model, refused request or malformed reply
 run with the assets pending; a generation that hits the time or token limit fails that
 asset only. The model identity is what the server reports (not hash-verified).
 
-**Not verified:** any AMD GPU, Ollama or LM Studio, and descriptions from models other than
+**Checked on AMD (October 25, 2026):** a Radeon RX 6800 (driver 26.7.1) with the same llama.cpp
+b11870 Vulkan build, `--device Vulkan0` (the discrete card; the CPU's integrated GPU is
+`Vulkan1`) and the official F16 files (`Qwen3VL-2B-Instruct-F16.gguf` +
+`mmproj-Qwen3VL-2B-Instruct-F16.gguf`, 4.07 GB): 32 of 32 valid descriptions at 3.9 s per asset
+(four views per request). Evidence: `data/evidence/cpu-embedder-e2e-2026-10-25/report.json`.
+
+**Not verified:** other AMD GPUs, Ollama or LM Studio, and descriptions from models other than
 Qwen3-VL-2B-Instruct (caption quality rules were calibrated on Qwen).
+
+## Search device (decision 0018)
+
+`search_device` (`cuda` by default, or `cpu`) picks the embedder in `engines.embedder`; there is
+no fallback between them. Settings → General → Search, the setup wizard, `apply_setup` or
+`local-assets settings set --search-device cpu`. The CPU embedder is the same EmbeddingGemma
+revision in BF16 with its own contract (device, adapter and lock hashes), so its vectors are a
+separate index: after switching, record the search check again and Process assets.
+
+CPU setup, from the Assetarium folder:
+
+```powershell
+.\scripts\embedding-runtime.ps1 sync --locked --project runtime/embedding-cpu
+.\scripts\embedding-runtime.ps1 run --locked --no-sync --project runtime/embedding-cpu python scripts/prepare_embedding_model.py --device cpu
+# After processing a source once (its search stage waits for this check):
+.\scripts\embedding-runtime.ps1 run --locked --no-sync --offline --project runtime/embedding-cpu python scripts/record-embedding-capability.py
+```
+
+Measured on a Ryzen 9 9950X3D (16 cores, AVX-512): about 1.1 s per image vector and 0.03 s
+per text vector in BF16, 2–10 s model load; vectors within 0.998 cosine of FP32
+(`data/evidence/cpu-embedder-probe-2026-10-25/report.json`). Every rendered view gets an image
+vector, so a 3D asset costs a few seconds to index. A local-server description run uses the app
+environment (`.venv-mcp`), so AMD and other GPUs need no description runtime at all.
 
 ## Places that still construct a concrete adapter
 

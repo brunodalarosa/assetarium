@@ -150,7 +150,9 @@ export const BUDGET_HELP =
 export const DESCRIPTIONS_OFF =
   "Generate descriptions is hidden and no ready-to-generate notices appear. Descriptions already written stay stored and searchable; nothing is deleted or redone. Turn it back on any time.";
 export const ENGINE_NOTE =
-  "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Semantic and image search still need the built-in search runtime and an NVIDIA CUDA GPU in this version.";
+  "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Where search by description and by image runs is a separate choice below.";
+export const SEARCH_HELP =
+  "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Process assets to rebuild search data. Until then, names, filters and keyword search keep working.";
 export const BATCH_HELP =
   "How many assets the model describes in one call. Larger batches finish sooner but need more GPU memory. If memory runs out, the run stops safely: nothing is marked failed and those assets stay waiting, so you can lower the size and continue. Wording can differ slightly with which assets share a batch. Changing this never redoes finished descriptions.";
 export function setupRecordText(record: Json | null | undefined) {

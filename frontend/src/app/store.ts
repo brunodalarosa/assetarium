@@ -148,6 +148,7 @@ export interface SetupDraft {
   engine: string;
   serverUrl: string;
   serverModel: string;
+  searchDevice: string;
   batch: string;
   skipped: SetupStep[];
 }
@@ -232,7 +233,7 @@ function emptySetup(): SetupState {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
     storage: null, measuring: false, server: null, testing: false, saving: false, result: null,
     agent: null, agentMode: false, agentBusy: null, baseline: null,
-    draft: { blenderPath: "", confirmRerender: false, engineHint: "", formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", batch: "8", skipped: [] },
+    draft: { blenderPath: "", confirmRerender: false, engineHint: "", formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", skipped: [] },
   };
 }
 const idleSearch: SearchState = {
@@ -785,19 +786,22 @@ export interface DescriptionSettings {
   engine: string;
   server: { url: string; model: string };
 }
-export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings) {
+export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string) {
+  const previousDevice = state.general.values?.search_device;
   setState((s) => ({ general: { ...s.general, busy: true, message: "Saving…" } }));
   try {
-    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null);
+    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null);
     if (result.status === "faulty") throw Error(result.reason);
     const described = !result.descriptions_enabled ? " Descriptions are off; existing descriptions are kept."
       : result.description_engine === "local-server" ? " Descriptions use the local model server." : ` Description batch size: ${result.caption_batch_size}.`;
+    const searched = previousDevice && previousDevice !== result.search_device
+      ? ` Search now runs on the ${result.search_device === "cpu" ? "CPU" : "NVIDIA GPU"}: run the search check again, then Process assets to rebuild search data.` : "";
     setState({
       general: {
         loading: false, busy: false, values: result,
         message: result.processing_formats.length
-          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described} Selected formats apply to new processing batches.`
-          : "Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.",
+          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described}${searched} Selected formats apply to new processing batches.`
+          : `Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.${searched}`,
       },
     });
     await loadSources();
@@ -837,6 +841,7 @@ function savedDraft(info: Json): SetupDraft {
     engine: values.description_engine || "builtin",
     serverUrl: values.description_server?.url || "http://127.0.0.1:8080/v1",
     serverModel: values.description_server?.model || "",
+    searchDevice: values.search_device || "cuda",
     batch: String(values.caption_batch_size ?? 8),
   };
 }
@@ -855,6 +860,9 @@ export async function openSetup() {
     void loadAgentSetup().then((agent) => agent?.session?.open && patchSetup({ agentMode: true }));
     const [env, storage] = await Promise.all([api().setup_environment(), api().setup_storage_use(false)]);
     patchSetup({ env: env.status === "faulty" ? null : env, storage, error: env.status === "faulty" ? env.reason : state.setup.error });
+    // A first run suggests where search runs from the GPU found; a saved or agent-set choice is never replaced.
+    if (env.status !== "faulty" && info.first_run?.fresh && !info.set_by?.search_device && env.suggested_search_device)
+      updateSetupDraft({ searchDevice: env.suggested_search_device });
   } catch (error) {
     patchSetup({ loading: false, error: (error as Error).message });
   }
@@ -937,18 +945,18 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, engine_hint: draft.engineHint || null });
   if (!skipped.has("storage") && draft.budget) choices.storage_budget_gib = draft.budget;
   if (!skipped.has("descriptions"))
-    Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel } });
+    Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
   if (!skipped.has("batch") && setupStepNeeded("batch", draft)) choices.caption_batch_size = draft.batch;
   return choices;
 }
 const STEP_FIELDS: Record<string, (keyof SetupDraft)[]> = {
   blender: ["blenderPath"], formats: ["formats", "engineHint"], storage: ["budget"],
-  descriptions: ["descriptionsEnabled", "engine", "serverUrl", "serverModel"], batch: ["batch"],
+  descriptions: ["descriptionsEnabled", "engine", "serverUrl", "serverModel", "searchDevice"], batch: ["batch"],
 };
 /** Which saved values a step shows, for "set by" badges. */
 export const STEP_KEYS: Record<string, string[]> = {
   blender: ["blender"], formats: ["processing_formats"], storage: ["storage_budget_gib"],
-  descriptions: ["descriptions_enabled", "description_engine", "description_server"], batch: ["caption_batch_size"],
+  descriptions: ["descriptions_enabled", "description_engine", "description_server", "search_device"], batch: ["caption_batch_size"],
 };
 export const stepChanged = (step: string, draft: SetupDraft, baseline: SetupDraft) =>
   (STEP_FIELDS[step] || []).some((key) => JSON.stringify(draft[key]) !== JSON.stringify(baseline[key]));

@@ -150,8 +150,10 @@ def fresh():
     shoot('03-storage')
     ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='descriptions');await frame();return true})()")
     wait("$('setup-readiness')")
-    ui.check('builtin_readiness_lists_copyable_commands', """(async()=>({items:$('setup-readiness').querySelectorAll('li').length===5,
-      model:document.body.innerText.includes('Qwen3-VL-2B-Instruct'), honest:document.body.innerText.includes('NVIDIA CUDA GPU in this version')}))()""")
+    # Search has its own card and checklist since decision 0018 (GPU or CPU; the CPU list has no GPU item).
+    ui.check('builtin_readiness_lists_copyable_commands', """(async()=>({items:$('setup-readiness').querySelectorAll('li').length===3,
+      search:[3,4].includes($('setup-search-readiness').querySelectorAll('li').length)&&$('setup-search-device').querySelectorAll('[role=radio]').length===2,
+      model:document.body.innerText.includes('Qwen3-VL-2B-Instruct'), honest:document.body.innerText.includes('on an NVIDIA GPU or on the CPU')}))()""")
     shoot('04-descriptions-builtin')
     ui.js("""(async()=>{const group=$('setup-engine');const first=group.querySelector('[role=radio]');first.focus();
       first.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));await frame();return true})()""")

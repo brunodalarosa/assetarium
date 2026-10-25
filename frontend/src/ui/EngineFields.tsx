@@ -58,3 +58,19 @@ export function EngineFields({ engine, onEngine, url, onUrl, model, onModel, dis
     </div>
   );
 }
+
+/** Where search by description and by image runs (decision 0018): the devices setup_core lists. */
+export function SearchDeviceField({ value, onChange, devices, disabled, idPrefix }: {
+  value: string; onChange: (value: string) => void; devices: Json[]; disabled?: boolean; idPrefix: string;
+}) {
+  return (
+    <RadioCards
+      id={`${idPrefix}-search-device`}
+      label="Where search runs"
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      options={devices.map((item) => ({ value: item.id, title: item.label, detail: item.summary }))}
+    />
+  );
+}

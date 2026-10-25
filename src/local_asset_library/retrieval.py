@@ -168,8 +168,12 @@ def recorded_contract(config, contract):
     except (OSError, ValueError, KeyError, TypeError):
         return contract  # The existing capability checks report the fault.
     result = dict(contract)
-    for key, path in (("adapter_sha256", Path(__file__).with_name("embedding_backend.py")),
-                      ("runtime_lock_sha256", config.project_root / "runtime/embedding/uv.lock")):
+    # A contract may name its own hashed files (the CPU embedder, decision 0018); CUDA keeps these two.
+    files = contract.get("hashed_files") or {"adapter_sha256": "src/local_asset_library/embedding_backend.py",
+                                             "runtime_lock_sha256": "runtime/embedding/uv.lock"}
+    package = "src/local_asset_library/"
+    for key, path in ((key, Path(__file__).with_name(relative[len(package):]) if relative.startswith(package)
+                       else config.project_root / relative) for key, relative in files.items()):
         old = recorded.get(key) if isinstance(recorded, dict) else None
         if old and contract.get(key) and contract[key] != old:
             try:

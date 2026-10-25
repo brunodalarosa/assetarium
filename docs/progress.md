@@ -1,5 +1,46 @@
 # Progress
 
+## October 25 — CPU search embedder and AMD end to end, branch `feature/cpu-search-embedder`
+
+[Decision 0018](decisions/0018-cpu-search-embedder.md), approved at the scope/plan checkpoint by
+the user of this checkout (owner review pending before any upstream merge). Machine: Ryzen 9
+9950X3D, Radeon RX 6800 16 GB, 31 GB RAM, Windows 11; no NVIDIA GPU.
+
+- **CPU embedder.** `embedding_cpu.py` (same EmbeddingGemma revision, prompts, preprocessing,
+  BF16 and normalization; own contract with device, adapter, base-adapter and lock hashes plus
+  `hashed_files` for the LF/CRLF rule in `retrieval.recorded_contract`). `search_device` setting
+  (`cuda` default, `cpu`) in `settings.py`, chosen in `engines.embedder`/`embedder_contract`; the
+  search worker's contract request goes through `engines`. `embedding_backend.py`, caption and
+  Blender worker files are byte-identical to `develop`.
+- **CPU-only lock.** `runtime/embedding-cpu/` (Torch/torchvision `+cpu`, every other pin equal),
+  synced into `.venv-embedding` by the same wrapper; `prepare_embedding_model.py --device cpu`.
+- **Fresh installs.** `scripts/record-embedding-capability.py` records the search check from two
+  of the library's own previews (sources' working records). The search stage stops with that
+  command as its reason while the receipt is missing or for the other device; a dry run counts
+  against the receipt's contract (first run, device switch). Stage environments follow the
+  settings (`source_operations.stage_runtime`): local-server descriptions run in `.venv-mcp`, CPU
+  search uses the CPU lock; the CLI stage command and overnight workers use the same helper.
+- **Setup and UI.** Settings → General → Search card; wizard step "Descriptions and search" with
+  per-device checklist (`environment_report.search_devices`) and a first-run CPU suggestion
+  without NVIDIA BF16; `apply_setup` and `settings set --search-device`; agent panel label.
+  `ui/build/` rebuilt.
+- **Measured.** CPU probe: 1.10 s per image and 0.033 s per text vector in BF16, cosine ≥ 0.998
+  to FP32 (`data/evidence/cpu-embedder-probe-2026-10-25/`). Medieval Weapons pack (64 logical
+  assets): previews 209 s; 32 Unity FBX duplicates recorded as import failures (kept, not
+  retried); 97 image vectors at 1.13 s each; 32/32 descriptions through llama.cpp b11870 Vulkan on
+  the RX 6800 with Qwen3-VL-2B F16 at 3.9 s per asset; MCP search 0.02–0.09 s after a 6.4 s first
+  query (`data/evidence/cpu-embedder-e2e-2026-10-25/`).
+- **Verification.** Full suite 648 passed, 2 skipped (`Real-Blender tests: 5 passed`), with
+  `tests/test_cpu_embedder.py` (10 tests). WebView2: new `verify-search-device.py`
+  (`data/gui/search-device-2026-10-25b/`), `verify-general-settings.py`,
+  `verify-setup-wizard.py` (readiness check updated for the separate search list;
+  `data/gui/setup-wizard-2026-10-25-cpu-r3/`) and `verify-agent-setup.py` passed.
+- **Storage.** Receipts `data/storage/2026-10-25-cpu-embedder-before.json` (207,869,096
+  allocated bytes) and `…-after.json` (1,463,004,608): the CPU search runtime, base and app
+  environments, frontend `node_modules`, evidence. Outside the project: 5.53 GB under `C:\AI`
+  (EmbeddingGemma 1.53 GB, Qwen F16 GGUF 4.07 GB, llama.cpp 0.13 GB), 10.8 MB `metadata-lal`.
+  `uv cache prune` found nothing to remove; the npm cache (`cache/npm`) is kept for offline rebuilds.
+
 ## October 25 — Beta cleanup before sharing the repository, branch `linux-support`
 
 Owner-approved cleanup from the beta audit (all items, internal plumbing included); license

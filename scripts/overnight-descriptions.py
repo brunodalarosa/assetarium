@@ -116,9 +116,10 @@ def supervise(config, identifier, command, phase, timeout=180):
 
 
 def worker_command(config, identifier, stage):
-    runtime = 'caption' if stage == 'caption' else 'embedding'
+    from local_asset_library.source_operations import stage_runtime
+    runtime, project = stage_runtime(config, 'caption' if stage == 'caption' else 'embeddings')
     return [*runtime_command(config.project_root, runtime),
-            'run', '--locked', '--no-sync', '--offline', '--project', str(config.project_root / 'runtime' / runtime),
+            'run', '--locked', '--no-sync', '--offline', '--project', str(config.project_root / 'runtime' / project),
             'python', str(config.project_root / 'scripts/overnight-descriptions.py'),
             '--worker', stage, '--run-id', identifier]
 
