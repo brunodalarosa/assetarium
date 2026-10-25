@@ -1,6 +1,6 @@
 # Assetarium Entity (Corporate) Contributor License Agreement
 
-Version 1.0 (draft) · Based on the Apache Software Grant and Corporate CLA
+Version 1.0 · Based on the Apache Software Grant and Corporate CLA
 v2.2 (CCLA), with the relicensing and outbound-license terms adapted from the
 Harmony CLA ("any licence" option) and the Canonical CLA. Its grants match the
 [Individual CLA](CLA.md).
