@@ -7,11 +7,10 @@ relicensing and outbound-license terms adapted from the Harmony CLA
 > **Draft, not legal advice.** This text is a template prepared for the
 > project owner. It has not been reviewed by a lawyer. Have it reviewed by
 > qualified counsel in your jurisdiction before asking anyone to sign it.
-> Bracketed items such as `[LEGAL ENTITY NAME]` are open decisions; see
-> "Open decisions" in [CONTRIBUTING.md](CONTRIBUTING.md).
+> Remove this notice once that review is done.
 
 Thank you for your interest in Assetarium (the "Project"), maintained by
-`[LEGAL ENTITY NAME]` ("we" or "us"). This agreement clarifies the rights in
+Bruno Cesar Puli Dala Rosa ("we" or "us"). This agreement clarifies the rights in
 the Contributions you make. It protects you, us and the Project's users.
 You keep the copyright in your Contributions; you grant us a license to use
 them. If you contribute on behalf of an employer or another organization,
@@ -122,14 +121,15 @@ We are not obliged to use or include any Contribution.
 
 ## 10. Notification
 
-You agree to notify us at `[CONTACT EMAIL]` if you become aware of any facts
+You agree to notify us at obrunodalarosa@gmail.com if you become aware of any facts
 or circumstances that would make any of your representations in section 7
 inaccurate.
 
 ## 11. General
 
 - **Governing law:** This agreement is governed by the laws of
-  `[JURISDICTION / GOVERNING LAW]`, excluding its conflict-of-law rules.
+  the Province of Quebec and the federal laws of Canada
+  applicable there, excluding their conflict-of-law rules.
 - **Assignment:** We may assign or transfer this agreement, including our
   rights under sections 2, 3 and 5, to a successor maintainer of the Project
   that agrees to be bound by section 4.
@@ -142,7 +142,7 @@ inaccurate.
 ## Signature
 
 Sign through the mechanism described in [CONTRIBUTING.md](CONTRIBUTING.md).
-For signatures made outside it, send the following to `[CONTACT EMAIL]`:
+For signatures made outside it, send the following to obrunodalarosa@gmail.com:
 
 ```
 Full name:

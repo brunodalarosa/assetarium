@@ -23,22 +23,22 @@ under AGPL-3.0-only or another OSI-approved open source license.
 
 ### Pull requests on GitHub (recommended)
 
-The repository uses the [CLA Assistant](https://github.com/cla-assistant/cla-assistant)
-GitHub app (or its GitHub Action variant).
+The repository uses the free [CLA Assistant](https://cla-assistant.io) GitHub
+app.
 
 1. Open your pull request as usual.
-2. A bot comment asks you to sign. Read [CLA.md](CLA.md), then reply in the
-   pull request with the exact sentence it shows, for example:
-   `I have read the CLA Document and I hereby sign the CLA`.
-3. The CLA check turns green. Later pull requests from the same GitHub
-   account pass automatically.
+2. The CLA Assistant bot comments on it with a link. Follow the link, read the
+   agreement (the same text as [CLA.md](CLA.md)), sign in with GitHub and
+   click **I agree**.
+3. The `license/cla` check turns green. Later pull requests from the same
+   GitHub account pass automatically.
 
 Make sure every commit's author email is linked to your GitHub account,
 otherwise the check cannot match the commits to your signature.
 
 ### Patches sent outside GitHub
 
-Email the signature block at the end of [CLA.md](CLA.md) to `[CONTACT EMAIL]`
+Email the signature block at the end of [CLA.md](CLA.md) to obrunodalarosa@gmail.com
 once, then add this trailer to each commit:
 
 ```
@@ -67,37 +67,42 @@ relicensing rights described above.
 
 ## For maintainers: setting up CLA Assistant
 
-Nothing is installed yet. When the repository is public:
+The repository needs no files for the app; it is configured at
+cla-assistant.io. One-time setup, done by the repository owner:
 
-1. Store the CLA text where CLA Assistant can read it: either a GitHub Gist
-   containing [CLA.md](CLA.md) (CLA Assistant app at cla-assistant.io), or the
-   file in this repository (CLA Assistant GitHub Action, which stores
-   signatures as JSON in a dedicated branch such as `cla-signatures`).
-2. Link the repository and require the `license/cla` (or the Action's) status
-   check in branch protection for `main`.
-3. Add the maintainer accounts and bots to the allowlist.
-4. When the CLA text changes, bump its version in [CLA.md](CLA.md) and decide
-   whether earlier signatures still apply.
+1. Create a GitHub Gist named `Assetarium-CLA.md` whose content is
+   [CLA.md](CLA.md). The gist is the text contributors sign, so keep it
+   identical to the file.
+2. Go to <https://cla-assistant.io>, sign in with the GitHub account that owns
+   `brunodalarosa/assetarium`, and authorize the app.
+3. Click **Configure CLA**, choose the repository and the gist, and click
+   **Link**. The app then adds a webhook and starts commenting on pull
+   requests.
+4. In the repository settings, add `license/cla` as a required status check in
+   the branch protection rule for `main`.
+5. Optionally add bots (for example `dependabot[bot]`) to the allowlist in the
+   CLA Assistant configuration.
+6. Contributors from a company sign the [Entity CLA](CLA-entity.md) by email;
+   their individual GitHub signature is still collected by the app.
 
-The Action variant keeps signatures in the repository itself, with no third
-party holding them; the app is easier to set up. Either works with these
-documents.
+When the CLA text changes, bump its version in [CLA.md](CLA.md), update the
+gist (CLA Assistant then asks for new signatures), and commit both together.
 
-## Open decisions
+CLA Assistant is run by SAP and stores signatures on its own service; you can
+export them from its dashboard.
 
-The CLA files are drafts and contain placeholders the owner must fill before
-publishing:
+## Who receives the licenses
 
-| Placeholder | Decision | Notes |
-| --- | --- | --- |
-| `[LEGAL ENTITY NAME]` | Who receives the licenses: Bruno as an individual, or a company. | A company makes later transfer and commercial licensing simpler. |
-| `[JURISDICTION / GOVERNING LAW]` | Which country's (and state's) law governs the CLA. | Usually where the licensor lives or is registered. Some jurisdictions limit moral-rights waivers. |
-| `[CONTACT EMAIL]` | Where contributors send signatures and notifications. | Use a project address, not a personal one. |
-| `[CORPORATE CLA SUBMISSION ADDRESS]` | Where entities send the signed Entity CLA and Schedule A updates. | Can be the same as the contact email. |
-| Signature mechanism | CLA Assistant app, CLA Assistant Action, or another. | See "For maintainers" above. |
+| Item | Value |
+| --- | --- |
+| Licensor | Bruno Cesar Puli Dala Rosa (as an individual) |
+| Governing law | Province of Quebec and the federal laws of Canada applicable there |
+| Contact and entity CLA submissions | obrunodalarosa@gmail.com |
+| Signature mechanism | CLA Assistant GitHub app |
 
 **Not legal advice.** The CLA texts were drafted as a starting point, modeled
 on the Apache ICLA/CCLA v2.2, the Harmony CLA and the Canonical CLA. They have
-not been reviewed by a lawyer. Have qualified counsel in your jurisdiction
-review them before use, particularly the relicensing clause (section 3), the
-moral-rights clause and the choice of law.
+not been reviewed by a lawyer. Have qualified counsel in Quebec review them
+before use, particularly the relicensing clause (section 3), the moral-rights
+clause, and whether Quebec's Charter of the French Language requires a French
+version of these standard-form agreements to be offered first.
