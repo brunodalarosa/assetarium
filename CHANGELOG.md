@@ -4,6 +4,13 @@ All notable changes to Assetarium are listed here. The project follows
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+
+- README: the setup welcome screenshots now show the current page with the
+  "Set up with your AI agent" and "Set it up yourself" choices, and the README explains both.
+
 ## [0.1.0] — 2026-10-25
 
 First public release.
