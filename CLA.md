@@ -1,6 +1,6 @@
 # Assetarium Individual Contributor License Agreement
 
-Version 1.0 (draft) · Based on the Apache Individual CLA v2.2, with the
+Version 1.0 · Based on the Apache Individual CLA v2.2, with the
 relicensing and outbound-license terms adapted from the Harmony CLA
 ("any licence" option) and the Canonical CLA.
 
