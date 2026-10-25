@@ -86,9 +86,14 @@ in **Settings → General**.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/setup/00-welcome-dark.png">
-    <img src="docs/images/setup/00-welcome-light.png" alt="Setup welcome page showing this computer's system, GPU, free space and Blender status" width="760">
+    <img src="docs/images/setup/00-welcome-light.png" alt="Setup welcome page showing this computer's system, GPU, free space and Blender status, with the choice between setting up with your AI agent or setting it up yourself" width="760">
   </picture>
 </p>
+
+**Choose how to set up.** Pick **Set up with my agent** and your AI agent checks this
+computer and chooses the settings for you, while you approve the risky parts, like which
+Blender to run. Or pick **Start setup** and answer a few questions yourself; it takes
+about two minutes. The steps below follow the second path.
 
 **Blender.** Assetarium finds your Blender installation and checks that it can import
 glTF, FBX and OBJ. Blender always runs in the background with scripts and add-ons turned
