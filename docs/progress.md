@@ -1,5 +1,15 @@
 # Progress
 
+## October 25 — Scan cache size bound, branch `feature/cpu-search-embedder`
+
+`Low Poly Nature - Extended` (16,504 files) showed **Scan fault: Managed manifest exceeds its
+bounded size**: its `metadata-lal/library/scan-cache.json` was 5.76 MB and `read_json` caps app
+JSON at 4 MiB, so every rescan after the first failed. `read_json(path, limit)` now takes a
+caller bound; only the scan cache uses `SCAN_CACHE_LIMIT` (256 MiB, about 750,000 files). New
+tests in `tests/test_manifest_bound.py`; full suite 649 passed, 2 skipped (`Real-Blender tests:
+5 passed`). The real rescan succeeded in 544 s (full re-hash after the unreadable cache) with
+9,900 assets pending and no faults. No storage change.
+
 ## October 25 — CPU search embedder and AMD end to end, branch `feature/cpu-search-embedder`
 
 [Decision 0018](decisions/0018-cpu-search-embedder.md), approved at the scope/plan checkpoint by

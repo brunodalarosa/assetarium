@@ -26,6 +26,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
+- Sources with more than about 12,000 files failed every rescan with "Managed manifest exceeds
+  its bounded size": their scan cache outgrew the 4 MiB limit for app JSON files. The scan cache
+  now has its own 256 MiB bound; every other file keeps 4 MiB.
+
 - A fresh install could not build search data: the search check only worked with the original
   pilot assets, and the first search stage stopped with "Verified embedding contract missing".
 

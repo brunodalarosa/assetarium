@@ -22,6 +22,7 @@ from .publication import pinned_config
 
 SOURCE_ID = "playful-lowpoly-v1"
 SCANNER_VERSION = "inventory-v1"
+SCAN_CACHE_LIMIT = 256 * 1024 * 1024
 MODELS = {".obj", ".fbx", ".glb", ".gltf", ".blend", ".dae", ".stl"}
 UNSUPPORTED = {".3ds", ".ply", ".usd", ".usda", ".usdc", ".usdz", ".max", ".ma", ".mb", ".lwo", ".vox"}
 IMAGES = {".png", ".jpg", ".jpeg", ".webp", ".tga", ".bmp", ".dds", ".exr", ".hdr"}
@@ -110,7 +111,8 @@ def walk_source(config):
         from .publication import read_json
         cache_path = config.output_path("data", "library/scan-cache.json")
         if cache_path.exists():
-            cached = read_json(cache_path).get("files", {})
+            # About 350 bytes per file: 256 MiB bounds packs of roughly 750,000 files.
+            cached = read_json(cache_path, SCAN_CACHE_LIMIT).get("files", {})
     next_cache = {}
     def walk_error(exc):
         raise ConfigError("Source directory cannot be scanned: " + str(exc))
