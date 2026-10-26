@@ -34,6 +34,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
+- Scans of large sources spent minutes matching every asset against every file (supplied
+  previews) and every other asset (name variants); both now look up names directly, with
+  identical results. A rescan of a 16,504-file source went from about 8½ minutes to 21 seconds.
 - Sources with more than about 12,000 files failed every rescan with "Managed manifest exceeds
   its bounded size": their scan cache outgrew the 4 MiB limit for app JSON files. The scan cache
   now has its own 256 MiB bound; every other file keeps 4 MiB.

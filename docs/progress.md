@@ -1,5 +1,19 @@
 # Progress
 
+## October 26 — Faster inventory building, branch `feature/cpu-search-embedder`
+
+`build_inventory` matched supplied previews by checking every row for every asset and name
+variants by scanning every asset for every asset (assets × files and assets² work). Previews are
+now indexed by (pack, stem) and looked up for the asset's name and its four Isometric directions,
+in row order, with the original per-row checks; variants are grouped by (pack, export anchor,
+prefix). Old (committed) and new code built byte-identical rows, assets, ambiguities, archives
+and suggestions for all six real sources (`Low Poly Nature - Extended` 163.9 s → 9.1 s,
+`Medieval Megapack` 13.8 s → 1.1 s); a real rescan of `Low Poly Nature` took 21.3 s (was 514 s
+before grouping). New `test_preview_lookup_keeps_row_order_labels_and_exact_versus_directional_matches`;
+full suite 657 passed, 2 skipped (`Real-Blender tests: 5 passed`), plus the new test. After the
+owner grouped the suggested folders, `Low Poly Nature` has 3,300 pending assets (was 9,900),
+`Medieval Megapack` 1,265 (was 2,530) and `Medieval Weapons` 0 failures.
+
 ## October 26 — Excluded folders, duplicate export folders, folder variants, branch `feature/cpu-search-embedder`
 
 [Decision 0019](decisions/0019-source-folders-and-export-variants.md), approved at the scope/plan

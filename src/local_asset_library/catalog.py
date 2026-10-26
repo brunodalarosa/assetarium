@@ -532,6 +532,13 @@ def build_inventory(config, suggestions=None):
     packs = sorted({row["path"].split("/")[0] for row in rows
                     if "/" in row["path"] and row["role"] in {"model", "unsupported_candidate"}})
     assets, ambiguities = [], []
+    # Supplied previews by (pack, file stem), in row order: each asset looks up its own few names
+    # instead of checking every file (the same per-row checks below decide a match).
+    previews_by_name = defaultdict(list)
+    for position, row in enumerate(rows):
+        if row["role"] == "individual_preview" and row["status"] == "available":
+            p = PurePosixPath(row["path"])
+            previews_by_name[(p.parts[0], p.stem)].append((position, row))
     for pack in packs:
         candidates = [row for row in rows if row["path"].startswith(pack + "/") and row["role"] in {"model", "unsupported_candidate"}]
         license_rows = license_evidence(config, pack, inventory)
@@ -576,7 +583,9 @@ def build_inventory(config, suggestions=None):
                 asset['texture_repair'] = recipe
             # Match exact names only in recognized preview trees at the matching export anchor.
             anchors = {export_slot(f["path"].split("/", 1)[1])[0] for f in files if export_slot(f["path"].split("/", 1)[1])}
-            for preview in rows:
+            names = [name] + [name + "_" + direction for direction in ("NE", "NW", "SE", "SW")]
+            found = sorted({position: row for stem in names for position, row in previews_by_name.get((pack, stem), [])}.items())
+            for _, preview in found:
                 p = PurePosixPath(preview["path"])
                 exact_name = p.stem == name
                 directional = p.parent.name == "Isometric" and p.stem in {name + "_" + direction for direction in ("NE", "NW", "SE", "SW")}
@@ -607,15 +616,18 @@ def build_inventory(config, suggestions=None):
             for asset in matching:
                 asset["grouping"]["unresolved_ambiguities"].append(case)
     # Variants are filename suggestions, not verified visual relationships, and never merged.
+    # Models by (pack, export anchor, name prefix), so each asset reads its own group instead of all assets.
+    variant_key = lambda a: (a["pack_id"], a["grouping"]["evidence"][0].get("anchor"), re.split(r"[-_]", a["display_name"])[0].casefold())
+    by_prefix = defaultdict(list)
+    for asset in assets:
+        if asset.get("asset_type") != "image":
+            by_prefix[variant_key(asset)].append(asset)
     for asset in assets:
         if asset.get("asset_type") == "image":
             continue  # Filename prefixes are not image variant evidence; identical bytes are recorded instead.
         parts = re.split(r"[-_]", asset["display_name"])
         if len(parts) > 1:
-            base = parts[0].casefold()
-            related = [a for a in assets if a["pack_id"] == asset["pack_id"] and a["asset_id"] != asset["asset_id"] and a.get("asset_type") != "image"
-                       and a["grouping"]["evidence"][0].get("anchor") == asset["grouping"]["evidence"][0].get("anchor")
-                       and re.split(r"[-_]", a["display_name"])[0].casefold() == base]
+            related = [a for a in by_prefix[variant_key(asset)] if a["asset_id"] != asset["asset_id"]]
             asset["variants"] = [{"asset_id": a["asset_id"], "relationship": "filename_variant_candidate",
                                   "evidence": f"Shared filename prefix {parts[0]!r}; unreviewed"} for a in sorted(related, key=lambda a: a["asset_id"])]
     archives = []
