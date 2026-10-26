@@ -111,6 +111,16 @@ def test_rejects_unknown_ids_paths_indexes_and_stale_generations(indexed):
         service.file('../other-file', 0)
 
 
+def test_preview_requires_the_generation_the_inspection_card_reports(indexed):
+    """Collection cards must send their card's generation: a missing version is stale, never skipped."""
+    config, record, service = fixture(indexed)
+    assert service.prepare(record['asset_id'], 'obj', None)['status'] == 'stale'
+    card_generation = service.service.synchronize()
+    manifest = service.prepare(record['asset_id'], 'obj', card_generation)
+    assert manifest['status'] == 'ready'
+    assert service.file(manifest['ticket'], 0)['status'] == 'ready'
+
+
 def test_file_limits_are_recorded_faults(indexed, monkeypatch):
     config, record, service = fixture(indexed)
     monkeypatch.setattr('local_asset_library.interactive_preview.MAX_FILE_BYTES', 1)
