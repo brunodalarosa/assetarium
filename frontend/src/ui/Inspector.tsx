@@ -51,7 +51,9 @@ function faultText(fault: Json) {
 /** The 3D still and interactive viewer from ui/interactive-preview.js, mounted per selection. */
 function ModelPreview({ grid, assetId, result, view }: { grid: GridId; assetId: string; result: Json; view: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const version = useApp((s) => gridVersion(s, grid));
+  const gridVer = useApp((s) => gridVersion(s, grid));
+  // Collection members come from the library or a source; the card's own generation is the one its preview must match.
+  const version = grid === "collection" ? result.generation ?? null : gridVer;
   useEffect(() => {
     const p = result.payload, info = p.presentation || {};
     const container = ref.current;

@@ -6,6 +6,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The interactive 3D preview now opens from asset cards inside a collection; it no longer
+  reports "Library changed; refresh the inspection card." for assets that preview fine from search.
+
 ### Changed
 
 - README: the setup welcome screenshots now show the current page with the
