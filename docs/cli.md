@@ -44,6 +44,7 @@ recorded faults or still running, `2` refused or invalid.
 | `process --asset-source KEY --follow` | Watch an operation that is already running |
 | `refresh --asset-source KEY` | Refresh published view (publishes usable partial results) |
 | `failures` | Importing failures report: original paths of assets whose import failed |
+| `recheck --asset-source KEY` | Recheck failures: lists failures from the file/dependency check that pass it now and, after a typed `yes`, retries them on the next Process assets (decision 0020) |
 
 `process` and `describe` wait and print progress. **Ctrl+C cancels safely**: the
 current asset finishes (descriptions finish their batch) and saved work is kept;

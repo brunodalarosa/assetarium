@@ -274,6 +274,20 @@ class DesktopBridge:
     def source_export_undo(self, key, decision_id):
         return self._wait(self._present(self._source_setting, 'forget_export', key, decision_id, guarded=False))
 
+    # Recheck of failures from the file/dependency check (decision 0020): preview reads; retry needs its preview.
+    def recheck_failures(self, key):
+        from .recheck import preview
+        return self._wait(self._present(preview, self._config, key, guarded=False))
+
+    def retry_failures(self, key, preview_id):
+        return self._wait(self._present(self._retry_failures, key, preview_id, guarded=False))
+
+    def _retry_failures(self, key, preview_id):
+        from .recheck import release
+        result = release(self._config, key, preview_id)
+        self._start_source_operation('scan', key)
+        return result
+
     def _source_setting(self, name, key, *args):
         from . import sources
         if not self._config.sources_registry:

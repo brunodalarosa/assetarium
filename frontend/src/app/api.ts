@@ -33,6 +33,8 @@ export interface Bridge {
   source_exclusions(key: string, patterns: string[]): Promise<Json>;
   source_export(key: string, suggestionId: string, decision: string): Promise<Json>;
   source_export_undo(key: string, decisionId: string): Promise<Json>;
+  recheck_failures(key: string): Promise<Json>;
+  retry_failures(key: string, previewId: string): Promise<Json>;
   choose_source_directory(): Promise<Json>;
   browse(filters: Json, offset: number, pageSize: number): Promise<Json>;
   source_browse(key: string, offset: number, pageSize: number): Promise<Json>;

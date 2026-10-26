@@ -110,13 +110,17 @@ class TransientFault(ConfigError):
     """Availability faults (busy GPU queue, stopped worker) are not retained per query."""
 
 
-def source_variants(record):
-    """The asset's files by folder label (decision 0019), so an agent can ask for one by name; empty when single."""
+def source_variants(record, problems=None):
+    """The asset's files by folder label (decision 0019), so an agent can ask for one by name; empty when single.
+
+    Unusable alternate files (decision 0020) are listed with ``usable: false`` and their reason.
+    """
     from .catalog import file_variants
-    labels = file_variants(record)
+    labels, problems = file_variants(record), problems or {}
     if not labels:
         return {}
-    return {"source_variants": [{"variant": labels[f["path"]], "format": f["format"]}
+    return {"source_variants": [{"variant": labels[f["path"]], "format": f["format"], "usable": f["path"] not in problems,
+                                 **({"reason": problems[f["path"]]} if f["path"] in problems else {})}
                                 for f in record["files"] if f["path"] in labels]}
 
 
@@ -393,7 +397,7 @@ class AssetService:
                    'asset_type': record.get('asset_type', 'model_3d'), 'parent_asset_id': record.get('parent_asset_id'),
                    "availability": "available", "status": "available", "usable": True,
                    "selected_source": result["selected_source"], "dependencies": deps,
-                   **source_variants(record),
+                   **source_variants(record, result["unusable_files"]),
                    "dependency_completeness": "Known references verified; uninspected binary/alternate dependencies remain unknown",
                    "source_faults": (record.get("inspection_run") or {}).get("source_faults", []),
                    **caption_summary(self.config, record),

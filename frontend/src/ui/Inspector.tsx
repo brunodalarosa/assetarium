@@ -141,7 +141,7 @@ function SourcesTab({ result, image }: { result: Json; image: boolean }) {
             <Text>{p.selected_source.format.toUpperCase()}{p.selected_source.variant ? ` · ${p.selected_source.variant} folder` : ""} · original file · verified hash</Text>
             {(p.source_variants || []).length > 1 && (
               <Hint>
-                Also in this asset: {(p.source_variants as Json[]).filter((v) => v.variant !== p.selected_source.variant || v.format !== p.selected_source.format).map((v) => `${v.variant} (${String(v.format).toUpperCase()})`).join(" · ")}. Agents can ask for one by its folder name.
+                Also in this asset: {(p.source_variants as Json[]).filter((v) => v.variant !== p.selected_source.variant || v.format !== p.selected_source.format).map((v) => `${v.variant} (${String(v.format).toUpperCase()}${v.usable === false ? `, unusable: ${v.reason}` : ""})`).join(" · ")}. Agents can ask for a usable one by its folder name.
               </Hint>
             )}
             <code className="path block rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed break-all text-muted-foreground select-text">{p.selected_source.resolved_path}</code>

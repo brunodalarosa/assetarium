@@ -160,7 +160,10 @@ instead of **Generate descriptions**; report notices drop **Continue**. The page
 shows the published library (coverage,
 catalog/index versions, **Refresh published view**) and the **Importing failures
 report**, a list of original asset paths with recorded failures, kept separate
-from pending work.
+from pending work. A source with recorded failures offers **Recheck failures**: it reruns the
+file/dependency check, read only, and a dialog offers **Retry N assets** for failures that came
+from that check and pass it now (or **Nothing to retry** with Close); retried assets become pending
+for the next **Process assets** ([decision 0020](../decisions/0020-alternate-file-faults-and-recheck.md)).
 
 **Setup** ([decision 0014](../decisions/0014-setup-wizard.md)). A full-window
 overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions and

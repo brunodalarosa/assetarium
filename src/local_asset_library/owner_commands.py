@@ -13,7 +13,7 @@ import time
 
 from .config import ConfigError, load_config, project_config_path
 
-COMMANDS = {'sources', 'settings', 'process', 'describe', 'cancel', 'failures', 'collections', 'setup'}
+COMMANDS = {'sources', 'settings', 'process', 'describe', 'cancel', 'failures', 'recheck', 'collections', 'setup'}
 ENDED_OK = {'complete'}
 
 
@@ -79,6 +79,8 @@ def parser():
         command.add_argument('--follow', action='store_true', help='Watch the running operation instead of starting one')
     commands.add_parser('cancel', help='Cancel the running operation safely').add_argument('--asset-source', required=True, metavar='KEY')
     commands.add_parser('failures', help='Original paths of assets whose import failed')
+    recheck = commands.add_parser('recheck', help='Recheck failures from the file/dependency check; retry those that pass (asks first)')
+    recheck.add_argument('--asset-source', dest='key', required=True)
     collections = commands.add_parser('collections', help='List, export or delete collections').add_subparsers(dest='action', required=True)
     collections.add_parser('list').add_argument('query', nargs='?', default='')
     export = collections.add_parser('export', help='Write JSON, a PNG sample sheet or Markdown (PDF: desktop app)')
@@ -92,6 +94,28 @@ def parser():
 def say(args, text):
     if not args.json:
         print(text, flush=True)
+
+
+def recheck_command(args, config):
+    """Recheck, then retry only after a typed yes (decision 0020); never from a script or an agent."""
+    from . import recheck
+    found = recheck.preview(config, args.key)
+    say(args, f"{found['retry']:,} recorded failures came from the file check and pass it now"
+              + (f" (e.g. {', '.join(found['examples'][:3])})" if found['examples'] else '') + '.'
+              + (f" {found['still_failing']:,} still fail it and stay recorded." if found['still_failing'] else ''))
+    if not found['retry']:
+        say(args, 'Nothing to retry.')
+        return found
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise ConfigError('Retrying recorded failures needs your answer in an interactive terminal; run it yourself')
+    if input(f"Retry these {found['retry']:,} assets on the next Process assets? Type \"yes\" to confirm: ").strip().lower() != 'yes':
+        say(args, 'Nothing was changed.')
+        return {**found, 'status': 'cancelled'}
+    result = recheck.release(config, args.key, found['preview_id'])
+    say(args, result['reason'] + ' Scanning to refresh the source status.')
+    args.follow = False
+    run_operation(args, config, 'scan', args.key)
+    return result
 
 
 def confirm(question):
@@ -504,6 +528,8 @@ def main(argv, config=None):
             from .sources import bound, get_source
             result = cancel(bound(config, get_source(config, args.asset_source)))
             say(args, result.get('reason') or 'Nothing is running for this source.')
+        elif args.command == 'recheck':
+            result = recheck_command(args, config)
         elif args.command == 'failures':
             from .sources import importing_failures
             result = importing_failures(config)

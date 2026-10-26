@@ -1,5 +1,27 @@
 # Progress
 
+## October 26 — Broken alternate files fail alone; Recheck failures, branch `feature/cpu-search-embedder`
+
+[Decision 0020](decisions/0020-alternate-file-faults-and-recheck.md). After grouping, all 3,300
+`Low Poly Nature - Extended` assets failed inspection: their OBJ alternates' MTL points at
+`C:/Users/Skup/Desktop/…/Atlas Nature Texture.png`, and `source_check` rejected an asset for any
+file's problem.
+
+- `retrieval.dependency_owners`, `used_file`, `file_problems`; `source_check` keeps the old check
+  (`_source_check`) and, only when it fails on a multi-file asset whose used file is fine, checks
+  the usable files and records `unusable_files`. `resolved_detail` never selects an unusable file,
+  refuses requests for it and returns only usable files' dependencies; `get_asset`
+  `source_variants` carry `usable`/`reason`; inspector label.
+- `recheck.py` (`preview`, `release`), `local-assets recheck --asset-source KEY` (typed yes),
+  bridge `recheck_failures` / `retry_failures`, **Recheck failures** button and a neutral
+  confirmation dialog (close-only when nothing applies) on Asset processing. Released jobs keep
+  their previous evidence (`released` ledger status, `released_faults`).
+- **Verification.** Full suite 665 passed, 2 skipped (`Real-Blender tests: 5 passed`), with
+  `tests/test_alternate_faults.py` (7 tests); WebView2
+  `scripts/verify-recheck.py` (`data/gui/recheck-2026-10-26b/`). On all six real sources every
+  asset that passed the old check keeps an identical fingerprint (2,013 assets); `Low Poly Nature`
+  has 3,300 newly usable assets and the recheck preview offers exactly those 3,300 (not released).
+
 ## October 26 — Faster inventory building, branch `feature/cpu-search-embedder`
 
 `build_inventory` matched supplied previews by checking every row for every asset and name

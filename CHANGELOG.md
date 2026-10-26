@@ -21,6 +21,8 @@ All notable changes to Assetarium are listed here. The project follows
   separate or exclude the extra folders, and undo an answer (decision 0019).
 - Grouped files keep their folder as a variant label; `get_asset` lists `source_variants` and
   accepts `source_variant` to pick, for example, the `Unity FBX` file.
+- **Recheck failures** on a source's Asset processing card (and `local-assets recheck`): reruns
+  the file check and, after you confirm, retries failures that came from it and pass it now.
 - `scripts/record-embedding-capability.py`, the one-time search check on two of your own
   processed assets. Setup lists it, and Process assets names it when it is missing.
 
@@ -34,6 +36,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
+- A broken alternate file (for example an OBJ whose texture path points at the pack author's
+  computer) no longer fails the whole asset: only that file is marked unusable, with its reason,
+  and the asset is rendered from its good file. Healthy assets keep their fingerprints (decision 0020).
+
 - Scans of large sources spent minutes matching every asset against every file (supplied
   previews) and every other asset (name variants); both now look up names directly, with
   identical results. A rescan of a 16,504-file source went from about 8½ minutes to 21 seconds.

@@ -5,7 +5,7 @@ import type { Json } from "../app/api";
 import {
   describeActive, DESCRIBE_RESULTS, descriptionBlocked, descriptionSummary, operationActive, plural, sourceMessage,
 } from "../app/format";
-import { generateDescriptions, navigate, refreshContext, setState, sourceAction, useApp } from "../app/store";
+import { generateDescriptions, navigate, recheckFailures, refreshContext, setState, sourceAction, useApp } from "../app/store";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
 import { Badge, type BadgeTone, Banner, Button, Disclosure, Progress } from "../ui/primitives";
 
@@ -85,6 +85,13 @@ function SourceCard({ source, focused }: { source: Json; focused: boolean }) {
               onClick={() => void sourceAction("process", source.key)}
             >
               Process assets
+            </Button>
+          )}
+          {source.failed > 0 && !operationActive(operation) && (
+            <Button variant="secondary" data-source={source.key} data-action="recheck"
+              title="Check recorded failures again; you confirm before anything is retried"
+              onClick={() => void recheckFailures(source)}>
+              <RotateCcw className="size-4" aria-hidden />Recheck failures
             </Button>
           )}
           {importing && (

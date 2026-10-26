@@ -115,7 +115,10 @@ rules; owner approval and source faults remain separate.
 otherwise. A grouped asset also lists `source_variants` (each file's folder label and format,
 [decision 0019](../decisions/0019-source-folders-and-export-variants.md)); optional
 `source_variant` picks one by label, for example `"Unity FBX"` when two files share a format.
-Labels come from the asset's own files; paths are never accepted. It returns the actual source path/hash, all known logical-asset
+Labels come from the asset's own files; paths are never accepted. A file that cannot be used
+(for example its texture path points outside the source) is listed with `usable: false` and a
+`reason`, is never selected, and requesting it is refused with that reason
+([decision 0020](../decisions/0020-alternate-file-faults-and-recheck.md)). It returns the actual source path/hash, all known logical-asset
 dependencies with referring-source evidence, completeness limitations and faults.
 `include_metadata=true` requests observations, measured summary, license evidence,
 processing states and caption fault evidence. No incomplete dependency package is

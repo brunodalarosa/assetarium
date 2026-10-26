@@ -128,7 +128,10 @@ export interface ConfirmRequest {
   title: string;
   body: string;
   confirmLabel: string;
-  run: () => Promise<unknown>;
+  /** Without run, the dialog only informs and offers Close. */
+  run?: () => Promise<unknown>;
+  /** Deletions are "danger" (the default); other confirmations are "neutral". */
+  tone?: "danger" | "neutral";
 }
 export interface CreateRequest {
   assetIds: string[];
@@ -1482,6 +1485,36 @@ export function confirmRemoveSource(source: Json) {
     confirmLabel: "Remove source",
     run: () => sourceAction("remove", source.key),
   });
+}
+/** Recheck failures from the file check (decision 0020), then confirm before anything is retried. */
+export async function recheckFailures(source: Json) {
+  try {
+    const found = await api().recheck_failures(source.key);
+    if (found.status === "faulty") throw Error(found.reason);
+    const still = found.still_failing ? ` ${found.still_failing.toLocaleString()} still fail it and stay recorded.` : "";
+    if (!found.retry) {
+      askConfirm({ tone: "neutral", title: "Nothing to retry", confirmLabel: "",
+        body: `No recorded failure in “${source.name}” came from a file problem that is resolved now.${still} Other failures stay recorded with their reasons in the Importing failures report.` });
+      return;
+    }
+    const count = found.retry.toLocaleString();
+    askConfirm({
+      tone: "neutral",
+      title: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}?`,
+      body: `${count} ${found.retry === 1 ? "asset" : "assets"} in “${source.name}” failed only because a file ${found.retry === 1 ? "it is" : "they are"} not rendered from had a problem (for example ${found.examples.slice(0, 3).join(", ")}). ${found.retry === 1 ? "It" : "They"} can be processed now.${still} Retrying marks them pending; nothing runs until you click Process assets. Other recorded failures stay as they are.`,
+      confirmLabel: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}`,
+      run: async () => {
+        const result = await api().retry_failures(source.key, found.preview_id);
+        if (result.status !== "faulty") {
+          setState({ sourcesMessage: result.reason || "" });
+          await loadSources();
+        }
+        return result;
+      },
+    });
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Recheck failed", body: (error as Error).message });
+  }
 }
 export function openCreateCollection(request: CreateRequest = { assetIds: [], sourceKey: null }) {
   setState({ create: request, menu: null });
