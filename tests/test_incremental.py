@@ -200,6 +200,36 @@ def test_stage_checkpoint_failure_and_resume(library,monkeypatch):
     assert process(config,'inspection',6)['selected']==0
 
 
+def test_reused_results_mark_their_stage_complete_after_a_rescan_reset(library, monkeypatch):
+    """Grouping export folders changes an asset's file list, so a rescan resets its stages, while the
+    rendered file is unchanged: processing reuses the finished result and must mark it complete again."""
+    config, _ = library
+    from local_asset_library import incremental
+    attempted = []
+    monkeypatch.setattr(incremental, 'run_inspection', lambda c, r, fp, resolution=640, formats=None:
+                        attempted.append(r['asset_id']) or {'status': 'complete'})
+    process(config, 'inspection', 6)
+    work = working(config)
+    for record in records(work):  # What a finished inspection leaves, then the rescan's reset.
+        record.update(inspection_run={'status': 'complete'}, technical={'inspected_path': record['files'][0]['path']},
+                      previews=[{'path': 'data/fixture.png', 'view_label': 'front'}])
+        record['processing'].update(inspection='pending', previews='pending')
+        update_record(work, record)
+    count = len(attempted)
+    dry = process(config, 'inspection', 6, dry_run=True)
+    assert dry['retained'] == {'complete': 6} and dry['pending'] == 0 and dry['restored'] == 6
+    assert all(r['processing']['inspection'] == 'pending' for r in records(work))  # A dry run changes nothing.
+    result = process(config, 'inspection', 6)
+    assert result['retained'] == {'complete': 6} and result['restored'] == 6 and len(attempted) == count  # Nothing rendered.
+    assert all(r['processing']['inspection'] == r['processing']['previews'] == 'complete' for r in records(work))
+    first = records(work)[0]
+    first.update(previews=[])
+    first['processing'].update(inspection='pending', previews='pending')
+    update_record(work, first)
+    process(config, 'inspection', 6)
+    again = next(r for r in records(work) if r['asset_id'] == first['asset_id'])
+    assert again['processing']['inspection'] == 'pending'  # Without its previews nothing is claimed.
+
 def test_dependency_changes_and_dry_run(library):
     config,_=library
     path=config.source_root/'one/item0.obj'

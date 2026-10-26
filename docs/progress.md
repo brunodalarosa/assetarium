@@ -1,5 +1,19 @@
 # Progress
 
+## October 26 — Reused results mark their stage complete, branch `feature/cpu-search-embedder`
+
+After the owner grouped `Medieval Weapons` (FBX + gLTF + Unity FBX), the rescan reset its 32
+processed assets to pending (their file lists changed) while their rendered glTF and inputs did not.
+`incremental.process` counted the finished ledger jobs as reused but never set the record's stages
+back, and `worker_stage` stopped after a dry run with nothing pending, so Process assets did nothing
+and Generate descriptions had no ready previews. Now `restore_reused` marks inspection + previews
+(complete run with previews) or the description (record still has it) complete on reuse; dry runs
+report `restored` without writing; the worker runs a reuse-only pass and builds no engine for it.
+Real run: Process assets (30 s) and Generate descriptions (38 s) brought all 32 back to complete
+with every ledger job keeping its October 25 timestamp (nothing re-rendered or regenerated).
+Tests: `test_reused_results_mark_their_stage_complete_after_a_rescan_reset`,
+`test_the_source_worker_runs_a_reuse_only_pass_without_a_model`.
+
 ## October 26 — Texture folder choice, branch `feature/cpu-search-embedder`
 
 [Decision 0021](decisions/0021-texture-folder-choice.md). `Desert Pack` (FBX only) failed 117

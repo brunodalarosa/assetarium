@@ -40,6 +40,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
+- After grouping export folders, already processed assets stayed "pending" forever: Process assets
+  reused their finished previews and descriptions but never marked those stages complete again,
+  and Generate descriptions had nothing to start from. Reused results now mark their stage
+  complete, and a reuse-only pass runs without starting a model.
+
 - A broken alternate file (for example an OBJ whose texture path points at the pack author's
   computer) no longer fails the whole asset: only that file is marked unusable, with its reason,
   and the asset is rendered from its good file. Healthy assets keep their fingerprints (decision 0020).

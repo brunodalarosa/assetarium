@@ -153,6 +153,24 @@ def test_small_or_ambiguous_folders_are_not_suggested(managed, tmp_path):
     assert state(config, added)[1]['export_suggestions'] == []
 
 
+def test_the_source_worker_runs_a_reuse_only_pass_without_a_model(managed, monkeypatch):
+    """After grouping, a stage's dry run finds nothing to compute but stages to mark complete: it must still run."""
+    from local_asset_library import engines, incremental, source_operations as operations
+    from test_sources import ready_source
+    config, backend, one, _ = managed
+    ready_source(config, backend, one)
+    scoped = sources.bound(config, one)
+    operations.state(scoped, operation='describe', status='processing', token='r1')
+    calls = []
+    def fake(scoped, stage, limit=40, backend=None, dry_run=False, asset_ids=None, **kw):
+        calls.append((dry_run, backend))
+        return {'pending': 0, 'restored': 0 if len(calls) > 2 else 2, 'outcomes': []}
+    monkeypatch.setattr(incremental, 'process', fake)
+    monkeypatch.setattr(engines, 'description_engine', lambda c: pytest.fail('Reuse alone must not start a model'))
+    operations.worker_stage(config, one, 'caption', 'r1')
+    assert calls == [(True, None), (False, None), (True, None)]
+
+
 def test_the_owner_cli_lists_and_answers_suggestions(source, capsys):
     from local_asset_library.owner_commands import sources_command
     config, added = source

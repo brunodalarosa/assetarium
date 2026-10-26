@@ -436,13 +436,13 @@ def worker_stage(config, source, stage, token):
             if stage == "embeddings":
                 require_search_check(config, scoped, token)
             raise
-        if not preview.get("pending"):
-            return
+        if not preview.get("pending") and not preview.get("restored"):
+            return  # Reused results whose stage a rescan reset still need the real pass to mark them complete.
         from . import engines
         from .description_engines import EngineStop
         with lease(config, "batch-source-" + stage, timeout=30) if stage != "inspection" else _nullcontext():
             try:
-                if stage != "inspection" and backend is None:
+                if stage != "inspection" and backend is None and preview.get("pending"):  # Reuse alone needs no model.
                     backend = engines.description_engine(scoped) if stage == "caption" else engines.embedder(scoped)
                 result = process(scoped, stage, limit=1000, backend=backend, asset_ids=only,
                                  cancelled=lambda: cancelled(scoped, token), progress=on_progress)
@@ -452,7 +452,7 @@ def worker_stage(config, source, stage, token):
                 raise
         if cancelled(scoped, token):
             return
-        if not result.get("outcomes") and not result.get("processed"):
+        if not result.get("outcomes") and not result.get("processed") and not result.get("restored"):
             raise ConfigError("No processing progress; source work preserved for review")
     raise ConfigError("Source processing exceeded its bounded batches")
 
