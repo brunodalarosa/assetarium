@@ -112,7 +112,10 @@ rules; owner approval and source faults remain separate.
 
 `get_asset` accepts an exact `asset_` + 32 lowercase hexadecimal ID. Optional
 `source_format` selects an existing export; the inspected source is preferred
-otherwise. It returns the actual source path/hash, all known logical-asset
+otherwise. A grouped asset also lists `source_variants` (each file's folder label and format,
+[decision 0019](../decisions/0019-source-folders-and-export-variants.md)); optional
+`source_variant` picks one by label, for example `"Unity FBX"` when two files share a format.
+Labels come from the asset's own files; paths are never accepted. It returns the actual source path/hash, all known logical-asset
 dependencies with referring-source evidence, completeness limitations and faults.
 `include_metadata=true` requests observations, measured summary, license evidence,
 processing states and caption fault evidence. No incomplete dependency package is

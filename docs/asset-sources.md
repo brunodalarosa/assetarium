@@ -193,6 +193,25 @@ evidence are retained. Equal manifests in sibling `fbx`, `fbx(unity)`, `gltf` an
 `obj` export trees can establish a logical export group, preserving subpack and
 color namespaces; they do not establish measured geometry equivalence.
 
+### Excluded folders and duplicate export folders (decision 0019)
+
+Settings → Asset sources (or `local-assets sources exclude|include KEY PATTERN`) keeps a list of
+**excluded folders** per source in `source.json`: a folder name with `*` (`Unity*`, `*Godot*`,
+any level) or a path from the source root (`Models/Unity FBX`), case ignored. Excluded folders
+are not walked or hashed; the source shows how many files they hold. Their files cannot be
+textures for other models. Removing a pattern brings the files back on the rescan.
+
+Each scan also compares **sibling folders by the names of their model files** (extension, case and
+subfolders ignored; each name once per folder; at least 3). Equal sets not already grouped by the
+recognized layouts become a suggestion on the source row and a line on its Asset processing card
+(`local-assets sources exports KEY`). **Group as alternate files** attaches each copy to the asset
+of the reference folder's file, keeping its ID, inspection, previews and description (search
+vectors are rebuilt); **Exclude extra folders** adds the non-reference folders to the exclusions;
+**Keep separate** stops suggesting them. Answers can be undone. An answer is bound to the folder
+names and a hash of the name list: if a folder's files change, its files become separate again
+and the suggestion returns. Grouped files carry their folder as a variant label
+(`get_asset` `source_variants` / `source_variant`).
+
 The owner-approved KayKit glTF cleanup uses
 `scripts/historical/kaykit-gltf-maintenance.py`, with immutable receipts in
 `data/library/maintenance/kaykit-gltf-20261016/`. Its phases preserve glTF IDs,

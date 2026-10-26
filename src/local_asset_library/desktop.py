@@ -264,6 +264,23 @@ class DesktopBridge:
             return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
         raise ConfigError('Unknown asset source action')
 
+    # Excluded folders and duplicate export folders (decision 0019): each change rescans the source.
+    def source_exclusions(self, key, patterns):
+        return self._wait(self._present(self._source_setting, 'set_excluded_folders', key, patterns, guarded=False))
+
+    def source_export(self, key, suggestion_id, decision):
+        return self._wait(self._present(self._source_setting, 'decide_export', key, suggestion_id, decision, guarded=False))
+
+    def source_export_undo(self, key, decision_id):
+        return self._wait(self._present(self._source_setting, 'forget_export', key, decision_id, guarded=False))
+
+    def _source_setting(self, name, key, *args):
+        from . import sources
+        if not self._config.sources_registry:
+            raise ConfigError('Configure asset sources before using source settings')
+        getattr(sources, name)(self._config, key, *args)
+        return self._start_source_operation('scan', key)
+
     def _start_source_operation(self, operation, key):
         from .source_operations import start
         result = start(self._config, operation, key)

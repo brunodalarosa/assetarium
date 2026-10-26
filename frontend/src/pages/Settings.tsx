@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, SEARCH_HELP, setupRecordText, sourceMessage } from "../app/format";
 import {
-  chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, saveGeneralSettings, setAppearance, type SettingsTab, sourceAction, useApp,
+  chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, saveGeneralSettings, setAppearance, type SettingsTab, sourceAction, sourceFolders, useApp,
 } from "../app/store";
 import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
@@ -156,6 +156,79 @@ function General() {
   );
 }
 
+const where = (anchor: string) => (anchor ? `In ${anchor}` : "At the top of this source");
+
+/** Duplicate export folder suggestions, saved answers and excluded folders for one source (decision 0019). */
+function SourceFolders({ source, busy }: { source: Json; busy: boolean }) {
+  const [pattern, setPattern] = useState("");
+  const [working, setWorking] = useState(false);
+  const exclusions: string[] = source.exclusions || [];
+  const excluded: Json[] = source.excluded_folders || [];
+  const suggestions: Json[] = source.export_suggestions || [];
+  const answers: Json[] = source.export_decisions || [];
+  const disabled = busy || working;
+  const run = async (change: "exclusions" | "export" | "undo", value: string[] | string, decision = "") => {
+    setWorking(true);
+    const result = await sourceFolders(change, source.key, value, decision);
+    if (change === "exclusions" && result.status !== "faulty") setPattern("");
+    setWorking(false);
+  };
+  const files = excluded.reduce((total, item) => total + (item.files || 0), 0);
+  return (
+    <div className="source-folders mt-2 grid gap-3">
+      {suggestions.map((s) => (
+        <div key={s.id} className="export-suggestion grid gap-2 rounded-2xl bg-surface-2 p-4" data-suggestion={s.id}>
+          <p className="text-[13px] font-medium">Possible duplicate exports</p>
+          <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+            {where(s.anchor)}, {s.folders.join(", ")} have the same {s.names.toLocaleString()} model names (for example {s.sample_names.slice(0, 3).join(", ")}).
+            {s.grouped_folders.length > 1 ? ` ${s.grouped_folders.join(" and ")} are already grouped.` : ""}
+          </p>
+          <p className="hint text-[11.5px] leading-relaxed text-subtle">
+            Grouping makes one asset per model with every folder’s file attached; only the preferred file is rendered. Previews and descriptions are kept and search data is rebuilt. Excluding stops scanning the extra folders ({s.folders.filter((f: string) => f !== s.reference && !s.grouped_folders.includes(f)).join(", ")}). Nothing on disk changes either way.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button className="h-9 px-4" disabled={disabled} data-action="group" onClick={() => void run("export", s.id, "group")}>Group as alternate files</Button>
+            <Button variant="secondary" className="h-9 px-4" disabled={disabled} data-action="exclude" onClick={() => void run("export", s.id, "exclude")}>Exclude extra folders</Button>
+            <Button variant="quiet" className="h-9 px-4" disabled={disabled} data-action="separate" onClick={() => void run("export", s.id, "separate")}>Keep separate</Button>
+          </div>
+        </div>
+      ))}
+      {answers.length > 0 && (
+        <ul className="export-answers grid gap-1 text-[12px] text-muted-foreground" aria-label="Saved answers about duplicate exports">
+          {answers.map((d) => (
+            <li key={d.id} className="flex flex-wrap items-center gap-2">
+              <span>{d.decision === "group" ? "Grouped" : "Kept separate"}: {d.anchor ? d.anchor + " / " : ""}{d.folders.join(", ")}</span>
+              <button type="button" className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="undo" onClick={() => void run("undo", d.id)}>Undo</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="grid gap-2">
+        <p className="text-[13px] font-medium">Excluded folders</p>
+        {exclusions.length > 0 && (
+          <ul className="flex flex-wrap gap-2" aria-label="Excluded folder patterns">
+            {exclusions.map((item) => (
+              <li key={item} className="flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pl-3 pr-1.5 text-[12px]">
+                <span className="font-mono">{item}</span>
+                <button type="button" aria-label={"Stop excluding " + item} disabled={disabled} className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-50"
+                  onClick={() => void run("exclusions", exclusions.filter((p) => p !== item))}>×</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); if (pattern.trim()) void run("exclusions", [...exclusions, pattern.trim()]); }}>
+          <TextField id={`exclude-${source.id}`} label="Folder name or path" value={pattern} disabled={disabled} spellCheck={false} placeholder="Unity*  or  Models/Unity FBX" onChange={(e) => setPattern(e.target.value)} className="min-w-[220px] flex-1" />
+          <Button type="submit" variant="secondary" className="h-10 px-4" disabled={disabled || !pattern.trim()}>Exclude</Button>
+        </form>
+        <p className="hint text-[11.5px] leading-relaxed text-subtle">
+          {exclusions.length ? `${files.toLocaleString()} files in ${excluded.length} excluded ${excluded.length === 1 ? "folder" : "folders"} are not scanned. ` : ""}
+          A name matches any folder with that name (* is a wildcard); a path with / matches one folder inside the source. Files in excluded folders can’t be used as textures either. Changing this scans the source again; nothing on disk is deleted.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function SourceRow({ source }: { source: Json }) {
   const busy = operationActive(source.operation);
   const counts = source.format_counts as Record<string, number> | undefined;
@@ -187,6 +260,7 @@ function SourceRow({ source }: { source: Json }) {
             onCheckedChange={(checked) => void sourceAction("images", source.key, null, checked)}
           />
         </div>
+        <SourceFolders source={source} busy={busy} />
       </div>
       <div className="source-controls flex items-start gap-4">
         <div className="source-enabled flex h-10 items-center">

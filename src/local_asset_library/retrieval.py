@@ -579,13 +579,25 @@ def reference_file(config, value):
     return path
 
 
-def resolved_detail(config, identifier, source_format=None):
+def resolved_detail(config, identifier, source_format=None, source_variant=None):
+    from .catalog import file_variants
     record = detail(config, identifier)
     source_check(config, record)
-    files = [f for f in record["files"] if source_format is None or f["format"] == source_format]
+    variants = file_variants(record)
+    files = [f for f in record["files"] if (source_format is None or f["format"] == source_format)
+             and (source_variant is None or (variants.get(f["path"]) or "").casefold() == source_variant.casefold())]
     if not files:
+        if source_variant is not None:
+            raise ConfigError("Requested source variant is not available; this asset has: "
+                              + (", ".join(sorted(set(variants.values()))) or "no folder variants"))
         raise ConfigError("Requested source format is not available")
-    selected = next((f for f in files if f["path"] == record.get("primary_inspection_path")), files[0])
+    # Without a variant: the rendered file, then the folder kept as reference, then recognized export folders.
+    from .catalog import EXPORT_DIRS
+    reference = ((record.get("grouping") or {}).get("evidence") or [{}])[0].get("reference")
+    rank = lambda f: (f["path"] != record.get("primary_inspection_path"), variants.get(f["path"]) != reference,
+                      (variants.get(f["path"]) or "").casefold() not in EXPORT_DIRS, f["path"])
+    selected = min(files, key=rank)
+    selected = {**selected, **({"variant": variants[selected["path"]]} if selected["path"] in variants else {})}
     dependencies = []
     # Preserve all known logical-asset dependency paths, each with its referring source.
     for item in record.get("dependencies", []):

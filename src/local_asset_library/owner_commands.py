@@ -37,7 +37,19 @@ def parser():
     images = sources.add_parser('images', help='Include 2D images from this source')
     images.add_argument('key')
     images.add_argument('state', choices=['on', 'off'])
-    settings = commands.add_parser('settings', help='Show or change Settings → General').add_subparsers(dest='action', required=True)
+    for action, text in (('exclude', 'Skip a folder when scanning (name pattern like "Unity*" or a path inside the source)'),
+                         ('include', 'Stop excluding a folder pattern')):
+        change = sources.add_parser(action, help=text)
+        change.add_argument('key')
+        change.add_argument('pattern')
+    exports = sources.add_parser('exports', help='Folders that look like other exports of the same models: list or answer')
+    exports.add_argument('key')
+    answer = exports.add_mutually_exclusive_group()
+    answer.add_argument('--group', metavar='ID', help='Group the suggested folders as alternate files of the same assets')
+    answer.add_argument('--separate', metavar='ID', help='Keep them separate; not suggested again')
+    answer.add_argument('--exclude', metavar='ID', help='Exclude the extra folders from scanning')
+    answer.add_argument('--undo', metavar='ID', help='Forget a saved answer; the folders are suggested again')
+    settings =commands.add_parser('settings', help='Show or change Settings → General').add_subparsers(dest='action', required=True)
     settings.add_parser('show')
     change = settings.add_parser('set')
     change.add_argument('--formats', help='Comma-separated: fbx,gltf,obj (glb counts as gltf); "none" pauses processing')
@@ -181,6 +193,40 @@ def sources_command(args, config):
             return {'status': 'saved'}
         args.follow = False
         return run_operation(args, config, 'scan', args.key)
+    if args.action in {'exclude', 'include'}:
+        current = sources.excluded_folders(sources.bound(config, source))
+        pattern = sources.validate_exclusion(args.pattern)
+        if args.action == 'include' and pattern not in current:
+            raise ConfigError(f"“{pattern}” is not excluded. Excluded: {', '.join(current) or 'none'}")
+        sources.set_excluded_folders(config, args.key, current + [pattern] if args.action == 'exclude'
+                                     else [p for p in current if p != pattern])
+        say(args, f"{'Excluding' if args.action == 'exclude' else 'No longer excluding'} “{pattern}” in {source['name']}; "
+                  "scanning. Nothing on disk is deleted.")
+        args.follow = False
+        return run_operation(args, config, 'scan', args.key)
+    if args.action == 'exports':
+        answers = {'group': args.group, 'separate': args.separate, 'exclude': args.exclude}
+        chosen = next(((d, i) for d, i in answers.items() if i), None)
+        if args.undo:
+            sources.forget_export(config, args.key, args.undo)
+        elif chosen:
+            sources.decide_export(config, args.key, chosen[1], chosen[0])
+        if args.undo or chosen:
+            say(args, 'Saved; scanning.')
+            args.follow = False
+            return run_operation(args, config, 'scan', args.key)
+        status = sources.source_status(config, source)
+        for s in status.get('export_suggestions', []):
+            where = s['anchor'] or 'the source root'
+            say(args, f"{s['id']}\n    In {where}: {', '.join(s['folders'])} have the same {s['names']} model names "
+                      f"(e.g. {', '.join(s['sample_names'][:3])}). Keeps {s['reference']}"
+                      + (f"; already grouped: {', '.join(s['grouped_folders'])}" if s['grouped_folders'] else '') + '.')
+        for d in status.get('export_decisions', []):
+            say(args, f"{d['id']}  answered {d['decision']}: {d['anchor'] or 'root'} / {', '.join(d['folders'])}")
+        if not status.get('export_suggestions') and not status.get('export_decisions'):
+            say(args, 'No duplicate export folders found.')
+        say(args, 'Answer with: sources exports KEY --group ID | --separate ID | --exclude ID   (undo: --undo ID)')
+        return status
     sources.set_import_types(config, args.key, args.state == 'on')
     say(args, f"2D images {args.state} for {source['name']}; scanning.")
     args.follow = False

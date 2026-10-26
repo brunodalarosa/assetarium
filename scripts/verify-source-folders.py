@@ -1,0 +1,151 @@
+"""Verify excluded folders and duplicate export folder suggestions (decision 0019) in the real WebView2 shell.
+
+A synthetic source has Exports/FBX + Exports/gLTF and a third copy named "Engine Copy". Checks the
+suggestion on Asset sources and Asset processing, Group and Undo, an exclusion chip and its removal,
+the narrow layout, and that originals are untouched and no model loads. Writes data/gui/<run-name>/.
+"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+import threading
+import time
+import traceback
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
+from test_sources import managed  # noqa: E402
+from test_source_exports import kit  # noqa: E402
+from local_asset_library import sources  # noqa: E402
+from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome  # noqa: E402
+from local_asset_library.incremental import working  # noqa: E402
+from local_asset_library.publication import atomic_json  # noqa: E402
+from gui_harness import Harness, isolate_hash_cache  # noqa: E402
+isolate_hash_cache(__file__)
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--run-name', required=True)
+args = parser.parse_args()
+OUT = ROOT / 'data/gui' / args.run_name
+OUT.mkdir(parents=True)
+fixture = ROOT / 'scratch' / args.run_name
+fixture.mkdir()
+config, _, one, two = managed.__wrapped__(fixture)
+root = kit(fixture / 'kit')
+added = sources.add(config, str(root))
+sources.scan_source(config, added)
+originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+
+
+def assets():
+    return len(sources.read_records(working(sources.bound(config, added))))
+
+
+def wait_assets(count, timeout=90):
+    """An answer hides its suggestion at once; the rescan runs in its own process, so wait for its result."""
+    deadline = time.monotonic() + timeout
+    while assets() != count:
+        if time.monotonic() > deadline:
+            raise AssertionError(f'expected {count} assets after the rescan, found {assets()}')
+        time.sleep(0.25)
+
+
+class FixtureBridge(DesktopBridge):
+    def context(self):
+        result = super().context()
+        result['managed_sources'] = False
+        return result
+
+    def _start_source_operation(self, operation, key):
+        # The fixture project has no runtimes to start a worker in; run the same scan in-process.
+        assert operation == 'scan'
+        sources.scan_source(config, sources.get_source(config, key))
+        return {'status': 'ready', 'reason': 'Scanned'}
+
+
+os.environ.update(PYTHONNET_RUNTIME='netfx', TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
+import webview  # noqa: E402
+bridge = FixtureBridge(config)
+window = create_window(config, bridge)
+profile = profile_path(config, bridge, window)
+report = {'status': 'running', 'checks': [], 'synthetic_only': True}
+ui = Harness(window, OUT, report)
+KIT = "document.querySelector('.source-row:has([data-source=kit])')"
+IDLE = "lal.state.sources.find(s=>s.key==='kit')&&!['queued','running','cancelling'].includes((lal.state.sources.find(s=>s.key==='kit').operation||{}).status)"
+
+
+def wait(expression, timeout=60):
+    ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
+
+
+def verify():
+    try:
+        ui.wait_ready(extra="lal.state.sources.length===3")
+        ui.js("$('nav-processing').click()")
+        wait("document.querySelector('[data-source=kit] .source-export-suggestions')")
+        assert ui.js("document.querySelector('[data-source=kit] .source-export-suggestions').textContent.includes('1 folder set looks')")
+        ui.capture('01-processing-suggestion.png')
+        report['checks'].append('Asset processing shows one line about the suggested folder set with a link to Asset sources')
+        ui.js("document.querySelector('[data-source=kit] .source-export-suggestions button').click()")
+        wait(f"{KIT}&&{KIT}.querySelector('.export-suggestion')")
+        text = ui.js(f"{KIT}.querySelector('.export-suggestion').textContent")
+        assert 'In Exports, Engine Copy, FBX, gLTF have the same 3 model names' in text and 'FBX and gLTF are already grouped' in text, text
+        assert ui.js(f"[...{KIT}.querySelectorAll('.export-suggestion button')].map(b=>b.textContent).join('|')") == \
+            'Group as alternate files|Exclude extra folders|Keep separate'
+        ui.js(f"{KIT}.scrollIntoView()")
+        ui.capture('02-sources-suggestion.png')
+        report['checks'].append('The link opens Asset sources; the suggestion names the folders, the match count and three answers')
+        assert assets() == 6
+        ui.js(f"{KIT}.querySelector('[data-action=group]').click()")
+        wait(f"{IDLE}&&!{KIT}.querySelector('.export-suggestion')&&{KIT}.querySelector('.export-answers')")
+        wait_assets(3)
+        wait(IDLE)
+        assert ui.js(f"{KIT}.querySelector('.export-answers').textContent.includes('Grouped: Exports / Engine Copy, FBX, gLTF')")
+        ui.capture('03-grouped.png')
+        report['checks'].append('Group saves the answer, rescans and leaves 3 assets with their copies attached; the answer is listed with Undo')
+        ui.js(f"{KIT}.querySelector('.export-answers [data-action=undo]').click()")
+        wait_assets(6)
+        wait(f"{IDLE}&&{KIT}.querySelector('.export-suggestion')&&!{KIT}.querySelector('.export-answers')")
+        report['checks'].append('Undo forgets the answer; the rescan separates the copies and the suggestion returns')
+        ui.js(f"""(async()=>{{const row={KIT};const input=row.querySelector('input[id^=exclude-]');type(input.id,'Engine*');await frame();
+          row.querySelector('.source-folders form').requestSubmit();return true}})()""")
+        wait_assets(3)
+        wait(f"{IDLE}&&{KIT}.querySelector('[aria-label=\"Excluded folder patterns\"]')&&!{KIT}.querySelector('.export-suggestion')")
+        wait(f"{IDLE}&&{KIT}.querySelector('.source-folders').textContent.includes('3 files in 1 excluded folder')")
+        assert sources.excluded_folders(sources.bound(config, added)) == ['Engine*']
+        ui.capture('04-excluded.png')
+        report['checks'].append('An exclusion chip is saved, the rescan skips the folder and the hint counts its 3 files')
+        ui.js(f"{KIT}.querySelector('[aria-label=\"Stop excluding Engine*\"]').click()")
+        wait_assets(6)
+        wait(f"{IDLE}&&!{KIT}.querySelector('[aria-label=\"Excluded folder patterns\"]')&&{KIT}.querySelector('.export-suggestion')")
+        report['checks'].append('Removing the chip rescans and brings the folder and its suggestion back')
+        window.resize(680, 900)
+        wait('innerWidth<761')
+        ui.js(f"{KIT}.scrollIntoView()")
+        assert ui.js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
+        ui.capture('05-narrow.png')
+        report['checks'].append('Narrow layout has no horizontal overflow')
+        assert not bridge._gateway.model_requested
+        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+        assert now == originals
+        report['checks'].append('Original files are byte-identical; no inference worker or model was loaded')
+        report.update(status='passed')
+    except BaseException as exc:
+        report.update(status='faulty', reason=str(exc), traceback=traceback.format_exc())
+        try:
+            ui.capture('failure.png')
+        except Exception:
+            pass
+    finally:
+        atomic_json(OUT / 'verification.json', report)
+        bridge._close()
+        window.destroy()
+
+
+window.events.loaded += lambda: threading.Thread(target=verify, daemon=True).start()
+webview.start(gui='edgechromium', debug=False, private_mode=True, storage_path=str(profile))
+record_profile_outcome(bridge, profile)
+print(json.dumps(dict(report, report=str(OUT / 'verification.json')), indent=2))
+raise SystemExit(report['status'] != 'passed')

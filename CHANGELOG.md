@@ -13,6 +13,14 @@ All notable changes to Assetarium are listed here. The project follows
   the agent's `apply_setup`. It uses the same EmbeddingGemma model and precision with a
   CPU-only search runtime (`runtime/embedding-cpu`, about 1 GB). Indexing is slower than on an
   NVIDIA GPU; searching feels the same (decision 0018).
+- Excluded folders per source (Settings → Asset sources, `local-assets sources exclude|include`):
+  a folder name with `*` or a path inside the source; excluded folders are not scanned.
+- Duplicate export folder suggestions: sibling folders whose model files have the same names
+  (for example `FBX/`, `OBJ/` and `Unity FBX/` copies) are suggested per source, and grouped as
+  alternate files of the same assets only when you choose **Group**. You can also keep them
+  separate or exclude the extra folders, and undo an answer (decision 0019).
+- Grouped files keep their folder as a variant label; `get_asset` lists `source_variants` and
+  accepts `source_variant` to pick, for example, the `Unity FBX` file.
 - `scripts/record-embedding-capability.py`, the one-time search check on two of your own
   processed assets. Setup lists it, and Process assets names it when it is missing.
 

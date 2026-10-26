@@ -23,4 +23,5 @@ ask the owner first, then update the file (do not silently contradict it).
 | [0015](0015-description-engines.md) | Inference ports and adapters; experimental loopback local-server description engine | 2026-10-25 |
 | [0016](0016-agent-setup.md) | Agent setup through MCP: user-opened setup session, Blender proposals applied by the user, live connection records, bounded status | 2026-10-25 |
 | [0017](0017-license-and-cla.md) | AGPL-3.0-only plus a Contributor License Agreement; third-party licenses unchanged | 2026-10-25 |
+| [0019](0019-source-folders-and-export-variants.md) | Excluded folders per source, owner-confirmed duplicate export folders, folder variants in `get_asset` | 2026-10-26 |
 | [0018](0018-cpu-search-embedder.md) | CPU search embedder (`search_device`), CPU-only search lock, search check for every install, local-server descriptions without the description runtime | 2026-10-25 |

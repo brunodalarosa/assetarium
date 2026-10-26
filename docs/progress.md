@@ -1,5 +1,33 @@
 # Progress
 
+## October 26 — Excluded folders, duplicate export folders, folder variants, branch `feature/cpu-search-embedder`
+
+[Decision 0019](decisions/0019-source-folders-and-export-variants.md), approved at the scope/plan
+checkpoint by the user of this checkout.
+
+- **Excluded folders** per source (`source.json` `excluded_folders`; `catalog.excluded_folder`,
+  `walk_source` prunes and records `excluded_folder` rows with file counts).
+- **Suggestions and answers.** `catalog.export_candidates` (sibling folders with equal sets of
+  ≥3 unique model stems) and `group_models` (answers bound to anchor, folders and name-list hash;
+  reference identity kept; `confirmed-sibling-export-v1` evidence). `sources.decide_export`,
+  `forget_export`, `set_excluded_folders`; status carries `export_suggestions` and
+  `excluded_folders`.
+- **Variants.** `catalog.file_variants`; `resolved_detail(..., source_variant)` with a stable
+  default (rendered file, reference folder, recognized folders); `get_asset` `source_variants` /
+  `source_variant`; inspector label.
+- **UI and CLI.** Source row section (suggestions, saved answers with Undo, exclusion chips),
+  Asset processing line, bridge `source_exclusions` / `source_export` / `source_export_undo`,
+  `sources exclude|include|exports`. `ui/build/` rebuilt.
+- **Verification.** Full suite 657 passed, 2 skipped (`Real-Blender tests: 5 passed`), with
+  `tests/test_source_exports.py` (8 tests). WebView2 `scripts/verify-source-folders.py`
+  (`data/gui/source-folders-2026-10-26c/`; the fixture bridge runs scans in-process because the
+  fixture project has no runtimes) and `verify-general-settings.py` passed. Real rescans gave
+  suggestions for Medieval Weapons (Unity FBX), Low Poly Nature (OBJ + Unity FBX, 3,300 names) and
+  Medieval Megapack (Unity FBX); none were answered. MCP `source_variant` checked on a real asset
+  (`data/evidence/source-folders-2026-10-26/report.json`).
+- **Found, not changed:** `Low Poly Nature - Extended` scans take ~514 s although walking its
+  16,504 files takes 4.5 s; the rest is in inventory building or scan merging.
+
 ## October 25 — Scan cache size bound, branch `feature/cpu-search-embedder`
 
 `Low Poly Nature - Extended` (16,504 files) showed **Scan fault: Managed manifest exceeds its

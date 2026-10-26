@@ -68,6 +68,12 @@ function SourceCard({ source, focused }: { source: Json; focused: boolean }) {
       <div className="grid gap-3">
         <h4 className="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">Import</h4>
         <p className="text-[13.5px] leading-relaxed text-foreground">{sourceMessage(source)}</p>
+        {(source.export_suggestions || []).length > 0 && (
+          <p className="source-export-suggestions flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted-foreground">
+            {plural(source.export_suggestions.length, "folder set looks", "folder sets look")} like another export of the same models. Answer before processing to avoid duplicate assets.
+            <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}>Review in Asset sources</button>
+          </p>
+        )}
         {(importing || finished) && <OperationProgress source={source} operation={operation} label="Processing and publishing progress" />}
         <div className="source-actions flex flex-wrap items-center gap-2">
           {needsWork && (

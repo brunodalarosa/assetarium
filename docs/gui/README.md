@@ -214,7 +214,11 @@ engine, with the local server's address, model and **Test connection**) and the
 description batch size (built-in engine only). *Asset
 sources* adds directories (**Choose folder…**), and per source shows format
 counts, the **Enabled** switch, **Include 2D images** (saves and rescans without
-deleting results) and **Remove** (keeps files and saved metadata). Click a source
+deleting results), **Excluded folders** (pattern chips; adding or removing one rescans),
+**Possible duplicate exports** suggestions with **Group as alternate files**, **Exclude extra
+folders** and **Keep separate**, saved answers with **Undo**
+([decision 0019](../decisions/0019-source-folders-and-export-variants.md)), and **Remove**
+(keeps files and saved metadata). The Asset processing card points to unanswered suggestions. Click a source
 name or its 🔍 icon to browse that source's saved assets, including disabled
 sources, with the same cards and inspection; it loads forty at a time as you
 scroll (**Load more assets** is the keyboard alternative) and never scans,

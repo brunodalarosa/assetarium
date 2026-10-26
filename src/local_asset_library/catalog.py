@@ -3,6 +3,7 @@
 from collections import Counter, defaultdict
 from contextlib import closing
 from datetime import datetime, timezone
+from fnmatch import fnmatchcase
 import hashlib
 import json
 import os
@@ -95,6 +96,12 @@ def check_fts5(connection):
         raise ConfigError(f"Python SQLite {sqlite3.sqlite_version} cannot run FTS5: {exc}. Fix the project Python build; no fallback index is used.") from exc
 
 
+def excluded_folder(folder, pattern):
+    """A pattern with ``/`` matches the folder's path from the source root; otherwise its name. Case is ignored."""
+    target = folder if "/" in pattern else folder.rsplit("/", 1)[-1]
+    return fnmatchcase(target.casefold(), pattern.casefold())
+
+
 def walk_source(config):
     """Sorted inventory; directory links are visible exclusions, never traversed."""
     if config.sources_registry and not config.source_key:
@@ -114,6 +121,8 @@ def walk_source(config):
             # About 350 bytes per file: 256 MiB bounds packs of roughly 750,000 files.
             cached = read_json(cache_path, SCAN_CACHE_LIMIT).get("files", {})
     next_cache = {}
+    from .sources import excluded_folders
+    patterns = excluded_folders(config) if config.source_key else []
     def walk_error(exc):
         raise ConfigError("Source directory cannot be scanned: " + str(exc))
     for directory, dirs, files in os.walk(config.source_root, followlinks=False, onerror=walk_error):
@@ -122,6 +131,14 @@ def walk_source(config):
             path = Path(directory) / name
             if name.casefold() == "metadata-lal":
                 dirs.remove(name)
+                continue
+            folder = path.relative_to(config.source_root).as_posix()
+            if any(excluded_folder(folder, pattern) for pattern in patterns):
+                # Owner-excluded (decision 0019): listed with a file count, never walked further or hashed.
+                dirs.remove(name)
+                count = sum(len(names) for _, _, names in os.walk(path, followlinks=False))
+                rows.append({"path": prefix + folder, "role": "boundary_exclusion", "status": "excluded_folder",
+                             "sha256": None, "size": None, "mtime_ns": None, "excluded_files": count})
                 continue
             if path.is_symlink() or path.is_junction():
                 dirs.remove(name)
@@ -214,8 +231,59 @@ def export_slot(pack_relative):
     return anchor, directory, key
 
 
-def group_models(pack, model_rows):
-    """Only equal full relative-name sets in sibling, format-specific directories."""
+SUGGESTION_MIN_NAMES = 3
+
+
+def export_candidates(model_rows):
+    """Sibling folders whose model files have the same names (decision 0019).
+
+    Names are file stems without case, ignoring extensions and subfolders, each unique in its folder.
+    Returns {id: candidate}; nothing here groups anything.
+    """
+    names = defaultdict(list)
+    for row in model_rows:
+        relative = PurePosixPath(row["path"].split("/", 1)[1])
+        for depth in range(1, len(relative.parts)):
+            names[PurePosixPath(*relative.parts[:depth]).as_posix()].append((relative.stem.casefold(), row))
+    siblings = defaultdict(list)
+    for folder, entries in names.items():
+        stems = [stem for stem, _ in entries]
+        if len(stems) >= SUGGESTION_MIN_NAMES and len(stems) == len(set(stems)):
+            parent = PurePosixPath(folder).parent.as_posix()
+            siblings[("" if parent == "." else parent, tuple(sorted(stems)))].append(folder)
+    candidates = {}
+    for (anchor, stems), folders in siblings.items():
+        if len(folders) < 2:
+            continue
+        labels = sorted(PurePosixPath(f).name for f in folders)
+        manifest = digest(list(stems))
+        identifier = digest({"anchor": anchor, "folders": labels, "manifest": manifest})
+        candidates[identifier] = {"id": identifier, "anchor": anchor, "folders": labels, "names": len(stems),
+                                  "name_manifest_sha256": manifest, "sample_names": list(stems[:5]),
+                                  "rows": {PurePosixPath(f).name: dict(names[f]) for f in folders}}
+    return candidates
+
+
+def file_variants(record):
+    """Folder label of each file in a grouped asset (``FBX``, ``Unity FBX``…); empty for a single file."""
+    evidence = (record.get("grouping") or {}).get("evidence") or [{}]
+    anchor, directories = evidence[0].get("anchor"), set(evidence[0].get("directories") or [])
+    if anchor is None or len(record.get("files", [])) < 2:
+        return {}
+    labels = {}
+    for item in record["files"]:
+        parts = PurePosixPath(item["path"].split("/", 1)[1]).parts
+        base = PurePosixPath(anchor).parts if anchor else ()
+        if parts[:len(base)] == base and len(parts) > len(base) + 1 and parts[len(base)] in directories:
+            labels[item["path"]] = parts[len(base)]
+    return labels
+
+
+def group_models(pack, model_rows, decisions=(), suggestions=None):
+    """Equal full relative-name sets in sibling, format-specific directories, plus owner-confirmed sibling folders.
+
+    Unconfirmed sibling folders with equal name sets are appended to ``suggestions`` (decision 0019).
+    """
     slots = defaultdict(lambda: defaultdict(list))
     for row in model_rows:
         slot = export_slot(row["path"].split("/", 1)[1])
@@ -240,13 +308,42 @@ def group_models(pack, model_rows):
                     for key, row in directories[directory]:
                         identity = (PurePosixPath(anchor) / "@exports" / key).as_posix()
                         approved[row["path"]] = (identity, evidence)
+    separate = lambda row: row["path"].split("/", 1)[1]
+    answered = {d["id"]: d for d in decisions}
+    for identifier, candidate in sorted(export_candidates(model_rows).items()):
+        rows = candidate["rows"]
+        # Folders already grouped with another candidate folder by the recognized layouts.
+        grouped = sorted(label for label, entries in rows.items() if all(
+            row["path"] in approved and len(set(approved[row["path"]][1].get("directories", [])) & set(rows)) >= 2
+            for row in entries.values()))
+        if len(grouped) == len(rows):
+            continue
+        recognized = [label for label in candidate["folders"] if label.casefold() in EXPORT_DIRS]
+        reference = (grouped or recognized or candidate["folders"])[0]
+        decision = answered.get(identifier)
+        if decision is None and suggestions is not None:
+            suggestions.append({**{k: v for k, v in candidate.items() if k != "rows"},
+                                "reference": reference, "grouped_folders": grouped})
+        if not decision or decision["decision"] != "group":
+            continue
+        evidence = {"method": "confirmed-sibling-export-v1", "anchor": candidate["anchor"],
+                    "directories": candidate["folders"], "reference": reference,
+                    "matching_name_count": candidate["names"], "name_manifest_sha256": candidate["name_manifest_sha256"],
+                    "decision_utc": decision.get("utc"),
+                    "basis": "Owner-confirmed sibling folders with identical model name sets; geometry equivalence not inspected."}
+        for stem, row in rows[reference].items():
+            # The reference file keeps its identity, so its asset ID and finished work stay.
+            identity = approved.get(row["path"], (separate(row), None))[0]
+            for label in candidate["folders"]:
+                approved[rows[label][stem]["path"]] = (identity, evidence)
     groups = defaultdict(list)
     evidence_by_identity = {}
     for row in model_rows:
-        identity, evidence = approved.get(row["path"], (row["path"].split("/", 1)[1], {
+        identity, evidence = approved.get(row["path"], (separate(row), {
             "method": "separate-file-v1", "basis": "No sufficient export-layout evidence; retained independently."}))
         groups[identity].append(row)
-        evidence_by_identity[identity] = evidence
+        if evidence_by_identity.get(identity, {}).get("method") != "confirmed-sibling-export-v1":
+            evidence_by_identity[identity] = evidence
     return [(identity, sorted(files, key=lambda f: f["path"]), evidence_by_identity[identity])
             for identity, files in sorted(groups.items())]
 
@@ -414,8 +511,11 @@ def relevant_license_evidence(record):
              and any(PurePosixPath(entry['path']).parent in model.parents for model in models))]
 
 
-def build_inventory(config):
+def build_inventory(config, suggestions=None):
+    """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``."""
     rows = walk_source(config)
+    from .sources import export_decisions
+    decisions = export_decisions(config) if config.source_key else []
     from .dependency_resolution import SharedDependencies
     shared = SharedDependencies(config)
     inventory = {row["path"]: row for row in rows}
@@ -435,7 +535,7 @@ def build_inventory(config):
     for pack in packs:
         candidates = [row for row in rows if row["path"].startswith(pack + "/") and row["role"] in {"model", "unsupported_candidate"}]
         license_rows = license_evidence(config, pack, inventory)
-        for identity, files, grouping in group_models(pack, candidates):
+        for identity, files, grouping in group_models(pack, candidates, decisions, suggestions):
             name = PurePosixPath(files[0]["path"]).stem
             asset = {"schema_version": 1, "asset_id": asset_id(pack, identity), "source_id": SOURCE_ID,
                      "pack_id": pack, "source_relative_identity": identity, "display_name": name,
