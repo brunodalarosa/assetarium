@@ -274,6 +274,13 @@ class DesktopBridge:
     def source_export_undo(self, key, decision_id):
         return self._wait(self._present(self._source_setting, 'forget_export', key, decision_id, guarded=False))
 
+    # Texture folder for models missing textures (decision 0021): each change rescans the source.
+    def source_textures(self, key, folder, single_copies):
+        return self._wait(self._present(self._source_setting, 'set_texture_folder', key, folder, single_copies, guarded=False))
+
+    def source_textures_undo(self, key):
+        return self._wait(self._present(self._source_setting, 'forget_texture_folder', key, guarded=False))
+
     # Recheck of failures from the file/dependency check (decision 0020): preview reads; retry needs its preview.
     def recheck_failures(self, key):
         from .recheck import preview

@@ -715,10 +715,12 @@ export async function sourceAction(action: string, key: string | null = null, di
   }
 }
 /** Excluded folders and duplicate export folder answers (decision 0019); each saved change rescans the source. */
-export async function sourceFolders(change: "exclusions" | "export" | "undo", key: string, value: string[] | string, decision = "") {
+export async function sourceFolders(change: "exclusions" | "export" | "undo" | "textures" | "textures-undo", key: string, value: string[] | string | null, decision = "") {
   try {
     const result = change === "exclusions" ? await api().source_exclusions(key, value as string[])
       : change === "export" ? await api().source_export(key, value as string, decision)
+      : change === "textures" ? await api().source_textures(key, value as string | null, decision === "single")
+      : change === "textures-undo" ? await api().source_textures_undo(key)
       : await api().source_export_undo(key, value as string);
     if (result.status === "faulty") throw Error(result.reason);
     setState({ sourcesMessage: result.reason || "" });

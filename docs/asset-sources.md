@@ -212,6 +212,16 @@ names and a hash of the name list: if a folder's files change, its files become 
 and the suggestion returns. Grouped files carry their folder as a variant label
 (`get_asset` `source_variants` / `source_variant`).
 
+### Texture folder for models missing textures (decision 0021)
+
+When inspected models could not find textures their files name, and the source has files with
+those exact names, the source row in Settings → Asset sources shows **Textures not found**: the
+candidate folders (for example `Textures/PBR`, `URP`, `HDRP`, `Unreal`), how many models each
+fixes, and **Also use textures that have only one version in this source**. **Apply** writes a
+texture-repair recipe for each model whose every missing texture resolves; Process assets then
+renders those models once with the mapped files. **Undo** removes the choice. Originals never
+change. Command line: `local-assets sources textures KEY [--use FOLDER] [--single-copies] [--undo]`.
+
 The owner-approved KayKit glTF cleanup uses
 `scripts/historical/kaykit-gltf-maintenance.py`, with immutable receipts in
 `data/library/maintenance/kaykit-gltf-20261016/`. Its phases preserve glTF IDs,

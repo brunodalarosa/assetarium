@@ -42,6 +42,11 @@ def parser():
         change = sources.add_parser(action, help=text)
         change.add_argument('key')
         change.add_argument('pattern')
+    textures = sources.add_parser('textures', help='Models missing textures: list folder suggestions, or choose one')
+    textures.add_argument('key')
+    textures.add_argument('--use', metavar='FOLDER', help='A suggested texture folder (path inside the source)')
+    textures.add_argument('--single-copies', action='store_true', help='Also use textures that exist only once in the source')
+    textures.add_argument('--undo', action='store_true', help='Remove the choice; its repairs are dropped on the rescan')
     exports = sources.add_parser('exports', help='Folders that look like other exports of the same models: list or answer')
     exports.add_argument('key')
     answer = exports.add_mutually_exclusive_group()
@@ -228,6 +233,30 @@ def sources_command(args, config):
                   "scanning. Nothing on disk is deleted.")
         args.follow = False
         return run_operation(args, config, 'scan', args.key)
+    if args.action == 'textures':
+        if args.undo or args.use or args.single_copies:
+            if args.undo:
+                sources.forget_texture_folder(config, args.key)
+            else:
+                sources.set_texture_folder(config, args.key, args.use, args.single_copies)
+            say(args, 'Saved; scanning. Repaired models wait for Process assets; originals are not changed.')
+            args.follow = False
+            return run_operation(args, config, 'scan', args.key)
+        status = sources.source_status(config, source)
+        found, chosen = status.get('texture_suggestion'), status.get('texture_folder')
+        if chosen:
+            say(args, f"Chosen: {chosen['folder'] or 'no folder'}{' + single copies' if chosen['single_copies'] else ''} "
+                      f"({chosen['utc']}). Undo with --undo.")
+        if not found:
+            say(args, 'No models are waiting for textures.')
+            return status
+        say(args, f"{found['assets']:,} models can't find their textures (e.g. {', '.join(found['examples'][:3])}).")
+        for option in found['folders']:
+            say(args, f"  --use \"{option['folder']}\"  fixes {option['fixes_without_single_copies']:,}; "
+                      f"with --single-copies {option['fixes']:,} ({option['unresolved']:,} stay unresolved)")
+        single = found['single_copies_only']
+        say(args, f"  --single-copies alone fixes {single['fixes']:,} ({single['unresolved']:,} stay unresolved)")
+        return status
     if args.action == 'exports':
         answers = {'group': args.group, 'separate': args.separate, 'exclude': args.exclude}
         chosen = next(((d, i) for d, i in answers.items() if i), None)

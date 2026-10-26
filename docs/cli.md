@@ -31,6 +31,7 @@ recorded faults or still running, `2` refused or invalid.
 | `sources enable KEY` / `sources disable KEY` | Enabled switch (enabling rescans) |
 | `sources images KEY on\|off` | Include 2D images (rescans; nothing is deleted) |
 | `sources exclude KEY PATTERN` / `sources include KEY PATTERN` | Excluded folders: a folder name with `*` or a path inside the source (rescans; nothing is deleted) |
+| `sources textures KEY` | Models missing textures: folder suggestions with counts; choose with `--use FOLDER` and/or `--single-copies`, undo with `--undo` (rescans; originals never change) |
 | `sources exports KEY` | Duplicate export folder suggestions and saved answers; answer with `--group ID`, `--separate ID`, `--exclude ID`, undo with `--undo ID` (rescans) |
 | `sources remove KEY` | Remove: stops listing the source; files and results stay on disk |
 

@@ -21,6 +21,10 @@ All notable changes to Assetarium are listed here. The project follows
   separate or exclude the extra folders, and undo an answer (decision 0019).
 - Grouped files keep their folder as a variant label; `get_asset` lists `source_variants` and
   accepts `source_variant` to pick, for example, the `Unity FBX` file.
+- **Textures not found** per source: when models can't find textures that the source holds under
+  the exact same name (for example once per render pipeline folder), choose the folder to use and
+  whether single copies may be used; Apply repairs every model whose textures all resolve, on the
+  next Process assets, without changing originals (decision 0021).
 - **Recheck failures** on a source's Asset processing card (and `local-assets recheck`): reruns
   the file check and, after you confirm, retries failures that came from it and pass it now.
 - `scripts/record-embedding-capability.py`, the one-time search check on two of your own

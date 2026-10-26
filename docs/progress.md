@@ -1,5 +1,25 @@
 # Progress
 
+## October 26 — Texture folder choice, branch `feature/cpu-search-embedder`
+
+[Decision 0021](decisions/0021-texture-folder-choice.md). `Desert Pack` (FBX only) failed 117
+models with "Missing, rejected or unresolved texture dependencies": each texture exists once per
+pipeline folder (`Textures/HDRP`, `PBR`, `URP`, `Unreal`), and the glTF-only path mapping cannot help.
+
+- `texture_folders.py`: missing required textures from inspection, exact-name index of the source's
+  images, candidate folders (shallowest holding one version of each ambiguous name), all-or-nothing
+  per-model plans, `texture_folder_paths` recipes for the existing repair worker, suggestion sorted by
+  folder-only fixes. Applied in `sources.scan_source`; `source.json` `texture_folder`;
+  `set_texture_folder` / `forget_texture_folder`; bridge `source_textures` / `source_textures_undo`;
+  `local-assets sources textures`; **Textures not found** panel (folder cards, single-copy switch,
+  live counts, Apply, Undo) and an Asset processing line.
+- **Verification.** `tests/test_texture_folders.py` (6 tests, one with real Blender: inspection
+  reports the texture missing, the repair worker renders it from the chosen folder's recipe). Full
+  suite 671 passed, 2 skipped (`Real-Blender tests: 6 passed`). WebView2
+  `scripts/verify-texture-folders.py` (`data/gui/texture-folders-2026-10-26b/`). On the real
+  `Desert Pack` the suggestion offers `PBR` (49 alone, 117 with single copies, 0 unresolved),
+  `Unreal`, `HDRP`, `URP`; nothing was applied.
+
 ## October 26 — Broken alternate files fail alone; Recheck failures, branch `feature/cpu-search-embedder`
 
 [Decision 0020](decisions/0020-alternate-file-faults-and-recheck.md). After grouping, all 3,300

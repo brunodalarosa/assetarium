@@ -74,6 +74,12 @@ function SourceCard({ source, focused }: { source: Json; focused: boolean }) {
             <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}>Review in Asset sources</button>
           </p>
         )}
+        {source.texture_suggestion && (
+          <p className="source-texture-suggestion flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted-foreground">
+            {plural(source.texture_suggestion.assets, "model can’t", "models can’t")} find {source.texture_suggestion.assets === 1 ? "its" : "their"} textures; choosing a texture folder can fix them.
+            <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}>Choose in Asset sources</button>
+          </p>
+        )}
         {(importing || finished) && <OperationProgress source={source} operation={operation} label="Processing and publishing progress" />}
         <div className="source-actions flex flex-wrap items-center gap-2">
           {needsWork && (

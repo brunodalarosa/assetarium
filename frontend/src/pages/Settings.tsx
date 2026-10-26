@@ -13,7 +13,7 @@ import {
 } from "../app/store";
 import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
-import { Banner, Button, Card, SelectField, TextField } from "../ui/primitives";
+import { Banner, Button, Card, RadioCards, SelectField, TextField } from "../ui/primitives";
 
 const FORMATS: [string, string][] = [["fbx", "FBX"], ["gltf", "glTF / GLB"], ["obj", "OBJ"]];
 const APPEARANCES = [
@@ -158,6 +158,59 @@ function General() {
 
 const where = (anchor: string) => (anchor ? `In ${anchor}` : "At the top of this source");
 
+/** Models that could not find their textures: choose a folder by exact file name (decision 0021). */
+function TextureChoice({ source, busy }: { source: Json; busy: boolean }) {
+  const found: Json | null = source.texture_suggestion || null;
+  const chosen: Json | null = source.texture_folder || null;
+  const options: Json[] = found?.folders || [];
+  const [folder, setFolder] = useState<string>("");
+  const [single, setSingle] = useState(true);
+  const [working, setWorking] = useState(false);
+  const selected = folder || options[0]?.folder || "";
+  const disabled = busy || working;
+  const run = async (undo: boolean) => {
+    setWorking(true);
+    await sourceFolders(undo ? "textures-undo" : "textures", source.key, undo ? null : selected || null, single ? "single" : "");
+    setWorking(false);
+  };
+  if (!found && !chosen) return null;
+  const option = options.find((o) => o.folder === selected);
+  const fixes = option ? (single ? option.fixes : option.fixes_without_single_copies) : single ? found?.single_copies_only.fixes : 0;
+  const left = (found?.assets || 0) - (fixes || 0);
+  return (
+    <div className="texture-choice grid gap-3 rounded-2xl bg-surface-2 p-4">
+      {chosen && (
+        <p className="texture-chosen flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
+          <span>Textures from {chosen.folder || "no folder"}{chosen.single_copies ? " and single copies" : ""}. Repaired models wait for Process assets; originals are not changed.</span>
+          <button type="button" className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="textures-undo" onClick={() => void run(true)}>Undo</button>
+        </p>
+      )}
+      {found && (
+        <>
+          <p className="text-[13px] font-medium">Textures not found</p>
+          <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+            {found.assets.toLocaleString()} {found.assets === 1 ? "model can’t" : "models can’t"} find {found.assets === 1 ? "its" : "their"} textures (for example {found.examples.slice(0, 3).join(", ")}).
+            {options.length ? " Some textures exist in several folders, one per render pipeline. Choose which to use; matches are by exact file name." : ""}
+          </p>
+          {options.length > 0 && (
+            <RadioCards id={`textures-${source.id}`} label="Use textures from" value={selected} onChange={setFolder} disabled={disabled}
+              options={options.map((o) => ({ value: o.folder, title: o.folder, detail: `Fixes ${(single ? o.fixes : o.fixes_without_single_copies).toLocaleString()} of ${found.assets.toLocaleString()}` }))} />
+          )}
+          <Checkbox label="Also use textures that have only one version in this source" checked={single} disabled={disabled} onCheckedChange={setSingle}
+            description="A file with that exact name exists once (or as identical copies), so there is no choice to make." />
+          <p className="texture-total text-[12.5px] text-foreground">
+            {(fixes || 0).toLocaleString()} fixed{left > 0 ? ` · ${left.toLocaleString()} ${left === 1 ? "stays" : "stay"} failed with ${left === 1 ? "its" : "their"} recorded ${left === 1 ? "reason" : "reasons"}` : " · none left unresolved"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button className="h-9 px-4" disabled={disabled || !fixes} data-action="textures-apply" onClick={() => void run(false)}>Apply</Button>
+          </div>
+          <p className="hint text-[11.5px] leading-relaxed text-subtle">Applying records your choice with each repaired model and scans again. Nothing is rendered until you click Process assets, and original files are never changed. Undo removes the choice.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Duplicate export folder suggestions, saved answers and excluded folders for one source (decision 0019). */
 function SourceFolders({ source, busy }: { source: Json; busy: boolean }) {
   const [pattern, setPattern] = useState("");
@@ -176,6 +229,7 @@ function SourceFolders({ source, busy }: { source: Json; busy: boolean }) {
   const files = excluded.reduce((total, item) => total + (item.files || 0), 0);
   return (
     <div className="source-folders mt-2 grid gap-3">
+      <TextureChoice source={source} busy={busy} />
       {suggestions.map((s) => (
         <div key={s.id} className="export-suggestion grid gap-2 rounded-2xl bg-surface-2 p-4" data-suggestion={s.id}>
           <p className="text-[13px] font-medium">Possible duplicate exports</p>
