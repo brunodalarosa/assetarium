@@ -41,6 +41,10 @@ EQUIVALENT_WORKERS = {
         'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
     'b9ac48c40e1c3d527f061438a98164ae3adc184c89832c52bc49ba66eadc5ab1':  # The same with CRLF endings
         'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
+    '3f11299afb416a7e1f0067df660aa0f371966fdb422e2e1217cb655cc49d525d':  # Edge-on flat models: an empty view turns toward the face (LF)
+        'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
+    '6a2996d6d709982917b2b34dcd7535eab7c27a05799cb9313e9ced8e2df53072':  # The same with CRLF endings
+        'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
 }
 
 

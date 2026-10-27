@@ -118,3 +118,22 @@ def test_worker_output_boundary_rejection(small_fixture):
     process, result = invoke(config, "model.obj", "obj", outside_output=outside)
     assert process["returncode"] != 0 and result is None
     assert not outside.exists()
+
+
+def test_a_flat_card_seen_edge_on_turns_that_view_instead_of_failing(small_fixture):
+    """A zero-thickness card (grass, cloud sprites) is invisible edge-on; only that empty view turns."""
+    config = small_fixture
+    # OBJ is Y-up: this upright card has no thickness along Blender's Y, the side camera's edge-on axis.
+    (config.source_root / "card.obj").write_text("v -1 0 0\nv 1 0 0\nv 1 2 0\nv -1 2 0\nf 1 2 3 4\n")
+    process, result = invoke(config, "card.obj", "obj")
+    assert process["returncode"] == 0 and result["status"] == "complete", result.get("errors")
+    views = {p["view_label"]: p for p in result["previews"]}
+    assert set(result["render_settings"]["view_adjustments"]) == {"side"}
+    adjusted = views["side"]["view_adjustment"]
+    assert adjusted["turned_degrees"] == 35 and adjusted["standard_outward"][1] == 0 and adjusted["outward"][1] < 0
+    assert not views["side"]["quality"]["empty"] and "view_adjustment" not in views["front"]
+    (config.source_root / "cube.obj").write_text("v -1 -1 0\nv 1 -1 0\nv 1 1 0\nv -1 1 0\nv -1 -1 2\nv 1 -1 2\nv 1 1 2\nv -1 1 2\n"
+                                                 "f 1 2 3 4\nf 5 8 7 6\nf 1 5 6 2\nf 2 6 7 3\nf 3 7 8 4\nf 5 1 4 8\n")
+    process, result = invoke(config, "cube.obj", "obj", outside_output=config.output_path("data", "cube"))
+    assert result["status"] == "complete" and "view_adjustments" not in result["render_settings"]
+    assert not any("view_adjustment" in p for p in result["previews"])

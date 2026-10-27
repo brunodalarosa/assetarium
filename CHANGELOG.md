@@ -56,6 +56,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Flat card models (grass and cloud sprites with no thickness) no longer fail with "Empty or
+  off-frame preview detected": a view that sees the card edge-on is rendered again turned toward
+  its face. Finished previews are unchanged and not rendered again.
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
 - After a crash or forced shutdown during processing, Settings → Asset sources showed "No asset

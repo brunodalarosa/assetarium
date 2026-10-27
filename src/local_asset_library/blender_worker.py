@@ -199,6 +199,25 @@ def inspect(source_root):
 
 
 DEVICE_UNAVAILABLE = "Render device unavailable: "
+EDGE_ON = 0.01  # A model this thin across a camera shows that camera only its edge.
+TURN = 35  # Degrees an empty edge-on view turns toward the model's face.
+
+
+def turned_view(outward, extent):
+    """The view direction turned toward the face of a model that is flat across this camera, else None.
+
+    Only used after a standard view rendered empty, so every view that showed the model is unchanged.
+    """
+    forward = -Vector(outward).normalized()
+    right = forward.cross(Vector((0, 0, 1)))
+    if right.length <= 1e-9 or sum(abs(r) * e for r, e in zip(right.normalized(), extent)) >= EDGE_ON * max(extent):
+        return None
+    side = Vector((right.x, right.y, 0)).normalized()
+    if side.dot(Vector((1, -1, 0))) < 0:  # Turn toward the three-quarter side, consistently.
+        side = -side
+    horizontal = Vector((outward[0], outward[1], 0))
+    turned = horizontal.normalized() * math.cos(math.radians(TURN)) + side * math.sin(math.radians(TURN))
+    return (turned.x * horizontal.length, turned.y * horizontal.length, outward[2])
 
 
 def use_device(scene, device):
@@ -286,46 +305,59 @@ def render(technical, output, resolution, device=None):
     camera_data.ortho_scale = settings["ortho_scale"]
     camera_data.clip_start = max(1e-5, radius * 0.01)
     camera_data.clip_end = radius * 20
-    records = []
+    records, adjustments = [], {}
     for name, view in settings["views"].items():
-        camera.location = center + Vector(view["outward"]) * radius * 5
-        if name == "top":
-            camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
-        else:
-            camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
-        path = inside(output, output / (name + ".png"))
-        scene.render.filepath = str(path)
-        bpy.ops.render.render(write_still=True, scene=scene.name)
-        image = bpy.data.images.load(str(path), check_existing=False)
-        try:
-            pixels = np.empty(resolution * resolution * 4, dtype=np.float32)
-            image.pixels.foreach_get(pixels)
-            pixels = pixels.reshape((resolution, resolution, 4))
-            mask = pixels[:, :, 3] > 0.05
-            ys, xs = np.where(mask)
-            count = int(mask.sum())
-            bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())] if count else None
-            clipped = bool(count and (min(bbox[:2]) <= 3 or max(bbox[2:]) >= resolution - 4))
-            empty = count < 32
-            quality = {"foreground_pixels": count, "foreground_fraction": count / (resolution * resolution),
-                       "pixel_bounds_bottom_origin": bbox, "empty": empty, "off_frame": clipped,
-                       "method": "transparent render alpha mask > 0.05; border margin 4 px; minimum 32 foreground px"}
-            # Loaded byte PNG pixels are sRGB; composite explicitly in linear light.
-            alpha = pixels[:, :, 3:4]
-            rgb = pixels[:, :, :3]
-            linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
-            background = ((0.32 + 0.055) / 1.055) ** 2.4
-            composed = linear * alpha + background * (1 - alpha)
-            pixels[:, :, :3] = np.where(composed <= 0.0031308, composed * 12.92, 1.055 * composed ** (1 / 2.4) - 0.055)
-            pixels[:, :, 3] = 1
-            image.pixels.foreach_set(pixels.ravel())
-            image.save_render(str(path), scene=scene)
-        finally:
-            bpy.data.images.remove(image)
-        records.append({"view_label": name, "filename": path.name, "sha256": sha(path),
-                        "camera_location": list(camera.location), "camera_rotation_euler": list(camera.rotation_euler),
-                        "quality": quality})
-    return records, {"engine": scene.render.engine, "resolution": [resolution, resolution],
+        outward = Vector(view["outward"])
+        while True:
+            camera.location = center + outward * radius * 5
+            if name == "top":
+                camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+            else:
+                camera.rotation_euler = (center - camera.location).to_track_quat("-Z", "Y").to_euler()
+            path = inside(output, output / (name + ".png"))
+            scene.render.filepath = str(path)
+            bpy.ops.render.render(write_still=True, scene=scene.name)
+            image = bpy.data.images.load(str(path), check_existing=False)
+            try:
+                pixels = np.empty(resolution * resolution * 4, dtype=np.float32)
+                image.pixels.foreach_get(pixels)
+                pixels = pixels.reshape((resolution, resolution, 4))
+                mask = pixels[:, :, 3] > 0.05
+                ys, xs = np.where(mask)
+                count = int(mask.sum())
+                bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())] if count else None
+                clipped = bool(count and (min(bbox[:2]) <= 3 or max(bbox[2:]) >= resolution - 4))
+                empty = count < 32
+                quality = {"foreground_pixels": count, "foreground_fraction": count / (resolution * resolution),
+                           "pixel_bounds_bottom_origin": bbox, "empty": empty, "off_frame": clipped,
+                           "method": "transparent render alpha mask > 0.05; border margin 4 px; minimum 32 foreground px"}
+                # Loaded byte PNG pixels are sRGB; composite explicitly in linear light.
+                alpha = pixels[:, :, 3:4]
+                rgb = pixels[:, :, :3]
+                linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+                background = ((0.32 + 0.055) / 1.055) ** 2.4
+                composed = linear * alpha + background * (1 - alpha)
+                pixels[:, :, :3] = np.where(composed <= 0.0031308, composed * 12.92, 1.055 * composed ** (1 / 2.4) - 0.055)
+                pixels[:, :, 3] = 1
+                image.pixels.foreach_set(pixels.ravel())
+                image.save_render(str(path), scene=scene)
+            finally:
+                bpy.data.images.remove(image)
+            # A flat card seen edge-on renders empty: look again once, turned toward its face.
+            turned = (None if not empty or name == "top" or name in adjustments
+                      else turned_view(view["outward"], settings["extent"]))
+            if turned is None:
+                break
+            adjustments[name] = {"reason": "the standard view was empty: the model is flat across this camera",
+                                 "turned_degrees": TURN, "standard_outward": list(view["outward"]), "outward": list(turned)}
+            outward = Vector(turned)
+        record = {"view_label": name, "filename": path.name, "sha256": sha(path),
+                  "camera_location": list(camera.location), "camera_rotation_euler": list(camera.rotation_euler),
+                  "quality": quality}
+        if name in adjustments:
+            record["view_adjustment"] = adjustments[name]
+        records.append(record)
+    render_settings = {"engine": scene.render.engine, "resolution": [resolution, resolution],
                      "device": device_label, "samples": 128, "seed": 0, "denoising": denoising,
                      "coordinate_convention": "Blender imported Z-up; canonical front -Y and side +X, both elevated 14 degrees; source-author front unknown",
                      "projection": "orthographic; shared scale across all views", "framing": settings,
@@ -334,6 +366,9 @@ def render(technical, output, resolution, device=None):
                      "materials": "imported materials preserved; new render scene omits source cameras/lights",
                      "shadow_overrides": shadow_overrides,
                      "top_view_reason": "vertical extent <18% of horizontal extent" if "top" in settings["views"] else None}
+    if adjustments:
+        render_settings["view_adjustments"] = adjustments
+    return records, render_settings
 
 
 def main():

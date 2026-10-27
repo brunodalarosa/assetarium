@@ -33,6 +33,14 @@ slower.
   to the hash finished inspections recorded, for edits whose CPU renders are proven identical by
   `scripts/check-render-stability.py`. The render-device edit is the first entry; all 4,708 finished 3D
   inspections kept their fingerprints. Any other edit still re-queues inspections.
+- **Edge-on flat models** (October 27, 2026). A card with no thickness across a camera (grass and
+  cloud sprites) renders empty from that side, and an empty view fails the asset. When a front, side
+  or three-quarter view renders empty and the model is under 1% of its size across that camera, the
+  worker renders that view once more turned 35° toward the face; the view keeps its label and the
+  turn is recorded (`view_adjustment` on the preview, `view_adjustments` in the render settings). A
+  second empty render still fails. Views that showed the model are untouched, so the edit is in
+  `EQUIVALENT_WORKERS` (35/35 finished CPU renders pixel-identical, 5,180 fingerprints kept).
+  `check-render-stability.py` compares CPU renders only with CPU-rendered previews.
 - **Speed test.** `render_devices.run` renders four synthetic OBJ shapes (written outside the project,
   never library assets) with the real worker at 640 px, on the CPU and every GPU Blender lists (one entry
   per card, OptiX before CUDA), at 1, 2, 4, 6 and 8 processes. Each step warms every process with one

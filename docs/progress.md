@@ -1,5 +1,23 @@
 # Progress
 
+## October 27 — Edge-on flat cards turn their empty view, branch `bugfix/flat-card-views`
+
+Twelve *Desert Pack* assets (a cloud sprite and grass billboards, zero thickness along Y) failed
+"Empty or off-frame preview detected": front and three-quarter renders were fine, but the side camera
+looks along the card's plane and saw nothing.
+
+- `blender_worker.turned_view` (decision 0022): after a front, side or three-quarter view renders
+  empty, if the model is under 1% of its size across that camera, render it once more turned 35°
+  toward the face (toward the three-quarter side); `view_adjustment` on the preview and
+  `view_adjustments` in the render settings record it; a second empty render still fails. New worker
+  hashes added to `EQUIVALENT_WORKERS`.
+- `check-render-stability.py` compares CPU re-renders only with CPU-rendered previews: one GPU-rendered
+  *Medieval Props* preview differed by 1/255 on the first run, as decision 0022 expects.
+- **Verification.** Real-Blender test: an upright zero-thickness card completes with only its side view
+  turned; a cube has no adjustment. `check-render-stability.py --baseline-rev 302b6ab`: 35/35 finished
+  CPU renders pixel-identical, 5,180/5,180 fingerprints kept, 115 GPU-rendered skipped
+  (`data/evidence/render-stability/2026-10-27-flat-card-views-cpu.json`). Full suite 715 passed, 2 skipped (`Real-Blender tests: 8 passed`). The 12 recorded
+  Desert faults are not retried automatically.
 ## October 27 — Near-miss duplicate export folders, branch `feature/near-miss-export-folders`
 
 Two real sources had duplicate export folders that decision 0019 never suggested, because their
