@@ -626,3 +626,63 @@ def test_code_line_endings_alone_never_requeue_finished_work(library):
     assert process(config, 'caption', dry_run=True)['retained'] == {'complete': 6}
     (config.project_root / 'runtime/caption/uv.lock').write_bytes(text.replace(b'\n', b'\r\n') + b'changed\r\n')
     assert process(config, 'caption', dry_run=True)['pending'] == 6
+
+
+def test_reused_vectors_record_the_search_data_state_again_after_a_rescan_reset(library):
+    """Grouping export folders resets the search data flag while every vector still matches: the dry run must
+    report it so the real pass records the state again, instead of the source asking for processing forever."""
+    config, backend = library
+    work = ready(config)
+    index_library(work, backend)
+    assert all(r['processing']['embeddings'] == 'complete' for r in records(work))
+    for record in records(work):
+        record['processing']['embeddings'] = 'pending'
+        update_record(work, record)
+    calls = len(backend.calls)
+    dry = index_library(work, None, dry_run=True)
+    assert dry['pending'] == 0 and dry['restored'] == 6
+    assert all(r['processing']['embeddings'] == 'pending' for r in records(work))  # A dry run writes nothing.
+    result = process(config, 'embeddings', 1000)  # No model is loaded: no vector is missing.
+    assert result['processed'] == 0 and result['restored'] == 6 and len(backend.calls) == calls
+    assert all(r['processing']['embeddings'] == 'complete' for r in records(work))
+    assert index_library(work, None, dry_run=True)['restored'] == 0
+
+
+def test_kept_faults_show_as_failed_again_after_a_rescan_reset(library, monkeypatch):
+    """A rescan resets a kept fault's flags to pending; processing restores the failed state without retrying."""
+    config, _ = library
+    from local_asset_library import incremental, render_pool
+    from local_asset_library.sources import import_outcome
+    render_pool.save(config, 1, None)
+    attempted = []
+
+    def inspect(work, record, fp, resolution=640, formats=None):
+        attempted.append(record['asset_id'])
+        if record['display_name'] == 'item0':
+            raise RuntimeError('synthetic geometry fault')
+        # A render that returned failed: inspection complete, previews failed, as publish records it.
+        record.update(technical={'inspected_path': record['files'][0]['path']},
+                      inspection_run={'status': 'failed', 'errors': ['Empty or off-frame preview detected'],
+                                      'result_path': 'data/fixture/result.json'})
+        record['processing'].update(inspection='complete', previews='failed')
+        incremental.update_record(work, record)
+        return {'status': 'failed', 'result_path': 'fixture/result.json', 'errors': ['Empty or off-frame preview detected']}
+    monkeypatch.setattr(incremental, 'run_inspection', inspect)
+    assert process(config, 'inspection', 6)['failed'] == 6  # Two raised, four returned a failed render.
+    work = working(config)
+    before = {r['asset_id']: (dict(r['processing']), r.get('stage_faults')) for r in records(work)}
+    for record in records(work):  # What a rescan after grouping leaves.
+        record['processing'].update(inspection='pending', previews='pending')
+        record.pop('stage_faults', None)
+        update_record(work, record)
+    assert all(import_outcome(r)['state'] == 'pending' for r in records(work))
+    dry = process(config, 'inspection', 6, dry_run=True)
+    assert dry['pending'] == 0 and dry['retained'] == {'failed': 6} and dry['restored'] == 6
+    result = process(config, 'inspection', 6)
+    assert result['restored'] == 6 and len(attempted) == 6  # Nothing was retried.
+    for record in records(work):
+        processing, faults = before[record['asset_id']]
+        assert record['processing'] == processing and import_outcome(record)['state'] == 'failed'
+        if record['display_name'] == 'item0':
+            assert record['stage_faults']['inspection']['error'] == 'synthetic geometry fault'
+    assert process(config, 'inspection', 6, dry_run=True)['restored'] == 0
