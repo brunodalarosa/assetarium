@@ -18,6 +18,29 @@ looks along the card's plane and saw nothing.
   CPU renders pixel-identical, 5,180/5,180 fingerprints kept, 115 GPU-rendered skipped
   (`data/evidence/render-stability/2026-10-27-flat-card-views-cpu.json`). Full suite 715 passed, 2 skipped (`Real-Blender tests: 8 passed`). The 12 recorded
   Desert faults are not retried automatically.
+## October 27 — Near-miss duplicate export folders, branch `feature/near-miss-export-folders`
+
+Two real sources had duplicate export folders that decision 0019 never suggested, because their
+model-name sets were not identical: *Medieval Props* `Unity FBX` holds 111 of the 115 names in
+`FBX`/`gLTF` (4 mannequin variants missing), and *Desert Pack* `Unity FBX` repeats `Pebble_1` in
+`Other/` and `Rocks/`, which disqualified the whole folder. The 111 Unity copies failed processing
+on a renamed atlas texture while their `FBX`/`gLTF` twins rendered fine.
+
+- `catalog.near_candidates`: sibling folders joined when the names found once in each cover at least
+  90% of every folder's model files; a name repeated inside a folder is set aside; only names found
+  once in every folder are grouped. Exact candidates are computed as before (same IDs, so saved
+  answers on *Low Poly Nature*, *Megapack* and *Weapons* still apply). Group evidence records the
+  near-miss counts. Settings card, Asset processing line and `local-assets sources exports` say what
+  is shared and what stays as it is; Exclude says how many ungrouped names it would also skip.
+  Decision 0019 updated.
+- **Real check.** Rescans: *Medieval Props* suggests `FBX`, `Unity FBX`, `gLTF` sharing 111 names
+  (4 each only in `FBX` and `gLTF`); *Desert Pack* suggests `FBX`, `Unity FBX` sharing 60 (1 repeated
+  inside `Unity FBX`); *Medieval Megapack* keeps its saved Group answer (1,265 assets). Nothing was
+  answered.
+- **Verification.** `tests/test_source_exports.py` (subset folder grouped on the shared names only,
+  a repeated name stays separate, under 90% is not suggested, exact IDs unchanged, CLI wording).
+  WebView2 `scripts/verify-source-folders.py` adds a near-miss source
+  (`data/gui/source-folders-2026-10-27-near-c/`). Full suite 719 passed, 2 skipped (`Real-Blender tests: 7 passed`).
 
 ## October 26 — Search data threads in the speed test and in Settings, branch `feature/search-data-threads`
 
