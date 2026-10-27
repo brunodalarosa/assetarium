@@ -18,7 +18,8 @@ until the owner retries them. Verification: `tests/test_captions.py` + `tests/te
   `local-assets describe --asset-source "Desert Pack"` then wrote all four: 0 pending, 0 failed, 0 without
   a description. `Pebble_3` again listed no parts and was accepted; `Grass_L_1` is labeled "unknown"
   (gray card preview), a review note rather than a fault. Run on a local branch with the unmerged fixes
-  and the parallel-requests change, so these four record `batch.size` 8.
+  and an experimental parallel-requests change, since dropped (about 10% faster on this machine), so
+  these four record `batch.size` 8; concurrency is no fingerprint input, so they stay valid.
 
 ## October 27 — Edge-on flat cards turn their empty view, branch `bugfix/flat-card-views`
 
