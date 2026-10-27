@@ -10,7 +10,8 @@ fingerprints (`incremental.caption_input`) do not hash `captions.py`, so nothing
 historical pilot `caption_fingerprint` does. The gray grass previews are faithful: the pack's
 `Textures/Other/GrassAlpha_D.png` is a gray alpha card tinted in the game engine. Recorded failures stay
 until the owner retries them. Verification: `tests/test_captions.py` + `tests/test_ui_encoding.py`
-94 passed (new test: empty parts accepted, empty shape/style still rejected).
+94 passed (new test: empty parts accepted, empty shape/style still rejected); full suite 721 passed,
+2 skipped (`Real-Blender tests: 8 passed`).
 
 - **Owner-approved retry.** `scripts/historical/release-desert-parts-captions.py` saved each failure's
   caption result, ledger row and stage fault (`data/evidence/desert-parts-release-2026-10-27/`) and
