@@ -1,5 +1,17 @@
 # Progress
 
+## October 27 — One-piece objects may list no parts, branch `bugfix/one-piece-caption-parts`
+
+Desert Pack's description run (local server, Qwen3-VL-2B F16) failed 4 of 63 assets with "Core visual
+attributes must not be empty": `Grass_L_1`, `Grass_S_1`, `Pebble_3` and `Rock_8` returned accurate
+descriptions with `"parts": []`. The prompt asks for visible components only, so a one-piece object
+honestly has none. `validate_caption` now requires `shape`, `colors` and `style` only. Library
+fingerprints (`incremental.caption_input`) do not hash `captions.py`, so nothing is re-queued; the
+historical pilot `caption_fingerprint` does. The gray grass previews are faithful: the pack's
+`Textures/Other/GrassAlpha_D.png` is a gray alpha card tinted in the game engine. Recorded failures stay
+until the owner retries them. Verification: `tests/test_captions.py` + `tests/test_ui_encoding.py`
+94 passed (new test: empty parts accepted, empty shape/style still rejected).
+
 ## October 27 — Edge-on flat cards turn their empty view, branch `bugfix/flat-card-views`
 
 Twelve *Desert Pack* assets (a cloud sprite and grass billboards, zero thickness along Y) failed

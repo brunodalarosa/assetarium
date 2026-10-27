@@ -9,7 +9,9 @@ response contains exactly `identity`, `description`, `shape`, `colors`, `parts`,
 `style`, `distinguishing_features`, `uncertainties` and `suggested_uses`.
 Identity has a short label and `probable`, `uncertain` or `unknown` certainty.
 Unknown labels cannot be probable. Uncertain/unknown identity needs a stated
-uncertainty. Confidence labels are uncalibrated model heuristics.
+uncertainty. Confidence labels are uncalibrated model heuristics. `shape`, `colors`
+and `style` need at least one item; `parts` may be empty, because one-piece objects
+(a pebble, a grass clump) have no visible components.
 
 Description is bounded to **10–170 words**. The active full-library prompt is
 `prompts/caption-v4.txt`; simple assets may need only 10–30 words and must not be
