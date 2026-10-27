@@ -153,8 +153,21 @@ export const ENGINE_NOTE =
   "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Where search by description and by image runs is a separate choice below.";
 export const SEARCH_HELP =
   "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Process assets to rebuild search data. Until then, names, filters and keyword search keep working.";
+export const SEARCH_THREADS_HELP =
+  "How many CPU threads build search data. More are faster until the processor is saturated; fewer leave the computer more responsive. Search results are identical at any number, so changing it never redoes work. Automatic uses the speed test's choice: the fewest threads within 3% of the fastest.";
+/** "Now: 24 of 32 threads (fastest in the speed test)." */
+export function searchThreadsText(search: Json) {
+  return `Now: ${search.threads} of ${search.cpu_threads} threads (${search.reason}).`;
+}
+/** The speed test's search data line: each tested count, or why there is none. */
+export function searchTestText(search: Json) {
+  if (search.device !== "cpu") return "Search data runs on the GPU, so CPU threads are not tested.";
+  if (!search.test) return "Not tested yet.";
+  const tested = search.test.results.map((r: Json) => `${r.threads} threads ${r.seconds_per_image.toFixed(2)} s`).join(" · ");
+  return `Per test image: ${tested} · ${search.test.chosen} threads chosen (the fewest within 3% of the fastest).`;
+}
 export const SPEED_TEST_HELP =
-  "A short test on this computer with synthetic shapes, never your assets (about 2 minutes). It finds the faster render device, the CPU or a graphics card, and how many renders at a time help. It runs by itself when processing first needs it and again after Blender or the hardware changes; Automatic in Rendering uses its results.";
+  "A short test on this computer with synthetic shapes and images, never your assets (about 2–3 minutes). It finds the faster render device, the CPU or a graphics card, and how many renders at a time help, and, when search runs on the CPU, how many CPU threads build search data fastest. It runs by itself when processing first needs it and again after Blender, the hardware or the search runtime changes; Automatic in Rendering and Search uses its results.";
 export const RENDER_HELP =
   "Previews render in Blender. Automatic uses the speed test's fastest device and number of renders at a time. Your limits can lower that number or change how much memory rendering may use, for example more when the computer does nothing else overnight. Rendering never goes past the fastest tested number or the memory that is free, so a limit never makes it slower.";
 const STOPPED: Record<string, string> = {

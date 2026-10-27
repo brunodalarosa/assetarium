@@ -8,8 +8,8 @@ import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import {
-  BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, RENDER_HELP, renderNowText, renderTestLine, SEARCH_HELP, setupRecordText,
-  sourceMessage, SPEED_TEST_HELP,
+  BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, RENDER_HELP, renderNowText, renderTestLine, SEARCH_HELP, SEARCH_THREADS_HELP,
+  searchTestText, searchThreadsText, setupRecordText, sourceMessage, SPEED_TEST_HELP,
 } from "../app/format";
 import {
   chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, renderTest, saveGeneralSettings, saveRenderSettings, setAppearance, type SettingsTab,
@@ -149,6 +149,12 @@ function SpeedTest() {
             <p id="render-test" className="text-muted-foreground">{values.blender ? "Not tested yet." : "Set up Blender to test render speed."}</p>
           )}
         </div>
+        {values.search && (
+          <div className="grid gap-1">
+            <p className="font-medium">Search data</p>
+            <p id="search-test">{searchTestText(values.search)}</p>
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-4">
         {running ? (
@@ -181,6 +187,8 @@ function General() {
   const [url, setUrl] = useState("");
   const [model, setModel] = useState("");
   const [device, setDevice] = useState("cuda");
+  const [threads, setThreads] = useState("auto");
+  const search = render?.search;
   useEffect(() => {
     if (!general.values) return;
     setBudget(String(general.values.storage_budget_gib));
@@ -191,13 +199,14 @@ function General() {
     setUrl(general.values.description_server.url);
     setModel(general.values.description_server.model);
     setDevice(general.values.search_device);
+    setThreads(general.values.search_threads ? String(general.values.search_threads) : "auto");
   }, [general.values]);
   const disabled = general.loading || general.busy || !general.values;
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
     if (render && !(await saveRenderSettings(rendering.device, rendering.processes, rendering.memory))) return;
-    void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } }, device);
+    void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } }, device, threads);
   };
   return (
     <div className="grid gap-5">
@@ -241,6 +250,16 @@ function General() {
         )}
         <Card id="search-card" title="Search" help={SEARCH_HELP}>
           <SearchDeviceField value={device} onChange={setDevice} devices={devices} disabled={disabled} idPrefix="settings" />
+          {device === "cpu" && search && (
+            <div id="search-threads-field" className="grid gap-2">
+              <SelectField id="search-threads" label="CPU threads for search data" value={threads} onChange={setThreads} disabled={disabled} className="w-64"
+                options={[["auto", `Automatic (${search.test ? search.test.chosen : search.cpu_threads})`],
+                  ...Array.from({ length: Math.max(search.cpu_threads, Number(threads) || 0) }, (_, i): [string, string] => [String(i + 1), String(i + 1)])]} />
+              <p className="hint max-w-[640px] text-[12.5px] leading-relaxed text-muted-foreground">{SEARCH_THREADS_HELP}</p>
+              <p id="search-threads-now" className="text-[12.5px] leading-relaxed">{searchThreadsText(search)}</p>
+              <SpeedTestLink running={operationActive(render?.operation)} />
+            </div>
+          )}
         </Card>
         <Rendering draft={rendering} onDraft={setRendering} disabled={disabled} />
         <SpeedTest />

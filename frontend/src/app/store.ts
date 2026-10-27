@@ -814,11 +814,11 @@ export interface DescriptionSettings {
   engine: string;
   server: { url: string; model: string };
 }
-export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string) {
+export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string, searchThreads?: string) {
   const previousDevice = state.general.values?.search_device;
   setState((s) => ({ general: { ...s.general, busy: true, message: "Saving…" } }));
   try {
-    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null);
+    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null, searchThreads ?? null);
     if (result.status === "faulty") throw Error(result.reason);
     const described = !result.descriptions_enabled ? " Descriptions are off; existing descriptions are kept."
       : result.description_engine === "local-server" ? " Descriptions use the local model server." : ` Description batch size: ${result.caption_batch_size}.`;
@@ -832,7 +832,7 @@ export async function saveGeneralSettings(budget: string, formats: string[], bat
           : `Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.${searched}`,
       },
     });
-    await loadSources();
+    await Promise.all([loadSources(), loadRenderSettings()]);
   } catch (error) {
     setState((s) => ({ general: { ...s.general, busy: false, message: (error as Error).message } }));
   }

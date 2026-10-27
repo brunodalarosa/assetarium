@@ -257,6 +257,7 @@ def run(config, progress=None, cancelled=None):
 def summary(config):
     """Settings → General → Rendering: the owner's choices, what runs now and why, the last speed test."""
     from . import render_pool
+    from .search_speed import summary as search_summary
     from .source_operations import operation_status
     plan = render_pool.plan(config)
     test = saved(config)
@@ -272,6 +273,7 @@ def summary(config):
                                            "best": r["best"] and {k: r["best"][k] for k in ("processes", "seconds_per_asset")}}
                                           for r in test["results"]]},
             "devices": [{"key": "cpu", "label": "CPU"}] + [{"key": key(d), "label": label(d)} for d in (test or {}).get("devices", [])],
+            "search": search_summary(config),
             "operation": operation if operation.get("operation") == "render-test" else None}
 
 

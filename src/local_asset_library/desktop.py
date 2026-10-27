@@ -136,11 +136,11 @@ class DesktopBridge:
 
     def save_general_settings(self, storage_budget_gib, processing_formats=None, caption_batch_size=None,
                               descriptions_enabled=None, description_engine=None, description_server=None,
-                              search_device=None):
+                              search_device=None, search_threads=None):
         from .settings import save_general_settings
         return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
-                                        search_device, guarded=False))
+                                        search_device, 'user', search_threads, guarded=False))
 
     # Rendering (decision 0022): device, parallel renders and memory; the speed test runs as an operation.
     def render_settings(self):
@@ -437,7 +437,7 @@ class DesktopBridge:
                                 ('source-status.json', 'source-operation.json', 'source-cancel.json', 'active.json')]
                                + [stamp(config.project_root / 'data/library/source-faults' / (source['id'] + '.json'))])
         sources.append(stamp(config.project_root / 'data/library/settings.json'))
-        sources += [stamp(config.project_root / 'data/library' / name) for name in ('rendering.json', 'render-test.json')]
+        sources += [stamp(config.project_root / 'data/library' / name) for name in ('rendering.json', 'render-test.json', 'search-test.json')]
         sources.append(stamp(config.project_root / 'data/library/setup.json'))
         sources.append(stamp(config.project_root / 'data/library/notifications.json'))
         from .asset_collections import path as collections_path

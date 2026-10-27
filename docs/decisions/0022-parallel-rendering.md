@@ -51,6 +51,16 @@ slower.
   again measures higher counts. Before any test the CPU uses one process per 8 cores (at most 4). While
   running, a job waits for a running render whenever free memory drops below 1 GiB; one always runs.
 
+- **Search data threads.** When search runs on the CPU, the speed test also times the loaded CPU
+  embedder on six synthetic images at the physical core count, about 1.5× it and every logical thread
+  (two passes, alternating order) and keeps the fewest threads within 3% of the fastest
+  (`search_speed.py`, `data/library/search-test.json`, keyed to the logical thread count, the CPU
+  search runtime lock and the model). It runs at the start of search data when no result matches,
+  and with Test again (in the CPU search runtime; a missing runtime or model skips it). The owner's
+  `search_threads` (Settings → General → Search, `settings set --search-threads`) overrides it, up to
+  every logical thread, capped on a smaller machine. Thread counts never change vectors (bit-identical
+  at 8–32 threads), so nothing re-queues.
+
 Why: one Blender at a time spent about 1.35 s of each 4.5 s asset starting Blender and left most of a
 many-core CPU and the GPU idle. On the owner's machine (Ryzen 9 9950X3D, Radeon RX 6800, 31 GB) real
 assets went from 4.5 s to 1.8 s each with kept-open GPU renders 2 at a time (1.4 s with 4, when memory

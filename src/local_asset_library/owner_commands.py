@@ -65,6 +65,7 @@ def parser():
     change.add_argument('--server-url', help='Local model server address, e.g. http://127.0.0.1:8080/v1')
     change.add_argument('--server-model', help='Model name the local server lists')
     change.add_argument('--search-device', choices=['cuda', 'cpu'], help='Where semantic and image search run (switching re-indexes)')
+    change.add_argument('--search-threads', help='"auto" (the speed test\'s choice) or how many CPU threads build search data')
     rendering = commands.add_parser('rendering', help='Render device, renders at a time, memory and the speed test'
                                     ).add_subparsers(dest='action', required=True)
     rendering.add_parser('show')
@@ -301,10 +302,10 @@ def settings_command(args, config):
     current = general_settings(config)
     if args.action == 'set':
         options = (args.formats, args.budget_gib, args.batch_size, args.descriptions, args.engine, args.server_url,
-                   args.server_model, args.search_device)
+                   args.server_model, args.search_device, getattr(args, 'search_threads', None))
         if all(value is None for value in options):
             raise ConfigError('Give at least one of --formats, --budget-gib, --batch-size, --descriptions, --engine, '
-                              '--server-url, --server-model or --search-device')
+                              '--server-url, --server-model, --search-device or --search-threads')
         formats = None if args.formats is None else (
             [] if args.formats.strip().lower() == 'none' else [f.strip().lower() for f in args.formats.split(',') if f.strip()])
         server = None if args.server_url is None and args.server_model is None else {
@@ -312,7 +313,7 @@ def settings_command(args, config):
             'model': args.server_model if args.server_model is not None else current['description_server']['model']}
         save_general_settings(config, args.budget_gib if args.budget_gib is not None else current['storage_budget_gib'],
                               formats, args.batch_size, None if args.descriptions is None else args.descriptions == 'on',
-                              args.engine, server, args.search_device)
+                              args.engine, server, args.search_device, search_threads=getattr(args, 'search_threads', None))
         current = general_settings(config)
         say(args, 'Saved. Changing settings never deletes results or retries faults.')
     engine = current['description_engine']
@@ -322,7 +323,8 @@ def settings_command(args, config):
               f"Description engine: {engine}" + (f" ({current['description_server']['url']}, model "
                                                  f"{current['description_server']['model'] or 'not set'})" if engine == 'local-server' else '')
               + f"\nDescription batch size: {current['caption_batch_size']}" + (' (not used by a local server)' if engine == 'local-server' else '')
-              + f"\nSearch runs on: {'CPU' if current['search_device'] == 'cpu' else 'NVIDIA GPU (CUDA)'}")
+              + f"\nSearch runs on: {'CPU' if current['search_device'] == 'cpu' else 'NVIDIA GPU (CUDA)'}"
+              + (f"\nSearch CPU threads: {search_line(config)}" if current['search_device'] == 'cpu' else ''))
     return current
 
 
@@ -377,6 +379,12 @@ def rendering_command(args, config):
         say(args, 'Not speed-tested yet: it runs at the start of the next process, or now with: rendering test')
     say(args, 'Devices: ' + ', '.join(f"{d['key']} ({d['label']})" for d in current['devices']))
     return current
+
+
+def search_line(config):
+    from .search_speed import summary
+    value = summary(config)
+    return f"{value['threads']} of {value['cpu_threads']} ({value['reason']})"
 
 
 def show_checks(args, result):

@@ -87,6 +87,26 @@ def search_device(config):
     return validate_search_device(_saved(config).get('search_device', 'cuda'))
 
 
+def validate_search_threads(value, available=None):
+    """None (automatic) or a thread count; a saved count above this machine's threads is capped where used."""
+    if value is None or value == 'auto' or value == '':
+        return None
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value)
+    if available is None:
+        from .engines import cpu_threads
+        available = cpu_threads()
+    if type(value) is not int or not 1 <= value <= available:
+        raise ConfigError(f'Choose Automatic or 1 to {available} CPU threads for search in Settings → General')
+    return value
+
+
+def search_threads(config):
+    """CPU threads for search data (decision 0022); unset is automatic: the speed test's choice."""
+    value = _saved(config).get('search_threads')
+    return value if type(value) is int and value >= 1 else None
+
+
 def format_group(extension):
     return 'gltf' if extension == 'glb' else extension
 
@@ -135,7 +155,7 @@ def storage_budget(config, fallback=None):
 
 
 SETTING_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
-                'description_engine', 'description_server', 'search_device')
+                'description_engine', 'description_server', 'search_device', 'search_threads')
 
 
 def general_settings(config):
@@ -143,7 +163,8 @@ def general_settings(config):
     return {'status': 'ready', 'storage_budget_gib': storage_budget(config)['total_allocated_bytes'] / GIB,
             'processing_formats': processing_formats(config), 'caption_batch_size': caption_batch_size(config),
             'descriptions_enabled': descriptions_enabled(config), 'description_engine': engine['engine'],
-            'description_server': engine['server'], 'search_device': search_device(config)}
+            'description_server': engine['server'], 'search_device': search_device(config),
+            'search_threads': search_threads(config)}
 
 
 def validate_budget_gib(value):
@@ -159,8 +180,9 @@ def validate_budget_gib(value):
 
 
 def checked_general(config, storage_budget_gib, processing_formats=None, caption_batch_size=None,
-                    descriptions_enabled=None, description_engine=None, description_server=None, search_device=None):
-    """Validated settings.json content; omitted values keep what is saved. Writes nothing."""
+                    descriptions_enabled=None, description_engine=None, description_server=None, search_device=None,
+                    search_threads=None):
+    """Validated settings.json content; omitted values keep what is saved ("auto" clears search_threads). Writes nothing."""
     limit = validate_budget_gib(storage_budget_gib)
     path = settings_path(config)
     value = read_json(path) if path.exists() else {'schema_version': 1}
@@ -174,17 +196,18 @@ def checked_general(config, storage_budget_gib, processing_formats=None, caption
                                      value.get('description_engine', 'builtin'),
                                      description_server if description_server is not None else value.get('description_server'))
     device = validate_search_device(search_device if search_device is not None else value.get('search_device', 'cuda'))
+    threads = (value.get('search_threads') if search_threads is None else validate_search_threads(search_threads))
     value.update(schema_version=1, storage_budget_bytes=limit * GIB, processing_formats=formats,
                  caption_batch_size=batch, descriptions_enabled=enabled, description_engine=engine,
-                 description_server=server, search_device=device)
+                 description_server=server, search_device=device, search_threads=threads)
     return value
 
 
 def save_general_settings(config, storage_budget_gib, processing_formats=None, caption_batch_size=None,
                           descriptions_enabled=None, description_engine=None, description_server=None,
-                          search_device=None, actor='user'):
+                          search_device=None, actor='user', search_threads=None):
     value = checked_general(config, storage_budget_gib, processing_formats, caption_batch_size,
-                            descriptions_enabled, description_engine, description_server, search_device)
+                            descriptions_enabled, description_engine, description_server, search_device, search_threads)
     path = settings_path(config)
     try:
         before = general_settings(config)

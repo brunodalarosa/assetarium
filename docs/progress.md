@@ -1,5 +1,49 @@
 # Progress
 
+## October 26 — Search data threads in the speed test and in Settings, branch `feature/search-data-threads`
+
+Follow-up to the entry below, at the owner's request. A second benchmark (48 previews, two passes in
+alternating order) gave 16 threads 1.14 s, 24 0.89 s, 28 0.89 s, 32 0.90 s per image, all 48/48
+bit-identical: the gain levels off around 24, so the count is now tested and configurable.
+
+- `search_speed.py` (decision 0022): six synthetic images, the loaded CPU embedder at the physical core
+  count, about 1.5× it and every logical thread, two alternating passes, the fewest threads within 3%
+  of the fastest; saved in `data/library/search-test.json` keyed to logical threads, the CPU search
+  runtime lock and the model. `ensure` runs it before CPU search data when nothing matches and applies
+  the choice; Test again runs it after the render test in the CPU search runtime (skipped with a reason
+  when that runtime or model is missing). `search_threads` in `settings.json` (Automatic or 1 to every
+  logical thread, capped on a smaller machine) overrides it; Search card field with the current count
+  and tested times; `settings set --search-threads`; `settings show` prints the count.
+- **Speed test card.** Test again moved out of the Rendering card into its own **Speed test** card
+  (both parts' results, Test speed / Test again, Cancel test, the phase); Rendering and Search keep
+  their "Now: …" lines and link to it ("See the speed test", "Speed test running…").
+- **Real run.** `local-assets rendering test`: render part as before, search part 34.9 s: 16 threads
+  1.143 s, 24 0.859 s, 32 0.828 s per test image; 32 chosen (3.7% faster than 24, past the 3% margin).
+- **Verification.** `tests/test_search_speed.py` (choice and tolerance, cancel, identity, setting and
+  cap, `ensure`, the embedder using the count, Test again's search part and its skip). WebView2
+  `scripts/verify-rendering-settings.py` now covers the Search card field
+  and the Speed test card (`data/gui/rendering-settings-2026-10-26f/`); `verify-search-device.py` waits for Save to be
+  enabled after returning to Settings (it clicked during the settings reload)
+  (`data/gui/search-device-2026-10-26-threads-c/`); `verify-general-settings.py` passes. Full suite 713 passed, 2 skipped (`Real-Blender tests: 7 passed`).
+
+## October 26 — CPU search embedder uses every logical thread, branch `feature/search-data-threads`
+
+With GPU renders, CPU search data became the slowest step (about 3.75 s per asset, 3 views each).
+Benchmarked on 48 real `Low Poly Nature - Extended` previews against their stored vectors, through
+the indexer's own path (backend vector normalized again): today 1.125 s per image (16 threads);
+preparing each image once 1.145 s (preparation is 0.009 s); batches of 4 and 8 1.18 and 1.195 s;
+8 threads 1.79 s; **32 threads 0.846 s**; 2 processes × 16 threads 0.749 s; 4 × 8 0.712 s; 2 × 8
+1.055 s. Every variant reproduced the stored vectors bit for bit.
+
+- `engines.embedder` sets the CPU embedder to `engines.cpu_threads()` (all logical threads), outside
+  `embedding_cpu.py`, whose hash is part of the CPU vector identity. Parallel embedder processes
+  (about 3 GB of memory each) and batching were left out.
+- **Verification.** `scripts/check-engine-stability.py` before and after: no differences in pending
+  counts or fingerprints for any source (`data/engines/embedder-threads-before-2026-10-26.json`,
+  `data/engines/embedder-threads-after-2026-10-26.json`). Real check through `engines.embedder` on
+  `Medieval Megapack - Low Poly`: 32 threads, 0.84 s per image, 24/24 vectors identical to the index.
+  `tests/test_cpu_embedder.py` checks the thread count; full suite 705 passed, 2 skipped (`Real-Blender tests: 7 passed`).
+
 ## October 26 — Reads survive a crash mid-write; one unreadable source never hides the others, branch `bugfix/crash-safe-source-reads`
 
 The owner's PC crashed while *Low Poly Nature - Extended* was writing search data. SQLite left a hot

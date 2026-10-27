@@ -35,7 +35,7 @@ SEARCH_DEVICES = {
              'summary': 'Needs an NVIDIA GPU with CUDA and BF16 (RTX 30-series or newer). Fastest: about 0.1 s per image.'},
     'cpu': {'id': 'cpu', 'label': 'CPU', 'project': 'runtime/embedding-cpu', 'status': 'tested',
             'summary': 'Runs on any x86-64 CPU with the same model and precision, so search results match closely. '
-                       'Indexing images is slower (about 1 s per image on a 16-core CPU); searching feels the same.'}}
+                       'Indexing images is slower (about 0.8 s per image on a 16-core CPU); searching feels the same.'}}
 RUNTIME_PACKAGES = {'caption': ('torch', 'transformers'), 'embedding': ('torch', 'sentence-transformers')}
 WEIGHTS = {'caption': ('captions/model-download.json', 'qwen3-vl-2b'),
            'embedding': ('embeddings/model-download.json', 'embeddinggemma-2')}
@@ -61,11 +61,21 @@ def search_device(config):
     return saved(config)
 
 
+def cpu_threads():
+    """Logical threads this process may use (all of them, including simultaneous multithreading)."""
+    return (os.process_cpu_count() if hasattr(os, 'process_cpu_count') else None) or os.cpu_count() or 1
+
+
 def embedder(config):
     """The configured Embedder adapter: EmbeddingGemma on the saved search device, never another one."""
     if search_device(config) == 'cpu':
         from .embedding_cpu import EmbeddingCpuBackend
-        return EmbeddingCpuBackend(config)
+        backend = EmbeddingCpuBackend(config)
+        # Torch defaults to one thread per physical core; more embed faster with bit-identical vectors
+        # (October 26, 2026). The owner's setting or the speed test's choice; outside the hashed adapter.
+        from .search_speed import threads
+        backend.torch.set_num_threads(threads(config)[0])
+        return backend
     from .embedding_backend import EmbeddingBackend
     return EmbeddingBackend(config)
 

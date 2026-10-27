@@ -35,7 +35,8 @@ def test_saved_total_survives_reload_and_source_binding_without_hidden_growth_ca
     result = save_general_settings(config, '24')
     assert result == {'status': 'saved', 'storage_budget_gib': 24, 'processing_formats': ['fbx', 'gltf', 'obj'],
                       'caption_batch_size': 8, 'descriptions_enabled': True, 'description_engine': 'builtin',
-                      'description_server': {'url': 'http://127.0.0.1:8080/v1', 'model': ''}, 'search_device': 'cuda'}
+                      'description_server': {'url': 'http://127.0.0.1:8080/v1', 'model': ''}, 'search_device': 'cuda',
+                      'search_threads': None}
     rebound = replace(config, metadata_root=config.source_root / 'metadata-lal', source_key='fixture')
     assert general_settings(rebound)['storage_budget_gib'] == 24
     assert settings_path(rebound) == settings_path(config)

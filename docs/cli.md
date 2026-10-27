@@ -67,6 +67,7 @@ settings set --descriptions off        # on/off; off keeps existing descriptions
 settings set --engine local-server --server-url http://127.0.0.1:8080/v1 --server-model qwen3-vl-2b
 settings set --engine builtin
 settings set --search-device cpu       # cuda or cpu: where search by description and image runs
+settings set --search-threads 24       # auto (the speed test's choice) or CPU threads for search data
 ```
 
 Changing settings never deletes results or retries faults. Server addresses must be on

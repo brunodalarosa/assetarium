@@ -171,3 +171,13 @@ def test_rendering_settings_and_speed_test_commands(managed, capsys):
     assert run(config, 'rendering', 'test') == 2 and 'Set up Blender' in capsys.readouterr().err
     assert run(config, 'rendering', 'cancel') == 0 and 'No speed test is running' in capsys.readouterr().out
 
+
+def test_search_threads_setting(managed, capsys, monkeypatch):
+    config = managed[0]
+    from local_asset_library import engines
+    monkeypatch.setattr(engines, 'cpu_threads', lambda: 32)
+    assert run(config, 'settings', 'set', '--search-device', 'cpu', '--search-threads', '28') == 0
+    assert 'Search CPU threads: 28 of 32 (your setting)' in capsys.readouterr().out
+    assert run(config, 'settings', 'set', '--search-threads', 'auto') == 0
+    assert 'Search CPU threads: 32 of 32 (every logical thread (not speed-tested yet))' in capsys.readouterr().out
+    assert run(config, 'settings', 'set', '--search-threads', '40') == 2 and '1 to 32 CPU threads' in capsys.readouterr().err

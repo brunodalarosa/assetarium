@@ -13,7 +13,7 @@ from local_asset_library.source_operations import scan_all, process_source, desc
 from local_asset_library.gpu_queue import lease
 
 parser = argparse.ArgumentParser()
-parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage', 'render-test'])
+parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage', 'render-test', 'search-test'])
 parser.add_argument('--source')
 parser.add_argument('--token', required=True)
 parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'])
@@ -23,6 +23,9 @@ source = get_source(config, args.source) if args.source else None
 scoped = bound(config, source) if source else config
 if args.operation == 'stage':
     worker_stage(config, source, args.stage, args.token)
+elif args.operation == 'search-test':
+    from local_asset_library.search_speed import standalone
+    standalone(config, args.token)  # Started by the render-test operation, which holds the operation lease.
 else:
     # Wait for the parent to finish its short, atomic process handoff.
     with lease(config, 'source-operation-handoff', resource='sources'):
