@@ -8,7 +8,7 @@ import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import {
-  BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, RENDER_HELP, renderNowText, renderTestLine, SEARCH_HELP, SEARCH_THREADS_HELP,
+  BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, nearMissText, operationActive, RENDER_HELP, renderNowText, renderTestLine, SEARCH_HELP, SEARCH_THREADS_HELP,
   searchTestText, searchThreadsText, setupRecordText, sourceMessage, SPEED_TEST_HELP,
 } from "../app/format";
 import {
@@ -327,6 +327,14 @@ function TextureChoice({ source, busy }: { source: Json; busy: boolean }) {
   );
 }
 
+/** ", including N names that would not be grouped" when excluding a near-miss folder drops models of its own. */
+function excludedOnly(s: Json) {
+  if (!s.near) return "";
+  const extra = s.folders.filter((f: string) => f !== s.reference && !s.grouped_folders.includes(f));
+  const own = extra.reduce((total: number, f: string) => total + (s.near.only[f] || 0) + (s.near.repeated[f] || 0), 0);
+  return own ? `, including ${own} ${own === 1 ? "name" : "names"} that would not be grouped` : "";
+}
+
 /** Duplicate export folder suggestions, saved answers and excluded folders for one source (decision 0019). */
 function SourceFolders({ source, busy }: { source: Json; busy: boolean }) {
   const [pattern, setPattern] = useState("");
@@ -350,11 +358,12 @@ function SourceFolders({ source, busy }: { source: Json; busy: boolean }) {
         <div key={s.id} className="export-suggestion grid gap-2 rounded-2xl bg-surface-2 p-4" data-suggestion={s.id}>
           <p className="text-[13px] font-medium">Possible duplicate exports</p>
           <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-            {where(s.anchor)}, {s.folders.join(", ")} have the same {s.names.toLocaleString()} model names (for example {s.sample_names.slice(0, 3).join(", ")}).
+            {where(s.anchor)}, {s.folders.join(", ")} {s.near ? "share" : "have the same"} {s.names.toLocaleString()} model names (for example {s.sample_names.slice(0, 3).join(", ")}).
+            {nearMissText(s.near)}
             {s.grouped_folders.length > 1 ? ` ${s.grouped_folders.join(" and ")} are already grouped.` : ""}
           </p>
           <p className="hint text-[11.5px] leading-relaxed text-subtle">
-            Grouping makes one asset per model with every folder’s file attached; only the preferred file is rendered. Previews and descriptions are kept and search data is rebuilt. Excluding stops scanning the extra folders ({s.folders.filter((f: string) => f !== s.reference && !s.grouped_folders.includes(f)).join(", ")}). Nothing on disk changes either way.
+            Grouping makes one asset per model with every folder’s file attached; only the preferred file is rendered. Previews and descriptions are kept and search data is rebuilt. Excluding stops scanning the extra folders ({s.folders.filter((f: string) => f !== s.reference && !s.grouped_folders.includes(f)).join(", ")}){excludedOnly(s)}. Nothing on disk changes either way.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button className="h-9 px-4" disabled={disabled} data-action="group" onClick={() => void run("export", s.id, "group")}>Group as alternate files</Button>
