@@ -354,8 +354,34 @@ def render_test(config, token):
         state(config, status="cancelled", phase="Speed test cancelled; the previous result is kept", progress=1)
         return
     best = next((r for r in result["results"] if r["key"] == result["chosen"]), None)
-    state(config, status="complete", progress=1, phase=("Speed test finished: " + best["label"] + f", {best['best']['processes']} at a time"
-                                                        if best else "Speed test finished without a working device"))
+    phase = ("Speed test finished: " + best["label"] + f", {best['best']['processes']} at a time"
+             if best else "Speed test finished without a working device")
+    from . import engines
+    if engines.search_device(config) == "cpu":
+        searched = search_test(config, token)
+        if cancelled(config, token):
+            state(config, status="cancelled", phase="Search speed test cancelled; the previous search result is kept", progress=1)
+            return
+        phase += "; search data " + searched
+    state(config, status="complete", progress=1, phase=phase)
+
+
+def search_test(config, token):
+    """The search part of the speed test, in the CPU search runtime; a missing runtime or model skips it."""
+    from .search_speed import saved
+    state(config, status="processing", phase="Testing search speed", progress=.9)
+    runtime, project = stage_runtime(config, "embeddings")
+    command = [*runtime_command(config.project_root, runtime), 'run', '--locked', '--no-sync', '--offline', '--project',
+               str(config.project_root / 'runtime' / project), 'python', str(config.project_root / "scripts/source-operation.py"),
+               "search-test", "--token", token]
+    env = os.environ.copy()
+    env.update(PYTHONPATH=str(config.project_root / "src"), HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
+    completed = subprocess.run(command, cwd=config.project_root, env=env,
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+    test = saved(config)
+    if completed.returncode or not test:
+        return "not tested (the CPU search runtime or its model is not ready)"
+    return f"{test['chosen']} CPU threads"
 
 
 def description_counts(scoped):
@@ -465,6 +491,10 @@ def worker_stage(config, source, stage, token):
             try:
                 if stage != "inspection" and backend is None and preview.get("pending"):  # Reuse alone needs no model.
                     backend = engines.description_engine(scoped) if stage == "caption" else engines.embedder(scoped)
+                    if stage == "embeddings":
+                        from .search_speed import ensure
+                        ensure(scoped, backend, progress=lambda phase: state(scoped, status="processing", phase=phase,
+                               stage=stage), cancelled=lambda: cancelled(scoped, token))
                 result = process(scoped, stage, limit=1000, backend=backend, asset_ids=only,
                                  cancelled=lambda: cancelled(scoped, token), progress=on_progress,
                                  status=lambda phase: state(scoped, status="processing", phase=phase, stage=stage))

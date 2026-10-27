@@ -36,16 +36,25 @@ def test_search_device_defaults_to_cuda_and_saves_cpu(config):
     assert search_device(config) == 'cpu'
 
 
+class FakeCpuBackend:
+    def __init__(self, config):
+        self.threads = []
+        self.torch = type('Torch', (), {'set_num_threads': staticmethod(self.threads.append)})
+
+
 def test_composition_root_builds_the_embedder_for_the_saved_device(config, monkeypatch):
     built = []
     monkeypatch.setattr('local_asset_library.embedding_backend.EmbeddingBackend', lambda c: built.append('cuda') or 'cuda-backend')
-    monkeypatch.setattr('local_asset_library.embedding_cpu.EmbeddingCpuBackend', lambda c: built.append('cpu') or 'cpu-backend')
+    monkeypatch.setattr('local_asset_library.embedding_cpu.EmbeddingCpuBackend', lambda c: built.append('cpu') or FakeCpuBackend(c))
     monkeypatch.setattr('local_asset_library.embedding_backend.runtime_contract', lambda c: {'device': 'cuda:0'})
     monkeypatch.setattr('local_asset_library.embedding_cpu.runtime_contract', lambda c: {'device': 'cpu'})
     assert engines.embedder(config) == 'cuda-backend' and engines.embedder_contract(config) == {'device': 'cuda:0'}
     save_general_settings(config, 8, None, None, None, None, None, 'cpu')
-    assert engines.embedder(config) == 'cpu-backend' and engines.embedder_contract(config) == {'device': 'cpu'}
+    cpu = engines.embedder(config)
+    assert isinstance(cpu, FakeCpuBackend) and engines.embedder_contract(config) == {'device': 'cpu'}
     assert built == ['cuda', 'cpu']
+    from local_asset_library.search_speed import threads
+    assert cpu.threads == [threads(config)[0]] == [engines.cpu_threads()]  # Untested, no setting: every thread.
 
 
 def test_cpu_contract_has_its_own_identity_and_keeps_the_cuda_adapter_untouched(monkeypatch):

@@ -41,6 +41,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- Search data on the CPU builds about 25% faster: it uses more CPU threads than one per physical
+  core. The speed test picks how many (the fewest within 3% of the fastest), and **Settings →
+  General → Search → CPU threads for search data** (`local-assets settings set --search-threads`)
+  lets you choose, for example to keep threads free. Vectors are identical at any thread count, so
+  existing search data stays valid.
 - Descriptions from a local model server no longer need the description runtime
   (`.venv-caption`); only the built-in engine does.
 - The setup wizard's descriptions step is now "Descriptions and search".
@@ -54,6 +59,7 @@ All notable changes to Assetarium are listed here. The project follows
   until something wrote to it. Reads now let SQLite undo the unfinished write first (finished data
   is kept), a source whose data cannot be read shows that on its own card without hiding the
   others, and a source list that fails to load says so instead of claiming there are no sources.
+
 - After grouping export folders, already processed assets stayed "pending" forever: Process assets
   reused their finished previews and descriptions but never marked those stages complete again,
   and Generate descriptions had nothing to start from. Reused results now mark their stage

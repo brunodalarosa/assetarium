@@ -153,9 +153,12 @@ progress through a final verification scan; **Cancel** finishes and saves the
 renders already running first (several run at once, decision 0022). **Settings → General →
 Rendering** says what renders now and why ("Now: AMD Radeon RX 6800 (HIP), 2 renders at a time
 (fastest in the speed test)") and offers the render device, renders at a time and memory for
-rendering (saved with the form; empty memory is automatic), with a link to the **Speed test**
-card, which shows when the test last ran, one line per tested render device, and **Test speed** /
-**Test again** and **Cancel test** with the test's phase. **Generate descriptions** runs the optional describe
+rendering (saved with the form; empty memory is automatic). When search runs on the CPU, the
+**Search** card adds **CPU threads for search data** (Automatic = the speed test's choice, or 1 to
+every logical thread) with "Now: 24 of 32 threads (…)". Both cards link to the **Speed test** card,
+which shows when the test last ran, one line per tested render device, the search-data line (each
+tested thread count's seconds per test image and the count chosen, or why it is not tested), and
+**Test speed** / **Test again** and **Cancel test** with the test's phase. **Generate descriptions** runs the optional describe
 operation per source with progress and **Cancel** (decision 0008); disabled
 buttons say why. Run reports open as a dialog; a GPU-memory stop suggests lowering
 **Settings → General → Description batch size** (1, 2, 4 or 8; default 8)

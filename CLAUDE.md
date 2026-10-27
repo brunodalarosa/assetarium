@@ -43,7 +43,7 @@ without covering it at the approval checkpoint; never edit installed packages.
 Prefer `--locked --no-sync --offline` for runs.
 
 ```powershell
-# Full suite (707 tests, includes real Blender fixtures; takes minutes)
+# Full suite (715 tests, includes real Blender fixtures; takes minutes)
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest
 # Targeted
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_desktop.py tests/test_sources.py --basetemp scratch/pytest
