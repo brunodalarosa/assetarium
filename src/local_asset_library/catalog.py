@@ -19,7 +19,7 @@ import zipfile
 
 from .config import Config, ConfigError
 from . import hash_cache
-from .publication import pinned_config
+from .publication import pinned_config, read_only
 
 SOURCE_ID = "playful-lowpoly-v1"
 SCANNER_VERSION = "inventory-v1"
@@ -703,7 +703,7 @@ def read_database(config):
     path = config.output_path("data", "catalog.sqlite")
     if not path.is_file():
         raise ConfigError("Catalog missing; run scan first")
-    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    db = read_only(path)
     version = db.execute('PRAGMA user_version').fetchone()[0]
     if version not in (1, 2):
         db.close()

@@ -1,5 +1,31 @@
 # Progress
 
+## October 26 — Reads survive a crash mid-write; one unreadable source never hides the others, branch `bugfix/crash-safe-source-reads`
+
+The owner's PC crashed while *Low Poly Nature - Extended* was writing search data. SQLite left a hot
+rollback journal beside the source's work index, which only a writable connection may roll back; every
+read-only status read then failed with "attempt to write a readonly database", `source_status` raised,
+the whole source list failed, and Settings → Asset sources said "No asset sources yet". The startup
+scan failed the same way and recorded a source fault, so Process assets could not resume either.
+
+- `publication.read_only(path)`: a read-only connection; on that exact error with a journal present it
+  opens the file writable once (SQLite's own recovery: the unfinished transaction is undone, committed
+  data stays), then reads. A live writer's journal is never hot and is untouched. Used by the 10
+  read-only opens in `catalog`, `incremental`, `overnight`, `retrieval`, `source_operations` and
+  `sources` (one-time migrations unchanged).
+- `sources.source_statuses`: an unreadable database becomes `scan_fault` on that source; any other
+  failure becomes `unreadable_status` for that source alone. Used by the bridge, `local-assets sources
+  list` and the stage CLI. The UI keeps a separate `sourcesError` and never shows "No asset sources yet"
+  when the list failed to load.
+- **Real crash.** Before the fix the index and its journal were copied (hashes matched). Listing
+  sources through the fixed code rolled the journal back; `PRAGMA integrity_check` ok, all 9,504 vectors
+  kept (3,300 renders complete). The source's startup scan then completed and cleared the recorded fault;
+  the source shows 3,300 pending for its remaining search data and publication.
+- **Verification.** `tests/test_crash_recovery.py` (a writer killed mid-transaction reproduces the
+  error and `read_only` recovers it; a live writer's journal is left alone; one unreadable source keeps
+  the others in `source_statuses` and the bridge). WebView2 `scripts/verify-source-list-fault.py`
+  (`data/gui/source-list-fault-2026-10-26a/`). Full suite on this branch 677 passed, 2 skipped (`Real-Blender tests: 6 passed`).
+
 ## October 26 — Reused results mark their stage complete, branch `feature/cpu-search-embedder`
 
 After the owner grouped `Medieval Weapons` (FBX + gLTF + Unity FBX), the rescan reset its 32

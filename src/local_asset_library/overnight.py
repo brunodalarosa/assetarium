@@ -24,7 +24,7 @@ from .config import ConfigError
 from .incremental import (CAPTION_PROMPT_VERSION, caption_input, checkpoint, ledger,
                           policy, stage_content, update_record, working)
 from .membership import membership, records
-from .publication import atomic_json, read_json
+from .publication import atomic_json, read_json, read_only
 from .retrieval import source_check
 from .settings import processing_formats, processing_eligible
 
@@ -93,7 +93,7 @@ def plan(config, packs=None, pending_only=False, peak_reserve_mib=500, asset_ids
 
 def image_rows(config):
     path = working(config).output_path('data', 'embeddings/index.sqlite')
-    with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
+    with closing(read_only(path)) as db:
         return {r[0]: digest([hashlib.sha256(v).hexdigest() if isinstance(v, bytes) else v for v in r])
                 for r in db.execute("SELECT * FROM vectors WHERE channel='image'")}
 

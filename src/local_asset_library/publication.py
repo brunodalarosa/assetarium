@@ -190,3 +190,31 @@ def read_json(path, limit=4 * 1024 * 1024):
     if len(data)>limit:
         raise ConfigError('Managed manifest exceeds its bounded size')
     return json.loads(data.decode('utf-8'))
+
+
+def read_only(path):
+    """A read-only SQLite connection that survives an interrupted writer.
+
+    A crash or kill mid-write leaves a hot rollback journal that only a writable connection may roll
+    back; a read-only one fails with "attempt to write a readonly database" until then. That one case
+    gets a short writable open, which is SQLite's own recovery (the unfinished transaction is undone,
+    committed data stays), and then the read-only connection. A live writer holds its lock, so its
+    journal is never hot and is never touched here.
+    """
+    import sqlite3
+    from pathlib import Path
+    uri = Path(path).as_uri() + "?mode=ro"
+    db = sqlite3.connect(uri, uri=True)
+    try:
+        db.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        return db
+    except sqlite3.OperationalError as exc:
+        db.close()
+        if "readonly" not in str(exc) or not Path(str(path) + "-journal").exists():
+            raise
+    recovering = sqlite3.connect(path)
+    try:
+        recovering.execute("SELECT count(*) FROM sqlite_master").fetchone()  # Reading rolls the hot journal back.
+    finally:
+        recovering.close()
+    return sqlite3.connect(uri, uri=True)

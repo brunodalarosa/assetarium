@@ -194,10 +194,10 @@ def sources_command(args, config):
     from . import sources
     from .source_operations import operation_status
     if args.action == 'list':
-        result = {'status': 'ready', 'sources': [sources.source_status(config, s) for s in sources.registry(config)['sources']]}
+        result = {'status': 'ready', 'sources': sources.source_statuses(config)}
         for s in result['sources']:
             say(args, f"{s['key']}  {'enabled ' if s['enabled'] else 'disabled'}  {s['pending']} pending · "
-                      f"{s.get('failed', 0)} failed  {s['path']}\n    {s['reason']}")
+                      f"{s.get('failed', 0)} failed  {s['path']}\n    {s.get('scan_fault') or s.get('reason', '')}")
         if not result['sources']:
             say(args, 'No asset sources yet. Add one with: sources add PATH')
         return result

@@ -17,7 +17,7 @@ import sqlite3
 import uuid
 
 from .config import ConfigError, _inside, _relative
-from .publication import atomic_json, read_json
+from .publication import atomic_json, read_json, read_only
 from .settings import processing_formats, processing_eligible, format_group, PROCESSING_FORMATS
 
 SHARED_DATA = {
@@ -485,7 +485,7 @@ def embedding_failures(config):
     path = config.output_path("data", "embeddings/index.sqlite")
     if not path.exists():
         return None
-    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
+    with closing(read_only(path)) as db:
         return {row[0] for row in db.execute("SELECT DISTINCT asset_id FROM jobs WHERE status='failed' AND channel='image'")}
 
 
@@ -527,7 +527,12 @@ def source_status(config, source):
              current.output_path('data', 'embeddings/index.sqlite')]
     signature = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) if p.exists() else (str(p), None, None) for p in paths)
     if paths[0].exists():
-        status = dict(status, **_format_status(scoped, formats, signature))
+        try:
+            status = dict(status, **_format_status(scoped, formats, signature))
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            # One unreadable database marks only this source; its files and results stay where they are.
+            status = dict(status, scan_fault=f"This source's saved processing data could not be read ({exc}). "
+                                             "Its files and results are kept.")
     from .settings import descriptions_enabled
     status = dict(status, processing_paused=not formats, processing_formats=list(formats),
                   descriptions_enabled=descriptions_enabled(config))
@@ -543,6 +548,30 @@ def source_status(config, source):
             'exclusions': excluded_folders(scoped), 'export_decisions': export_decisions(scoped),
             'texture_folder': texture_folder(scoped),
             "operation": operation_status(scoped)}
+
+
+def unreadable_status(config, source, exc):
+    """A source whose status could not be read at all: shown with its fault, never hiding the others."""
+    from .source_operations import operation_status
+    try:
+        operation = operation_status(bound(config, source))
+    except Exception:  # The fault below already explains this source.
+        operation = {'status': 'idle', 'progress': 0}
+    return {**source, 'scanned': True, 'needs_processing': False, 'pending': 0, 'failed': 0,
+            'scan_fault': f"This source's status could not be read ({type(exc).__name__}: {exc}). Its files and results are kept.",
+            'import_formats': [], 'import_types': [], 'exclusions': [], 'export_decisions': [], 'export_suggestions': [],
+            'texture_folder': None, 'operation': operation}
+
+
+def source_statuses(config):
+    """Every registered source's status; one that cannot be read shows its fault instead of failing the list."""
+    statuses = []
+    for source in registry(config)['sources']:
+        try:
+            statuses.append(source_status(config, source))
+        except Exception as exc:
+            statuses.append(unreadable_status(config, source, exc))
+    return statuses
 
 
 def processing_summary(current, published, formats, vector_faults=None):
@@ -780,7 +809,7 @@ def aggregate(config):
             inventories.extend(json.loads(r[0]) for r in db.execute("SELECT record FROM inventory"))
         path = scoped.output_path("data", "embeddings/index.sqlite")
         if path.exists():
-            with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
+            with closing(read_only(path)) as db:
                 source_meta = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
                 if meta and source_meta.get("contract_fingerprint") != meta.get("contract_fingerprint"):
                     raise ConfigError("Source vector models differ; source retained without combined publication")
@@ -811,7 +840,7 @@ def aggregate(config):
     if not meta:
         old_index = config.output_path('data','embeddings/index.sqlite')
         if old_index.exists():
-            with closing(sqlite3.connect(old_index.as_uri()+'?mode=ro',uri=True)) as db:
+            with closing(read_only(old_index)) as db:
                 meta = {k: json.loads(v) for k,v in db.execute('SELECT key,value FROM meta')}
         elif contract_path.exists():
             meta = {k: json.loads(v) for k,v in read_json(contract_path).items()}

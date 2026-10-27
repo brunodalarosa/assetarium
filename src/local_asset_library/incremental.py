@@ -18,7 +18,7 @@ from .catalog import (build_inventory, detail, digest, encoded, read_database, s
                       snapshot, walk_source, write_database, SOURCE_ID, SCANNER_VERSION)
 from .config import ConfigError
 from .membership import records, membership
-from .publication import atomic_json, generation, line_ending_hashes
+from .publication import atomic_json, generation, line_ending_hashes, read_only
 from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
 from .inspection import blender_command, choose_source, discover_blender, environment, run_process, validate_result
@@ -59,7 +59,7 @@ def policy(config):
 
 def copy_database(source, target):
     target.parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)) as src, closing(sqlite3.connect(target)) as dst:
+    with closing(read_only(source)) as src, closing(sqlite3.connect(target)) as dst:
         src.backup(dst)
 
 
@@ -656,7 +656,7 @@ def publish(config):
     work = working(config)
     scope = membership(work)
     index = work.output_path("data", "embeddings/index.sqlite")
-    with closing(sqlite3.connect(index.as_uri() + "?mode=ro", uri=True)) as db:
+    with closing(read_only(index)) as db:
         meta = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
         if set(meta.get("pilot_ids", [])) != set(scope["asset_ids"]):
             raise ConfigError("Cannot publish mismatched catalog/index membership")
@@ -717,7 +717,7 @@ def publish(config):
 def database_content(path, kind):
     tables = ('metadata','assets','inventory','files') if kind=='catalog' else ('meta','jobs','vectors')
     content = {}
-    with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)) as db:
+    with closing(read_only(path)) as db:
         for table in tables:
             values = db.execute('SELECT * FROM '+table+' ORDER BY 1').fetchall()
             content[table] = [[hashlib.sha256(value).hexdigest() if isinstance(value,bytes) else value for value in row] for row in values]
