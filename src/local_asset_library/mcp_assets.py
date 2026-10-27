@@ -51,6 +51,9 @@ SCHEMAS = {
     "get_asset": {"type": "object", "required": ["asset_id"], "additionalProperties": False, "properties": {
         "asset_id": {"type": "string", "pattern": "^" + ID_PATTERN + "$"},
         "source_format": {"type": "string", "enum": FORMATS},
+        "source_variant": {"type": "string", "maxLength": 128,
+                           "description": "Folder label of one of this asset's files, from source_variants (for example \"Unity FBX\"); "
+                                          "chooses between files of the same format. Never a path."},
         "include_metadata": {"type": "boolean", "default": False},
         "include_preview": {"type": "boolean", "default": False},
         "preview_view": {"type": "string", "enum": VIEWS, "description": "Default: image for images, three_quarter for models."}}},
@@ -87,6 +90,8 @@ SCHEMAS = {
         "description_server": {"type": "object", "additionalProperties": False, "properties": {
             "url": {"type": "string", "maxLength": 256, "description": "Loopback only, e.g. http://127.0.0.1:8080/v1."},
             "model": {"type": "string", "maxLength": 256}}},
+        "search_device": {"type": "string", "enum": ["cuda", "cpu"],
+                          "description": "Where semantic and image search run: cuda (NVIDIA GPU with BF16) or cpu (any x86-64 CPU; slower first index)."},
         "engine_hint": {"type": "string", "enum": [hint["id"] for hint in ENGINE_HINTS]}}},
     "propose_setup": {"type": "object", "required": ["blender_path"], "additionalProperties": False, "properties": {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},
@@ -103,6 +108,20 @@ def default_view(record):
 
 class TransientFault(ConfigError):
     """Availability faults (busy GPU queue, stopped worker) are not retained per query."""
+
+
+def source_variants(record, problems=None):
+    """The asset's files by folder label (decision 0019), so an agent can ask for one by name; empty when single.
+
+    Unusable alternate files (decision 0020) are listed with ``usable: false`` and their reason.
+    """
+    from .catalog import file_variants
+    labels, problems = file_variants(record), problems or {}
+    if not labels:
+        return {}
+    return {"source_variants": [{"variant": labels[f["path"]], "format": f["format"], "usable": f["path"] not in problems,
+                                 **({"reason": problems[f["path"]]} if f["path"] in problems else {})}
+                                for f in record["files"] if f["path"] in labels]}
 
 
 def check_string(key, value, prop, multiline=False):
@@ -370,7 +389,7 @@ class AssetService:
 
     def get(self, args):
         record = self.record(args["asset_id"])
-        result = resolved_detail(self.config, record["asset_id"], args.get("source_format"))
+        result = resolved_detail(self.config, record["asset_id"], args.get("source_format"), args.get("source_variant"))
         deps = result["dependencies"]
         if len(deps) > 64:
             raise ConfigError("Dependency count exceeds 64; cannot return an incomplete usable package")
@@ -378,6 +397,7 @@ class AssetService:
                    'asset_type': record.get('asset_type', 'model_3d'), 'parent_asset_id': record.get('parent_asset_id'),
                    "availability": "available", "status": "available", "usable": True,
                    "selected_source": result["selected_source"], "dependencies": deps,
+                   **source_variants(record, result["unusable_files"]),
                    "dependency_completeness": "Known references verified; uninspected binary/alternate dependencies remain unknown",
                    "source_faults": (record.get("inspection_run") or {}).get("source_faults", []),
                    **caption_summary(self.config, record),

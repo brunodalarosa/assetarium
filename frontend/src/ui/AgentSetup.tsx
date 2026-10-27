@@ -129,6 +129,7 @@ function valueText(key: string, settings: Json, blender: Json) {
     case "descriptions_enabled": return settings.descriptions_enabled ? "On" : "Off (existing descriptions are kept)";
     case "description_engine": return settings.description_engine === "local-server" ? "Local model server" : "Built in";
     case "description_server": return `${settings.description_server.url}${settings.description_server.model ? " · " + settings.description_server.model : ""}`;
+    case "search_device": return settings.search_device === "cpu" ? "CPU" : "NVIDIA GPU";
     case "blender": return blender.configured || "Found automatically";
     default: return "";
   }
@@ -136,6 +137,7 @@ function valueText(key: string, settings: Json, blender: Json) {
 const VALUE_LABELS: [string, string][] = [
   ["blender", "Blender"], ["processing_formats", "Formats"], ["storage_budget_gib", "Storage budget"], ["descriptions_enabled", "Descriptions"],
   ["description_engine", "Description engine"], ["description_server", "Model server"], ["caption_batch_size", "Batch size"],
+  ["search_device", "Search runs on"],
 ];
 
 function Values({ agent }: { agent: Json }) {

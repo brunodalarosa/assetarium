@@ -54,12 +54,13 @@ Assetarium fixes that:
 
 **Optional, for AI descriptions and appearance search:**
 
-- An NVIDIA GPU with CUDA and BF16 support (RTX 30-series or newer)
+- An NVIDIA GPU with CUDA and BF16 support (RTX 30-series or newer) for the built-in engines
 - About 6 GB for the local models (Qwen3-VL-2B for descriptions, EmbeddingGemma for search)
   plus a few GB for their runtimes
 
-Without a GPU you can still browse, preview, view in 3D and search by name. Other GPUs can
-write descriptions through a local model server such as llama.cpp, Ollama or LM Studio
+Without a GPU you can still browse, preview, view in 3D and search by name. Appearance and
+image search can also run on the CPU (slower to index, same results). Other GPUs can write
+descriptions through a local model server such as llama.cpp, Ollama or LM Studio
 (experimental).
 
 ## Getting started

@@ -138,7 +138,12 @@ function SourcesTab({ result, image }: { result: Json; image: boolean }) {
       <Section title="Source location">
         {p.selected_source ? (
           <>
-            <Text>{p.selected_source.format.toUpperCase()} · original file · verified hash</Text>
+            <Text>{p.selected_source.format.toUpperCase()}{p.selected_source.variant ? ` · ${p.selected_source.variant} folder` : ""} · original file · verified hash</Text>
+            {(p.source_variants || []).length > 1 && (
+              <Hint>
+                Also in this asset: {(p.source_variants as Json[]).filter((v) => v.variant !== p.selected_source.variant || v.format !== p.selected_source.format).map((v) => `${v.variant} (${String(v.format).toUpperCase()}${v.usable === false ? `, unusable: ${v.reason}` : ""})`).join(" · ")}. Agents can ask for a usable one by its folder name.
+              </Hint>
+            )}
             <code className="path block rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed break-all text-muted-foreground select-text">{p.selected_source.resolved_path}</code>
             <div><Button variant="secondary" className="h-9 px-4" onClick={() => void copyText(p.selected_source.resolved_path, "Source path copied. Asset files were not copied.")}><Copy className="size-3.5" aria-hidden />Copy source path</Button></div>
             <Hint>Original files stay in their source folder.</Hint>

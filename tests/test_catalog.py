@@ -139,6 +139,21 @@ def test_ids_determinism_content_changes_and_renames(catalog_config):
     assert asset_id("first", "chair.obj") != asset_id("second", "chair.obj")
 
 
+def test_preview_lookup_keeps_row_order_labels_and_exact_versus_directional_matches(catalog_config):
+    exports(catalog_config)
+    put(catalog_config, "pack/Models/OBJ format/chair_NE.obj", "v 0 0 0\n")
+    for name in ("chair_SW", "chair_NE", "chair"):
+        put(catalog_config, f"pack/Isometric/{name}.png")
+    put(catalog_config, "pack/Previews/chair.png")
+    by_name = {a["display_name"]: a for a in build_inventory(catalog_config)[1]}
+    # One image is a directional view of "chair" and the exact preview of "chair_NE"; rows keep path order.
+    assert [(p["source_path"], p["view_label"]) for p in by_name["chair"]["previews"]] == [
+        ("pack/Isometric/chair.png", "Isometric"), ("pack/Isometric/chair_NE.png", "Isometric_NE"),
+        ("pack/Isometric/chair_SW.png", "Isometric_SW"), ("pack/Previews/chair.png", "Previews")]
+    assert [(p["source_path"], p["view_label"]) for p in by_name["chair_NE"]["previews"]] == [
+        ("pack/Isometric/chair_NE.png", "Isometric")]
+
+
 def test_variants_previews_texture_and_missing_dependency(catalog_config):
     exports(catalog_config)
     put(catalog_config, "pack/Previews/chair.png")

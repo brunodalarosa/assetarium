@@ -159,11 +159,11 @@ def atomic_json(path, value):
             time.sleep(.02)  # Bounded application publication sharing race, never an asset retry.
 
 
-def read_json(path):
+def read_json(path, limit=4 * 1024 * 1024):
     """Windows readers permit atomic manifest replacement while holding an old handle."""
     # Full-library preservation receipts contain several thousand vector hashes.
-    # Four MiB covers the approved membership while retaining a strict bound.
-    limit = 4 * 1024 * 1024
+    # Four MiB covers the approved membership while retaining a strict bound;
+    # per-file caches that grow with a source's file count pass their own bound.
     if os.name!='nt':
         with path.open('rb') as stream:
             data = stream.read(limit + 1)

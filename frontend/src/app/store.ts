@@ -128,7 +128,10 @@ export interface ConfirmRequest {
   title: string;
   body: string;
   confirmLabel: string;
-  run: () => Promise<unknown>;
+  /** Without run, the dialog only informs and offers Close. */
+  run?: () => Promise<unknown>;
+  /** Deletions are "danger" (the default); other confirmations are "neutral". */
+  tone?: "danger" | "neutral";
 }
 export interface CreateRequest {
   assetIds: string[];
@@ -148,6 +151,7 @@ export interface SetupDraft {
   engine: string;
   serverUrl: string;
   serverModel: string;
+  searchDevice: string;
   batch: string;
   skipped: SetupStep[];
 }
@@ -232,7 +236,7 @@ function emptySetup(): SetupState {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
     storage: null, measuring: false, server: null, testing: false, saving: false, result: null,
     agent: null, agentMode: false, agentBusy: null, baseline: null,
-    draft: { blenderPath: "", confirmRerender: false, engineHint: "", formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", batch: "8", skipped: [] },
+    draft: { blenderPath: "", confirmRerender: false, engineHint: "", formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", skipped: [] },
   };
 }
 const idleSearch: SearchState = {
@@ -710,6 +714,26 @@ export async function sourceAction(action: string, key: string | null = null, di
     return { status: "faulty", reason: (error as Error).message };
   }
 }
+/** Excluded folders and duplicate export folder answers (decision 0019); each saved change rescans the source. */
+export async function sourceFolders(change: "exclusions" | "export" | "undo" | "textures" | "textures-undo", key: string, value: string[] | string | null, decision = "") {
+  try {
+    const result = change === "exclusions" ? await api().source_exclusions(key, value as string[])
+      : change === "export" ? await api().source_export(key, value as string, decision)
+      : change === "textures" ? await api().source_textures(key, value as string | null, decision === "single")
+      : change === "textures-undo" ? await api().source_textures_undo(key)
+      : await api().source_export_undo(key, value as string);
+    if (result.status === "faulty") throw Error(result.reason);
+    setState({ sourcesMessage: result.reason || "" });
+    closeDetail("library");
+    await refreshContext(true);
+    await loadSources();
+    return result;
+  } catch (error) {
+    setState({ sourcesMessage: (error as Error).message });
+    await loadSources();
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
 export async function chooseSourceDirectory() {
   const result = await api().choose_source_directory();
   if (result.status === "faulty") setState({ sourcesMessage: result.reason });
@@ -785,19 +809,22 @@ export interface DescriptionSettings {
   engine: string;
   server: { url: string; model: string };
 }
-export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings) {
+export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string) {
+  const previousDevice = state.general.values?.search_device;
   setState((s) => ({ general: { ...s.general, busy: true, message: "Saving…" } }));
   try {
-    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null);
+    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null);
     if (result.status === "faulty") throw Error(result.reason);
     const described = !result.descriptions_enabled ? " Descriptions are off; existing descriptions are kept."
       : result.description_engine === "local-server" ? " Descriptions use the local model server." : ` Description batch size: ${result.caption_batch_size}.`;
+    const searched = previousDevice && previousDevice !== result.search_device
+      ? ` Search now runs on the ${result.search_device === "cpu" ? "CPU" : "NVIDIA GPU"}: run the search check again, then Process assets to rebuild search data.` : "";
     setState({
       general: {
         loading: false, busy: false, values: result,
         message: result.processing_formats.length
-          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described} Selected formats apply to new processing batches.`
-          : "Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.",
+          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described}${searched} Selected formats apply to new processing batches.`
+          : `Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.${searched}`,
       },
     });
     await loadSources();
@@ -837,6 +864,7 @@ function savedDraft(info: Json): SetupDraft {
     engine: values.description_engine || "builtin",
     serverUrl: values.description_server?.url || "http://127.0.0.1:8080/v1",
     serverModel: values.description_server?.model || "",
+    searchDevice: values.search_device || "cuda",
     batch: String(values.caption_batch_size ?? 8),
   };
 }
@@ -855,6 +883,9 @@ export async function openSetup() {
     void loadAgentSetup().then((agent) => agent?.session?.open && patchSetup({ agentMode: true }));
     const [env, storage] = await Promise.all([api().setup_environment(), api().setup_storage_use(false)]);
     patchSetup({ env: env.status === "faulty" ? null : env, storage, error: env.status === "faulty" ? env.reason : state.setup.error });
+    // A first run suggests where search runs from the GPU found; a saved or agent-set choice is never replaced.
+    if (env.status !== "faulty" && info.first_run?.fresh && !info.set_by?.search_device && env.suggested_search_device)
+      updateSetupDraft({ searchDevice: env.suggested_search_device });
   } catch (error) {
     patchSetup({ loading: false, error: (error as Error).message });
   }
@@ -937,18 +968,18 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, engine_hint: draft.engineHint || null });
   if (!skipped.has("storage") && draft.budget) choices.storage_budget_gib = draft.budget;
   if (!skipped.has("descriptions"))
-    Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel } });
+    Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
   if (!skipped.has("batch") && setupStepNeeded("batch", draft)) choices.caption_batch_size = draft.batch;
   return choices;
 }
 const STEP_FIELDS: Record<string, (keyof SetupDraft)[]> = {
   blender: ["blenderPath"], formats: ["formats", "engineHint"], storage: ["budget"],
-  descriptions: ["descriptionsEnabled", "engine", "serverUrl", "serverModel"], batch: ["batch"],
+  descriptions: ["descriptionsEnabled", "engine", "serverUrl", "serverModel", "searchDevice"], batch: ["batch"],
 };
 /** Which saved values a step shows, for "set by" badges. */
 export const STEP_KEYS: Record<string, string[]> = {
   blender: ["blender"], formats: ["processing_formats"], storage: ["storage_budget_gib"],
-  descriptions: ["descriptions_enabled", "description_engine", "description_server"], batch: ["caption_batch_size"],
+  descriptions: ["descriptions_enabled", "description_engine", "description_server", "search_device"], batch: ["caption_batch_size"],
 };
 export const stepChanged = (step: string, draft: SetupDraft, baseline: SetupDraft) =>
   (STEP_FIELDS[step] || []).some((key) => JSON.stringify(draft[key]) !== JSON.stringify(baseline[key]));
@@ -1456,6 +1487,36 @@ export function confirmRemoveSource(source: Json) {
     confirmLabel: "Remove source",
     run: () => sourceAction("remove", source.key),
   });
+}
+/** Recheck failures from the file check (decision 0020), then confirm before anything is retried. */
+export async function recheckFailures(source: Json) {
+  try {
+    const found = await api().recheck_failures(source.key);
+    if (found.status === "faulty") throw Error(found.reason);
+    const still = found.still_failing ? ` ${found.still_failing.toLocaleString()} still fail it and stay recorded.` : "";
+    if (!found.retry) {
+      askConfirm({ tone: "neutral", title: "Nothing to retry", confirmLabel: "",
+        body: `No recorded failure in “${source.name}” came from a file problem that is resolved now.${still} Other failures stay recorded with their reasons in the Importing failures report.` });
+      return;
+    }
+    const count = found.retry.toLocaleString();
+    askConfirm({
+      tone: "neutral",
+      title: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}?`,
+      body: `${count} ${found.retry === 1 ? "asset" : "assets"} in “${source.name}” failed only because a file ${found.retry === 1 ? "it is" : "they are"} not rendered from had a problem (for example ${found.examples.slice(0, 3).join(", ")}). ${found.retry === 1 ? "It" : "They"} can be processed now.${still} Retrying marks them pending; nothing runs until you click Process assets. Other recorded failures stay as they are.`,
+      confirmLabel: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}`,
+      run: async () => {
+        const result = await api().retry_failures(source.key, found.preview_id);
+        if (result.status !== "faulty") {
+          setState({ sourcesMessage: result.reason || "" });
+          await loadSources();
+        }
+        return result;
+      },
+    });
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Recheck failed", body: (error as Error).message });
+  }
 }
 export function openCreateCollection(request: CreateRequest = { assetIds: [], sourceKey: null }) {
   setState({ create: request, menu: null });

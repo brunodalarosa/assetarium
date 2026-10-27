@@ -27,8 +27,15 @@ DESCRIPTION_ENGINES = {
 }
 EMBEDDERS = {BUILTIN: {'id': BUILTIN, 'name': 'EmbeddingGemma 2', 'kind': 'sentence-transformers', 'runtime': 'embedding',
                        'model_contract': 'docs/embedding-model.json', 'status': 'tested',
-                       'summary': 'Semantic and image search. Needs an NVIDIA GPU with CUDA and BF16, the search '
-                                  'runtime and about 1.5 GB of model weights.'}}
+                       'summary': 'Semantic and image search with EmbeddingGemma 2 (about 1.5 GB of model weights), on an '
+                                  'NVIDIA GPU or on the CPU.'}}
+# Where the embedder runs (decision 0018). Each device has its own vector identity; switching re-indexes.
+SEARCH_DEVICES = {
+    'cuda': {'id': 'cuda', 'label': 'NVIDIA GPU', 'project': 'runtime/embedding', 'status': 'tested',
+             'summary': 'Needs an NVIDIA GPU with CUDA and BF16 (RTX 30-series or newer). Fastest: about 0.1 s per image.'},
+    'cpu': {'id': 'cpu', 'label': 'CPU', 'project': 'runtime/embedding-cpu', 'status': 'tested',
+            'summary': 'Runs on any x86-64 CPU with the same model and precision, so search results match closely. '
+                       'Indexing images is slower (about 1 s per image on a 16-core CPU); searching feels the same.'}}
 RUNTIME_PACKAGES = {'caption': ('torch', 'transformers'), 'embedding': ('torch', 'sentence-transformers')}
 WEIGHTS = {'caption': ('captions/model-download.json', 'qwen3-vl-2b'),
            'embedding': ('embeddings/model-download.json', 'embeddinggemma-2')}
@@ -49,10 +56,27 @@ def description_engine(config):
     return TransformersQwenEngine(config)
 
 
+def search_device(config):
+    from .settings import search_device as saved
+    return saved(config)
+
+
 def embedder(config):
-    """The configured Embedder adapter (EmbeddingGemma is the only one in this version)."""
+    """The configured Embedder adapter: EmbeddingGemma on the saved search device, never another one."""
+    if search_device(config) == 'cpu':
+        from .embedding_cpu import EmbeddingCpuBackend
+        return EmbeddingCpuBackend(config)
     from .embedding_backend import EmbeddingBackend
     return EmbeddingBackend(config)
+
+
+def embedder_contract(config):
+    """The vector identity the configured embedder will report, without loading the model."""
+    if search_device(config) == 'cpu':
+        from .embedding_cpu import runtime_contract
+    else:
+        from .embedding_backend import runtime_contract
+    return runtime_contract(config)
 
 
 def batch_size(config):
@@ -83,11 +107,12 @@ def runtime_ready(config, runtime):
     python = venv_python(config.project_root, environment)
     root = config.project_root / environment
     sites = list(root.glob('Lib/site-packages')) + list(root.glob('lib/python3*/site-packages'))
-    found = {d.metadata['Name'].lower() for site in sites for d in importlib.metadata.distributions(path=[str(site)])
+    found = {d.metadata['Name'].lower(): d.version for site in sites for d in importlib.metadata.distributions(path=[str(site)])
              if d.metadata and d.metadata['Name']}
     missing = [name for name in RUNTIME_PACKAGES[runtime] if name not in found]
     return {'ready': python.is_file() and not missing, 'environment': environment,
-            'missing_packages': missing if python.is_file() else list(RUNTIME_PACKAGES[runtime])}
+            'missing_packages': missing if python.is_file() else list(RUNTIME_PACKAGES[runtime]),
+            'cpu_only_torch': str(found.get('torch', '')).endswith('+cpu')}
 
 
 def weights_ready(config, runtime):
@@ -140,12 +165,44 @@ def readiness(config, engine_id, gpu=None):
                       'detail': None if configured else 'Not set yet. Setup only lists the server’s models; it never generates text.'})
     else:
         raise ConfigError('Unknown description engine')
+    return {'engine': engine_id, 'items': items, 'search': search_readiness(config, gpu)}
+
+
+def capability_ready(config, device):
+    """The recorded text/image capability check matches the chosen device (static read; the contract is re-checked at use)."""
+    try:
+        value = json.loads(config.output_path('data', 'embeddings/capability.json').read_text(encoding='utf-8'))
+        recorded = value['contract']['device']
+    except (OSError, ValueError, KeyError, TypeError, ConfigError):
+        return {'ready': False, 'reason': 'Not recorded yet. It needs two processed assets with previews.'}
+    if recorded != ('cpu' if device == 'cpu' else 'cuda:0'):
+        return {'ready': False, 'reason': 'Recorded for the other search device; record it again for this one.'}
+    return {'ready': bool(value.get('actual_text_and_image_inference'))}
+
+
+def search_readiness(config, gpu=None, device=None):
+    """Static checklist for the search embedder on a device (the saved one by default), with commands for what is missing."""
+    device = device or search_device(config)
+    project = SEARCH_DEVICES[device]['project']
+    items = []
+    if device == 'cuda':
+        bf16 = gpu_bf16(gpu)
+        items.append({'id': 'search_gpu', 'label': 'NVIDIA GPU with BF16 for search', 'ready': bool(bf16),
+                      'detail': None if bf16 else 'Not detected on this computer. Choose CPU for search in Settings → General.'})
     runtime = runtime_ready(config, 'embedding')
+    mismatch = device == 'cuda' and runtime['ready'] and runtime['cpu_only_torch']
+    items.append({'id': 'embedding_runtime', 'label': 'Search runtime (.venv-embedding)', 'ready': runtime['ready'] and not mismatch,
+                  'detail': 'The installed search runtime is the CPU-only build.' if mismatch else None,
+                  'command': None if runtime['ready'] and not mismatch else command(config, 'embedding', 'sync --locked --project ' + project)})
     weights = weights_ready(config, 'embedding')
-    search = [{'id': 'embedding_runtime', 'label': 'Search runtime (.venv-embedding)', 'ready': runtime['ready'],
-               'command': None if runtime['ready'] else command(config, 'embedding', 'sync --locked --project runtime/embedding')},
-              {'id': 'embedding_weights', 'label': 'Search model weights (EmbeddingGemma, about 1.5 GB)', 'ready': weights['ready'],
-               'detail': weights.get('reason'),
-               'command': None if weights['ready'] else command(config, 'embedding',
-                   'run --locked --no-sync --project runtime/embedding python scripts/prepare_embedding_model.py')}]
-    return {'engine': engine_id, 'items': items, 'search': search}
+    items.append({'id': 'embedding_weights', 'label': 'Search model weights (EmbeddingGemma, about 1.5 GB)', 'ready': weights['ready'],
+                  'detail': weights.get('reason'),
+                  'command': None if weights['ready'] else command(config, 'embedding',
+                      f'run --locked --no-sync --project {project} python scripts/prepare_embedding_model.py'
+                      + (' --device cpu' if device == 'cpu' else ''))})
+    capability = capability_ready(config, device)
+    items.append({'id': 'embedding_capability', 'label': 'Search check on two of your assets', 'ready': capability['ready'],
+                  'detail': capability.get('reason'),
+                  'command': None if capability['ready'] else command(config, 'embedding',
+                      f'run --locked --no-sync --project {project} python scripts/record-embedding-capability.py')})
+    return items

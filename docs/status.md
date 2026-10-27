@@ -11,6 +11,9 @@ Short, current summary. Detailed dated history, test counts and evidence are in
   OBJ/MTL, BLEND…) and static images (PNG, JPEG, SVG…).
 - **Search:** keyword, description, image and combined search in the desktop app, the
   owner CLI ([`cli.md`](cli.md)) and the STDIO MCP server ([`mcp/README.md`](mcp/README.md)).
+  Description and image search run on an NVIDIA GPU or on the CPU (decision 0018).
+- **AMD machines (Windows):** checked end to end on a Radeon RX 6800 with a Ryzen 9 9950X3D:
+  descriptions through llama.cpp's Vulkan build (Qwen3-VL-2B F16) and search on the CPU.
 - **Desktop app (Windows):** sources, asset processing, search, 3D preview, collections and
   tags, setup wizard, agent-assisted setup.
 - **Linux:** CLI + MCP only, no desktop app ([`linux.md`](linux.md), decision 0013).

@@ -84,9 +84,91 @@ def image_input(preview):
     return digest({k:preview[k] for k in ('path','source_path','sha256','view_label','origin') if k in preview})
 
 
+def dependency_owners(record):
+    """Each dependency's owning file: the asset file that refers to it, directly or through a material (OBJ → MTL → texture)."""
+    files = {f["path"] for f in record["files"]}
+    owners, deps = {}, list(enumerate(record.get("dependencies", [])))
+    for _ in range(len(deps) + 1):
+        changed = False
+        for index, dependency in deps:
+            if index in owners:
+                continue
+            source = dependency.get("from")
+            owner = source if source in files else next((owners[i] for i, d in deps if i in owners and d.get("path") == source), None)
+            if owner:
+                owners[index], changed = owner, True
+        if not changed:
+            break
+    return owners
+
+
+def used_file(config, record):
+    """The file an asset is rendered from: the inspected one, else the one inspection would choose now."""
+    technical = record.get("technical") or {}
+    if technical.get("inspected_path"):
+        return technical["inspected_path"]
+    if record.get("asset_type", "model_3d") == "model_3d":  # Not inspected yet: the file inspection picks next.
+        from .inspection import choose_source
+        from .settings import processing_formats
+        try:
+            asset = {"pack": record["pack_id"], "name": record["display_name"], "files": record["files"]}
+            return choose_source(asset, processing_formats(config))[0]["path"]
+        except (ConfigError, KeyError, TypeError, ValueError):
+            pass
+    return record.get("primary_inspection_path") or record["files"][0]["path"]
+
+
+def file_problems(config, record):
+    """{path: reason} for asset files that cannot be used: unavailable or changed, or with a broken dependency."""
+    from .dependency_resolution import dependency_file
+    problems = {}
+    for item in record["files"]:
+        try:
+            if item["availability"] != "available":
+                raise ConfigError("Catalog marks alternate source unavailable")
+            if not item.get("sha256") or file_hash(config.source_file(item["path"])) != item["sha256"]:
+                raise ConfigError("Source content is stale: " + item["path"])
+        except (OSError, ValueError) as exc:
+            problems[item["path"]] = str(exc)
+    owners = dependency_owners(record)
+    for index, dependency in enumerate(record.get("dependencies", [])):
+        owner = owners.get(index)
+        if owner is None or owner in problems or dependency.get("required_for_render") is False:
+            continue
+        try:
+            if dependency.get("status") != "available" or not dependency.get("path"):
+                raise ConfigError("Dependency unavailable or unresolved: " + str(dependency.get('reference') or dependency.get('path'))
+                                  + (" — " + dependency['error'] if dependency.get('error') else ''))
+            if not dependency.get("sha256") or file_hash(dependency_file(config, dependency)) != dependency["sha256"]:
+                raise ConfigError("Dependency content is stale: " + dependency["path"])
+        except (OSError, ValueError) as exc:
+            problems[owner] = str(exc)
+    return problems
+
+
 @pinned_config
 def source_check(config, record):
-    """Conservative logical-asset exclusion on missing/stale recorded files/dependencies."""
+    """Logical-asset check of recorded files and dependencies (decision 0020).
+
+    A problem in the file the asset is rendered from, or in a dependency no file owns, excludes the
+    asset. A problem in an alternate file excludes only that file: it and its dependencies are left
+    out and recorded in the check. With no problems the result is unchanged, so fingerprints are too.
+    """
+    try:
+        return _source_check(config, record)
+    except (OSError, ValueError):
+        # Only a failing multi-file asset pays for the per-file breakdown.
+        problems = file_problems(config, record) if len(record["files"]) > 1 else {}
+        if not problems or used_file(config, record) in problems:
+            raise
+    owners = dependency_owners(record)
+    usable = {**record, "files": [f for f in record["files"] if f["path"] not in problems],
+              "dependencies": [d for i, d in enumerate(record.get("dependencies", [])) if owners.get(i) not in problems]}
+    return digest({"usable": _source_check(config, usable),
+                   "unusable_files": [{"path": path, "reason": problems[path]} for path in sorted(problems)]})
+
+
+def _source_check(config, record):
     checked = []
     if record.get('texture_repair'):
         from .texture_repair import validate_recipe
@@ -168,8 +250,12 @@ def recorded_contract(config, contract):
     except (OSError, ValueError, KeyError, TypeError):
         return contract  # The existing capability checks report the fault.
     result = dict(contract)
-    for key, path in (("adapter_sha256", Path(__file__).with_name("embedding_backend.py")),
-                      ("runtime_lock_sha256", config.project_root / "runtime/embedding/uv.lock")):
+    # A contract may name its own hashed files (the CPU embedder, decision 0018); CUDA keeps these two.
+    files = contract.get("hashed_files") or {"adapter_sha256": "src/local_asset_library/embedding_backend.py",
+                                             "runtime_lock_sha256": "runtime/embedding/uv.lock"}
+    package = "src/local_asset_library/"
+    for key, path in ((key, Path(__file__).with_name(relative[len(package):]) if relative.startswith(package)
+                       else config.project_root / relative) for key, relative in files.items()):
         old = recorded.get(key) if isinstance(recorded, dict) else None
         if old and contract.get(key) and contract[key] != old:
             try:
@@ -575,16 +661,36 @@ def reference_file(config, value):
     return path
 
 
-def resolved_detail(config, identifier, source_format=None):
+def resolved_detail(config, identifier, source_format=None, source_variant=None):
+    from .catalog import file_variants
     record = detail(config, identifier)
     source_check(config, record)
-    files = [f for f in record["files"] if source_format is None or f["format"] == source_format]
+    variants = file_variants(record)
+    # A usable asset can still hold unusable alternate files (decision 0020); they are never selected.
+    problems = file_problems(config, record) if len(record["files"]) > 1 else {}
+    requested = [f for f in record["files"] if (source_format is None or f["format"] == source_format)
+                 and (source_variant is None or (variants.get(f["path"]) or "").casefold() == source_variant.casefold())]
+    files = [f for f in requested if f["path"] not in problems]
+    if requested and not files:
+        raise ConfigError("Requested source is not usable: " + problems[requested[0]["path"]])
     if not files:
+        if source_variant is not None:
+            raise ConfigError("Requested source variant is not available; this asset has: "
+                              + (", ".join(sorted(set(variants.values()))) or "no folder variants"))
         raise ConfigError("Requested source format is not available")
-    selected = next((f for f in files if f["path"] == record.get("primary_inspection_path")), files[0])
+    # Without a variant: the rendered file, then the folder kept as reference, then recognized export folders.
+    from .catalog import EXPORT_DIRS
+    reference = ((record.get("grouping") or {}).get("evidence") or [{}])[0].get("reference")
+    rank = lambda f: (f["path"] != record.get("primary_inspection_path"), variants.get(f["path"]) != reference,
+                      (variants.get(f["path"]) or "").casefold() not in EXPORT_DIRS, f["path"])
+    selected = min(files, key=rank)
+    selected = {**selected, **({"variant": variants[selected["path"]]} if selected["path"] in variants else {})}
     dependencies = []
-    # Preserve all known logical-asset dependency paths, each with its referring source.
-    for item in record.get("dependencies", []):
+    owners = dependency_owners(record)
+    # Preserve all known logical-asset dependency paths of usable files, each with its referring source.
+    for index, item in enumerate(record.get("dependencies", [])):
+        if owners.get(index) in problems:
+            continue
         try:
             from .dependency_resolution import dependency_file
             path = str(dependency_file(config, item))
@@ -601,8 +707,10 @@ def resolved_detail(config, identifier, source_format=None):
                  for b in (record.get('texture_repair') or {}).get('bindings', [])]
     return {"asset_id": identifier, "selected_source": {**selected, "resolved_path": str(config.source_file(selected["path"]))},
             'texture_overrides': overrides,
-            "dependencies": dependencies, "record": record,
+            "dependencies": dependencies, "record": record, "unusable_files": problems,
             "limitations": ["All known logical-asset dependencies listed with referring-source evidence; binary/alternate dependency inspection may remain incomplete.",
+                            *([f"{len(problems)} alternate file(s) of this asset cannot be used and are not offered; see source_variants."]
+                              if problems else []),
                             "Visual descriptions are provisional; suggested uses remain a separate field."] +
                            (["Preview uses library texture overrides. Apply the supplied overrides when importing the unchanged original source."] if overrides else []) +
                            (["This is the parent source package. Sub-asset extraction and playback are not implemented."] if record.get('parent_asset_id') else []) +

@@ -165,10 +165,13 @@ def disk_report(config):
 
 def environment_report(config, run=_run):
     """OS, GPUs, free disk and the readiness of every engine. Read only; runs no model."""
-    from .engines import DESCRIPTION_ENGINES, readiness
+    from .engines import DESCRIPTION_ENGINES, SEARCH_DEVICES, gpu_bf16, readiness, search_readiness
     gpu = gpu_report(run)
     return {'status': 'ready', 'os': os_report(), 'gpu': gpu, 'disk': disk_report(config),
             'engines': {key: readiness(config, key, gpu) for key in DESCRIPTION_ENGINES},
+            # Per device, so setup can show the checklist for the device being chosen before it is saved.
+            'search_devices': {key: search_readiness(config, gpu, key) for key in SEARCH_DEVICES},
+            'suggested_search_device': 'cuda' if gpu_bf16(gpu) else 'cpu',
             'recommended_batch': recommended_batch(gpu)}
 
 
@@ -480,7 +483,7 @@ def _registered(config):
 
 
 def setup_state(config):
-    from .engines import DESCRIPTION_ENGINES
+    from .engines import DESCRIPTION_ENGINES, SEARCH_DEVICES
     from .settings import general_settings
     record, fault = load_record(config)
     try:
@@ -493,7 +496,8 @@ def setup_state(config):
             'record': record and {k: record.get(k) for k in ('state', 'completed_utc', 'skipped_utc', 'by', 'wizard_version')},
             'record_fault': fault, 'set_by': (record or {}).get('values', {}), 'settings': current,
             'settings_fault': settings_fault, 'blender': {'configured': configured, 'config_file': source},
-            'engines': list(DESCRIPTION_ENGINES.values()), 'hints': list(ENGINE_HINTS),
+            'engines': list(DESCRIPTION_ENGINES.values()), 'search_devices': list(SEARCH_DEVICES.values()),
+            'hints': list(ENGINE_HINTS),
             'batch_benchmark': list(BATCH_BENCHMARK), 'steps': list(STEPS)}
 
 
@@ -510,14 +514,16 @@ def save_setup(config, choices, actor='user'):
     current = general_settings(config)
     values = {key: choices.get(key, current[key]) for key in SETTING_KEYS}
     checked_general(config, values['storage_budget_gib'], values['processing_formats'], values['caption_batch_size'],
-                    values['descriptions_enabled'], values['description_engine'], values['description_server'])
+                    values['descriptions_enabled'], values['description_engine'], values['description_server'],
+                    values['search_device'])
     blender = choices.get('blender_path')
     change = None
     if blender is not None and 'blender' not in skipped:
         change = blender_plan(config, blender, choices.get('confirm_rerender'))
     saved = save_general_settings(config, values['storage_budget_gib'], values['processing_formats'],
                                   values['caption_batch_size'], values['descriptions_enabled'],
-                                  values['description_engine'], values['description_server'], actor=actor)
+                                  values['description_engine'], values['description_server'], values['search_device'],
+                                  actor=actor)
     outcome = {'status': 'unchanged'} if change in {None, 'unchanged'} else None
     if outcome is None:
         try:

@@ -77,11 +77,12 @@ def main() -> int:
         if args.command=='embed-index' and library_mode(config):
             raise ConfigError('Use library-batch.py process for coordinated incremental indexing')
         if args.command == 'process' and not args.dry_run:
-            runtime = {'inspection':'mcp','caption':'caption','embeddings':'embedding'}[args.stage]
+            from .source_operations import stage_runtime
+            runtime, project = stage_runtime(config, args.stage)
             expected = root / ('.venv-' + runtime)
             if os.environ.get('UV_PROJECT_ENVIRONMENT') != str(expected):
                 command = [*runtime_command(root, runtime), 'run','--locked','--no-sync','--offline',
-                    '--project',str(root / 'runtime' / runtime),'python','-m','local_asset_library.cli',*sys.argv[1:]]
+                    '--project',str(root / 'runtime' / project),'python','-m','local_asset_library.cli',*sys.argv[1:]]
                 return subprocess.run(command,cwd=root,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0).returncode
         if args.command in {'scan', 'process', 'refresh', 'status'} and library_mode(config):
             from .incremental import refresh, process, coverage, publish, working

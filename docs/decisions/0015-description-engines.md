@@ -32,7 +32,8 @@ catalog, configuration and Blender keep one implementation each.
   library before and after the refactor showed identical pending counts and fingerprints
   (`scripts/check-engine-stability.py`).
 - **Embeddings.** Only EmbeddingGemma (CUDA, BF16) exists; semantic and image search on
-  AMD remain unsupported, and the UI says so.
+  AMD remain unsupported, and the UI says so. *Superseded by
+  [decision 0018](0018-cpu-search-embedder.md): EmbeddingGemma also runs on the CPU.*
 
 **Why.** The owner wants Assetarium usable on AMD setups without hardware to test them
 here. A local OpenAI-compatible server is testable on the owner's NVIDIA GPU through the

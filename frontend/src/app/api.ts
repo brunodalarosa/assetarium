@@ -10,7 +10,7 @@ export interface Bridge {
   changes(): Promise<Json>;
   general_settings(): Promise<Json>;
   save_general_settings(budget: string | number, formats: string[], batch: string | number, descriptionsEnabled?: boolean | null,
-    engine?: string | null, server?: { url: string; model: string } | null): Promise<Json>;
+    engine?: string | null, server?: { url: string; model: string } | null, searchDevice?: string | null): Promise<Json>;
   setup_state(): Promise<Json>;
   setup_environment(): Promise<Json>;
   setup_blender(): Promise<Json>;
@@ -30,6 +30,13 @@ export interface Bridge {
   importing_failures(): Promise<Json>;
   notification_action(action: string, identifier?: string | null): Promise<Json>;
   source_action(action: string, key?: string | null, directory?: string | null, enabled?: boolean | null): Promise<Json>;
+  source_exclusions(key: string, patterns: string[]): Promise<Json>;
+  source_export(key: string, suggestionId: string, decision: string): Promise<Json>;
+  source_export_undo(key: string, decisionId: string): Promise<Json>;
+  source_textures(key: string, folder: string | null, singleCopies: boolean): Promise<Json>;
+  source_textures_undo(key: string): Promise<Json>;
+  recheck_failures(key: string): Promise<Json>;
+  retry_failures(key: string, previewId: string): Promise<Json>;
   choose_source_directory(): Promise<Json>;
   browse(filters: Json, offset: number, pageSize: number): Promise<Json>;
   source_browse(key: string, offset: number, pageSize: number): Promise<Json>;

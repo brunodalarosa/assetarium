@@ -160,11 +160,15 @@ instead of **Generate descriptions**; report notices drop **Continue**. The page
 shows the published library (coverage,
 catalog/index versions, **Refresh published view**) and the **Importing failures
 report**, a list of original asset paths with recorded failures, kept separate
-from pending work.
+from pending work. A source with recorded failures offers **Recheck failures**: it reruns the
+file/dependency check, read only, and a dialog offers **Retry N assets** for failures that came
+from that check and pass it now (or **Nothing to retry** with Close); retried assets become pending
+for the next **Process assets** ([decision 0020](../decisions/0020-alternate-file-faults-and-recheck.md)).
 
 **Setup** ([decision 0014](../decisions/0014-setup-wizard.md)). A full-window
-overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions,
-Batch size, Review and finish), **Back** / **Skip step** / **Next**, and **Skip setup**
+overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions and
+search, Batch size, Review and finish; the descriptions step also chooses **Where search
+runs**, NVIDIA GPU or CPU, with its own checklist, [decision 0018](../decisions/0018-cpu-search-embedder.md)), **Back** / **Skip step** / **Next**, and **Skip setup**
 at any time. It opens by itself only on a genuinely fresh install (no setup record, no
 saved settings, no source); otherwise **Settings → General → Run setup** opens it
 pre-filled. Nothing is saved until **Save** on the review step, and setup never
@@ -213,7 +217,11 @@ engine, with the local server's address, model and **Test connection**) and the
 description batch size (built-in engine only). *Asset
 sources* adds directories (**Choose folder…**), and per source shows format
 counts, the **Enabled** switch, **Include 2D images** (saves and rescans without
-deleting results) and **Remove** (keeps files and saved metadata). Click a source
+deleting results), **Excluded folders** (pattern chips; adding or removing one rescans),
+**Possible duplicate exports** suggestions with **Group as alternate files**, **Exclude extra
+folders** and **Keep separate**, saved answers with **Undo**, **Textures not found** with a folder choice, live counts, **Apply** and **Undo** ([decision 0021](../decisions/0021-texture-folder-choice.md))
+([decision 0019](../decisions/0019-source-folders-and-export-variants.md)), and **Remove**
+(keeps files and saved metadata). The Asset processing card points to unanswered suggestions. Click a source
 name or its 🔍 icon to browse that source's saved assets, including disabled
 sources, with the same cards and inspection; it loads forty at a time as you
 scroll (**Load more assets** is the keyboard alternative) and never scans,

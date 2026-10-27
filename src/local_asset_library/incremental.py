@@ -438,6 +438,24 @@ def run_caption(config, record, fingerprint, backend):
     return returned(run_captions(config, [(record, fingerprint, image_inputs(config, record))], backend)[0])
 
 
+def restore_reused(record, stage, apply=True):
+    """A reused complete result whose stage a rescan reset (for example after grouping export folders) is complete again.
+
+    Only when the record still carries that result: a complete inspection run with its previews, or its description.
+    With ``apply=False`` it only reports whether it would (dry runs write nothing).
+    """
+    states = record['processing'] if apply else dict(record['processing'])
+    if stage == 'inspection':
+        if ((record.get('inspection_run') or {}).get('status') == 'complete' and record.get('technical') and record.get('previews')
+                and (states.get('inspection'), states.get('previews')) != ('complete', 'complete')):
+            states.update(inspection='complete', previews='complete')
+            return True
+    elif stage == 'caption' and record.get('description') and record.get('caption_provenance') and states.get('caption') != 'complete':
+        states['caption'] = 'complete'
+        return True
+    return False
+
+
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
             cancelled=None, progress=None, asset_ids=None):
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
@@ -460,7 +478,7 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         return {"stage": stage, "pending": 0, "selected": 0, "retained": {}, "dry_run": dry_run, "outcomes": [],
                 "pending_ids": [], "descriptions_disabled": True,
                 "reason": "Descriptions are turned off in Settings → General"}
-    pending, retained = [], Counter()
+    pending, retained, restored = [], Counter(), 0
     with closing(ledger(config)) as db:
         for record in selected:
             old = db.execute("SELECT fingerprint,status,evidence FROM jobs WHERE asset_id=? AND stage=?", (record["asset_id"], stage)).fetchone()
@@ -506,12 +524,17 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                             update_record(work,record)
                         retained['failed'] += 1
                         continue
+                    if restore_reused(record, stage, apply=not dry_run):
+                        restored += 1
+                        if not dry_run:
+                            update_record(work, record)
                 retained[old[1]] += 1
                 continue
             if stage == 'caption':
                 fp = caption_input(work, record, prompt_version=default_prompt_version(record))
             pending.append((record, fp))
-        report = {"stage": stage, "pending": len(pending), "selected": min(limit, len(pending)), "retained": dict(retained), "dry_run": dry_run, "outcomes": []}
+        report = {"stage": stage, "pending": len(pending), "selected": min(limit, len(pending)), "retained": dict(retained),
+                  "restored": restored, "dry_run": dry_run, "outcomes": []}
         report['pending_ids'] = [r['asset_id'] for r, _ in pending]
         if dry_run:
             return report

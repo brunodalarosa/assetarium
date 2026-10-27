@@ -4,18 +4,18 @@ import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
-import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, plural } from "../app/format";
+import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, plural, SEARCH_HELP } from "../app/format";
 import {
   cancelBlenderCheck, checkBlender, chooseBlenderExecutable, copyText, finishSetup, goToSetupStep, measureSetupStorage,
   saveSetup, SETUP_STEPS, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
 } from "../app/store";
 import { AgentPanel, SetByBadge, SetupPaths } from "./AgentSetup";
-import { EngineFields } from "./EngineFields";
+import { EngineFields, SearchDeviceField } from "./EngineFields";
 import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
 
 const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
-  descriptions: "Descriptions", batch: "Batch size", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Batch size", review: "Review and finish",
 };
 const FORMAT_NOTES: [string, string, string][] = [
   ["fbx", "FBX", "Rigs and animation; common in Unity and Unreal."],
@@ -247,11 +247,14 @@ function StorageStep() {
 
 function Readiness({ engine }: { engine: string }) {
   const env = useApp((s) => s.setup.env);
-  const readiness = env?.engines?.[engine];
-  if (!readiness) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Checking what is installed…</p>;
-  const items = [...readiness.items, ...readiness.search];
+  return <ReadinessList id="setup-readiness" items={env?.engines?.[engine]?.items} />;
+}
+
+/** One checklist of what is installed, with the command for anything missing. */
+function ReadinessList({ id, items }: { id: string; items?: Json[] }) {
+  if (!items) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Checking what is installed…</p>;
   return (
-    <ul id="setup-readiness" className="grid gap-3" aria-label="Readiness">
+    <ul id={id} className="grid gap-3" aria-label="Readiness">
       {items.map((item: Json) => (
         <li key={item.id} className="grid gap-1.5" data-item={item.id} data-ready={item.ready}>
           <span className="flex items-center gap-2 text-[13px]">
@@ -271,6 +274,7 @@ function Readiness({ engine }: { engine: string }) {
 
 function DescriptionsStep() {
   const info = useApp((s) => s.setup.info);
+  const env = useApp((s) => s.setup.env);
   const draft = useApp((s) => s.setup.draft);
   return (
     <>
@@ -291,6 +295,10 @@ function DescriptionsStep() {
           <Readiness engine={draft.engine} />
         </Card>
       )}
+      <Card id="setup-search-card" title="Search" help={SEARCH_HELP}>
+        <SearchDeviceField value={draft.searchDevice} onChange={(searchDevice) => updateSetupDraft({ searchDevice })} devices={info?.search_devices || []} idPrefix="setup" />
+        <ReadinessList id="setup-search-readiness" items={env?.search_devices?.[draft.searchDevice]} />
+      </Card>
     </>
   );
 }
@@ -326,9 +334,10 @@ function summary(step: SetupStep, draft: Json, info: Json): string {
     case "formats": return draft.formats.length ? draft.formats.map(formatLabel).join(", ") : "None (processing paused)";
     case "storage": return draft.budget ? `${Number(draft.budget).toLocaleString()} GiB` : "Keeps the current value";
     case "descriptions": {
-      if (!draft.descriptionsEnabled) return "Off (existing descriptions are kept)";
+      const search = ` · search on the ${draft.searchDevice === "cpu" ? "CPU" : "NVIDIA GPU"}`;
+      if (!draft.descriptionsEnabled) return `Off (existing descriptions are kept)${search}`;
       const engine = (info?.engines || []).find((e: Json) => e.id === draft.engine);
-      return draft.engine === "local-server" ? `On · local model server ${draft.serverUrl} · model ${draft.serverModel || "not set"}` : `On · ${engine ? `${engine.label} — ${engine.name}` : draft.engine}`;
+      return (draft.engine === "local-server" ? `On · local model server ${draft.serverUrl} · model ${draft.serverModel || "not set"}` : `On · ${engine ? `${engine.label} — ${engine.name}` : draft.engine}`) + search;
     }
     case "batch": return setupStepNeeded("batch", draft) ? draft.batch : "Not used";
     default: return "";
@@ -389,7 +398,7 @@ const CONTENT: Record<SetupStep, () => ReactNode> = {
 };
 const TITLES: Record<SetupStep, string> = {
   welcome: "Set up Assetarium", blender: "Blender", formats: "Formats to process", storage: "Storage budget",
-  descriptions: "Descriptions", batch: "Description batch size", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Description batch size", review: "Review and finish",
 };
 
 export function SetupWizard() {

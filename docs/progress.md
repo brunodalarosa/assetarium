@@ -1,5 +1,154 @@
 # Progress
 
+## October 26 — Reused results mark their stage complete, branch `feature/cpu-search-embedder`
+
+After the owner grouped `Medieval Weapons` (FBX + gLTF + Unity FBX), the rescan reset its 32
+processed assets to pending (their file lists changed) while their rendered glTF and inputs did not.
+`incremental.process` counted the finished ledger jobs as reused but never set the record's stages
+back, and `worker_stage` stopped after a dry run with nothing pending, so Process assets did nothing
+and Generate descriptions had no ready previews. Now `restore_reused` marks inspection + previews
+(complete run with previews) or the description (record still has it) complete on reuse; dry runs
+report `restored` without writing; the worker runs a reuse-only pass and builds no engine for it.
+Real run: Process assets (30 s) and Generate descriptions (38 s) brought all 32 back to complete
+with every ledger job keeping its October 25 timestamp (nothing re-rendered or regenerated).
+Tests: `test_reused_results_mark_their_stage_complete_after_a_rescan_reset`,
+`test_the_source_worker_runs_a_reuse_only_pass_without_a_model`.
+
+## October 26 — Texture folder choice, branch `feature/cpu-search-embedder`
+
+[Decision 0021](decisions/0021-texture-folder-choice.md). `Desert Pack` (FBX only) failed 117
+models with "Missing, rejected or unresolved texture dependencies": each texture exists once per
+pipeline folder (`Textures/HDRP`, `PBR`, `URP`, `Unreal`), and the glTF-only path mapping cannot help.
+
+- `texture_folders.py`: missing required textures from inspection, exact-name index of the source's
+  images, candidate folders (shallowest holding one version of each ambiguous name), all-or-nothing
+  per-model plans, `texture_folder_paths` recipes for the existing repair worker, suggestion sorted by
+  folder-only fixes. Applied in `sources.scan_source`; `source.json` `texture_folder`;
+  `set_texture_folder` / `forget_texture_folder`; bridge `source_textures` / `source_textures_undo`;
+  `local-assets sources textures`; **Textures not found** panel (folder cards, single-copy switch,
+  live counts, Apply, Undo) and an Asset processing line.
+- **Verification.** `tests/test_texture_folders.py` (6 tests, one with real Blender: inspection
+  reports the texture missing, the repair worker renders it from the chosen folder's recipe). Full
+  suite 671 passed, 2 skipped (`Real-Blender tests: 6 passed`). WebView2
+  `scripts/verify-texture-folders.py` (`data/gui/texture-folders-2026-10-26b/`). On the real
+  `Desert Pack` the suggestion offers `PBR` (49 alone, 117 with single copies, 0 unresolved),
+  `Unreal`, `HDRP`, `URP`; nothing was applied.
+
+## October 26 — Broken alternate files fail alone; Recheck failures, branch `feature/cpu-search-embedder`
+
+[Decision 0020](decisions/0020-alternate-file-faults-and-recheck.md). After grouping, all 3,300
+`Low Poly Nature - Extended` assets failed inspection: their OBJ alternates' MTL points at
+`C:/Users/Skup/Desktop/…/Atlas Nature Texture.png`, and `source_check` rejected an asset for any
+file's problem.
+
+- `retrieval.dependency_owners`, `used_file`, `file_problems`; `source_check` keeps the old check
+  (`_source_check`) and, only when it fails on a multi-file asset whose used file is fine, checks
+  the usable files and records `unusable_files`. `resolved_detail` never selects an unusable file,
+  refuses requests for it and returns only usable files' dependencies; `get_asset`
+  `source_variants` carry `usable`/`reason`; inspector label.
+- `recheck.py` (`preview`, `release`), `local-assets recheck --asset-source KEY` (typed yes),
+  bridge `recheck_failures` / `retry_failures`, **Recheck failures** button and a neutral
+  confirmation dialog (close-only when nothing applies) on Asset processing. Released jobs keep
+  their previous evidence (`released` ledger status, `released_faults`).
+- **Verification.** Full suite 665 passed, 2 skipped (`Real-Blender tests: 5 passed`), with
+  `tests/test_alternate_faults.py` (7 tests); WebView2
+  `scripts/verify-recheck.py` (`data/gui/recheck-2026-10-26b/`). On all six real sources every
+  asset that passed the old check keeps an identical fingerprint (2,013 assets); `Low Poly Nature`
+  has 3,300 newly usable assets and the recheck preview offers exactly those 3,300 (not released).
+
+## October 26 — Faster inventory building, branch `feature/cpu-search-embedder`
+
+`build_inventory` matched supplied previews by checking every row for every asset and name
+variants by scanning every asset for every asset (assets × files and assets² work). Previews are
+now indexed by (pack, stem) and looked up for the asset's name and its four Isometric directions,
+in row order, with the original per-row checks; variants are grouped by (pack, export anchor,
+prefix). Old (committed) and new code built byte-identical rows, assets, ambiguities, archives
+and suggestions for all six real sources (`Low Poly Nature - Extended` 163.9 s → 9.1 s,
+`Medieval Megapack` 13.8 s → 1.1 s); a real rescan of `Low Poly Nature` took 21.3 s (was 514 s
+before grouping). New `test_preview_lookup_keeps_row_order_labels_and_exact_versus_directional_matches`;
+full suite 657 passed, 2 skipped (`Real-Blender tests: 5 passed`), plus the new test. After the
+owner grouped the suggested folders, `Low Poly Nature` has 3,300 pending assets (was 9,900),
+`Medieval Megapack` 1,265 (was 2,530) and `Medieval Weapons` 0 failures.
+
+## October 26 — Excluded folders, duplicate export folders, folder variants, branch `feature/cpu-search-embedder`
+
+[Decision 0019](decisions/0019-source-folders-and-export-variants.md), approved at the scope/plan
+checkpoint by the user of this checkout.
+
+- **Excluded folders** per source (`source.json` `excluded_folders`; `catalog.excluded_folder`,
+  `walk_source` prunes and records `excluded_folder` rows with file counts).
+- **Suggestions and answers.** `catalog.export_candidates` (sibling folders with equal sets of
+  ≥3 unique model stems) and `group_models` (answers bound to anchor, folders and name-list hash;
+  reference identity kept; `confirmed-sibling-export-v1` evidence). `sources.decide_export`,
+  `forget_export`, `set_excluded_folders`; status carries `export_suggestions` and
+  `excluded_folders`.
+- **Variants.** `catalog.file_variants`; `resolved_detail(..., source_variant)` with a stable
+  default (rendered file, reference folder, recognized folders); `get_asset` `source_variants` /
+  `source_variant`; inspector label.
+- **UI and CLI.** Source row section (suggestions, saved answers with Undo, exclusion chips),
+  Asset processing line, bridge `source_exclusions` / `source_export` / `source_export_undo`,
+  `sources exclude|include|exports`. `ui/build/` rebuilt.
+- **Verification.** Full suite 657 passed, 2 skipped (`Real-Blender tests: 5 passed`), with
+  `tests/test_source_exports.py` (8 tests). WebView2 `scripts/verify-source-folders.py`
+  (`data/gui/source-folders-2026-10-26c/`; the fixture bridge runs scans in-process because the
+  fixture project has no runtimes) and `verify-general-settings.py` passed. Real rescans gave
+  suggestions for Medieval Weapons (Unity FBX), Low Poly Nature (OBJ + Unity FBX, 3,300 names) and
+  Medieval Megapack (Unity FBX); none were answered. MCP `source_variant` checked on a real asset
+  (`data/evidence/source-folders-2026-10-26/report.json`).
+- **Found, not changed:** `Low Poly Nature - Extended` scans take ~514 s although walking its
+  16,504 files takes 4.5 s; the rest is in inventory building or scan merging.
+
+## October 25 — Scan cache size bound, branch `feature/cpu-search-embedder`
+
+`Low Poly Nature - Extended` (16,504 files) showed **Scan fault: Managed manifest exceeds its
+bounded size**: its `metadata-lal/library/scan-cache.json` was 5.76 MB and `read_json` caps app
+JSON at 4 MiB, so every rescan after the first failed. `read_json(path, limit)` now takes a
+caller bound; only the scan cache uses `SCAN_CACHE_LIMIT` (256 MiB, about 750,000 files). New
+tests in `tests/test_manifest_bound.py`; full suite 649 passed, 2 skipped (`Real-Blender tests:
+5 passed`). The real rescan succeeded in 544 s (full re-hash after the unreadable cache) with
+9,900 assets pending and no faults. No storage change.
+
+## October 25 — CPU search embedder and AMD end to end, branch `feature/cpu-search-embedder`
+
+[Decision 0018](decisions/0018-cpu-search-embedder.md), approved at the scope/plan checkpoint by
+the user of this checkout (owner review pending before any upstream merge). Machine: Ryzen 9
+9950X3D, Radeon RX 6800 16 GB, 31 GB RAM, Windows 11; no NVIDIA GPU.
+
+- **CPU embedder.** `embedding_cpu.py` (same EmbeddingGemma revision, prompts, preprocessing,
+  BF16 and normalization; own contract with device, adapter, base-adapter and lock hashes plus
+  `hashed_files` for the LF/CRLF rule in `retrieval.recorded_contract`). `search_device` setting
+  (`cuda` default, `cpu`) in `settings.py`, chosen in `engines.embedder`/`embedder_contract`; the
+  search worker's contract request goes through `engines`. `embedding_backend.py`, caption and
+  Blender worker files are byte-identical to `develop`.
+- **CPU-only lock.** `runtime/embedding-cpu/` (Torch/torchvision `+cpu`, every other pin equal),
+  synced into `.venv-embedding` by the same wrapper; `prepare_embedding_model.py --device cpu`.
+- **Fresh installs.** `scripts/record-embedding-capability.py` records the search check from two
+  of the library's own previews (sources' working records). The search stage stops with that
+  command as its reason while the receipt is missing or for the other device; a dry run counts
+  against the receipt's contract (first run, device switch). Stage environments follow the
+  settings (`source_operations.stage_runtime`): local-server descriptions run in `.venv-mcp`, CPU
+  search uses the CPU lock; the CLI stage command and overnight workers use the same helper.
+- **Setup and UI.** Settings → General → Search card; wizard step "Descriptions and search" with
+  per-device checklist (`environment_report.search_devices`) and a first-run CPU suggestion
+  without NVIDIA BF16; `apply_setup` and `settings set --search-device`; agent panel label.
+  `ui/build/` rebuilt.
+- **Measured.** CPU probe: 1.10 s per image and 0.033 s per text vector in BF16, cosine ≥ 0.998
+  to FP32 (`data/evidence/cpu-embedder-probe-2026-10-25/`). Medieval Weapons pack (64 logical
+  assets): previews 209 s; 32 Unity FBX duplicates recorded as import failures (kept, not
+  retried); 97 image vectors at 1.13 s each; 32/32 descriptions through llama.cpp b11870 Vulkan on
+  the RX 6800 with Qwen3-VL-2B F16 at 3.9 s per asset; MCP search 0.02–0.09 s after a 6.4 s first
+  query (`data/evidence/cpu-embedder-e2e-2026-10-25/`).
+- **Verification.** Full suite 648 passed, 2 skipped (`Real-Blender tests: 5 passed`), with
+  `tests/test_cpu_embedder.py` (10 tests). WebView2: new `verify-search-device.py`
+  (`data/gui/search-device-2026-10-25b/`), `verify-general-settings.py`,
+  `verify-setup-wizard.py` (readiness check updated for the separate search list;
+  `data/gui/setup-wizard-2026-10-25-cpu-r3/`) and `verify-agent-setup.py` passed.
+- **Storage.** Receipts `data/storage/2026-10-25-cpu-embedder-before.json` (207,869,096
+  allocated bytes) and `…-after.json` (1,463,004,608): the CPU search runtime, base and app
+  environments, frontend `node_modules`, evidence. Outside the project: 5.53 GB under `C:\AI`
+  (EmbeddingGemma 1.53 GB, Qwen F16 GGUF 4.07 GB, llama.cpp 0.13 GB), 10.8 MB `metadata-lal`.
+  `uv cache prune` found nothing to remove; the npm cache (`cache/npm`) is kept for offline rebuilds.
+
 ## October 25 — Beta cleanup before sharing the repository, branch `linux-support`
 
 Owner-approved cleanup from the beta audit (all items, internal plumbing included); license

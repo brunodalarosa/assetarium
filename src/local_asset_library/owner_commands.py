@@ -13,7 +13,7 @@ import time
 
 from .config import ConfigError, load_config, project_config_path
 
-COMMANDS = {'sources', 'settings', 'process', 'describe', 'cancel', 'failures', 'collections', 'setup'}
+COMMANDS = {'sources', 'settings', 'process', 'describe', 'cancel', 'failures', 'recheck', 'collections', 'setup'}
 ENDED_OK = {'complete'}
 
 
@@ -37,7 +37,24 @@ def parser():
     images = sources.add_parser('images', help='Include 2D images from this source')
     images.add_argument('key')
     images.add_argument('state', choices=['on', 'off'])
-    settings = commands.add_parser('settings', help='Show or change Settings → General').add_subparsers(dest='action', required=True)
+    for action, text in (('exclude', 'Skip a folder when scanning (name pattern like "Unity*" or a path inside the source)'),
+                         ('include', 'Stop excluding a folder pattern')):
+        change = sources.add_parser(action, help=text)
+        change.add_argument('key')
+        change.add_argument('pattern')
+    textures = sources.add_parser('textures', help='Models missing textures: list folder suggestions, or choose one')
+    textures.add_argument('key')
+    textures.add_argument('--use', metavar='FOLDER', help='A suggested texture folder (path inside the source)')
+    textures.add_argument('--single-copies', action='store_true', help='Also use textures that exist only once in the source')
+    textures.add_argument('--undo', action='store_true', help='Remove the choice; its repairs are dropped on the rescan')
+    exports = sources.add_parser('exports', help='Folders that look like other exports of the same models: list or answer')
+    exports.add_argument('key')
+    answer = exports.add_mutually_exclusive_group()
+    answer.add_argument('--group', metavar='ID', help='Group the suggested folders as alternate files of the same assets')
+    answer.add_argument('--separate', metavar='ID', help='Keep them separate; not suggested again')
+    answer.add_argument('--exclude', metavar='ID', help='Exclude the extra folders from scanning')
+    answer.add_argument('--undo', metavar='ID', help='Forget a saved answer; the folders are suggested again')
+    settings =commands.add_parser('settings', help='Show or change Settings → General').add_subparsers(dest='action', required=True)
     settings.add_parser('show')
     change = settings.add_parser('set')
     change.add_argument('--formats', help='Comma-separated: fbx,gltf,obj (glb counts as gltf); "none" pauses processing')
@@ -47,7 +64,8 @@ def parser():
     change.add_argument('--engine', choices=['builtin', 'local-server'], help='How descriptions are generated')
     change.add_argument('--server-url', help='Local model server address, e.g. http://127.0.0.1:8080/v1')
     change.add_argument('--server-model', help='Model name the local server lists')
-    setup = commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
+    change.add_argument('--search-device', choices=['cuda', 'cpu'], help='Where semantic and image search run (switching re-indexes)')
+    setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
     agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium (interactive terminal only)')
@@ -66,6 +84,8 @@ def parser():
         command.add_argument('--follow', action='store_true', help='Watch the running operation instead of starting one')
     commands.add_parser('cancel', help='Cancel the running operation safely').add_argument('--asset-source', required=True, metavar='KEY')
     commands.add_parser('failures', help='Original paths of assets whose import failed')
+    recheck = commands.add_parser('recheck', help='Recheck failures from the file/dependency check; retry those that pass (asks first)')
+    recheck.add_argument('--asset-source', dest='key', required=True)
     collections = commands.add_parser('collections', help='List, export or delete collections').add_subparsers(dest='action', required=True)
     collections.add_parser('list').add_argument('query', nargs='?', default='')
     export = collections.add_parser('export', help='Write JSON, a PNG sample sheet or Markdown (PDF: desktop app)')
@@ -79,6 +99,28 @@ def parser():
 def say(args, text):
     if not args.json:
         print(text, flush=True)
+
+
+def recheck_command(args, config):
+    """Recheck, then retry only after a typed yes (decision 0020); never from a script or an agent."""
+    from . import recheck
+    found = recheck.preview(config, args.key)
+    say(args, f"{found['retry']:,} recorded failures came from the file check and pass it now"
+              + (f" (e.g. {', '.join(found['examples'][:3])})" if found['examples'] else '') + '.'
+              + (f" {found['still_failing']:,} still fail it and stay recorded." if found['still_failing'] else ''))
+    if not found['retry']:
+        say(args, 'Nothing to retry.')
+        return found
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise ConfigError('Retrying recorded failures needs your answer in an interactive terminal; run it yourself')
+    if input(f"Retry these {found['retry']:,} assets on the next Process assets? Type \"yes\" to confirm: ").strip().lower() != 'yes':
+        say(args, 'Nothing was changed.')
+        return {**found, 'status': 'cancelled'}
+    result = recheck.release(config, args.key, found['preview_id'])
+    say(args, result['reason'] + ' Scanning to refresh the source status.')
+    args.follow = False
+    run_operation(args, config, 'scan', args.key)
+    return result
 
 
 def confirm(question):
@@ -180,6 +222,64 @@ def sources_command(args, config):
             return {'status': 'saved'}
         args.follow = False
         return run_operation(args, config, 'scan', args.key)
+    if args.action in {'exclude', 'include'}:
+        current = sources.excluded_folders(sources.bound(config, source))
+        pattern = sources.validate_exclusion(args.pattern)
+        if args.action == 'include' and pattern not in current:
+            raise ConfigError(f"“{pattern}” is not excluded. Excluded: {', '.join(current) or 'none'}")
+        sources.set_excluded_folders(config, args.key, current + [pattern] if args.action == 'exclude'
+                                     else [p for p in current if p != pattern])
+        say(args, f"{'Excluding' if args.action == 'exclude' else 'No longer excluding'} “{pattern}” in {source['name']}; "
+                  "scanning. Nothing on disk is deleted.")
+        args.follow = False
+        return run_operation(args, config, 'scan', args.key)
+    if args.action == 'textures':
+        if args.undo or args.use or args.single_copies:
+            if args.undo:
+                sources.forget_texture_folder(config, args.key)
+            else:
+                sources.set_texture_folder(config, args.key, args.use, args.single_copies)
+            say(args, 'Saved; scanning. Repaired models wait for Process assets; originals are not changed.')
+            args.follow = False
+            return run_operation(args, config, 'scan', args.key)
+        status = sources.source_status(config, source)
+        found, chosen = status.get('texture_suggestion'), status.get('texture_folder')
+        if chosen:
+            say(args, f"Chosen: {chosen['folder'] or 'no folder'}{' + single copies' if chosen['single_copies'] else ''} "
+                      f"({chosen['utc']}). Undo with --undo.")
+        if not found:
+            say(args, 'No models are waiting for textures.')
+            return status
+        say(args, f"{found['assets']:,} models can't find their textures (e.g. {', '.join(found['examples'][:3])}).")
+        for option in found['folders']:
+            say(args, f"  --use \"{option['folder']}\"  fixes {option['fixes_without_single_copies']:,}; "
+                      f"with --single-copies {option['fixes']:,} ({option['unresolved']:,} stay unresolved)")
+        single = found['single_copies_only']
+        say(args, f"  --single-copies alone fixes {single['fixes']:,} ({single['unresolved']:,} stay unresolved)")
+        return status
+    if args.action == 'exports':
+        answers = {'group': args.group, 'separate': args.separate, 'exclude': args.exclude}
+        chosen = next(((d, i) for d, i in answers.items() if i), None)
+        if args.undo:
+            sources.forget_export(config, args.key, args.undo)
+        elif chosen:
+            sources.decide_export(config, args.key, chosen[1], chosen[0])
+        if args.undo or chosen:
+            say(args, 'Saved; scanning.')
+            args.follow = False
+            return run_operation(args, config, 'scan', args.key)
+        status = sources.source_status(config, source)
+        for s in status.get('export_suggestions', []):
+            where = s['anchor'] or 'the source root'
+            say(args, f"{s['id']}\n    In {where}: {', '.join(s['folders'])} have the same {s['names']} model names "
+                      f"(e.g. {', '.join(s['sample_names'][:3])}). Keeps {s['reference']}"
+                      + (f"; already grouped: {', '.join(s['grouped_folders'])}" if s['grouped_folders'] else '') + '.')
+        for d in status.get('export_decisions', []):
+            say(args, f"{d['id']}  answered {d['decision']}: {d['anchor'] or 'root'} / {', '.join(d['folders'])}")
+        if not status.get('export_suggestions') and not status.get('export_decisions'):
+            say(args, 'No duplicate export folders found.')
+        say(args, 'Answer with: sources exports KEY --group ID | --separate ID | --exclude ID   (undo: --undo ID)')
+        return status
     sources.set_import_types(config, args.key, args.state == 'on')
     say(args, f"2D images {args.state} for {source['name']}; scanning.")
     args.follow = False
@@ -190,10 +290,11 @@ def settings_command(args, config):
     from .settings import general_settings, save_general_settings
     current = general_settings(config)
     if args.action == 'set':
-        options = (args.formats, args.budget_gib, args.batch_size, args.descriptions, args.engine, args.server_url, args.server_model)
+        options = (args.formats, args.budget_gib, args.batch_size, args.descriptions, args.engine, args.server_url,
+                   args.server_model, args.search_device)
         if all(value is None for value in options):
             raise ConfigError('Give at least one of --formats, --budget-gib, --batch-size, --descriptions, --engine, '
-                              '--server-url or --server-model')
+                              '--server-url, --server-model or --search-device')
         formats = None if args.formats is None else (
             [] if args.formats.strip().lower() == 'none' else [f.strip().lower() for f in args.formats.split(',') if f.strip()])
         server = None if args.server_url is None and args.server_model is None else {
@@ -201,7 +302,7 @@ def settings_command(args, config):
             'model': args.server_model if args.server_model is not None else current['description_server']['model']}
         save_general_settings(config, args.budget_gib if args.budget_gib is not None else current['storage_budget_gib'],
                               formats, args.batch_size, None if args.descriptions is None else args.descriptions == 'on',
-                              args.engine, server)
+                              args.engine, server, args.search_device)
         current = general_settings(config)
         say(args, 'Saved. Changing settings never deletes results or retries faults.')
     engine = current['description_engine']
@@ -210,7 +311,8 @@ def settings_command(args, config):
               f"Descriptions: {'on' if current['descriptions_enabled'] else 'off (existing descriptions are kept)'}\n"
               f"Description engine: {engine}" + (f" ({current['description_server']['url']}, model "
                                                  f"{current['description_server']['model'] or 'not set'})" if engine == 'local-server' else '')
-              + f"\nDescription batch size: {current['caption_batch_size']}" + (' (not used by a local server)' if engine == 'local-server' else ''))
+              + f"\nDescription batch size: {current['caption_batch_size']}" + (' (not used by a local server)' if engine == 'local-server' else '')
+              + f"\nSearch runs on: {'CPU' if current['search_device'] == 'cpu' else 'NVIDIA GPU (CUDA)'}")
     return current
 
 
@@ -248,7 +350,7 @@ def ask(question, default=''):
 
 def wizard(args, config):
     """The desktop wizard's steps in a terminal; the same setup_core rules decide everything."""
-    from . import setup_core
+    from . import engines, setup_core
     from .settings import general_settings
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise ConfigError('Guided setup needs an interactive terminal; use setup status / setup blender / settings set instead')
@@ -303,6 +405,11 @@ def wizard(args, config):
             recommended = status['environment']['recommended_batch']
             choices['caption_batch_size'] = int(ask('5. Description batch size (1, 2, 4, 8)', recommended['size'] if recommended
                                                     else current['caption_batch_size']))
+    nvidia = bool(engines.gpu_bf16(status['environment']['gpu']))
+    say(args, '\nSearch by description and by image runs EmbeddingGemma on an NVIDIA GPU (cuda) or on the CPU (cpu, '
+              'slower to index, same results).' + ('' if nvidia else ' No NVIDIA GPU with BF16 was found, so cpu is suggested.'))
+    choices['search_device'] = ask('Search device (cuda/cpu)', current['search_device'] if nvidia or current['search_device'] == 'cpu'
+                                   else 'cpu').lower()
     say(args, '\nReview:\n' + json.dumps({k: v for k, v in choices.items() if k != 'confirm_rerender'}, indent=2, ensure_ascii=False))
     if ask('Save these choices? (yes/no)', 'yes').lower() != 'yes':
         say(args, 'Nothing was saved.')
@@ -450,6 +557,8 @@ def main(argv, config=None):
             from .sources import bound, get_source
             result = cancel(bound(config, get_source(config, args.asset_source)))
             say(args, result.get('reason') or 'Nothing is running for this source.')
+        elif args.command == 'recheck':
+            result = recheck_command(args, config)
         elif args.command == 'failures':
             from .sources import importing_failures
             result = importing_failures(config)

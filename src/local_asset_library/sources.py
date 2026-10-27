@@ -168,6 +168,131 @@ def set_import_types(config, key, images):
     return source
 
 
+def _source_settings(config):
+    if config.metadata_root is None:
+        return {}
+    path = config.output_path('data', 'source.json')
+    return read_json(path) if path.exists() else {}
+
+
+def validate_exclusion(pattern):
+    """A folder-name pattern (``Unity*``) or a folder path from the source root (``Weapons/Unity FBX``)."""
+    if not isinstance(pattern, str):
+        raise ConfigError('Enter a folder name or a path inside the source')
+    value = pattern.strip().replace('\\', '/').strip('/')
+    parts = value.split('/')
+    if (not value or len(value) > 200 or any(ord(c) < 32 for c in value) or ':' in value
+            or any(part in {'', '.', '..'} for part in parts) or value.casefold() == 'metadata-lal'):
+        raise ConfigError('Enter a folder name like "Unity*" or a path inside the source like "Models/Unity FBX"')
+    return value
+
+
+def excluded_folders(config):
+    """Folders a scan skips entirely (decision 0019): not walked, hashed or imported."""
+    value = _source_settings(config).get('excluded_folders', [])
+    if not isinstance(value, list) or len(value) > 50:
+        raise ConfigError('Invalid saved excluded folders; set them again in Settings → Asset sources')
+    return [validate_exclusion(item) for item in value]
+
+
+def export_decisions(config):
+    """Owner answers to duplicate export folder suggestions: group or keep separate (decision 0019)."""
+    value = _source_settings(config).get('export_decisions', [])
+    if not isinstance(value, list) or any(not isinstance(item, dict) or item.get('decision') not in {'group', 'separate'}
+                                          for item in value):
+        raise ConfigError('Invalid saved export folder decisions; answer the suggestions again in Settings → Asset sources')
+    return value
+
+
+def _change_source_settings(config, key, change, busy_reason):
+    from .gpu_queue import lease
+    from .source_operations import active_operation
+    source = get_source(config, key)
+    scoped = bound(config, source)
+    if active_operation(scoped):
+        raise ConfigError(busy_reason)
+    with lease(config, 'source-settings', resource='sources'):
+        path = scoped.output_path('data', 'source.json')
+        value = read_json(path)
+        change(value)
+        atomic_json(path, value)
+    return source
+
+
+def set_excluded_folders(config, key, patterns):
+    """Save a source's excluded folders; the caller rescans. Nothing on disk is deleted."""
+    if not isinstance(patterns, list) or len(patterns) > 50:
+        raise ConfigError('Give up to 50 excluded folders')
+    cleaned = list(dict.fromkeys(validate_exclusion(item) for item in patterns))
+    return _change_source_settings(config, key, lambda value: value.update(excluded_folders=cleaned),
+                                   "Wait for this source's operation to finish before changing its excluded folders")
+
+
+def decide_export(config, key, suggestion_id, decision):
+    """Group a suggested duplicate export folder set, keep it separate, or exclude its extra folders."""
+    if decision not in {'group', 'separate', 'exclude'}:
+        raise ConfigError('Choose Group, Keep separate or Exclude')
+    source = get_source(config, key)
+    status = source_status(config, source)
+    suggestion = next((s for s in status.get('export_suggestions', []) if s['id'] == suggestion_id), None)
+    if suggestion is None:
+        raise ConfigError('This suggestion is no longer current; the source was scanned again since it was shown')
+    if decision == 'exclude':
+        # Keep the reference folder and any folders already grouped with it; exclude the extra copies.
+        extra = [(suggestion['anchor'] + '/' + folder).strip('/') for folder in suggestion['folders']
+                 if folder != suggestion['reference'] and folder not in suggestion['grouped_folders']]
+        return set_excluded_folders(config, key, excluded_folders(bound(config, source)) + extra)
+    entry = {k: suggestion[k] for k in ('id', 'anchor', 'folders', 'reference', 'names', 'name_manifest_sha256')}
+    entry.update(decision=decision, utc=now())
+    def change(value):
+        value['export_decisions'] = [d for d in value.get('export_decisions', []) if d.get('id') != suggestion_id] + [entry]
+    return _change_source_settings(config, key, change, "Wait for this source's operation to finish before answering")
+
+
+def texture_folder(config):
+    """The owner's texture folder choice for models missing textures (decision 0021), or None."""
+    value = _source_settings(config).get('texture_folder')
+    if value is None:
+        return None
+    if (not isinstance(value, dict) or not (value.get('folder') is None or isinstance(value.get('folder'), str))
+            or type(value.get('single_copies')) is not bool or (value.get('folder') is None and not value['single_copies'])):
+        raise ConfigError('Invalid saved texture folder; choose it again in Settings → Asset sources')
+    return value
+
+
+def set_texture_folder(config, key, folder, single_copies):
+    """Save a texture folder choice offered by the current suggestion; the caller rescans. Originals never change."""
+    if type(single_copies) is not bool or not (folder is None or isinstance(folder, str)):
+        raise ConfigError('Choose a suggested folder and whether to use single copies')
+    if folder is None and not single_copies:
+        raise ConfigError('Choose a texture folder, single copies, or both')
+    source = get_source(config, key)
+    offered = (source_status(config, source).get('texture_suggestion') or {}).get('folders', [])
+    if folder is not None and folder not in {item['folder'] for item in offered}:
+        raise ConfigError('That folder is not one of the current suggestions; the source was scanned again since')
+    choice = {'folder': folder, 'single_copies': single_copies, 'utc': now()}
+    return _change_source_settings(config, key, lambda value: value.update(texture_folder=choice),
+                                   "Wait for this source's operation to finish before choosing textures")
+
+
+def forget_texture_folder(config, key):
+    """Undo the choice: the rescan drops its recipes; recorded results stay."""
+    def change(value):
+        if value.pop('texture_folder', None) is None:
+            raise ConfigError('No texture folder is chosen for this source')
+    return _change_source_settings(config, key, change, "Wait for this source's operation to finish before changing textures")
+
+
+def forget_export(config, key, decision_id):
+    """Undo an answer: the folders become separate again and the suggestion returns on the rescan."""
+    def change(value):
+        before = value.get('export_decisions', [])
+        value['export_decisions'] = [d for d in before if d.get('id') != decision_id]
+        if len(value['export_decisions']) == len(before):
+            raise ConfigError('That answer is no longer saved for this source')
+    return _change_source_settings(config, key, change, "Wait for this source's operation to finish before changing answers")
+
+
 @lru_cache(maxsize=8)
 def _owner_map(path, stamp, size):
     return read_json(Path(path)).get("assets", {})
@@ -412,7 +537,11 @@ def source_status(config, source):
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():
         status = dict(status, **read_json(fault_path), needs_processing=True)
+    answered = {d['id'] for d in export_decisions(scoped)}  # Hidden at once; the rescan the answer starts confirms it.
+    status['export_suggestions'] = [s for s in status.get('export_suggestions', []) if s['id'] not in answered]
     return {**source, **status, 'import_formats': import_formats(scoped), 'import_types': list(import_types(scoped)),
+            'exclusions': excluded_folders(scoped), 'export_decisions': export_decisions(scoped),
+            'texture_folder': texture_folder(scoped),
             "operation": operation_status(scoped)}
 
 
@@ -520,7 +649,8 @@ def scan_source(config, source):
     work = working(scoped)
     previous = read_records(work) or read_records(scoped)
     old = {r["asset_id"]: r for r in previous}
-    rows, fresh, _, _ = build_inventory(scoped)
+    suggestions = []
+    rows, fresh, _, _ = build_inventory(scoped, suggestions)
     from .catalog import snapshot, walk_source
     if snapshot(rows) != snapshot(walk_source(scoped)):
         raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
@@ -566,6 +696,11 @@ def scan_source(config, source):
             record.setdefault('stage_faults',{})['inventory'] = {
                 'status':'faulty','reason':'Source files could not be read','files':failures}
         merged.append(record)
+    # Owner texture folder recipes (decision 0021): a recipe change is a changed input for those models.
+    from .texture_folders import apply as apply_texture_folder
+    before = {r['asset_id']: r.get('texture_repair') for r in merged}
+    texture_suggestion = apply_texture_folder(merged, rows, texture_folder(scoped))
+    changed.update(r['asset_id'] for r in merged if r.get('texture_repair') != before[r['asset_id']])
     inventory_hash = digest(rows)
     status_path = scoped.output_path("data", "library/source-status.json")
     prior_status = read_json(status_path) if status_path.exists() else {}
@@ -604,6 +739,10 @@ def scan_source(config, source):
               "assets": len(merged), "pending": len(pending_ids), "failed": len(failed),
               "pending_ids": pending_ids, "searchable_ids": sorted(searchable),
               "needs_processing": bool(pending_ids), "removed": len(set(old) - {r["asset_id"] for r in merged}),
+              # Decision 0019: owner-excluded folders and unanswered duplicate export folder suggestions.
+              "excluded_folders": [{"path": r["path"].split("/", 1)[1], "files": r["excluded_files"]}
+                                   for r in rows if r.get("status") == "excluded_folder"],
+              "export_suggestions": suggestions, "texture_suggestion": texture_suggestion,
               "reason": ("Assets need processing or publication" if pending_ids else
                          "Import finished with recorded failures" if failed else "Up to date and published")}
     formats = processing_formats(config)

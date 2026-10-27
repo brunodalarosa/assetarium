@@ -135,11 +135,12 @@ class DesktopBridge:
         return self._wait(self._present(general_settings, self._config, guarded=False))
 
     def save_general_settings(self, storage_budget_gib, processing_formats=None, caption_batch_size=None,
-                              descriptions_enabled=None, description_engine=None, description_server=None):
+                              descriptions_enabled=None, description_engine=None, description_server=None,
+                              search_device=None):
         from .settings import save_general_settings
         return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
-                                        guarded=False))
+                                        search_device, guarded=False))
 
     # Setup wizard (decision 0014): thin calls into setup_core; nothing here starts at launch.
     def setup_state(self):
@@ -262,6 +263,44 @@ class DesktopBridge:
         if action == 'cancel':
             return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
         raise ConfigError('Unknown asset source action')
+
+    # Excluded folders and duplicate export folders (decision 0019): each change rescans the source.
+    def source_exclusions(self, key, patterns):
+        return self._wait(self._present(self._source_setting, 'set_excluded_folders', key, patterns, guarded=False))
+
+    def source_export(self, key, suggestion_id, decision):
+        return self._wait(self._present(self._source_setting, 'decide_export', key, suggestion_id, decision, guarded=False))
+
+    def source_export_undo(self, key, decision_id):
+        return self._wait(self._present(self._source_setting, 'forget_export', key, decision_id, guarded=False))
+
+    # Texture folder for models missing textures (decision 0021): each change rescans the source.
+    def source_textures(self, key, folder, single_copies):
+        return self._wait(self._present(self._source_setting, 'set_texture_folder', key, folder, single_copies, guarded=False))
+
+    def source_textures_undo(self, key):
+        return self._wait(self._present(self._source_setting, 'forget_texture_folder', key, guarded=False))
+
+    # Recheck of failures from the file/dependency check (decision 0020): preview reads; retry needs its preview.
+    def recheck_failures(self, key):
+        from .recheck import preview
+        return self._wait(self._present(preview, self._config, key, guarded=False))
+
+    def retry_failures(self, key, preview_id):
+        return self._wait(self._present(self._retry_failures, key, preview_id, guarded=False))
+
+    def _retry_failures(self, key, preview_id):
+        from .recheck import release
+        result = release(self._config, key, preview_id)
+        self._start_source_operation('scan', key)
+        return result
+
+    def _source_setting(self, name, key, *args):
+        from . import sources
+        if not self._config.sources_registry:
+            raise ConfigError('Configure asset sources before using source settings')
+        getattr(sources, name)(self._config, key, *args)
+        return self._start_source_operation('scan', key)
 
     def _start_source_operation(self, operation, key):
         from .source_operations import start
