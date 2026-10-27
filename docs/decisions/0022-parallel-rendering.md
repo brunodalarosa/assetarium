@@ -1,6 +1,7 @@
 # 0022 — Parallel kept-open renders, render device and speed test
 
-**Decision (owner, October 26, 2026).** Inspection renders run in several Blender processes at once,
+**Decision (user of this checkout, October 26, 2026; for the owner's review before any merge
+upstream).** Inspection renders run in several Blender processes at once,
 each kept open across assets, on the CPU or a graphics card. A short speed test on the computer picks
 the device and how many renders at a time; the owner can limit both, and limits never make rendering
 slower.
