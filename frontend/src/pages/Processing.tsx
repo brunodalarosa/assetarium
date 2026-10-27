@@ -198,6 +198,7 @@ export function Processing({ focus }: { focus?: string }) {
   const coverage = useApp((s) => s.coverage);
   const context = useApp((s) => s.context);
   const message = useApp((s) => s.sourcesMessage);
+  const sourcesError = useApp((s) => s.sourcesError);
   const loaded = useApp((s) => s.sourcesLoaded);
   const count = (value: number) => (loaded ? value : <Skeleton className="my-1.5 h-6 w-10" />);
   const running = sources.filter((source: Json) => operationActive(source.operation)).length;
@@ -229,13 +230,16 @@ export function Processing({ focus }: { focus?: string }) {
           </div>
         </div>
         {message && <Banner tone="info" role="status"><span id="sources-message">{message}</span></Banner>}
+        {sourcesError && (
+        <Banner tone="fault"><span id="sources-error">Asset sources could not be loaded: {sourcesError}. Your sources, their files and their results are kept.</span></Banner>
+        )}
         <section aria-labelledby="processing-sources-title" className="grid gap-4">
           <h2 id="processing-sources-title" className="text-[16px] font-semibold">Sources</h2>
           {!loaded ? (
             <div id="source-warnings-loading" className="grid gap-4"><span className="sr" role="status">Loading sources…</span>{[0, 1].map((index) => <SourceCardGhost key={index} index={index} />)}</div>
           ) : sources.length ? (
             <div id="source-warnings" className="grid gap-4">{ordered.map((source: Json) => <SourceCard key={source.key} source={source} focused={focus === source.key} />)}</div>
-          ) : (
+          ) : sourcesError ? null : (
             <div className="grid justify-items-start gap-3 rounded-[22px] border border-dashed border-border-strong p-6">
               <p className="text-[13.5px] text-muted-foreground">No asset sources yet. Add a folder of assets to start importing.</p>
               <Button variant="secondary" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}><FolderOpen className="size-4" aria-hidden />Add an asset source</Button>

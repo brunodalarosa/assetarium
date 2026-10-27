@@ -208,6 +208,8 @@ export interface AppState {
   sourcesLoaded: boolean;
   sourcesRevision: string | null;
   sourcesMessage: string;
+  /** Why the source list itself could not be loaded; the sources are not gone. */
+  sourcesError: string | null;
   notifications: Json[];
   notificationsOpen: boolean;
   toasts: Toast[];
@@ -254,7 +256,7 @@ let state: AppState = {
   collections: { items: [], total: 0, loading: false, loaded: false, error: null, query: "" },
   selection: { active: false, ids: [], anchor: null }, menu: null, confirm: null, create: null, knownTags: [],
   inspector: { open: false, width: boot.inspector_width, tab: "overview" },
-  sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", notifications: [], notificationsOpen: false, toasts: [],
+  sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
   setup: emptySetup(),
@@ -681,12 +683,12 @@ export async function loadSources() {
     const result = await api().sources();
     if (result.status === "faulty") throw Error(result.reason);
     const changed = state.sourcesRevision !== result.revision;
-    setState({ sources: result.sources || [], sourcesLoaded: true, sourcesRevision: result.revision });
+    setState({ sources: result.sources || [], sourcesLoaded: true, sourcesRevision: result.revision, sourcesError: null });
     updateNotifications(result.notifications || []);
     if (route().page === "processing" && changed) await loadImportFailures();
     if (changed && state.context && result.revision !== state.context.sources_revision) await refreshContext();
   } catch (error) {
-    setState({ sourcesMessage: (error as Error).message, sourcesLoaded: true });
+    setState({ sourcesError: (error as Error).message, sourcesLoaded: true });
   } finally {
     loadingSources = false;
   }

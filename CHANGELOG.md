@@ -40,6 +40,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 - The interactive 3D preview now opens from asset cards inside a collection; it no longer
   reports "Library changed; refresh the inspection card." for assets that preview fine from search.
+- After a crash or forced shutdown during processing, Settings → Asset sources showed "No asset
+  sources yet" and processing could not resume: a search index left mid-write could not be read
+  until something wrote to it. Reads now let SQLite undo the unfinished write first (finished data
+  is kept), a source whose data cannot be read shows that on its own card without hiding the
+  others, and a source list that fails to load says so instead of claiming there are no sources.
 - After grouping export folders, already processed assets stayed "pending" forever: Process assets
   reused their finished previews and descriptions but never marked those stages complete again,
   and Generate descriptions had nothing to start from. Reused results now mark their stage

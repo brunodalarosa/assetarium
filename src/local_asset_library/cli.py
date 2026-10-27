@@ -49,11 +49,11 @@ def main() -> int:
     try:
         config = load_config(args.config, root)
         if config.sources_registry:
-            from .sources import registry, bound, get_source, source_status, scan_source, aggregate
+            from .sources import registry, bound, get_source, source_status, source_statuses, scan_source, aggregate
             source = get_source(config, args.asset_source) if args.asset_source else None
             if args.command in {'scan','status','refresh'}:
                 if args.dry_run:
-                    print(json.dumps({'dry_run':True,'sources':[source_status(config,s) for s in registry(config)['sources']]}));return 0
+                    print(json.dumps({'dry_run':True,'sources':source_statuses(config)}));return 0
                 if args.command == 'scan':
                     from .source_operations import scan_all
                     import uuid
@@ -68,7 +68,7 @@ def main() -> int:
                             scoped=bound(config,source);ensure_index(config,scoped);publish_source(scoped)
                             scan_source(config,source)
                         aggregate(config)
-                result={'sources':[source_status(config,s) for s in registry(config)['sources']]}
+                result={'sources':source_statuses(config)}
                 print(json.dumps(result,ensure_ascii=False));return 0
             if args.command == 'process' and source is None:
                 raise ConfigError('Choose --asset-source or use its Process assets card in LAL')

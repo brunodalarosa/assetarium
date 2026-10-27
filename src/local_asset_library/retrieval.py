@@ -15,7 +15,7 @@ from .caption_quality import caption_summary
 from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
-from .publication import line_ending_hashes, pinned, pinned_config
+from .publication import line_ending_hashes, pinned, pinned_config, read_only
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, RRF_K, RRF_WEIGHTS, search_character_cap
 from .asset_structure import asset_type
 from .dependency_resolution import dependency_file
@@ -219,7 +219,7 @@ def index_database(config, readonly=False):
     if readonly:
         if not path.is_file():
             raise ConfigError("Pilot embedding index missing")
-        return sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+        return read_only(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
     db.executescript("""

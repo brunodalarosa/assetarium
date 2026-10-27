@@ -328,6 +328,7 @@ function SourceRow({ source }: { source: Json }) {
 
 function AssetSources() {
   const sources = useApp((s) => s.sources);
+  const sourcesError = useApp((s) => s.sourcesError);
   const message = useApp((s) => s.sourcesMessage);
   const loaded = useApp((s) => s.sourcesLoaded);
   const [directory, setDirectory] = useState("");
@@ -346,6 +347,9 @@ function AssetSources() {
         </div>
       </Card>
       {message && <Banner tone="info" role="status"><span id="sources-message">{message}</span></Banner>}
+      {sourcesError && (
+        <Banner tone="fault"><span id="sources-error">Asset sources could not be loaded: {sourcesError}. Your sources, their files and their results are kept.</span></Banner>
+      )}
       <div id="source-list" className="grid gap-4">{sources.map((source: Json) => <SourceRow key={source.key} source={source} />)}</div>
       {!loaded && (
         <div id="sources-loading" className="grid gap-4" role="status">
@@ -359,7 +363,7 @@ function AssetSources() {
           ))}
         </div>
       )}
-      {loaded && !sources.length && <p id="sources-empty" className="text-[13px] text-muted-foreground">No asset sources yet. Add a directory to get started.</p>}
+      {loaded && !sources.length && !sourcesError && <p id="sources-empty" className="text-[13px] text-muted-foreground">No asset sources yet. Add a directory to get started.</p>}
     </div>
   );
 }

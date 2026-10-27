@@ -219,10 +219,10 @@ class DesktopBridge:
         return self._wait(self._present(importing_failures, self._config, guarded=False))
 
     def _sources(self):
-        from .sources import registry, source_status, revision
+        from .sources import revision, source_statuses
         from .source_operations import operation_status
         from .notifications import reconcile
-        statuses = [source_status(self._config, s) for s in registry(self._config)['sources']]
+        statuses = source_statuses(self._config)
         # Notices follow the statuses already read for this call; no extra scans.
         return {'status': 'ready', 'sources': statuses, 'revision': revision(self._config),
                 'scan': operation_status(self._config), 'notifications': reconcile(self._config, statuses)['items']}

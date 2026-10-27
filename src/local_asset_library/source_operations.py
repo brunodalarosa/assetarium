@@ -11,7 +11,7 @@ import time
 import uuid
 
 from .config import ConfigError, load_config, runtime_command, venv_python
-from .publication import atomic_json, read_json
+from .publication import atomic_json, read_json, read_only
 from .sources import (registry, get_source, bound, now, source_status, scan_source,
                       aggregate, read_records, write_membership)
 from .gpu_queue import lease, process_alive
@@ -199,7 +199,7 @@ def ensure_index(config, scoped):
     base = config.output_path("data", "embeddings/index.sqlite")
     metadata = {}
     if base.exists():
-        with closing(sqlite3.connect(base.as_uri() + "?mode=ro", uri=True)) as db:
+        with closing(read_only(base)) as db:
             metadata = dict(db.execute("SELECT key,value FROM meta"))
     if not metadata.get('contract'):
         capability = config.project_root / 'data/library/embedding-contract.json'
