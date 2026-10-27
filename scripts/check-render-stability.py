@@ -31,11 +31,15 @@ def line_hashes(data):
     return {hashlib.sha256(lf).hexdigest(), hashlib.sha256(lf.replace(b'\n', b'\r\n')).hexdigest()}
 
 
+gpu_rendered = []  # Finished assets whose previews were rendered on a GPU (not a CPU bit-equality baseline).
+
+
 def fingerprints(config):
     from local_asset_library.incremental import inspection_input, ledger, working
     from local_asset_library.membership import records
     from local_asset_library.sources import bound, registry
     kept, changed, finished = 0, [], []
+    gpu_rendered.clear()
     for source in registry(config)['sources']:
         scoped = bound(config, source)
         work = working(scoped)
@@ -52,7 +56,15 @@ def fingerprints(config):
                     finished.append((scoped, record, run['result_path']))
             else:
                 changed.append(record['asset_id'])
-    return kept, changed, finished
+    # A CPU render can only be bit-identical to a CPU-rendered preview; GPU-rendered ones are visually equal.
+    cpu = []
+    for item in finished:
+        settings = json.loads(item[0].output_path('data', item[2].removeprefix('data/')).read_text(encoding='utf-8')).get('render_settings') or {}
+        if settings.get('device', 'CPU') == 'CPU':
+            cpu.append(item)
+        else:
+            gpu_rendered.append(item[1]['asset_id'])
+    return kept, changed, cpu
 
 
 def compare(production, rendered, prefix):
@@ -147,6 +159,7 @@ def main():
     shutil.rmtree(folder, ignore_errors=True)
     cpu = runs['CPU']
     report = {'run_name': args.run_name, 'worker_table': table, 'fingerprints': {'kept': kept, 'changed': changed},
+              'gpu_rendered_skipped': len(gpu_rendered),
               'runs': runs, 'elapsed_seconds': round(time.monotonic() - started, 1),
               'passed': table['mapped'] and not changed and cpu['identical'] == cpu['assets'] > 0}
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -155,6 +168,7 @@ def main():
         print(f"{label}: {run['identical']}/{run['assets']} identical, largest pixel difference {run['largest_pixel_difference']}/255, "
               f"formats {', '.join(run['formats'])}")
     print(f"Fingerprints kept: {kept}, changed: {len(changed)}; equivalence table maps current to baseline: {table['mapped']}")
+    print(f"Skipped {len(gpu_rendered)} finished assets rendered on a GPU (CPU renders are compared with CPU-rendered previews)")
     print(('PASSED' if report['passed'] else 'FAILED') + f': {report_path.relative_to(ROOT)}')
     raise SystemExit(0 if report['passed'] else 1)
 
