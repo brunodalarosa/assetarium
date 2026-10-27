@@ -204,7 +204,10 @@ textures for other models. Removing a pattern brings the files back on the resca
 Each scan also compares **sibling folders by the names of their model files** (extension, case and
 subfolders ignored; each name once per folder; at least 3). Equal sets not already grouped by the
 recognized layouts become a suggestion on the source row and a line on its Asset processing card
-(`local-assets sources exports KEY`). **Group as alternate files** attaches each copy to the asset
+(`local-assets sources exports KEY`). Near misses are suggested too: folders whose shared names
+cover at least 90% of each folder's model files (an engine copy missing a few models, or a name
+repeated in two subfolders of one folder). The suggestion says how many names they share and which
+stay as they are; Group groups only the shared names. **Group as alternate files** attaches each copy to the asset
 of the reference folder's file, keeping its ID, inspection, previews and description (search
 vectors are rebuilt); **Exclude extra folders** adds the non-reference folders to the exclusions;
 **Keep separate** stops suggesting them. Answers can be undone. An answer is bound to the folder

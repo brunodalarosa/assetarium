@@ -188,6 +188,16 @@ export function renderNowText(plan: Json) {
   if (plan.reason === plan.best_reason) return `Now: ${plan.device}, ${count} (${plan.reason}).`;
   return `Now: ${plan.device}, ${count}, limited by ${plan.reason} (${plan.best_reason}: ${plan.best}).`;
 }
+/** "4 in FBX and 4 in gLTF are not in every folder; 1 name repeats inside Unity FBX. Those stay as they are." */
+export function nearMissText(near: Json | undefined) {
+  if (!near) return "";
+  const list = (counts: Record<string, number>) => Object.entries(counts).map(([folder, n]) => `${n} in ${folder}`).join(" and ");
+  const parts = [];
+  if (Object.keys(near.only).length) parts.push(`${list(near.only)} ${Object.values(near.only).reduce((a: number, b) => a + (b as number), 0) === 1 ? "is" : "are"} not in every folder`);
+  if (Object.keys(near.repeated).length)
+    parts.push(Object.entries(near.repeated).map(([folder, n]) => `${n} ${n === 1 ? "name repeats" : "names repeat"} inside ${folder}`).join(" and "));
+  return parts.length ? ` ${parts.join("; ")}. Those stay as they are.` : "";
+}
 export const BATCH_HELP =
   "How many assets the model describes in one call. Larger batches finish sooner but need more GPU memory. If memory runs out, the run stops safely: nothing is marked failed and those assets stay waiting, so you can lower the size and continue. Wording can differ slightly with which assets share a batch. Changing this never redoes finished descriptions.";
 export function setupRecordText(record: Json | null | undefined) {

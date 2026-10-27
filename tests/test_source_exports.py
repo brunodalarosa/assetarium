@@ -178,3 +178,80 @@ def test_the_owner_cli_lists_and_answers_suggestions(source, capsys):
     listed = sources_command(args, config)
     assert 'Engine Copy, FBX, gLTF have the same 3 model names' in capsys.readouterr().out
     assert listed['export_suggestions'][0]['reference'] == 'FBX'
+
+
+TWENTY = tuple(f'prop_{i}' for i in range(20))
+
+
+def near_kit(root, copy=TWENTY, repeated=()):
+    """FBX + gLTF with twenty names, and an engine copy holding ``copy`` (plus repeats in a second subfolder)."""
+    for folder, sub, suffix, names in (('FBX', 'Props', '.fbx', TWENTY), ('gLTF', 'Props', '.gltf', TWENTY),
+                                       ('Unity FBX', 'Props', '.fbx', copy), ('Unity FBX', 'Other', '.fbx', repeated)):
+        for name in names:
+            path = root / 'Pack' / folder / sub / (name + suffix)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'{"asset":{"version":"2.0"}}' if suffix == '.gltf' else f'{folder} {sub} {name}'.encode())
+    return root
+
+
+def scanned(managed, tmp_path, **kwargs):
+    config = managed[0]
+    added = sources.add(config, str(near_kit(tmp_path / 'near', **kwargs)))
+    sources.scan_source(config, added)
+    return config, added
+
+
+def test_a_folder_missing_a_few_names_is_suggested_and_groups_only_the_shared_ones(managed, tmp_path):
+    config, added = scanned(managed, tmp_path, copy=TWENTY[:19])  # 19 of 20 shared.
+    records, status, _ = state(config, added)
+    [suggestion] = status['export_suggestions']
+    assert suggestion['folders'] == ['FBX', 'Unity FBX', 'gLTF'] and suggestion['names'] == 19
+    assert suggestion['grouped_folders'] == ['FBX', 'gLTF'] and suggestion['reference'] == 'FBX'
+    assert suggestion['near']['only'] == {'FBX': 1, 'gLTF': 1} and suggestion['near']['repeated'] == {}
+    assert suggestion['near']['files'] == {'FBX': 20, 'Unity FBX': 19, 'gLTF': 20}
+    assert len(records) == 39  # 20 FBX+glTF groups and 19 separate engine copies, until the owner answers.
+    sources.decide_export(config, added['key'], suggestion['id'], 'group')
+    sources.scan_source(config, added)
+    records, status, _ = state(config, added)
+    assert len(records) == 20 and not status['export_suggestions']
+    by_name = {r['display_name']: r for r in records}
+    assert all(len(by_name[name]['files']) == 3 for name in TWENTY[:19]) and len(by_name['prop_19']['files']) == 2
+    evidence = by_name['prop_0']['grouping']['evidence'][0]
+    assert evidence['method'] == 'confirmed-sibling-export-v1' and evidence['near']['only'] == {'FBX': 1, 'gLTF': 1}
+
+
+def test_a_name_repeated_inside_a_folder_stays_separate_instead_of_hiding_the_folder(managed, tmp_path):
+    config, added = scanned(managed, tmp_path, repeated=('prop_0',))  # prop_0 in Unity FBX/Props and /Other.
+    _, status, _ = state(config, added)
+    [suggestion] = status['export_suggestions']
+    assert suggestion['names'] == 19 and suggestion['near']['repeated'] == {'Unity FBX': 1}
+    assert suggestion['near']['repeated_samples'] == {'Unity FBX': ['prop_0']}
+    sources.decide_export(config, added['key'], suggestion['id'], 'group')
+    sources.scan_source(config, added)
+    records = state(config, added)[0]
+    copies = [r for r in records if r['display_name'] == 'prop_0']
+    assert len(records) == 22 and sorted(len(r['files']) for r in copies) == [1, 1, 2]  # Both repeats stay separate.
+
+
+def test_folders_sharing_less_than_ninety_percent_are_not_suggested(managed, tmp_path):
+    config, added = scanned(managed, tmp_path, copy=TWENTY[:17])  # 85%.
+    assert state(config, added)[1]['export_suggestions'] == []
+
+
+def test_exact_matches_keep_their_suggestion_identity(source):
+    from local_asset_library.catalog import digest
+    config, added = source
+    [suggestion] = state(config, added)[1]['export_suggestions']
+    manifest = digest(sorted(NAMES))
+    assert 'near' not in suggestion and suggestion['name_manifest_sha256'] == manifest
+    assert suggestion['id'] == digest({'anchor': 'Exports', 'folders': ['Engine Copy', 'FBX', 'gLTF'], 'manifest': manifest})
+
+
+def test_the_owner_cli_explains_a_near_miss(managed, tmp_path, capsys):
+    from local_asset_library.owner_commands import sources_command
+    config, added = scanned(managed, tmp_path, copy=TWENTY[:19])
+    args = Namespace(action='exports', key=added['key'], group=None, separate=None, exclude=None, undo=None, json=False, quiet=False)
+    sources_command(args, config)
+    out = capsys.readouterr().out
+    assert 'FBX, Unity FBX, gLTF share 19 model names' in out
+    assert 'not in every folder: 1 in FBX, 1 in gLTF (those stay as they are)' in out

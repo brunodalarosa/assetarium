@@ -282,8 +282,13 @@ def sources_command(args, config):
         status = sources.source_status(config, source)
         for s in status.get('export_suggestions', []):
             where = s['anchor'] or 'the source root'
-            say(args, f"{s['id']}\n    In {where}: {', '.join(s['folders'])} have the same {s['names']} model names "
-                      f"(e.g. {', '.join(s['sample_names'][:3])}). Keeps {s['reference']}"
+            near = s.get('near') or {}
+            differs = '; '.join(part for part in (
+                near.get('only') and 'not in every folder: ' + ', '.join(f'{n} in {f}' for f, n in near['only'].items()),
+                near.get('repeated') and 'repeated inside: ' + ', '.join(f'{n} in {f}' for f, n in near['repeated'].items())) if part)
+            say(args, f"{s['id']}\n    In {where}: {', '.join(s['folders'])} {'share' if near else 'have the same'} {s['names']} model names "
+                      f"(e.g. {', '.join(s['sample_names'][:3])})" + (f"; {differs} (those stay as they are)" if differs else '')
+                      + f". Keeps {s['reference']}"
                       + (f"; already grouped: {', '.join(s['grouped_folders'])}" if s['grouped_folders'] else '') + '.')
         for d in status.get('export_decisions', []):
             say(args, f"{d['id']}  answered {d['decision']}: {d['anchor'] or 'root'} / {', '.join(d['folders'])}")

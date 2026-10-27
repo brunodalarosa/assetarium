@@ -17,7 +17,7 @@ import traceback
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from test_sources import managed  # noqa: E402
-from test_source_exports import kit  # noqa: E402
+from test_source_exports import TWENTY, kit, near_kit  # noqa: E402
 from local_asset_library import sources  # noqa: E402
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome  # noqa: E402
 from local_asset_library.incremental import working  # noqa: E402
@@ -36,6 +36,9 @@ config, _, one, two = managed.__wrapped__(fixture)
 root = kit(fixture / 'kit')
 added = sources.add(config, str(root))
 sources.scan_source(config, added)
+# A near miss: Unity FBX lacks prop_19 and repeats prop_0 in a second subfolder.
+near = sources.add(config, str(near_kit(fixture / 'near', copy=TWENTY[:19], repeated=('prop_0',))))
+sources.scan_source(config, near)
 originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
 
 
@@ -82,7 +85,7 @@ def wait(expression, timeout=60):
 
 def verify():
     try:
-        ui.wait_ready(extra="lal.state.sources.length===3")
+        ui.wait_ready(extra="lal.state.sources.length===4")  # Two fixture sources, the kit and the near miss.
         ui.js("$('nav-processing').click()")
         wait("document.querySelector('[data-source=kit] .source-export-suggestions')")
         assert ui.js("document.querySelector('[data-source=kit] .source-export-suggestions').textContent.includes('1 folder set looks')")
@@ -121,6 +124,16 @@ def verify():
         wait_assets(6)
         wait(f"{IDLE}&&!{KIT}.querySelector('[aria-label=\"Excluded folder patterns\"]')&&{KIT}.querySelector('.export-suggestion')")
         report['checks'].append('Removing the chip rescans and brings the folder and its suggestion back')
+        NEAR = f"document.querySelector('.source-row:has([data-source={near['key']}])')"
+        wait(f"{NEAR}&&{NEAR}.querySelector('.export-suggestion')")
+        text = ui.js(f"{NEAR}.querySelector('.export-suggestion').textContent")
+        assert 'In Pack, FBX, Unity FBX, gLTF share 18 model names' in text, text
+        assert '2 in FBX and 2 in gLTF are not in every folder; 1 name repeats inside Unity FBX. Those stay as they are.' in text, text
+        assert 'Excluding stops scanning the extra folders (Unity FBX), including 1 name that would not be grouped.' in text, text
+        ui.js(f"{NEAR}.querySelector('.export-suggestion').scrollIntoView()")
+        ui.capture('04b-near-miss.png')
+        report['checks'].append('A near miss says how many names the folders share, which names stay as they are, '
+                                'and what excluding would also skip')
         window.resize(680, 900)
         wait('innerWidth<761')
         ui.js(f"{KIT}.scrollIntoView()")

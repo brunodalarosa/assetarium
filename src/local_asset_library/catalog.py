@@ -232,12 +232,16 @@ def export_slot(pack_relative):
 
 
 SUGGESTION_MIN_NAMES = 3
+NEAR_SHARE = 0.9  # A near miss shares at least this share of every folder's model files.
 
 
 def export_candidates(model_rows):
     """Sibling folders whose model files have the same names (decision 0019).
 
     Names are file stems without case, ignoring extensions and subfolders, each unique in its folder.
+    Near misses are suggested too: sibling folders sharing at least 90% of each folder's files, where a
+    name repeated inside a folder is set aside rather than disqualifying it; only names found once in
+    every folder are grouped. Exact matches keep their identities, so earlier answers stay valid.
     Returns {id: candidate}; nothing here groups anything.
     """
     names = defaultdict(list)
@@ -251,7 +255,7 @@ def export_candidates(model_rows):
         if len(stems) >= SUGGESTION_MIN_NAMES and len(stems) == len(set(stems)):
             parent = PurePosixPath(folder).parent.as_posix()
             siblings[("" if parent == "." else parent, tuple(sorted(stems)))].append(folder)
-    candidates = {}
+    candidates = near_candidates(names)
     for (anchor, stems), folders in siblings.items():
         if len(folders) < 2:
             continue
@@ -261,6 +265,49 @@ def export_candidates(model_rows):
         candidates[identifier] = {"id": identifier, "anchor": anchor, "folders": labels, "names": len(stems),
                                   "name_manifest_sha256": manifest, "sample_names": list(stems[:5]),
                                   "rows": {PurePosixPath(f).name: dict(names[f]) for f in folders}}
+    return candidates
+
+
+def near_candidates(names):
+    """Sibling folder sets that share most, not all, of their model names (see export_candidates)."""
+    by_parent = defaultdict(list)
+    for folder, entries in names.items():
+        if len(entries) >= SUGGESTION_MIN_NAMES:
+            parent = PurePosixPath(folder).parent.as_posix()
+            by_parent["" if parent == "." else parent].append(folder)
+    candidates = {}
+    for anchor, folders in sorted(by_parent.items()):
+        counts = {f: Counter(stem for stem, _ in names[f]) for f in folders}
+        unique = {f: {stem for stem, n in counts[f].items() if n == 1} for f in folders}
+        near = lambda shared, members: len(shared) >= SUGGESTION_MIN_NAMES and all(
+            len(shared) >= NEAR_SHARE * len(names[f]) for f in members)
+        linked = {f: {f} for f in folders}  # Folders joined by a near pair, as connected sets.
+        for index, first in enumerate(folders):
+            for second in folders[index + 1:]:
+                if near(unique[first] & unique[second], (first, second)) and linked[first] is not linked[second]:
+                    merged = linked[first] | linked[second]
+                    for member in merged:
+                        linked[member] = merged
+        for members in {id(group): group for group in linked.values()}.values():
+            members = sorted(members)
+            shared = set.intersection(*(unique[f] for f in members))
+            exact = all(len(counts[f]) == len(names[f]) and set(counts[f]) == set(counts[members[0]]) for f in members)
+            if len(members) < 2 or exact or not near(shared, members):
+                continue
+            labels = {f: PurePosixPath(f).name for f in members}
+            only = {labels[f]: sorted(unique[f] - shared) for f in members}
+            repeated = {labels[f]: sorted(stem for stem, n in counts[f].items() if n > 1) for f in members}
+            manifest = digest({"shared": sorted(shared), "only": only, "repeated": repeated})
+            ordered = sorted(labels.values())
+            identifier = digest({"anchor": anchor, "folders": ordered, "manifest": manifest, "match": "near"})
+            candidates[identifier] = {
+                "id": identifier, "anchor": anchor, "folders": ordered, "names": len(shared),
+                "name_manifest_sha256": manifest, "sample_names": sorted(shared)[:5],
+                "near": {"files": {labels[f]: len(names[f]) for f in members},
+                         "only": {k: len(v) for k, v in only.items() if v}, "only_samples": {k: v[:3] for k, v in only.items() if v},
+                         "repeated": {k: len(v) for k, v in repeated.items() if v},
+                         "repeated_samples": {k: v[:3] for k, v in repeated.items() if v}},
+                "rows": {labels[f]: {stem: row for stem, row in names[f] if stem in shared} for f in members}}
     return candidates
 
 
@@ -331,6 +378,10 @@ def group_models(pack, model_rows, decisions=(), suggestions=None):
                     "matching_name_count": candidate["names"], "name_manifest_sha256": candidate["name_manifest_sha256"],
                     "decision_utc": decision.get("utc"),
                     "basis": "Owner-confirmed sibling folders with identical model name sets; geometry equivalence not inspected."}
+        if candidate.get("near"):
+            evidence.update(near={k: candidate["near"][k] for k in ("files", "only", "repeated")},
+                            basis="Owner-confirmed sibling folders sharing these model names; names found in only some "
+                                  "folders or repeated inside one stay separate. Geometry equivalence not inspected.")
         for stem, row in rows[reference].items():
             # The reference file keeps its identity, so its asset ID and finished work stay.
             identity = approved.get(row["path"], (separate(row), None))[0]

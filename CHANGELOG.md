@@ -41,6 +41,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- Duplicate export folder suggestions also catch near misses: folders that share at least 90% of
+  their model names, such as a `Unity FBX` copy missing a few models or repeating one name in two
+  subfolders. The suggestion says which names stay as they are, and Group groups only the shared
+  names. Earlier answers and exact suggestions are unchanged.
 - Search data on the CPU builds about 25% faster: it uses more CPU threads than one per physical
   core. The speed test picks how many (the fewest within 3% of the fastest), and **Settings →
   General → Search → CPU threads for search data** (`local-assets settings set --search-threads`)

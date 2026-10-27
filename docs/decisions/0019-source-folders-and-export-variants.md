@@ -15,7 +15,15 @@ capabilities, all saved per source in `metadata-lal/source.json`:
 - **Duplicate export folder suggestions** (`export_decisions`). A scan compares sibling folders by
   the stems of their model files (no extension, case or subfolders; each unique in its folder, at
   least 3). Equal sets become a suggestion unless every folder is already grouped by the
-  recognized layouts. Nothing groups on a guess: the owner answers **Group**, **Keep separate** or
+  recognized layouts. **Near misses** are suggested too (October 27, 2026): sibling folders whose
+  names found once in every folder cover at least 90% of each folder's model files, for example an
+  engine copy missing a few models, or a folder repeating one name in two subfolders. A name
+  repeated inside a folder is set aside instead of disqualifying the folder. Group then groups only
+  the names found once in every folder; names in only some folders, or repeated inside one, stay as
+  they are. The card and CLI say how many names are shared and which stay as they are, and Exclude
+  says how many ungrouped names it would also skip. Near-miss answers are bound to the shared names
+  and to each folder's remaining and repeated names. Exact matches keep their suggestion identities,
+  so earlier answers stay valid. Nothing groups on a guess: the owner answers **Group**, **Keep separate** or
   **Exclude** (adds the extra folders to the exclusions). An answer is bound to the anchor, the
   folders and a hash of the name list; when a folder's names change it stops applying (its files
   are separate again and the suggestion returns) and applies again if the names match again.
