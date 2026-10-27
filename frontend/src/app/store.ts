@@ -215,6 +215,8 @@ export interface AppState {
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
+  /** Rendering (decision 0022): device, renders at a time, memory and the speed test. */
+  render: { loading: boolean; busy: boolean; message: string; values: Json | null };
   setup: SetupState;
   appearance: string;
   runReport: Json | null;
@@ -259,6 +261,7 @@ let state: AppState = {
   sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
+  render: { loading: false, busy: false, message: "", values: null },
   setup: emptySetup(),
   appearance: boot.appearance, runReport: null, imageBackground: "checker", coverage: "",
   worker: "not_started", previews: 0,
@@ -336,7 +339,7 @@ export function goForward() {
   enterRoute(route(), previous);
 }
 function enterRoute(next: Route, previous: Route) {
-  if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadSources(), loadSetupState().catch(() => undefined)]);
+  if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadRenderSettings(), loadSources(), loadSetupState().catch(() => undefined)]);
   if (next.page === "processing") void Promise.all([loadSources(), loadImportFailures()]);
   if (next.page === "source" && next.key && (state.source.key !== next.key || previous.page !== "source")) void openSourceBrowser(next.key);
   if (next.page === "collections") void loadCollections();
@@ -833,6 +836,44 @@ export async function saveGeneralSettings(budget: string, formats: string[], bat
   } catch (error) {
     setState((s) => ({ general: { ...s.general, busy: false, message: (error as Error).message } }));
   }
+}
+
+/* -------------------------------- rendering ------------------------------ */
+
+export async function loadRenderSettings() {
+  setState((s) => ({ render: { ...s.render, loading: !s.render.values } }));
+  try {
+    const result = await api().render_settings();
+    if (result.status === "faulty") throw Error(result.reason);
+    setState((s) => ({ render: { ...s.render, loading: false, values: result } }));
+  } catch (error) {
+    setState((s) => ({ render: { ...s.render, loading: false, message: (error as Error).message } }));
+  }
+}
+/** Saves the rendering choices ("auto" or an empty memory field mean automatic); false when refused. */
+export async function saveRenderSettings(device: string, processes: string, memory: string) {
+  setState((s) => ({ render: { ...s.render, busy: true, message: "" } }));
+  try {
+    const result = await api().save_render_settings(device === "auto" ? null : device, processes === "auto" ? null : Number(processes),
+      memory.trim() ? Number(memory) : null);
+    if (result.status === "faulty") throw Error(result.reason);
+    setState({ render: { loading: false, busy: false, message: "", values: result } });
+    return true;
+  } catch (error) {
+    setState((s) => ({ render: { ...s.render, busy: false, message: (error as Error).message } }));
+    return false;
+  }
+}
+export async function renderTest(action: "start" | "cancel") {
+  setState((s) => ({ render: { ...s.render, busy: true, message: action === "start" ? "Starting the speed test…" : "Cancelling…" } }));
+  try {
+    const result = await api().render_test(action);
+    if (result.status === "faulty" || result.status === "busy") throw Error(result.reason);
+    setState((s) => ({ render: { ...s.render, busy: false, message: "" } }));
+  } catch (error) {
+    setState((s) => ({ render: { ...s.render, busy: false, message: (error as Error).message } }));
+  }
+  await loadRenderSettings();
 }
 
 /* ---------------------------------- setup -------------------------------- */
@@ -1638,6 +1679,7 @@ async function watchChanges() {
       }
       // Running operations also report worker liveness, which is not a file change.
       if (sourcesChanged || state.sources.some((source) => operationActive(source.operation))) await loadSources();
+      if (route().page === "settings" && (sourcesChanged || operationActive(state.render.values?.operation))) void loadRenderSettings();
     } finally {
       checking = false;
     }

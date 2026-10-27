@@ -7,9 +7,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/beui/tabs";
 import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
-import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, SEARCH_HELP, setupRecordText, sourceMessage } from "../app/format";
 import {
-  chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, saveGeneralSettings, setAppearance, type SettingsTab, sourceAction, sourceFolders, useApp,
+  BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, operationActive, RENDER_HELP, renderNowText, renderTestLine, SEARCH_HELP, setupRecordText,
+  sourceMessage, SPEED_TEST_HELP,
+} from "../app/format";
+import {
+  chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, renderTest, saveGeneralSettings, saveRenderSettings, setAppearance, type SettingsTab,
+  sourceAction, sourceFolders, useApp,
 } from "../app/store";
 import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
@@ -75,8 +79,98 @@ function SetupCard() {
   );
 }
 
+interface RenderDraft {
+  device: string;
+  processes: string;
+  memory: string;
+}
+
+/** Device, renders at a time and memory (decision 0022); saved with the form, the speed test starts here. */
+function Rendering({ draft, onDraft, disabled }: { draft: RenderDraft; onDraft: (draft: RenderDraft) => void; disabled: boolean }) {
+  const render = useApp((s) => s.render);
+  const values = render.values;
+  if (!values) return <Card id="rendering-card" title="Rendering" help={RENDER_HELP}><SkeletonLines lines={2} /></Card>;
+  const plan = values.plan;
+  const test = values.test;
+  const running = operationActive(values.operation);
+  const selected = draft.device === "auto" ? test?.chosen || "cpu" : draft.device;
+  const best = test?.results.find((r: Json) => r.key === selected)?.best?.processes ?? plan.best;
+  const counts = Array.from({ length: Math.max(best, Number(draft.processes) || 0) }, (_, i) => String(i + 1));
+  return (
+    <Card id="rendering-card" title="Rendering" help={RENDER_HELP}>
+      <p id="render-now" className="text-[13px] leading-relaxed">{renderNowText(plan)}</p>
+      <div className="flex flex-wrap gap-4">
+        <SelectField id="render-device" label="Render device" value={draft.device} disabled={disabled} className="w-72"
+          onChange={(device) => onDraft({ ...draft, device })}
+          options={[["auto", "Automatic (fastest in the speed test)"], ...values.devices.map((d: Json): [string, string] => [d.key, d.label])]} />
+        <SelectField id="render-processes" label="Renders at a time" value={draft.processes} disabled={disabled} className="w-56"
+          onChange={(processes) => onDraft({ ...draft, processes })}
+          options={[["auto", `Automatic (${best})`], ...counts.map((n): [string, string] => [n, n])]} />
+        <TextField id="render-memory" label="Memory for rendering (GiB)" type="number" min={1} max={4096} step={1} value={draft.memory}
+          disabled={disabled} className="w-56" placeholder={plan.allowance_gib == null ? "Automatic" : `Automatic (${plan.allowance_gib} GiB now)`}
+          onChange={(e) => onDraft({ ...draft, memory: e.target.value })} />
+      </div>
+      <p className="hint text-[12.5px] leading-relaxed text-muted-foreground">
+        Leave memory empty for automatic: 70% of the memory free when processing starts.
+        {plan.available_gib != null && ` ${plan.available_gib} GiB is free now; each render uses about ${plan.process_gib} GiB.`}
+      </p>
+      <SpeedTestLink running={running} />
+    </Card>
+  );
+}
+
+/** "See the speed test" for the Rendering and Search cards, whose Automatic choices come from it. */
+function SpeedTestLink({ running }: { running?: boolean }) {
+  return (
+    <button type="button" className="speed-test-link w-fit text-[12.5px] font-medium text-primary hover:underline"
+      onClick={() => document.getElementById("speed-test-card")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+      {running ? "Speed test running…" : "See the speed test"}
+    </button>
+  );
+}
+
+/** One test for the render device, renders at a time and, on the CPU, search data threads (decision 0022). */
+function SpeedTest() {
+  const render = useApp((s) => s.render);
+  const values = render.values;
+  if (!values) return <Card id="speed-test-card" title="Speed test" help={SPEED_TEST_HELP}><SkeletonLines lines={2} /></Card>;
+  const test = values.test;
+  const running = operationActive(values.operation);
+  const status = running ? values.operation.phase : render.message || (values.operation?.status === "complete" || values.operation?.status === "cancelled" ? values.operation.phase : "");
+  return (
+    <Card id="speed-test-card" title="Speed test" help={SPEED_TEST_HELP}>
+      <div className="grid gap-3 text-[12.5px] leading-relaxed">
+        {test && <p id="speed-test-when" className="text-muted-foreground">Last run: {new Date(test.utc).toLocaleString()}</p>}
+        <div className="grid gap-1">
+          <p className="font-medium">Rendering</p>
+          {test ? (
+            <ul id="render-test" className="grid gap-0.5">{test.results.map((r: Json) => <li key={r.key}>{renderTestLine(r, test.chosen)}</li>)}</ul>
+          ) : (
+            <p id="render-test" className="text-muted-foreground">{values.blender ? "Not tested yet." : "Set up Blender to test render speed."}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-4">
+        {running ? (
+          <Button type="button" variant="secondary" id="render-test-cancel" disabled={render.busy} onClick={() => void renderTest("cancel")}>Cancel test</Button>
+        ) : (
+          <Button type="button" variant="secondary" id="render-test-start" disabled={render.busy || !values.blender} onClick={() => void renderTest("start")}>
+            {test ? "Test again" : "Test speed"}
+          </Button>
+        )}
+        <p id="render-test-message" role="status" aria-live="polite" className="text-[12.5px] leading-relaxed text-muted-foreground">{status}</p>
+      </div>
+    </Card>
+  );
+}
+
 function General() {
   const general = useApp((s) => s.general);
+  const render = useApp((s) => s.render.values);
+  const [rendering, setRendering] = useState<RenderDraft>({ device: "auto", processes: "auto", memory: "" });
+  useEffect(() => {
+    if (render) setRendering({ device: render.device ?? "auto", processes: render.processes ? String(render.processes) : "auto", memory: render.memory_gib ? String(render.memory_gib) : "" });
+  }, [render?.device, render?.processes, render?.memory_gib]);
   const engines = useApp((s) => s.setup.info?.engines) || [];
   const devices = useApp((s) => s.setup.info?.search_devices) || [];
   const [budget, setBudget] = useState("");
@@ -99,9 +193,10 @@ function General() {
     setDevice(general.values.search_device);
   }, [general.values]);
   const disabled = general.loading || general.busy || !general.values;
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
+    if (render && !(await saveRenderSettings(rendering.device, rendering.processes, rendering.memory))) return;
     void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } }, device);
   };
   return (
@@ -147,6 +242,8 @@ function General() {
         <Card id="search-card" title="Search" help={SEARCH_HELP}>
           <SearchDeviceField value={device} onChange={setDevice} devices={devices} disabled={disabled} idPrefix="settings" />
         </Card>
+        <Rendering draft={rendering} onDraft={setRendering} disabled={disabled} />
+        <SpeedTest />
         <div className="flex flex-wrap items-center gap-4">
           <Button type="submit" id="save-general-settings" disabled={disabled}>Save</Button>
           <p id="general-settings-message" role="status" aria-live="polite" className="text-[12.5px] leading-relaxed text-muted-foreground">{general.message}</p>

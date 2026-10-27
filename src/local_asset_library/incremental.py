@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+import threading
 import time
 import uuid
 
@@ -21,7 +22,7 @@ from .membership import records, membership
 from .publication import atomic_json, generation, line_ending_hashes, read_only
 from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
-from .inspection import blender_command, choose_source, discover_blender, environment, run_process, validate_result
+from .inspection import choose_source, discover_blender, validate_result
 
 STAGES = ("inspection", "caption", "embeddings")
 COVERAGE_STAGES = ('inventory','inspection','previews','caption','embeddings')
@@ -30,6 +31,17 @@ IMAGE_CAPTION_PROMPT_VERSION = 'image-v1'
 PROMPT_VERSIONS = {'v1', 'v2', 'v3', 'v4', IMAGE_CAPTION_PROMPT_VERSION}
 WORK = "work"
 _blender_runtime = {}
+# Parallel inspections render outside it; catalog reads/writes around them take turns.
+_catalog = threading.RLock()
+GPU_WAIT = 30  # Seconds GPU renders wait for another GPU job, like the other GPU stages.
+# blender_worker.py edits whose CPU renders are proven identical (scripts/check-render-stability.py), mapped
+# to the hash finished inspections recorded, so an equivalent edit never re-queues them (decision 0022).
+EQUIVALENT_WORKERS = {
+    '69520d2225259116d055fb94d8c4948b5bb8e020773b3e9889885632dee6f690':  # Render device from the job (LF)
+        'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
+    'b9ac48c40e1c3d527f061438a98164ae3adc184c89832c52bc49ba66eadc5ab1':  # The same with CRLF endings
+        'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
+}
 
 
 def working(config):
@@ -129,25 +141,28 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
         return asset,source,reason,digest(content)
     code = config.project_root / "src/local_asset_library"
     files = {"worker": code / "blender_worker.py", "render_math": code / "render_math.py"}
+    worker = file_hash(files["worker"])
     settings = {"source": content, "resolution": resolution,
-        "worker": file_hash(files["worker"]), "render_math": file_hash(files["render_math"]),
+        "worker": EQUIVALENT_WORKERS.get(worker, worker), "render_math": file_hash(files["render_math"]),
         "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None}
     if repair:
         files['repair_worker'] = code / ('blender_shared_dependency_worker.py' if repair.get('kind') == 'shared_dependency_paths'
                                         else 'blender_repair_worker.py')
         settings['repair_worker'] = file_hash(files['repair_worker'])
-    return asset, source, reason, recorded_fingerprint(settings, files, recorded)
+    return asset, source, reason, recorded_fingerprint(settings, files, recorded, EQUIVALENT_WORKERS)
 
 
-def recorded_fingerprint(value, files, recorded=None):
+def recorded_fingerprint(value, files, recorded=None, equivalents=None):
     """digest(value), or ``recorded`` when it differs only by LF/CRLF endings of ``files``.
 
     ``value[key]`` is the hash of ``files[key]``. Python and uv read these files as
     text, so a git checkout that swaps line endings must not re-queue finished work.
+    ``equivalents`` maps a file hash to the proven-equivalent hash recorded instead.
     """
     current = digest(value)
+    equivalents = equivalents or {}
     if recorded and recorded != current:
-        for hashes in product(*(line_ending_hashes(path) for path in files.values())):
+        for hashes in product(*([equivalents.get(h, h) for h in line_ending_hashes(path)] for path in files.values())):
             if digest({**value, **dict(zip(files, hashes))}) == recorded:
                 return recorded
     return current
@@ -347,13 +362,15 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
     from .asset_structure import asset_type
     if asset_type(record) == 'image':
         from .image_inspection import run
-        return run(config, record, fingerprint)
+        with _catalog:
+            return run(config, record, fingerprint)
     from .inspection import publish
-    asset, source, reason, _ = inspection_input(config, record, resolution, formats=formats)
-    key = (str(config.blender), config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None)
-    if key not in _blender_runtime:
-        _blender_runtime[key] = discover_blender(config)
-    blender, runtime = _blender_runtime[key]
+    with _catalog:
+        asset, source, reason, _ = inspection_input(config, record, resolution, formats=formats)
+        key = (str(config.blender), config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None)
+        if key not in _blender_runtime:
+            _blender_runtime[key] = discover_blender(config)
+        blender, runtime = _blender_runtime[key]
     relative = f"inspection/{record['asset_id']}/{source['format']}/{fingerprint[:16]}"
     output = config.output_path("data", relative)
     job = {"schema_version": 1, "project_root": str(config.project_root), "source_root": str(config.source_root),
@@ -361,6 +378,10 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
         "source_sha256": source["sha256"], "output": str(output), "resolution": resolution}
     if config.source_key:
         job.update(source_prefix=config.source_key, metadata_root=str(config.metadata_root))
+    from . import render_pool
+    device = render_pool.job_device(config)
+    if device:
+        job['render_device'] = device
     worker = 'blender_worker.py'
     if record.get('texture_repair'):
         from .texture_repair import validate_recipe
@@ -373,19 +394,29 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
     task = output / "job.json"
     result_path = output / "result.json"
     if result_path.exists():
-        result = json.loads(result_path.read_text(encoding="utf-8"))
-        validate_result(config, job, result)
-    else:
+        try:
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+        except ValueError:
+            # Cut off by an interrupted run: an unfinished render, not an asset fault. Keep the partial file.
+            result_path.replace(output / f"result.interrupted-{uuid.uuid4().hex[:8]}.json")
+            result = None
+        if result is not None:
+            validate_result(config, job, result)
+    if not result_path.exists():
         save_json(task, job)
-        command = blender_command(blender, "--python-exit-code", "5", "--python",
-                                  str(config.project_root / 'src/local_asset_library' / worker), "--", str(task))
-        process = run_process(command, config.project_root, environment(config), timeout)
+        process = render_pool.run(config, blender, config.project_root / 'src/local_asset_library' / worker, task, timeout)
         (output / "blender.log").write_text(process["output"], encoding="utf-8")
         if process["timed_out"] or process["returncode"] != 0 or not result_path.exists():
             raise RuntimeError(f"Inspection timeout/exit {process['returncode']}; see {output / 'blender.log'}")
         result = json.loads(result_path.read_text(encoding="utf-8"))
+        unavailable = [e for e in result.get("errors", []) if e.startswith("Render device unavailable: ")]
+        if unavailable:
+            # A machine fault, not this asset's: keep the evidence aside and leave the asset pending.
+            result_path.replace(output / f"result.device-unavailable-{uuid.uuid4().hex[:8]}.json")
+            raise render_pool.DeviceUnavailable(unavailable[0] + ". Choose Automatic or CPU in Settings → General")
         validate_result(config, job, result)
-    publish(config, asset, source, reason, result, fingerprint, relative)
+    with _catalog:
+        publish(config, asset, source, reason, result, fingerprint, relative)
     return {"status": result["status"], "result_path": str(result_path), "seconds": result.get("elapsed_seconds"), "errors": result.get("errors", [])}
 
 
@@ -457,7 +488,7 @@ def restore_reused(record, stage, apply=True):
 
 
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
-            cancelled=None, progress=None, asset_ids=None):
+            cancelled=None, progress=None, asset_ids=None, status=None):
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
@@ -546,6 +577,10 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         size = batch_size(config) if stage == 'caption' else 1
 
         def settle(record, fp, run):
+            with _catalog:
+                record_outcome(record, fp, run)
+
+        def record_outcome(record, fp, run):
             identifier = record["asset_id"]
             try:
                 outcome = run()
@@ -573,44 +608,86 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
             atomic_json(status_path,{'status':'running','stage':stage,'selected':len(chosen),'completed':len(report['outcomes']),'pid':os.getpid(),'last_asset':identifier,'last_status':outcome['status']})
 
         from .retrieval import source_check
-        for start in range(0, len(chosen), size):
-            if cancelled and cancelled():
-                report['cancelled'] = True
-                break
-            group = chosen[start:start + size]
-            if progress:
-                progress(group[0][0]["asset_id"], len(report['outcomes']), len(chosen))
-            ready = []
-            for record, fp in group:
-                checkpoint(db, record["asset_id"], stage, fp, "running", {"resumable": True})
-                print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
-                try:
-                    checked = deepcopy(record)
-                    if stage == "inspection":
-                        checked["technical"] = None
-                    source_check(work, checked)
-                    inputs = image_inputs(work, record) if stage == "caption" else None
-                except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
-                    settle(record, fp, lambda exc=exc: returned(exc))
-                    continue
-                if stage == "inspection":
-                    settle(record, fp, lambda: run_inspection(work, record, fp, resolution, formats=formats))
-                else:
-                    ready.append((record, fp, inputs))
-            if ready:
-                from .description_engines import EngineStop
-                try:
-                    results = run_captions(work, ready, backend, batch_size=size)
-                except EngineStop as exc:
-                    # Ledger rows stay "running", which the next pass treats as pending.
-                    report.update(stopped=str(exc), elapsed_seconds=time.monotonic() - started)
-                    save_json(config.output_path("data", f"library/batches/{stage}-{uuid.uuid4().hex}.json"), report)
-                    atomic_json(status_path,{'status':'stopped','stage':stage,'completed':len(report['outcomes']),'reason':str(exc)})
-                    raise
-                for (record, fp, _), result in zip(ready, results):
-                    settle(record, fp, lambda result=result: returned(result))
-            if progress:
-                progress(None, len(report['outcomes']), len(chosen))
+        from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+        from contextlib import ExitStack
+        inflight, executor, parallel = [], None, 1
+
+        def collect(everything=False):
+            # Settle finished parallel renders on this thread; keep at most one job per render process.
+            while inflight and (everything or len(inflight) >= parallel):
+                done, _ = wait([future for _, _, future in inflight], return_when=FIRST_COMPLETED)
+                for item in [item for item in inflight if item[2] in done]:
+                    inflight.remove(item)
+                    settle(item[0], item[1], item[2].result)
+                    if progress:
+                        progress(None, len(report['outcomes']), len(chosen))
+
+        with ExitStack() as stack:
+            if stage == "inspection":
+                from . import render_devices, render_pool
+                from .asset_structure import asset_type
+                if any(asset_type(record) == 'model_3d' for record, _ in chosen):
+                    render_devices.ensure(work, progress=status, cancelled=cancelled)
+                plan = render_pool.plan(work)
+                report['render'] = {key: plan[key] for key in ('processes', 'threads', 'reason', 'device_label')}
+                if plan['device']:
+                    tested = render_devices.saved(work)
+                    if tested and plan['device_key'] not in {render_devices.key(d) for d in tested['devices']}:
+                        raise render_pool.DeviceUnavailable(f"The chosen render device ({plan['device_label']}) was not found. "
+                                                            "Choose Automatic or CPU in Settings → General")
+                    from .gpu_queue import lease
+                    try:
+                        stack.enter_context(lease(config, 'batch-source-inspection', timeout=GPU_WAIT))
+                    except ConfigError as exc:
+                        raise render_pool.DeviceUnavailable('The GPU is busy with another job (descriptions or search). '
+                            'Process assets again when it finishes, or choose CPU in Settings → General') from exc
+                stack.enter_context(render_pool.opened(work, plan['processes'], plan['threads'], plan['device']))
+                if plan['processes'] > 1:
+                    parallel = plan['processes']
+                    executor = stack.enter_context(ThreadPoolExecutor(plan['processes'], thread_name_prefix='render'))
+            for start in range(0, len(chosen), size):
+                if cancelled and cancelled():
+                    report['cancelled'] = True
+                    break
+                group = chosen[start:start + size]
+                if progress:
+                    progress(group[0][0]["asset_id"], len(report['outcomes']), len(chosen))
+                ready = []
+                for record, fp in group:
+                    checkpoint(db, record["asset_id"], stage, fp, "running", {"resumable": True})
+                    print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
+                    try:
+                        checked = deepcopy(record)
+                        if stage == "inspection":
+                            checked["technical"] = None
+                        source_check(work, checked)
+                        inputs = image_inputs(work, record) if stage == "caption" else None
+                    except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
+                        settle(record, fp, lambda exc=exc: returned(exc))
+                        continue
+                    if stage == "inspection" and executor:
+                        inflight.append((record, fp, executor.submit(run_inspection, work, record, fp, resolution, formats=formats)))
+                        collect()
+                    elif stage == "inspection":
+                        settle(record, fp, lambda: run_inspection(work, record, fp, resolution, formats=formats))
+                    else:
+                        ready.append((record, fp, inputs))
+                if ready:
+                    from .description_engines import EngineStop
+                    try:
+                        results = run_captions(work, ready, backend, batch_size=size)
+                    except EngineStop as exc:
+                        # Ledger rows stay "running", which the next pass treats as pending.
+                        report.update(stopped=str(exc), elapsed_seconds=time.monotonic() - started)
+                        save_json(config.output_path("data", f"library/batches/{stage}-{uuid.uuid4().hex}.json"), report)
+                        atomic_json(status_path,{'status':'stopped','stage':stage,'completed':len(report['outcomes']),'reason':str(exc)})
+                        raise
+                    for (record, fp, _), result in zip(ready, results):
+                        settle(record, fp, lambda result=result: returned(result))
+                if progress:
+                    progress(None, len(report['outcomes']), len(chosen))
+            if executor:
+                collect(everything=True)
         report["elapsed_seconds"] = time.monotonic() - started
         report['complete']=sum(o['status']=='complete' for o in report['outcomes'])
         report['failed']=sum(o['status']=='failed' for o in report['outcomes'])

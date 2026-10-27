@@ -344,8 +344,9 @@ def test_empty_source_and_metadata_are_excluded_from_scans(managed,tmp_path):
 
 
 def test_cancellation_finishes_current_inspection_and_checkpoints(managed,monkeypatch):
-    from local_asset_library import incremental
+    from local_asset_library import incremental, render_pool
     config,_,one,_=managed
+    render_pool.save(config,1,None)  # One render process: exactly the current asset finishes.
     sources.scan_source(config,one);scoped=sources.bound(config,one)
     stop=[False];finished=[]
     def inspect(work,record,*args,**kwargs):

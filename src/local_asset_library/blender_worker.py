@@ -198,7 +198,32 @@ def inspect(source_root):
                             "Action data and armatures are enumerated, not played or behaviorally validated."]}
 
 
-def render(technical, output, resolution):
+DEVICE_UNAVAILABLE = "Render device unavailable: "
+
+
+def use_device(scene, device):
+    """CPU unless the job names a GPU (decision 0022); a missing GPU stops the run, never a silent CPU render."""
+    if not device or device.get("type") == "CPU":
+        scene.cycles.device = "CPU"
+        scene.cycles.denoising_use_gpu = False
+        return "CPU", "OpenImageDenoise CPU"
+    preferences = bpy.context.preferences.addons["cycles"].preferences
+    try:
+        preferences.compute_device_type = device["backend"]
+        preferences.get_devices()
+    except (TypeError, KeyError, AttributeError) as exc:
+        raise RuntimeError(DEVICE_UNAVAILABLE + str(exc)) from exc
+    chosen = [d.name for d in preferences.devices if d.type == device["backend"] and d.id == device["id"]]
+    if not chosen:
+        raise RuntimeError(DEVICE_UNAVAILABLE + device.get("name", device["id"]))
+    for candidate in preferences.devices:
+        candidate.use = candidate.type == device["backend"] and candidate.id == device["id"]
+    scene.cycles.device = "GPU"
+    scene.cycles.denoising_use_gpu = True
+    return f"GPU ({device['backend']}: {chosen[0]})", "OpenImageDenoise GPU"
+
+
+def render(technical, output, resolution, device=None):
     scene = bpy.context.scene
     # Keep imported model objects/materials; hide source cameras/lights, isolate from their staging.
     models = [o for o in scene.objects if o.type in {"MESH", "ARMATURE"}]
@@ -216,12 +241,11 @@ def render(technical, output, resolution):
     bpy.context.window.scene = scene
     scene.frame_set(technical["sample_frame"])
     scene.render.engine = "CYCLES"
-    scene.cycles.device = "CPU"
+    device_label, denoising = use_device(scene, device)
     scene.cycles.samples = 128
     scene.cycles.use_adaptive_sampling = False
     scene.cycles.use_denoising = True
     scene.cycles.denoiser = "OPENIMAGEDENOISE"
-    scene.cycles.denoising_use_gpu = False
     scene.cycles.seed = 0
     scene.cycles.use_animated_seed = False
     scene.render.resolution_x = scene.render.resolution_y = resolution
@@ -302,7 +326,7 @@ def render(technical, output, resolution):
                         "camera_location": list(camera.location), "camera_rotation_euler": list(camera.rotation_euler),
                         "quality": quality})
     return records, {"engine": scene.render.engine, "resolution": [resolution, resolution],
-                     "device": "CPU", "samples": 128, "seed": 0, "denoising": "OpenImageDenoise CPU",
+                     "device": device_label, "samples": 128, "seed": 0, "denoising": denoising,
                      "coordinate_convention": "Blender imported Z-up; canonical front -Y and side +X, both elevated 14 degrees; source-author front unknown",
                      "projection": "orthographic; shared scale across all views", "framing": settings,
                      "color_management": {"view_transform": "Standard", "look": "None", "exposure": 0, "gamma": 1},
@@ -357,7 +381,7 @@ def main():
                               for texture in technical["textures"] if not texture["required_for_render"] and texture["status"] in {"missing", "rejected", "unknown"}]
         if bad:
             raise ValueError("Missing, rejected or unresolved texture dependencies: " + ", ".join(t["name"] for t in bad))
-        previews, settings = render(technical, output, job["resolution"])
+        previews, settings = render(technical, output, job["resolution"], job.get("render_device"))
         result.update(previews=previews, render_settings=settings)
         if any(v["quality"]["empty"] or v["quality"]["off_frame"] for v in previews):
             raise ValueError("Empty or off-frame preview detected")

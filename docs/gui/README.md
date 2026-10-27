@@ -150,7 +150,12 @@ click outside closes the panel and marks its notices read.
 descriptions. **Process assets** (offered only when there is pending work or a
 scan fault) runs inspection/previews and search vectors, then publishes, with
 progress through a final verification scan; **Cancel** finishes and saves the
-current asset first. **Generate descriptions** runs the optional describe
+renders already running first (several run at once, decision 0022). **Settings → General →
+Rendering** says what renders now and why ("Now: AMD Radeon RX 6800 (HIP), 2 renders at a time
+(fastest in the speed test)") and offers the render device, renders at a time and memory for
+rendering (saved with the form; empty memory is automatic), with a link to the **Speed test**
+card, which shows when the test last ran, one line per tested render device, and **Test speed** /
+**Test again** and **Cancel test** with the test's phase. **Generate descriptions** runs the optional describe
 operation per source with progress and **Cancel** (decision 0008); disabled
 buttons say why. Run reports open as a dialog; a GPU-memory stop suggests lowering
 **Settings → General → Description batch size** (1, 2, 4 or 8; default 8)

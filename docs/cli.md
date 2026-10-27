@@ -72,6 +72,21 @@ settings set --search-device cpu       # cuda or cpu: where search by descriptio
 Changing settings never deletes results or retries faults. Server addresses must be on
 this computer ([description engines](description-engines.md)).
 
+## Rendering
+
+```text
+rendering show                          # what renders now and why, the last speed test, device keys
+rendering set --device cpu              # auto (fastest tested), cpu, or a GPU key from "rendering show"
+rendering set --processes 2             # auto or 1-8: at most this many renders at a time
+rendering set --memory-gib 20           # auto (70% of free memory) or whole GiB, e.g. more overnight
+rendering test                          # run the speed test now (about 2 minutes); Ctrl+C cancels
+rendering cancel                        # cancel a running speed test; the previous result is kept
+```
+
+Limits only lower the number of renders at a time or change their memory allowance; rendering
+never goes past the fastest tested number or the memory free now
+([decision 0022](decisions/0022-parallel-rendering.md)).
+
 ## Setup
 
 The desktop app's setup wizard, in a terminal ([decision 0014](decisions/0014-setup-wizard.md));

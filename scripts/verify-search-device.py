@@ -73,7 +73,9 @@ def verify():
         ui.capture('01-search-cpu-saved.png')
         report['checks'].append('Choosing CPU saves search_device=cpu and the confirmation says to run the search check and process again')
         ui.js("(async()=>{$('nav-home').click();await until(()=>$('library-view'));$('nav-settings').click();return true})()")
-        wait("$('settings-search-device')&&$('settings-search-device').querySelector('[data-value=cpu]').getAttribute('aria-checked')==='true'")
+        # Settings reloads on return; Save stays disabled until the reload finishes.
+        wait("$('settings-search-device')&&$('settings-search-device').querySelector('[data-value=cpu]').getAttribute('aria-checked')==='true'"
+             "&&!$('save-general-settings').disabled")
         ui.js("(async()=>{$('save-general-settings').click();return true})()")
         wait("$('general-settings-message').textContent.startsWith('Saved.')")
         assert ui.js("!$('general-settings-message').textContent.includes('Search now runs')")

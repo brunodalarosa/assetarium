@@ -9,6 +9,9 @@ export interface Bridge {
   sources(): Promise<Json>;
   changes(): Promise<Json>;
   general_settings(): Promise<Json>;
+  render_settings(): Promise<Json>;
+  save_render_settings(device: string | null, processes: number | null, memoryGib: number | null): Promise<Json>;
+  render_test(action: "start" | "cancel"): Promise<Json>;
   save_general_settings(budget: string | number, formats: string[], batch: string | number, descriptionsEnabled?: boolean | null,
     engine?: string | null, server?: { url: string; model: string } | null, searchDevice?: string | null): Promise<Json>;
   setup_state(): Promise<Json>;

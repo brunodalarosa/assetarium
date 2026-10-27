@@ -226,3 +226,21 @@ def test_desktop_bridge_saves_description_batch_size_with_general_settings(index
         assert bridge.general_settings()['caption_batch_size'] == 2
     finally:
         bridge._close()
+
+
+def test_desktop_bridge_rendering_settings_and_speed_test(indexed):
+    config, _, _ = indexed
+    bridge = DesktopBridge(config, prestart_worker=False)
+    try:
+        current = bridge.render_settings()
+        assert current['status'] == 'ready' and current['device'] is None and current['plan']['device'] == 'CPU'
+        saved = bridge.save_render_settings('cpu', 2, 16)
+        assert saved['status'] == 'saved' and (saved['processes'], saved['memory_gib']) == (2, 16)
+        refused = bridge.save_render_settings(None, 0, None)
+        assert refused['status'] == 'faulty' and 'render processes' in refused['reason']
+        assert bridge.render_settings()['processes'] == 2
+        assert bridge.render_test('cancel') == {'status': 'idle'}
+        started = bridge.render_test('start')
+        assert started['status'] == 'faulty' and 'Set up Blender' in started['reason']
+    finally:
+        bridge._close()

@@ -153,3 +153,21 @@ def test_description_settings_and_setup_commands(managed, monkeypatch, capsys):
     assert run(config, 'setup', 'status') == 0
     out = capsys.readouterr().out
     assert 'This computer:' in out and 'Engine builtin:' in out and '[miss] NVIDIA GPU with BF16' in out
+
+
+def test_rendering_settings_and_speed_test_commands(managed, capsys):
+    config = managed[0]
+    from local_asset_library import render_pool
+    assert run(config, 'rendering', 'set', '--processes', '2', '--memory-gib', '12', '--device', 'cpu') == 0
+    assert render_pool.saved(config) == {'device': 'cpu', 'processes': 2, 'memory_gib': 12}
+    assert run(config, 'rendering', 'set', '--processes', 'auto') == 0
+    assert render_pool.saved(config) == {'device': 'cpu', 'processes': None, 'memory_gib': 12}
+    out = capsys.readouterr().out
+    assert 'Not speed-tested yet' in out and 'memory: 12 GiB' in out
+    assert run(config, 'rendering', 'set', '--processes', 'nine') == 2 and 'whole number' in capsys.readouterr().err
+    assert run(config, 'rendering', 'set', '--processes', '9') == 2
+    assert run(config, 'rendering', 'set') == 2
+    capsys.readouterr()
+    assert run(config, 'rendering', 'test') == 2 and 'Set up Blender' in capsys.readouterr().err
+    assert run(config, 'rendering', 'cancel') == 0 and 'No speed test is running' in capsys.readouterr().out
+

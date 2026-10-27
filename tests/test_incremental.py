@@ -185,7 +185,8 @@ def test_atomic_publication_pins_requests_and_shared_parity(library):
 
 def test_stage_checkpoint_failure_and_resume(library,monkeypatch):
     config,_=library
-    from local_asset_library import incremental
+    from local_asset_library import incremental, render_pool
+    render_pool.save(config,1,None)  # Exact attempt order; parallel interruption is covered in test_render_pool.
     attempted=[]
     def fake(config,record,fp,resolution=640,formats=None):
         attempted.append(record['asset_id'])
