@@ -26,6 +26,39 @@ scan failed the same way and recorded a source fault, so Process assets could no
   the others in `source_statuses` and the bridge). WebView2 `scripts/verify-source-list-fault.py`
   (`data/gui/source-list-fault-2026-10-26a/`). Full suite on this branch 677 passed, 2 skipped (`Real-Blender tests: 6 passed`).
 
+## October 26 — Parallel kept-open renders, render device and speed test, branch `feature/parallel-rendering`
+
+[Decision 0022](decisions/0022-parallel-rendering.md). One Blender per asset took 4.5 s per asset
+(1.35 s of it Blender startup) and left the 32-thread CPU and the Radeon RX 6800 mostly idle.
+
+- `render_pool.py` (slots of kept-open Blender, per-job timeout/crash isolation, recycling, a memory
+  guard, lifetime bound to the processing run, the plan from cores/memory/limits/speed test),
+  `blender_batch_worker.py` (fresh factory session per job around the unchanged worker),
+  `render_devices.py` (device listing, synthetic-shape speed test, summary). `incremental.process`
+  runs inspections in parallel with catalog writes and checkpoints on one thread; cancel settles running
+  renders; a truncated result is rendered again; a missing/failing GPU stops the run
+  (`DeviceUnavailable`) with assets pending. `blender_worker.py` takes `render_device` from the job;
+  `EQUIVALENT_WORKERS` keeps every finished fingerprint. Speed test operation `render-test`; bridge
+  `render_settings` / `save_render_settings` / `render_test`; **Settings → General → Rendering**;
+  `local-assets rendering show|set|test|cancel`. Test speed / Test again and the results live in their
+  own **Speed test** card; the Rendering card links to it.
+- **Measurements (this machine).** Real assets: 4.5 s → 2.6 s each on the CPU (4 kept-open), 1.8 s on
+  the GPU 2 at a time, 1.4 s with 4; 6 GPU processes paged with 14 GB free (stopped). Speed test:
+  CPU 3.51 s, RX 6800 1.68 s (2 at a time, limited by memory), integrated GPU cut off as much slower;
+  134.6 s in total. CPU kept-open processes peak at 0.8–0.9 GiB, GPU (HIP) at 2.8 GiB.
+- **Verification.** Full suite on this branch 705 passed, 2 skipped (`Real-Blender tests: 7 passed`). `scripts/check-render-stability.py`: CPU renders of 50 finished FBX/GLB assets
+  pixel-identical with identical metadata, GPU within 6/255, 4,708/4,708 fingerprints kept
+  (`data/evidence/render-stability/2026-10-26-render-device-formats.json`). Real processing
+  `scripts/verify-parallel-processing.py` (12 synthetic models: 2 at a time on the RX 6800, cancel
+  settled every running render, a killed run took its Blender processes with it, resume finished all 12,
+  no fault; `data/library/verification/parallel-processing-2026-10-26-b.json`);
+  `scripts/verify-source-operation.py` passed with its cancel check updated for parallel renders.
+  WebView2 `scripts/verify-rendering-settings.py` (`data/gui/rendering-settings-2026-10-26b/`),
+  `verify-general-settings.py` and `verify-search-device.py` pass. Storage receipt
+  `data/storage/parallel-rendering-2026-10-26.json` (2.17 GiB unique allocated; no new runtime).
+  Not verified on Linux (no WSL check environment on this machine): the parent-death signal and
+  `/proc` memory paths.
+
 ## October 26 — Reused results mark their stage complete, branch `feature/cpu-search-embedder`
 
 After the owner grouped `Medieval Weapons` (FBX + gLTF + Unity FBX), the rescan reset its 32

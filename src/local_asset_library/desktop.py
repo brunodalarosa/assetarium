@@ -142,6 +142,33 @@ class DesktopBridge:
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
                                         search_device, guarded=False))
 
+    # Rendering (decision 0022): device, parallel renders and memory; the speed test runs as an operation.
+    def render_settings(self):
+        from .render_devices import summary
+        return self._wait(self._present(summary, self._config, guarded=False))
+
+    def save_render_settings(self, device=None, processes=None, memory_gib=None):
+        return self._wait(self._present(self._save_render_settings, device, processes, memory_gib, guarded=False))
+
+    def _save_render_settings(self, device, processes, memory_gib):
+        from .render_devices import summary
+        from .render_pool import save
+        save(self._config, processes, memory_gib, device)
+        return dict(summary(self._config), status='saved')
+
+    def render_test(self, action='start'):
+        return self._wait(self._present(self._render_test, action, guarded=False))
+
+    def _render_test(self, action):
+        from .source_operations import cancel, operation_status
+        if action == 'cancel':
+            if operation_status(self._config).get('operation') != 'render-test':
+                return {'status': 'idle'}
+            return cancel(self._config)
+        if action != 'start':
+            raise ConfigError('Unknown render test action')
+        return self._start_source_operation('render-test', None)
+
     # Setup wizard (decision 0014): thin calls into setup_core; nothing here starts at launch.
     def setup_state(self):
         from .setup_core import setup_state
@@ -410,6 +437,7 @@ class DesktopBridge:
                                 ('source-status.json', 'source-operation.json', 'source-cancel.json', 'active.json')]
                                + [stamp(config.project_root / 'data/library/source-faults' / (source['id'] + '.json'))])
         sources.append(stamp(config.project_root / 'data/library/settings.json'))
+        sources += [stamp(config.project_root / 'data/library' / name) for name in ('rendering.json', 'render-test.json')]
         sources.append(stamp(config.project_root / 'data/library/setup.json'))
         sources.append(stamp(config.project_root / 'data/library/notifications.json'))
         from .asset_collections import path as collections_path

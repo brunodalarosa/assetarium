@@ -43,7 +43,7 @@ without covering it at the approval checkpoint; never edit installed packages.
 Prefer `--locked --no-sync --offline` for runs.
 
 ```powershell
-# Full suite (630 tests, includes real Blender fixtures; takes minutes)
+# Full suite (707 tests, includes real Blender fixtures; takes minutes)
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest
 # Targeted
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_desktop.py tests/test_sources.py --basetemp scratch/pytest
@@ -79,7 +79,8 @@ scripts\asset-desktop.pyw`; startup never installs or runs models).
 - **Processing pipeline:** `incremental.py` (stage ledger, bounded processing,
   publication; driven by `scripts/library-batch.py scan|process|refresh|status`),
   `inspection.py` + `blender_worker.py` + `render_math.py` (Blender in background,
-  scripts disabled), `texture_repair.py` + `blender_repair_worker.py`,
+  scripts disabled), `render_pool.py` + `blender_batch_worker.py` (parallel kept-open renders)
+  + `render_devices.py` (render device and speed test; decision 0022), `texture_repair.py` + `blender_repair_worker.py`,
   `captions.py` + `caption_backend.py` + `caption_quality.py` + `caption_review.py`,
   `overnight.py` (owner-started caption runs), `library_index.py` +
   `embedding_backend.py` (vectors), `gpu_queue.py` (cross-process GPU lease),
@@ -157,12 +158,18 @@ Recent commits (`git log`) follow this shape; mirror it:
 - Local overrides go in ignored `config.local.toml` (copy `config.example.toml`).
   The tracked example is neutral (project `models/`, Blender discovered); the owner's
   machine paths live in their `config.local.toml`. Scripts use `load_project_config`.
-- Hardware: RTX 5070 (~12 GB VRAM). One GPU job at a time via `gpu_queue`.
+- Hardware: RTX 5070 (~12 GB VRAM) in the original setup; the current owner machine is a
+  Ryzen 9 9950X3D with a Radeon RX 6800 (HIP; no CUDA). One GPU job at a time via `gpu_queue`.
 - Linux check environment: WSL2 `Ubuntu-24.04`, clone in `~/lal` (ext4), Blender in
   `~/blender-5.2.2-linux-x64/`. Run Linux suites with `LAL_REQUIRE_BLENDER=1` and
   report the `Real-Blender tests:` line; a skipped Blender fixture is unverified.
 - Do not edit `blender_worker.py` / `render_math.py` / repair workers for portability:
-  their hashes are inspection fingerprints (editing re-queues every inspection).
+  their hashes are inspection fingerprints (editing re-queues every inspection). A worker edit
+  that keeps CPU renders identical can keep them only through `incremental.EQUIVALENT_WORKERS`,
+  proven with `scripts/check-render-stability.py` (decision 0022).
+- Inspection renders run in kept-open Blender processes in parallel (`render_pool.py`,
+  `blender_batch_worker.py`); device and count come from the speed test (`render_devices.py`)
+  and the owner's limits in `data/library/rendering.json`.
 - Match the existing dense style: short module docstrings stating the guarantee,
   compact code, few comments that explain *why*.
 

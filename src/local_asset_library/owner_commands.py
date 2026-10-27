@@ -13,7 +13,7 @@ import time
 
 from .config import ConfigError, load_config, project_config_path
 
-COMMANDS = {'sources', 'settings', 'process', 'describe', 'cancel', 'failures', 'recheck', 'collections', 'setup'}
+COMMANDS = {'sources', 'settings', 'rendering', 'process', 'describe', 'cancel', 'failures', 'recheck', 'collections', 'setup'}
 ENDED_OK = {'complete'}
 
 
@@ -65,6 +65,16 @@ def parser():
     change.add_argument('--server-url', help='Local model server address, e.g. http://127.0.0.1:8080/v1')
     change.add_argument('--server-model', help='Model name the local server lists')
     change.add_argument('--search-device', choices=['cuda', 'cpu'], help='Where semantic and image search run (switching re-indexes)')
+    rendering = commands.add_parser('rendering', help='Render device, renders at a time, memory and the speed test'
+                                    ).add_subparsers(dest='action', required=True)
+    rendering.add_parser('show')
+    change = rendering.add_parser('set', help='Limits only lower renders at a time or change their memory; never slower')
+    change.add_argument('--device', help='"auto" (fastest tested), "cpu", or a GPU key that "rendering show" lists')
+    change.add_argument('--processes', help='"auto" or 1 to 8: at most this many renders at a time')
+    change.add_argument('--memory-gib', help='"auto" (70%% of free memory) or whole GiB rendering may use')
+    test = rendering.add_parser('test', help='Run the render speed test now (about 2 minutes; synthetic shapes only)')
+    test.add_argument('--follow', action='store_true', help='Watch a running test instead of starting one')
+    rendering.add_parser('cancel', help='Cancel a running speed test (the previous result is kept)')
     setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
@@ -316,6 +326,59 @@ def settings_command(args, config):
     return current
 
 
+def rendering_command(args, config):
+    from .render_devices import summary
+    from .render_pool import save, saved
+    from .source_operations import RUNNING, cancel, operation_status, start
+    if args.action == 'set':
+        if args.device is None and args.processes is None and args.memory_gib is None:
+            raise ConfigError('Give at least one of --device, --processes or --memory-gib')
+        current = saved(config)
+        number = lambda value, name: None if value == 'auto' else int(value) if value.isdigit() else ConfigError(
+            f'--{name} takes "auto" or a whole number')
+        choice = {key: current[key] if value is None else number(value, key.replace('_', '-')) if key != 'device'
+                  else None if value == 'auto' else value
+                  for key, value in (('device', args.device), ('processes', args.processes), ('memory_gib', args.memory_gib))}
+        for value in choice.values():
+            if isinstance(value, ConfigError):
+                raise value
+        save(config, choice['processes'], choice['memory_gib'], choice['device'])
+        say(args, 'Saved.')
+    if args.action in {'test', 'cancel'}:
+        running = operation_status(config).get('status') in RUNNING
+        if args.action == 'cancel':
+            result = cancel(config) if running and operation_status(config).get('operation') == 'render-test' else {'status': 'idle'}
+            say(args, 'Cancelling the speed test; the previous result is kept.' if result['status'] != 'idle' else 'No speed test is running.')
+            return result
+        if not args.follow:
+            started = start(config, 'render-test')
+            if started.get('status') == 'busy':
+                raise ConfigError(started['reason'] + '; watch a running test with: rendering test --follow')
+        elif not running:
+            say(args, 'No speed test is running.')
+        ended = follow(args, config, config)
+        if ended.get('reason'):
+            say(args, 'Reason: ' + ended['reason'])
+    current = summary(config)
+    plan = current['plan']
+    say(args, f"Now: {plan['device']}, {plan['processes']} at a time ({plan['reason']}"
+              + (f"; {plan['best_reason']}: {plan['best']}" if plan['reason'] != plan['best_reason'] else '') + ')\n'
+              f"Device: {current['device'] or 'auto'} · renders at a time: {current['processes'] or 'auto'} · "
+              f"memory: {str(current['memory_gib']) + ' GiB' if current['memory_gib'] else 'auto'}"
+              + (f" ({plan['allowance_gib']} GiB now)" if plan['allowance_gib'] is not None else ''))
+    test = current['test']
+    if test:
+        say(args, f"Speed test {test['utc'][:16].replace('T', ' ')} UTC ({test['elapsed_seconds']:.0f} s):")
+        for r in test['results']:
+            best = r['best']
+            say(args, f"  {r['label']}: " + (f"{best['seconds_per_asset']:.2f} s per test asset, {best['processes']} at a time"
+                                             if best else 'not used') + f" ({r['stopped']})" + (' · fastest' if r['key'] == test['chosen'] else ''))
+    else:
+        say(args, 'Not speed-tested yet: it runs at the start of the next process, or now with: rendering test')
+    say(args, 'Devices: ' + ', '.join(f"{d['key']} ({d['label']})" for d in current['devices']))
+    return current
+
+
 def show_checks(args, result):
     for check in result['checks']:
         mark = {'passed': 'ok  ', 'warning': 'warn', 'failed': 'FAIL'}[check['status']]
@@ -548,6 +611,8 @@ def main(argv, config=None):
             result = sources_command(args, config)
         elif args.command == 'settings':
             result = settings_command(args, config)
+        elif args.command == 'rendering':
+            result = rendering_command(args, config)
         elif args.command == 'setup':
             result = setup_command(args, config)
         elif args.command in {'process', 'describe'}:

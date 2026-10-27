@@ -107,8 +107,10 @@ def operation_lease(config, scoped, token):
 
 
 def start(config, operation, key=None):
-    if operation not in {"scan", "process", "describe"}:
+    if operation not in {"scan", "process", "describe", "render-test"}:
         raise ConfigError("Unknown asset source operation")
+    if operation == "render-test" and (key or not config.blender or not config.blender.exists()):
+        raise ConfigError("Set up Blender first (Settings → General → Setup), then test render speed")
     if operation == "describe" and not key:
         raise ConfigError("Choose an asset source to generate descriptions for")
     scoped = bound(config, get_source(config, key)) if key else config
@@ -134,7 +136,8 @@ def start(config, operation, key=None):
     # running processing lease. Duplicate clicks cannot start duplicate work.
     with lease(config, "source-operation-start", resource="sources"):
         if active_operation(scoped):
-            return {"status": "busy", "reason": "This operation is already running"}
+            return {"status": "busy", "reason": "Another operation is running; try again when it finishes"
+                    if operation == "render-test" else "This operation is already running"}
         token = uuid.uuid4().hex
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
               operation=operation, key=key, reason=None, current_asset=None)
@@ -337,6 +340,24 @@ def process_source(config, source, token):
     notify_ready(config, source, (status.get("descriptions") or {}).get("missing", 0))
 
 
+def render_test(config, token):
+    """The owner-started render speed test (decision 0022); waits for processing like other operations."""
+    from .render_devices import label, run
+    steps = [0]
+
+    def progress(phase):
+        steps[0] += 1
+        state(config, status="processing", phase=phase, progress=min(.95, .05 + .08 * steps[0]))
+    state(config, status="processing", phase="Listing render devices", progress=.02)
+    result = run(config, progress, cancelled=lambda: cancelled(config, token))
+    if result["cancelled"]:
+        state(config, status="cancelled", phase="Speed test cancelled; the previous result is kept", progress=1)
+        return
+    best = next((r for r in result["results"] if r["key"] == result["chosen"]), None)
+    state(config, status="complete", progress=1, phase=("Speed test finished: " + best["label"] + f", {best['best']['processes']} at a time"
+                                                        if best else "Speed test finished without a working device"))
+
+
 def description_counts(scoped):
     from collections import Counter
     from .incremental import working
@@ -445,7 +466,8 @@ def worker_stage(config, source, stage, token):
                 if stage != "inspection" and backend is None and preview.get("pending"):  # Reuse alone needs no model.
                     backend = engines.description_engine(scoped) if stage == "caption" else engines.embedder(scoped)
                 result = process(scoped, stage, limit=1000, backend=backend, asset_ids=only,
-                                 cancelled=lambda: cancelled(scoped, token), progress=on_progress)
+                                 cancelled=lambda: cancelled(scoped, token), progress=on_progress,
+                                 status=lambda phase: state(scoped, status="processing", phase=phase, stage=stage))
             except EngineStop as exc:
                 # A machine limit, not an asset fault: the coordinator shows this reason.
                 atomic_json(stage_fault_path(scoped, token), {"reason": str(exc), "utc": now()})

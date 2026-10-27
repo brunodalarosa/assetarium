@@ -153,6 +153,28 @@ export const ENGINE_NOTE =
   "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Where search by description and by image runs is a separate choice below.";
 export const SEARCH_HELP =
   "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Process assets to rebuild search data. Until then, names, filters and keyword search keep working.";
+export const SPEED_TEST_HELP =
+  "A short test on this computer with synthetic shapes, never your assets (about 2 minutes). It finds the faster render device, the CPU or a graphics card, and how many renders at a time help. It runs by itself when processing first needs it and again after Blender or the hardware changes; Automatic in Rendering uses its results.";
+export const RENDER_HELP =
+  "Previews render in Blender. Automatic uses the speed test's fastest device and number of renders at a time. Your limits can lower that number or change how much memory rendering may use, for example more when the computer does nothing else overnight. Rendering never goes past the fastest tested number or the memory that is free, so a limit never makes it slower.";
+const STOPPED: Record<string, string> = {
+  "no gain": "more at a time did not help", slower: "more at a time was slower", memory: "more at a time would not fit in memory",
+  "processor cores": "limited by processor cores", "tested every step": "", cancelled: "test cancelled",
+};
+/** One line per tested device: its best speed, or why it is not used. */
+export function renderTestLine(result: Json, chosen: string) {
+  if (!result.best) {
+    if (result.stopped === "much slower than another device") return `${result.label}: much slower than another device; not used`;
+    return `${result.label}: could not render${result.stopped?.startsWith("failed: ") ? " (" + result.stopped.slice(8) + ")" : ""}; not used`;
+  }
+  const why = STOPPED[result.stopped] ?? "";
+  return `${result.label}: ${result.best.seconds_per_asset.toFixed(2)} s per test asset, ${result.best.processes} at a time${why ? ` (${why})` : ""}${result.key === chosen ? " · fastest" : ""}`;
+}
+export function renderNowText(plan: Json) {
+  const count = `${plan.processes} ${plan.processes === 1 ? "render" : "renders"} at a time`;
+  if (plan.reason === plan.best_reason) return `Now: ${plan.device}, ${count} (${plan.reason}).`;
+  return `Now: ${plan.device}, ${count}, limited by ${plan.reason} (${plan.best_reason}: ${plan.best}).`;
+}
 export const BATCH_HELP =
   "How many assets the model describes in one call. Larger batches finish sooner but need more GPU memory. If memory runs out, the run stops safely: nothing is marked failed and those assets stay waiting, so you can lower the size and continue. Wording can differ slightly with which assets share a batch. Changing this never redoes finished descriptions.";
 export function setupRecordText(record: Json | null | undefined) {

@@ -21,6 +21,14 @@ Uncheck all to pause processing. Existing results, search vectors and recorded
 failures remain preserved; formats excluded by the selection create no new
 actionable processing work. See [processing formats](asset-sources.md#processing-formats).
 
+**Settings → General → Rendering** shows what renders previews now and why: the device
+(CPU or a graphics card) and how many renders run at a time in Blender processes that stay
+open between assets. A short speed test with synthetic shapes picks both; it runs at the start
+of a Process assets when Blender or the devices changed, or with **Test again**. Limits for the
+device, renders at a time and memory never make rendering slower; finished previews stay valid
+when they change. Cancel and closing the app finish the running renders; a stopped run resumes
+([decision 0022](decisions/0022-parallel-rendering.md)).
+
 **Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets how
 many assets share one description model call. Larger is faster and uses more GPU
 memory. Changing it never re-queues finished descriptions. Running out of GPU

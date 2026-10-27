@@ -8,6 +8,15 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- Faster previews: Process assets renders several assets at once in Blender processes that stay
+  open between assets, on the CPU or a graphics card (decision 0022). A short speed test on your
+  computer (about 2 minutes, synthetic shapes only) picks the faster device and how many renders at
+  a time help; it runs on the next Process assets or from **Settings → General → Speed test → Test
+  again** (`local-assets rendering test`). You can choose the device, limit renders at a time, and
+  set how much memory rendering may use (`local-assets rendering set`); limits never go past the
+  fastest tested number or the memory that is free. Finished previews stay valid and are not
+  rendered again; cancelling or closing the app finishes the running renders, and a stopped run
+  resumes where it left off.
 - Search by description and by image can run on the CPU: choose **Where search runs** in
   Settings → General, the setup wizard, `local-assets settings set --search-device cpu` or
   the agent's `apply_setup`. It uses the same EmbeddingGemma model and precision with a
