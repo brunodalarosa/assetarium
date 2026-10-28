@@ -59,6 +59,9 @@ All notable changes to Assetarium are listed here. The project follows
 - One-piece objects such as rocks, pebbles and grass clumps no longer fail their description
   because the model listed no separate parts; shape, colors and style are still required.
   Descriptions that already failed this way stay recorded until you retry them.
+- After grouping export folders, a source could ask for **Process assets** forever: its search data
+  was all reused, or its recorded failures were kept, but the assets stayed "pending". Processing now
+  records those states again; recorded failures show as failed and are still never retried.
 - Flat card models (grass and cloud sprites with no thickness) no longer fail with "Empty or
   off-frame preview detected": a view that sees the card edge-on is rendered again turned toward
   its face. Finished previews are unchanged and not rendered again.

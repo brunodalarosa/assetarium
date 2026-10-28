@@ -491,6 +491,28 @@ def restore_reused(record, stage, apply=True):
     return False
 
 
+def restore_fault(record, stage, evidence, status, apply=True):
+    """A kept fault whose stage a rescan reset (for example after grouping export folders) shows as failed again.
+
+    Nothing is retried: only the saved state returns, for flags the rescan reset to pending. A returned failed
+    render keeps its completed inspection and failed previews; any other fault fails the stage with its evidence.
+    With ``apply=False`` it only reports whether it would (dry runs write nothing).
+    """
+    states = record['processing'] if apply else dict(record['processing'])
+    run = record.get('inspection_run') or {}
+    if stage == 'inspection' and evidence.get('result_path') and run.get('status') == status:
+        wanted = {'inspection': 'complete' if record.get('technical') else status, 'previews': status}
+    else:
+        wanted = {stage: status}
+    if all(states.get(key) == value for key, value in wanted.items()) or any(
+            states.get(key) not in {None, 'pending', value} for key, value in wanted.items()):
+        return False
+    states.update(wanted)
+    if apply and 'previews' not in wanted:
+        record.setdefault('stage_faults', {}).setdefault(stage, {k: v for k, v in evidence.items() if k != 'fault_content'})
+    return True
+
+
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
             cancelled=None, progress=None, asset_ids=None, status=None):
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
@@ -530,6 +552,10 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                     checkpoint(db,record['asset_id'],stage,fp,old[1],evidence)
                     old=(old[0],old[1],encoded(evidence))
             if old and old[1] in {'failed','unsupported'} and json.loads(old[2]).get('fault_content')==stage_content(work,record,stage):
+                if restore_fault(record, stage, json.loads(old[2]), old[1], apply=not dry_run):
+                    restored += 1
+                    if not dry_run:
+                        update_record(work, record)
                 retained[old[1]]+=1
                 continue  # Changing settings alone is not authorization to retry a source/input fault.
             if (stage == 'inspection' and old and old[1] == 'complete' and record.get('asset_type') == 'image'

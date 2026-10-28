@@ -22,6 +22,28 @@ until the owner retries them. Verification: `tests/test_captions.py` + `tests/te
   and an experimental parallel-requests change, since dropped (about 10% faster on this machine), so
   these four record `batch.size` 8; concurrency is no fingerprint input, so they stay valid.
 
+## October 27 — Stage flags restored after a regrouping rescan, branch `bugfix/restore-stage-flags`
+
+After the owner grouped near-miss export folders, *Medieval Props* (111 assets) and *Desert Pack*
+(*Cloud*) kept asking for Process assets. Grouping changes an asset's file list, so the rescan resets
+its stage flags; two cases never set them again.
+
+- **Search data**: every vector was reused, so `index_library`'s dry run reported nothing pending and
+  `worker_stage` skipped the real pass that records `processing.embeddings`; the stale "pending" was
+  published each time. The dry run now reports `restored` for flags that differ from the reused
+  vectors, so the real pass runs (no model is loaded when nothing is missing).
+- **Kept faults**: a retained failure (never retried) left the reset flags pending, so the card
+  offered an action that could not change anything. `incremental.restore_fault` puts the saved state
+  back for flags a rescan reset: a returned failed render keeps inspection complete and previews
+  failed; any other fault fails its stage with its evidence.
+- **Real check** (on a local branch with the near-miss and flat-card changes, since the grouping
+  answers need them): *Desert Pack* dry run restored 1 (*Cloud*: inspection complete, previews failed),
+  then Process assets finished with recorded issues, 0 pending, 6 failed; *Medieval Props* stays up to
+  date and published (its 111 assets were first cleared by one real search-data pass while diagnosing).
+- **Verification.** Two tests in `tests/test_incremental.py` (reused vectors record the flag again
+  without a model; kept faults, raised and returned, show as failed again without a retry). Full suite
+  716 passed, 2 skipped (`Real-Blender tests: 7 passed`).
+
 ## October 27 — Edge-on flat cards turn their empty view, branch `bugfix/flat-card-views`
 
 Twelve *Desert Pack* assets (a cloud sprite and grass billboards, zero thickness along Y) failed

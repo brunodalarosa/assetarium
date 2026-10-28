@@ -37,7 +37,7 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
         old_jobs = {r[0]: r[1:] for r in db.execute("SELECT job_id,fingerprint,status,evidence FROM jobs")}
         old_vectors = {r[0]: r for r in db.execute("SELECT * FROM vectors")}
         expected, outcomes, visited = set(), [], set()
-        pending, processed, deferred = 0, 0, 0
+        pending, processed, deferred, restored = 0, 0, 0, 0
         started = time.monotonic()
         if not dry_run:
             atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':'embeddings','completed':0,'selected':limit,'pid':os.getpid()})
@@ -141,10 +141,15 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                 outcomes.append({"asset_id": identifier, "channel": channel, "status": status, "reused": reuse, **evidence})
                 if not dry_run and processed and processed%10==0:
                     atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':'embeddings','completed':processed,'selected':limit,'pid':os.getpid()})
+            state = ("pending" if counts["pending"] else
+                     "partial" if counts["complete"] and (counts["failed"] or counts["deferred"]) else
+                     "failed" if counts["failed"] else "pending" if counts['deferred'] else "complete")
+            # A rescan (for example after grouping export folders) resets the flag while every vector is reused:
+            # report it, so the real pass runs and records the state again instead of leaving it pending.
+            if state != record["processing"].get("embeddings") and not counts["pending"]:
+                restored += 1
             if not dry_run:
-                record["processing"]["embeddings"] = ("pending" if counts["pending"] else
-                    "partial" if counts["complete"] and (counts["failed"] or counts["deferred"]) else
-                    "failed" if counts["failed"] else "pending" if counts['deferred'] else "complete")
+                record["processing"]["embeddings"] = state
                 update_record(config, record)
                 visited.add(identifier)
                 if progress:
@@ -163,7 +168,8 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                         db.execute("DELETE FROM jobs WHERE job_id=?", (job,))
                 values = {"version": VERSION, "contract": contract, "contract_fingerprint": common, "pilot_ids": [r["asset_id"] for r in inventory], "input_policy": "effective-description-content-v1",'image_input_policy':'verified-view-content-v1'}
                 db.executemany("INSERT OR REPLACE INTO meta VALUES (?,?)", [(k, encoded(v)) for k, v in values.items() if metadata.get(k) != v])
-        report = {"stage": "embeddings", "pending": pending, "processed": processed, "deferred_descriptions": deferred, "dry_run": dry_run, "outcomes": outcomes, "elapsed_seconds": time.monotonic() - started, "vectors": db.execute("SELECT COUNT(*) FROM vectors").fetchone()[0]}
+        report = {"stage": "embeddings", "pending": pending, "processed": processed, "restored": restored,
+                  "deferred_descriptions": deferred, "dry_run": dry_run, "outcomes": outcomes, "elapsed_seconds": time.monotonic() - started, "vectors": db.execute("SELECT COUNT(*) FROM vectors").fetchone()[0]}
         if backend is not None and hasattr(backend,'resources'):
             report['resources']=backend.resources()
         if not dry_run:
