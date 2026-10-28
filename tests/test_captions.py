@@ -80,6 +80,16 @@ def test_short_caption_still_requires_consistent_identity_and_visual_fields():
         validate_caption(value)
 
 
+def test_one_piece_object_may_have_no_parts():
+    value=caption()
+    value['description']='A low-poly rock with an irregular faceted shape and a matte brown surface.'
+    value['parts']=[]
+    assert validate_caption(value)['parts']==[]
+    for key in ('shape','style'):
+        with pytest.raises(ValueError,match='Core visual attributes'):
+            validate_caption({**value,key:[]})
+
+
 @pytest.mark.parametrize("raw", ["{}", "not json", '{"identity":',
     json.dumps({**caption(), "technical": {"triangles": 12}}),
     json.dumps({**caption(), "uncertainties": []}),

@@ -48,7 +48,8 @@ def validate_caption(value):
         items = value[key]
         if not isinstance(items, list) or len(items) > 16 or not all(string(v, 300) for v in items):
             raise ValueError(f"Invalid string list: {key}")
-    if any(not value[key] for key in ("shape", "colors", "parts", "style")):
+    # The prompt asks for visible components only; a pebble or grass clump honestly has none.
+    if any(not value[key] for key in ("shape", "colors", "style")):
         raise ValueError("Core visual attributes must not be empty")
     if identity["certainty"] != "probable" and not value["uncertainties"]:
         raise ValueError("Uncertain identity requires an explicit uncertainty")

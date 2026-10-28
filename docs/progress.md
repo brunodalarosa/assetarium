@@ -1,5 +1,27 @@
 # Progress
 
+## October 27 — One-piece objects may list no parts, branch `bugfix/one-piece-caption-parts`
+
+Desert Pack's description run (local server, Qwen3-VL-2B F16) failed 4 of 63 assets with "Core visual
+attributes must not be empty": `Grass_L_1`, `Grass_S_1`, `Pebble_3` and `Rock_8` returned accurate
+descriptions with `"parts": []`. The prompt asks for visible components only, so a one-piece object
+honestly has none. `validate_caption` now requires `shape`, `colors` and `style` only. Library
+fingerprints (`incremental.caption_input`) do not hash `captions.py`, so nothing is re-queued; the
+historical pilot `caption_fingerprint` does. The gray grass previews are faithful: the pack's
+`Textures/Other/GrassAlpha_D.png` is a gray alpha card tinted in the game engine. Recorded failures stay
+until the owner retries them. Verification: `tests/test_captions.py` + `tests/test_ui_encoding.py`
+94 passed (new test: empty parts accepted, empty shape/style still rejected); full suite 721 passed,
+2 skipped (`Real-Blender tests: 8 passed`).
+
+- **Owner-approved retry.** `scripts/historical/release-desert-parts-captions.py` saved each failure's
+  caption result, ledger row and stage fault (`data/evidence/desert-parts-release-2026-10-27/`) and
+  set only those four description stages back to pending (the failures stay in the ledger history);
+  `local-assets describe --asset-source "Desert Pack"` then wrote all four: 0 pending, 0 failed, 0 without
+  a description. `Pebble_3` again listed no parts and was accepted; `Grass_L_1` is labeled "unknown"
+  (gray card preview), a review note rather than a fault. Run on a local branch with the unmerged fixes
+  and an experimental parallel-requests change, since dropped (about 10% faster on this machine), so
+  these four record `batch.size` 8; concurrency is no fingerprint input, so they stay valid.
+
 ## October 27 — Stage flags restored after a regrouping rescan, branch `bugfix/restore-stage-flags`
 
 After the owner grouped near-miss export folders, *Medieval Props* (111 assets) and *Desert Pack*
