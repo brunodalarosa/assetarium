@@ -26,6 +26,11 @@ generation fingerprint and original visual findings. Changed captions/evidence,
 missing classifications, malformed records or incomplete coverage leave the
 findings visible as warnings. This file cannot downgrade failed/unusable captions.
 
+The validator adds its own notes: use wording in a description ("designed for use in
+games") is recorded as a `review_note` in `caption_provenance.validation_notes` when the
+description is saved. These are already classified, sit beside review findings and are
+never replaced by a later review.
+
 The shared `caption_quality` implementation serves desktop browse/detail and
 retrieval/MCP responses. Search summaries and basic asset details expose
 `caption_status` and the compatible boolean `caption_faulty`. The boolean now

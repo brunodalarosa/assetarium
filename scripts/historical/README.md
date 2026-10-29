@@ -12,7 +12,7 @@ their earlier `scripts/<name>` paths.
 
 | Group | Scripts |
 | --- | --- |
-| One-time migrations and repairs | `migrate-sources.py`, `complete-source-report-copies.py`, `reduce-storage.py`, `retry-storage-links.py` (loads `reduce-storage.py`), `relocate-models.ps1`, `cleanup-gui-checks.py`, `cleanup-source-check-projections.py`, `finish-texture-repair-descriptions.py`, `kaykit-gltf-maintenance.py`, `repair-textures.py`, `verify-texture-repairs.py`, `verify-kaykit-gltf.py`, `release-desert-parts-captions.py` |
+| One-time migrations and repairs | `migrate-sources.py`, `complete-source-report-copies.py`, `reduce-storage.py`, `retry-storage-links.py` (loads `reduce-storage.py`), `relocate-models.ps1`, `cleanup-gui-checks.py`, `cleanup-source-check-projections.py`, `finish-texture-repair-descriptions.py`, `kaykit-gltf-maintenance.py`, `repair-textures.py`, `verify-texture-repairs.py`, `verify-kaykit-gltf.py`, `release-desert-parts-captions.py`, `revalidate-caption-wording.py` |
 | 40-asset caption pilot | `caption_pilot.py`, `caption_review_images.py`, `caption_review_text.py`, `check_caption_review.py`, `check_catalog.py`, `check_inspection.py`, `check_captions.py`, `check_embeddings.py` |
 | Frozen search benchmark ([`docs/evaluation/`](../../docs/evaluation/README.md)) | `prepare_evaluation.py`, `label_evaluation.py`, `benchmark_evaluation.py`, `report_evaluation.py`, `review-owner-results.py`, `verify_evaluation.py`, `embedding_capability.py`, `embedding_demo.py` |
 | Image pilot (October 20, 2026) | `image-pilot.py`, `image-pilot-describe.py`, `image-preprocessing-eval.py`, `image-pilot-search-eval.py` |
