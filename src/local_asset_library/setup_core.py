@@ -421,13 +421,12 @@ def write_blender(config, path):
 
 
 def blender_change(config, path):
-    """'unchanged' when the choice is what Assetarium already uses this way; else 'write'."""
-    from .inspection import blender_candidates
-    fresh, configured, _ = configured_blender(config)
-    if configured:
-        return 'unchanged' if _same(path, configured) else 'write'
-    found = blender_candidates(fresh)
-    return 'unchanged' if found and _same(path, found[0]) else 'write'
+    """'unchanged' only when the choice is the saved [tools].blender; else 'write'.
+
+    A Blender that is only discovered is not saved: the speed test and render pool need the saved one.
+    """
+    _, configured, _ = configured_blender(config)
+    return 'unchanged' if configured and _same(path, configured) else 'write'
 
 
 def check_blender(config, path):
@@ -453,7 +452,7 @@ def blender_plan(config, path, confirm_rerender=False):
 
 
 def set_blender(config, path, confirm_rerender=False, actor='user'):
-    """Save a checked Blender path on its own (CLI); unchanged choices write nothing."""
+    """Save a checked Blender path on its own (CLI, Settings, agent proposals); unchanged choices write nothing."""
     checked_actor(actor)
     if blender_plan(config, path, confirm_rerender) == 'unchanged':
         return {'status': 'unchanged', 'path': path}

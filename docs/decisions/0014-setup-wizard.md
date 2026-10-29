@@ -31,8 +31,13 @@ Blender, and only when the user asks for a check.
   shapes are refused with the exact line to add by hand. A path is written only after a
   passing check in the same process (name `blender.exe`/`blender`, version, headless
   start with scripts disabled, glTF/FBX/OBJ importers; versions other than 5.2 warn).
-  Choosing the Blender already in use writes nothing. Process assets reads the file in
-  its own process, so no restart is needed. A failed Blender write is reported on its own
+  Choosing the Blender already saved in the configuration writes nothing; a Blender that
+  was only discovered is written, because the speed test and render pool use the saved
+  `[tools].blender` only (corrected 2026-10-28: treating a discovered Blender as "in use"
+  left fresh installs with nothing saved and the speed test blocked). Process assets reads
+  the file in its own process and the Speed test card and its start check read it fresh,
+  so no restart is needed. **Settings → General → Blender installation** shows the saved
+  Blender's state and offers the same check and save on its own (`set_blender`). A failed Blender write is reported on its own
   and keeps the other saved settings.
 - **Blender change cost.** The configured path is an inspection fingerprint input, so a
   change marks every finished 3D inspection as pending again. The wizard shows the count

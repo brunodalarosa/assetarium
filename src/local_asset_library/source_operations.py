@@ -10,7 +10,7 @@ import sys
 import time
 import uuid
 
-from .config import ConfigError, load_config, runtime_command, venv_python
+from .config import ConfigError, load_config, runtime_command, venv_python, with_saved_blender
 from .publication import atomic_json, read_json, read_only
 from .sources import (registry, get_source, bound, now, source_status, scan_source,
                       aggregate, read_records, write_membership)
@@ -109,7 +109,7 @@ def operation_lease(config, scoped, token):
 def start(config, operation, key=None):
     if operation not in {"scan", "process", "describe", "render-test"}:
         raise ConfigError("Unknown asset source operation")
-    if operation == "render-test" and (key or not config.blender or not config.blender.exists()):
+    if operation == "render-test" and (key or not (blender := with_saved_blender(config).blender) or not blender.exists()):
         raise ConfigError("Set up Blender first (Settings → General → Setup), then test render speed")
     if operation == "describe" and not key:
         raise ConfigError("Choose an asset source to generate descriptions for")

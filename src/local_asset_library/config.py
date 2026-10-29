@@ -4,7 +4,7 @@ These guards are application policy, not an OS sandbox. Future workers must use
 them and must never accept source files as writable destinations.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path, PureWindowsPath
 import ntpath
@@ -169,6 +169,15 @@ def project_config_path(project_root: Path) -> Path:
 
 def load_project_config(project_root: Path) -> Config:
     return load_config(project_config_path(project_root), project_root)
+
+
+def with_saved_blender(config: Config) -> Config:
+    """``config`` with [tools].blender as saved on disk now, when one is (a running app's Config is frozen at launch)."""
+    try:
+        saved = load_project_config(config.project_root).blender
+    except (ConfigError, OSError):
+        return config
+    return replace(config, blender=saved) if saved else config
 
 
 def load_config(path: Path, project_root: Path) -> Config:

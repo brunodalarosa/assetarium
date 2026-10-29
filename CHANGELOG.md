@@ -8,6 +8,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Settings → General → Blender installation** shows whether a Blender is saved (Saved, Not
+  saved, Missing, Not found), checks it on request and changes it with the same choose, check and
+  confirm steps as the setup wizard, without running setup again.
 - Faster previews: Process assets renders several assets at once in Blender processes that stay
   open between assets, on the CPU or a graphics card (decision 0022). A short speed test on your
   computer (about 2 minutes, synthetic shapes only) picks the faster device and how many renders at
@@ -61,6 +64,11 @@ All notable changes to Assetarium are listed here. The project follows
   description are now kept with a review note instead of failing it. The 35 descriptions an
   earlier run rejected this way were accepted from their saved output without running the
   model again.
+- The setup wizard now saves the Blender it found when none was saved yet. It used to treat a
+  discovered Blender as already in use and write nothing, so a fresh install had no saved Blender
+  and the speed test stayed blocked ("Set up Blender to test render speed"). The speed test also
+  sees a Blender saved after the app started, without a restart. Run setup again (or use Blender
+  installation) to save yours.
 - One-piece objects such as rocks, pebbles and grass clumps no longer fail their description
   because the model listed no separate parts; shape, colors and style are still required.
   Descriptions that already failed this way stay recorded until you retry them.

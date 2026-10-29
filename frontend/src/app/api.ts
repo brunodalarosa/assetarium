@@ -21,6 +21,7 @@ export interface Bridge {
   setup_cancel_blender(): Promise<Json>;
   setup_storage_use(measure: boolean): Promise<Json>;
   setup_check_server(url: string, model: string): Promise<Json>;
+  save_blender(path: string, confirm_rerender: boolean): Promise<Json>;
   save_setup(choices: Json): Promise<Json>;
   skip_setup(): Promise<Json>;
   choose_blender_executable(): Promise<Json>;

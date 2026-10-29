@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Copy, Cpu, FolderOpen, HardDrive, Monitor, TriangleAlert } from "lucide-react";
+import { Check, CircleAlert, Copy, Cpu, HardDrive, Monitor } from "lucide-react";
 import { type ReactNode, useId } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
@@ -10,6 +10,7 @@ import {
   saveSetup, SETUP_STEPS, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
 } from "../app/store";
 import { AgentPanel, SetByBadge, SetupPaths } from "./AgentSetup";
+import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
 import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
 
@@ -84,78 +85,19 @@ function Welcome() {
   );
 }
 
-function CheckList({ check }: { check: Json }) {
-  return (
-    <ul id="setup-blender-checks" className="grid gap-2" aria-label="Blender checks">
-      {check.checks.map((item: Json) => (
-        <li key={item.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 text-[13px]" data-check={item.id} data-status={item.status}>
-          <span className={cn("mt-0.5 grid size-5 place-items-center rounded-full", item.status === "passed" ? "bg-success-bg text-success" : item.status === "warning" ? "bg-warning-bg text-warning" : "bg-fault-bg text-fault")}>
-            {item.status === "passed" ? <Check className="size-3" aria-hidden /> : item.status === "warning" ? <TriangleAlert className="size-3" aria-hidden /> : <CircleAlert className="size-3" aria-hidden />}
-          </span>
-          <span className="min-w-0 break-words">
-            <span className="font-medium">{item.label}</span>
-            <span className="sr"> — {item.status}</span>
-            {item.detail && <span className="text-muted-foreground"> · {item.detail}</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function BlenderStep() {
   const blender = useApp((s) => s.setup.blender);
   const check = useApp((s) => s.setup.check);
   const checking = useApp((s) => s.setup.checking);
   const draft = useApp((s) => s.setup.draft);
-  const paths: string[] = (blender?.candidates || []).map((c: Json) => c.path);
-  const options = (blender?.candidates || []).map((c: Json) => ({ value: c.path, title: c.path, detail: c.origin }));
-  if (draft.blenderPath && !paths.includes(draft.blenderPath)) options.push({ value: draft.blenderPath, title: draft.blenderPath, detail: "chosen by you" });
-  const current = check && check.path === draft.blenderPath ? check : null;
-  const usable = current && ["passed", "warning"].includes(current.status);
   return (
     <>
       <Paragraph>Assetarium uses Blender in the background to inspect 3D files and render their previews. It starts Blender with scripts and add-ons turned off and never changes your Blender settings or your files. Without Blender you can still browse, search by name and keyword, and view previews that were already rendered; new 3D assets just can’t be processed.</Paragraph>
       <Card title="Blender executable" help={`Tested with Blender ${blender?.tested_version || "5.2"}; other versions show a warning but can be used.`}>
-        {!blender ? (
-          <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Looking for Blender (nothing is run yet)…</p>
-        ) : (
-          <>
-            {blender.configured && !blender.configured_exists && (
-              <Banner tone="warning" role="status">The configured Blender ({blender.configured}, in {blender.config_file}) no longer exists. Choose one that does, then check it.</Banner>
-            )}
-            {options.length ? (
-              <RadioCards id="setup-blender-choice" label="Blender executable" value={draft.blenderPath} onChange={(value) => updateSetupDraft({ blenderPath: value, confirmRerender: false })} options={options} />
-            ) : (
-              <Banner tone="info" role="status">
-                No Blender was found. Install Blender {blender.tested_version} from the address below, then choose its {navigator.platform.startsWith("Win") ? "blender.exe" : "blender"} here, or skip this step.
-                <span className="mt-2 block"><CopyCommand command={blender.download_url} /></span>
-              </Banner>
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" id="setup-choose-blender" disabled={checking} onClick={() => void chooseBlenderExecutable()}><FolderOpen className="size-4" aria-hidden />Choose executable…</Button>
-              {checking ? (
-                <Button variant="secondary" id="setup-cancel-blender" onClick={() => void cancelBlenderCheck()}>Cancel check</Button>
-              ) : (
-                <Button id="setup-check-blender" disabled={!draft.blenderPath} onClick={() => void checkBlender()}>Check Blender</Button>
-              )}
-              <p role="status" aria-live="polite" className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                {checking ? <><Spinner />Checking… (up to about 2 minutes)</> : current ? { passed: "Ready.", warning: "Works, with a warning.", failed: "This executable can’t be used.", cancelled: "Check cancelled." }[current.status as string] : draft.blenderPath ? "Not checked yet." : ""}
-              </p>
-            </div>
-            {current && <CheckList check={current} />}
-            {usable && current.change === "unchanged" && <p className="text-[12.5px] text-muted-foreground">This is already the Blender Assetarium uses; saving writes nothing.</p>}
-            {usable && current.change === "write" && (
-              <p className="text-[12.5px] text-muted-foreground">Saved to config.local.toml when you finish. Process assets uses it from its next run; no restart needed.</p>
-            )}
-            {usable && current.change === "write" && current.rerender > 0 && (
-              <Banner tone="warning" role="status" className="grid gap-3">
-                <span>Changing Blender marks {plural(current.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Process assets renders them again.</span>
-                <Checkbox id="setup-confirm-rerender" label="I understand; render them again with this Blender" checked={draft.confirmRerender} onCheckedChange={(checked) => updateSetupDraft({ confirmRerender: checked })} />
-              </Banner>
-            )}
-          </>
-        )}
+        <BlenderPicker idPrefix="setup" report={blender} path={draft.blenderPath} check={check} checking={checking} confirmRerender={draft.confirmRerender}
+          saveNote="Saved to config.local.toml when you finish. Process assets and the speed test use it right away; no restart needed."
+          onPath={(value) => updateSetupDraft({ blenderPath: value, confirmRerender: false })} onConfirm={(checked) => updateSetupDraft({ confirmRerender: checked })}
+          onCheck={() => void checkBlender()} onCancel={() => void cancelBlenderCheck()} onChoose={() => void chooseBlenderExecutable()} />
       </Card>
     </>
   );
@@ -330,7 +272,7 @@ function BatchStep() {
 function summary(step: SetupStep, draft: Json, info: Json): string {
   if (draft.skipped.includes(step)) return "Skipped — keeps the current value";
   switch (step) {
-    case "blender": return draft.blenderPath || "Not set (found automatically when processing)";
+    case "blender": return draft.blenderPath || "Not saved (the speed test needs a saved Blender)";
     case "formats": return draft.formats.length ? draft.formats.map(formatLabel).join(", ") : "None (processing paused)";
     case "storage": return draft.budget ? `${Number(draft.budget).toLocaleString()} GiB` : "Keeps the current value";
     case "descriptions": {

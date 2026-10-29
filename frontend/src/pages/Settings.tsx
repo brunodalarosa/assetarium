@@ -12,12 +12,13 @@ import {
   searchTestText, searchThreadsText, setupRecordText, sourceMessage, SPEED_TEST_HELP,
 } from "../app/format";
 import {
-  chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, renderTest, saveGeneralSettings, saveRenderSettings, setAppearance, type SettingsTab,
-  sourceAction, sourceFolders, useApp,
+  cancelBlenderCheck, checkBlenderInstallation, chooseBlenderInstallation, chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, renderTest, saveBlenderInstallation, saveGeneralSettings, saveRenderSettings, setAppearance, type SettingsTab,
+  sourceAction, sourceFolders, updateBlenderInstallation, useApp,
 } from "../app/store";
 import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
-import { Banner, Button, Card, RadioCards, SelectField, TextField } from "../ui/primitives";
+import { BlenderChecks, BlenderPicker } from "../ui/BlenderPicker";
+import { Badge, Banner, Button, Card, RadioCards, SelectField, Spinner, TextField } from "../ui/primitives";
 
 const FORMATS: [string, string][] = [["fbx", "FBX"], ["gltf", "glTF / GLB"], ["obj", "OBJ"]];
 const APPEARANCES = [
@@ -64,12 +65,10 @@ function AppearancePicker() {
 
 function SetupCard() {
   const info = useApp((s) => s.setup.info);
-  const configured = info?.blender?.configured;
   return (
     <Card id="setup-card" title="Setup" help="Walks through Blender, formats, storage and descriptions again with your current values filled in, or lets your AI agent do it. Nothing is saved until you (or your agent, within the access you open) save it.">
       <div className="grid gap-1 text-[13px]">
         <p id="setup-record">{setupRecordText(info?.record)}</p>
-        <p className="break-words text-[12.5px] text-muted-foreground">Blender: {configured ? `${configured} (${info.blender.config_file})` : "found automatically when processing (not set in the configuration)"}</p>
       </div>
       <div className="flex flex-wrap gap-3">
         <Button variant="secondary" id="run-setup" onClick={() => void openSetup()}>Run setup</Button>
@@ -119,6 +118,65 @@ function Rendering({ draft, onDraft, disabled }: { draft: RenderDraft; onDraft: 
   );
 }
 
+const CHECK_STATUS: Record<string, string> = { passed: "Ready.", warning: "Works, with a warning.", failed: "This executable can’t be used.", cancelled: "Check cancelled." };
+
+/** The saved Blender, its check, and the wizard's Blender step to change it (decision 0014). */
+function BlenderInstallation() {
+  const b = useApp((s) => s.blender);
+  const report = b.report;
+  const saved = !!report?.configured && report.configured_exists;
+  const current = b.check && b.check.path === b.path ? b.check : null;
+  const usable = !!current && ["passed", "warning"].includes(current.status);
+  const writes = usable && current.change === "write";
+  const canSave = writes && (!current.rerender || b.confirmRerender) && !b.saving && !b.checking;
+  const status = !report ? null : saved ? { tone: "success" as const, label: "Saved", text: `${report.configured} · in ${report.config_file}` }
+    : report.configured ? { tone: "fault" as const, label: "Missing", text: report.configured }
+    : report.used ? { tone: "warning" as const, label: "Not saved", text: "Blender was found but isn’t saved, so the speed test can’t use it. Check it, then save it." }
+    : { tone: "warning" as const, label: "Not found", text: "No Blender was found on this computer. New 3D assets can’t be processed until one is saved." };
+  return (
+    <Card id="blender-card" title="Blender installation" help="Assetarium runs Blender in the background, with scripts and add-ons off, to inspect 3D files, render their previews and test render speed. The chosen executable is saved in config.local.toml.">
+      {!report || !status ? <SkeletonLines lines={2} /> : (
+        <>
+          <p id="blender-status" className="flex min-w-0 flex-wrap items-center gap-2 text-[13px]" data-status={status.label}>
+            <Badge tone={status.tone}>{status.label}</Badge>
+            <span className="min-w-0 break-all">{status.text}</span>
+          </p>
+          {b.editing ? (
+            <>
+              <BlenderPicker idPrefix="settings" report={report} path={b.path} check={b.check} checking={b.checking} confirmRerender={b.confirmRerender}
+                saveNote="Save writes it to config.local.toml. Process assets and the speed test use it right away; no restart needed."
+                onPath={(path) => updateBlenderInstallation({ path, confirmRerender: false })} onConfirm={(checked) => updateBlenderInstallation({ confirmRerender: checked })}
+                onCheck={() => void checkBlenderInstallation()} onCancel={() => void cancelBlenderCheck()} onChoose={() => void chooseBlenderInstallation()} />
+              {(writes || saved) && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {writes && <Button id="save-blender" disabled={!canSave} onClick={() => void saveBlenderInstallation()}>{b.saving ? "Saving…" : "Save Blender"}</Button>}
+                  {saved && <Button variant="secondary" id="keep-blender" disabled={b.saving} onClick={() => updateBlenderInstallation({ editing: false })}>Keep the saved Blender</Button>}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                {b.checking ? (
+                  <Button variant="secondary" id="settings-cancel-blender" onClick={() => void cancelBlenderCheck()}>Cancel check</Button>
+                ) : (
+                  <Button variant="secondary" id="settings-check-blender" onClick={() => void checkBlenderInstallation(report.configured)}>Check Blender</Button>
+                )}
+                <Button variant="secondary" id="change-blender" disabled={b.checking} onClick={() => updateBlenderInstallation({ editing: true })}>Change Blender…</Button>
+                <p role="status" aria-live="polite" className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+                  {b.checking ? <><Spinner />Checking… (up to about 2 minutes)</> : current ? CHECK_STATUS[current.status] : ""}
+                </p>
+              </div>
+              {current && <BlenderChecks check={current} />}
+            </>
+          )}
+          {b.message && <Banner className="blender-message">{b.message}</Banner>}
+        </>
+      )}
+    </Card>
+  );
+}
+
 /** "See the speed test" for the Rendering and Search cards, whose Automatic choices come from it. */
 function SpeedTestLink({ running }: { running?: boolean }) {
   return (
@@ -146,7 +204,7 @@ function SpeedTest() {
           {test ? (
             <ul id="render-test" className="grid gap-0.5">{test.results.map((r: Json) => <li key={r.key}>{renderTestLine(r, test.chosen)}</li>)}</ul>
           ) : (
-            <p id="render-test" className="text-muted-foreground">{values.blender ? "Not tested yet." : "Set up Blender to test render speed."}</p>
+            <p id="render-test" className="text-muted-foreground">{values.blender ? "Not tested yet." : "Save a Blender in Blender installation above to test render speed."}</p>
           )}
         </div>
         {values.search && (
@@ -214,6 +272,7 @@ function General() {
         <AppearancePicker />
       </Card>
       <SetupCard />
+      <BlenderInstallation />
       <form id="general-settings-form" onSubmit={submit} className="grid gap-5">
         <Card title="Storage budget" help={BUDGET_HELP}>
           <TextField id="storage-budget" label="Storage budget (GiB)" type="number" min={1} max={1048576} step={1} required value={budget} disabled={disabled} onChange={(e) => setBudget(e.target.value)} className="w-48" />

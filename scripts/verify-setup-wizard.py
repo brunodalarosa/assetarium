@@ -2,7 +2,8 @@
 
 Phase "fresh": an empty project with the shipped example config opens setup by itself; every step,
 Back/Next/Skip, arrow keys and focus, a failing and a passing Blender check, a fake local model
-server, Save and Skip. Phase "existing" (a child process): an install with sources is not
+server, Save (which writes the discovered Blender, so the speed test can start without a restart)
+and Skip; Settings → Blender installation shows it saved. Phase "existing" (a child process): an install with sources is not
 interrupted; Run setup pre-fills; changing Blender asks to confirm re-rendering; descriptions off
 removes Generate descriptions. Writes data/gui/<run-name>/report.json and screenshots.
 """
@@ -123,8 +124,8 @@ def fresh():
     if found:
         ui.js(f"(async()=>{{lal.updateSetupDraft({{blenderPath:{json.dumps(found[0])}}});await frame();$('setup-check-blender').click();return true}})()")
         wait("lal.state.setup.check&&!lal.state.setup.checking&&lal.state.setup.check.path===lal.state.setup.draft.blenderPath", 180)
-        ui.check('installed_blender_passes_and_writes_nothing', """(async()=>({passed:['passed','warning'].includes(lal.state.setup.check.status),
-          checks:lal.state.setup.check.checks.length===4, unchanged:lal.state.setup.check.change==='unchanged'}))()""")
+        ui.check('discovered_blender_passes_and_will_be_saved', """(async()=>({passed:['passed','warning'].includes(lal.state.setup.check.status),
+          checks:lal.state.setup.check.checks.length===4, write:lal.state.setup.check.change==='write'}))()""")
         shoot('01-blender-ready')
     # Arrow keys move within a radio-card group, like native radios.
     ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='formats');await frame();"
@@ -191,11 +192,26 @@ def fresh():
     assert settings['processing_formats'] == ['fbx', 'gltf', 'obj'] and settings['caption_batch_size'] == 4
     assert settings['description_engine'] == 'builtin' and settings['descriptions_enabled'] is True
     assert record['state'] == 'completed' and record['by'] == 'user' and record['values']['caption_batch_size']['set_by'] == 'user'
-    assert not (FIXTURE / 'config.local.toml').exists()  # The discovered Blender needs no configuration write.
-    report['checks']['save_writes_settings_and_setup_record_only'] = True
+    if found:  # A discovered Blender is saved: the speed test and render pool use the saved one only.
+        assert setup_core.configured_blender(config)[1] == found[0] and record['values']['blender']['set_by'] == 'user'
+        ui.check('saved_blender_is_reported', "$('setup-blender-result').textContent.includes('saved to config.local.toml')")
+    else:
+        assert not (FIXTURE / 'config.local.toml').exists()
+    report['checks']['save_writes_settings_setup_record_and_blender'] = True
     shoot('07-saved')
     ui.js("(async()=>{$('setup-go-sources').click();await until(()=>!$('setup-wizard')&&$('asset-sources-panel')&&!$('asset-sources-panel').hidden);return true})()")
     ui.check('next_step_opens_asset_sources', "$('nav-settings').closest('[inert]')===null")
+    if found:  # The app was launched without a saved Blender; no restart is needed for the speed test.
+        ui.js("(async()=>{lal.navigate({page:'settings',tab:'general'});await until(()=>$('blender-status')&&$('render-test-start')"
+              "&&lal.state.render.values&&lal.state.render.values.blender);await frame();return true})()")
+        ui.check('settings_shows_saved_blender_and_speed_test_is_available', """(async()=>({saved:$('blender-status').dataset.status==='Saved',
+          path:$('blender-status').textContent.includes(%s), closed:!$('settings-blender-choice'),
+          test:!$('render-test-start').disabled}))()""" % json.dumps(found[0]))
+        ui.js("(async()=>{$('blender-card').scrollIntoView({block:'start'});await frame();return true})()")
+        shoot('07b-settings-blender-saved')
+        ui.js("(async()=>{$('change-blender').click();await until(()=>$('settings-blender-choice'));await frame();return true})()")
+        ui.check('change_blender_opens_the_picker_with_a_way_back', "!!$('keep-blender')&&!$('change-blender')")
+        ui.js("(async()=>{$('keep-blender').click();await until(()=>!$('settings-blender-choice'));return true})()")
     ui.js("(async()=>{await lal.loadSetupState();return true})()")
     ui.check('does_not_reopen_after_saving', "lal.state.setup.info.auto_open===false")
     ui.js("(async()=>{await lal.openSetup();await until(()=>$('setup-skip-all'));$('setup-skip-all').click();await until(()=>!$('setup-wizard'));return true})()")
@@ -213,8 +229,13 @@ def existing():
     ui.wait_ready(extra='lal.state.sources.length===2')
     ui.js("(async()=>{await lal.loadSetupState();await frame();return true})()")
     ui.check('existing_install_is_not_interrupted', "!$('setup-wizard')&&lal.state.setup.info.auto_open===false")
-    ui.js("(async()=>{$('nav-settings').click();await until(()=>$('setup-card')&&$('descriptions-card')&&lal.state.general.values);await frame();return true})()")
+    ui.js("(async()=>{$('nav-settings').click();await until(()=>$('setup-card')&&$('descriptions-card')&&lal.state.general.values&&$('blender-status'));await frame();return true})()")
+    ui.check('settings_explains_missing_blender_with_the_picker_open', """(async()=>({missing:$('blender-status').dataset.status==='Missing',
+      explained:$('blender-card').textContent.includes('no longer exists'), picker:!!$('settings-blender-choice')&&!!$('settings-check-blender'),
+      noKeep:!$('keep-blender')}))()""")
     shoot('10-settings-general')
+    ui.js("(async()=>{$('blender-card').scrollIntoView({block:'start'});await frame();return true})()")
+    shoot('10b-settings-blender-missing')
     ui.js("(async()=>{$('run-setup').click();await until(()=>$('setup-wizard')&&!lal.state.setup.loading);return true})()")
     ui.check('run_setup_prefills_current_values', """(async()=>({budget:lal.state.setup.draft.budget==='40',
       formats:lal.state.setup.draft.formats.join()==='gltf,obj', batch:lal.state.setup.draft.batch==='4'}))()""")
@@ -244,6 +265,8 @@ def existing():
     if found:
         assert setup_core.configured_blender(config)[1] == found[0]
         report['checks']['confirmed_blender_saved_to_config_local'] = True
+        wait("lal.state.blender.report&&lal.state.blender.report.configured===%s" % json.dumps(found[0]))
+        ui.check('settings_card_follows_the_wizard_save', "!lal.state.blender.editing&&lal.state.blender.path===%s" % json.dumps(found[0]))
     ui.js("(async()=>{$('setup-close').click();await until(()=>!$('setup-wizard'));$('nav-processing').click();"
           "await until(()=>document.querySelector('.source-descriptions-off'));await frame();return true})()")
     ui.check('descriptions_off_removes_generate_descriptions', """(async()=>({noButton:!document.querySelector('[data-action=describe]'),

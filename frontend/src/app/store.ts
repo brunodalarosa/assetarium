@@ -179,6 +179,17 @@ export interface SetupState {
   /** Saved values the review starts from after an agent set them; only what the user changes is saved as theirs. */
   baseline: SetupDraft | null;
 }
+export interface BlenderState {
+  report: Json | null;
+  path: string;
+  check: Json | null;
+  checking: boolean;
+  confirmRerender: boolean;
+  /** The picker is open: always while no usable Blender is saved, else after Change Blender. */
+  editing: boolean;
+  saving: boolean;
+  message: string;
+}
 export interface AppState {
   api: Bridge | null;
   ready: boolean;
@@ -218,6 +229,8 @@ export interface AppState {
   /** Rendering (decision 0022): device, renders at a time, memory and the speed test. */
   render: { loading: boolean; busy: boolean; message: string; values: Json | null };
   setup: SetupState;
+  /** Settings → General → Blender installation: its own choice and check, saved on its own. */
+  blender: BlenderState;
   appearance: string;
   runReport: Json | null;
   imageBackground: string;
@@ -235,6 +248,7 @@ const emptyGrid = (id: GridId): Grid => ({
 function emptyCollectionView(): CollectionView {
   return { id: null, name: "", description: "", updatedAt: "", count: 0, unavailable: 0, loading: false, error: null, query: "", mode: "combined", phase: "all", busy: false, search: null, members: {} };
 }
+const emptyBlender = (): BlenderState => ({ report: null, path: "", check: null, checking: false, confirmRerender: false, editing: false, saving: false, message: "" });
 function emptySetup(): SetupState {
   return {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
@@ -263,6 +277,7 @@ let state: AppState = {
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
   setup: emptySetup(),
+  blender: emptyBlender(),
   appearance: boot.appearance, runReport: null, imageBackground: "checker", coverage: "",
   worker: "not_started", previews: 0,
 };
@@ -339,7 +354,7 @@ export function goForward() {
   enterRoute(route(), previous);
 }
 function enterRoute(next: Route, previous: Route) {
-  if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadRenderSettings(), loadSources(), loadSetupState().catch(() => undefined)]);
+  if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadRenderSettings(), loadSources(), loadSetupState().catch(() => undefined), loadBlenderInstallation()]);
   if (next.page === "processing") void Promise.all([loadSources(), loadImportFailures()]);
   if (next.page === "source" && next.key && (state.source.key !== next.key || previous.page !== "source")) void openSourceBrowser(next.key);
   if (next.page === "collections") void loadCollections();
@@ -964,12 +979,17 @@ export async function loadSetupBlender() {
   patchSetup((s) => ({ blender, draft: { ...s.draft, blenderPath: s.draft.blenderPath || blender.used || "" } }));
 }
 let checkGeneration = 0;
+/** setup_core.check_blender; a bridge fault becomes a failed check of that path. */
+async function runBlenderCheck(path: string): Promise<Json> {
+  const check = await api().setup_check_blender(path);
+  return check.status === "faulty" && !check.checks ? { status: "failed", path, checks: [{ id: "file", label: "Executable", status: "failed", detail: check.reason }] } : check;
+}
 export async function checkBlender(path = state.setup.draft.blenderPath) {
   const generation = ++checkGeneration;
   patchSetup({ checking: true, check: null });
-  const check = await api().setup_check_blender(path);
+  const check = await runBlenderCheck(path);
   if (generation !== checkGeneration) return;
-  patchSetup({ checking: false, check: check.status === "faulty" && !check.checks ? { status: "failed", path, checks: [{ id: "file", label: "Executable", status: "failed", detail: check.reason }] } : check });
+  patchSetup({ checking: false, check });
 }
 export async function cancelBlenderCheck() {
   await api().setup_cancel_blender();
@@ -980,6 +1000,51 @@ export async function chooseBlenderExecutable() {
   if (result.status !== "selected") return;
   updateSetupDraft({ blenderPath: result.path, confirmRerender: false });
   await checkBlender(result.path);
+}
+/* ------------------------- blender installation ------------------------ */
+// Settings → General → Blender installation: the wizard's Blender step on its own (decision 0014).
+
+function patchBlender(patch: Partial<BlenderState> | ((current: BlenderState) => Partial<BlenderState>)) {
+  setState((s) => ({ blender: { ...s.blender, ...(typeof patch === "function" ? patch(s.blender) : patch) } }));
+}
+/** The saved Blender and what was found; the picker opens by itself while none usable is saved. */
+export async function loadBlenderInstallation() {
+  const report = await api().setup_blender();
+  if (report.status === "faulty") return patchBlender({ message: report.reason });
+  const saved = report.configured && report.configured_exists;
+  // A Blender saved elsewhere (wizard, agent, CLI) replaces an edit in progress here.
+  patchBlender((b) => {
+    const keep = b.editing && !!b.path && (!b.report || b.report.configured === report.configured);
+    return { report, path: keep ? b.path : report.configured_exists ? report.configured : report.used || "", editing: !saved || keep,
+      ...(keep ? {} : { check: null, confirmRerender: false }) };
+  });
+}
+export function updateBlenderInstallation(patch: Partial<Pick<BlenderState, "path" | "confirmRerender" | "editing">>) {
+  patchBlender((b) => ({ ...patch, message: "", ...(patch.editing === false ? { path: b.report?.configured || b.path, check: null, confirmRerender: false } : {}) }));
+}
+let installationGeneration = 0;
+export async function checkBlenderInstallation(path = state.blender.path) {
+  const generation = ++installationGeneration;
+  patchBlender({ checking: true, check: null, message: "" });
+  const check = await runBlenderCheck(path);
+  if (generation !== installationGeneration) return;
+  patchBlender({ checking: false, check });
+}
+export async function chooseBlenderInstallation() {
+  const result = await api().choose_blender_executable();
+  if (result.status === "faulty") return patchBlender({ message: result.reason });
+  if (result.status !== "selected") return;
+  patchBlender({ path: result.path, confirmRerender: false });
+  await checkBlenderInstallation(result.path);
+}
+export async function saveBlenderInstallation() {
+  const { path, confirmRerender } = state.blender;
+  patchBlender({ saving: true, message: "" });
+  const result = await api().save_blender(path, confirmRerender);
+  if (result.status === "faulty") return patchBlender({ saving: false, message: result.reason });
+  patchBlender({ saving: false, editing: false, check: null, confirmRerender: false });
+  pushToast({ tone: "success", title: "Blender saved", body: result.status === "saved" ? `Saved to ${result.file}. Process assets and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
+  await Promise.all([loadBlenderInstallation(), loadRenderSettings(), loadSetupState().catch(() => undefined)]);
 }
 export async function measureSetupStorage() {
   patchSetup({ measuring: true });
@@ -1037,7 +1102,7 @@ export async function saveSetup() {
   const result = await api().save_setup(baseline ? changedChoices(draft, baseline) : setupChoices());
   patchSetup({ saving: false, ...(result.status === "faulty" ? { error: result.reason } : { result }) });
   if (result.status !== "faulty") {
-    await Promise.all([loadGeneralSettings(), loadSources(), loadSetupState()]);
+    await Promise.all([loadGeneralSettings(), loadSources(), loadSetupState(), loadRenderSettings(), loadBlenderInstallation()]);
     requestAnimationFrame(() => document.getElementById("setup-saved-title")?.focus());
   }
 }
@@ -1087,10 +1152,10 @@ export async function decideProposal(proposal: Json, decision: "apply" | "reject
   patchSetup({ agentBusy: null });
   if (result.status === "faulty") pushToast({ tone: "fault", title: "Proposal not decided", body: result.reason });
   else if (result.status === "applied")
-    pushToast({ tone: "success", title: "Blender applied", body: result.blender?.status === "saved" ? `Saved to ${result.blender.file}. Process assets uses it from its next run.` : "Already the Blender Assetarium uses; nothing was written." });
+    pushToast({ tone: "success", title: "Blender applied", body: result.blender?.status === "saved" ? `Saved to ${result.blender.file}. Process assets and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
   else if (result.status === "failed") pushToast({ tone: "fault", title: "Blender not applied", body: `${result.proposal.reason}. Ask your agent to check it again.` });
   else pushToast({ tone: "info", title: "Proposal rejected", body: "Nothing was saved. Your agent sees that you rejected it." });
-  await Promise.all([loadAgentSetup(), loadSetupState()]);
+  await Promise.all([loadAgentSetup(), loadSetupState(), loadRenderSettings(), loadBlenderInstallation()]);
 }
 /** The final review: the wizard's review step, filled with the values saved now. */
 export async function reviewAgentSetup() {

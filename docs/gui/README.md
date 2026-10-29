@@ -184,7 +184,7 @@ downloads, installs, processes or starts a model. *Welcome* shows the system, GP
 (NVIDIA with VRAM and driver; other adapters by name) and free space. *Blender* lists
 discovered executables and **Choose executable…**; **Check Blender** runs the version,
 headless-start and importer checks (Cancel stops the probe), says when saving writes
-nothing, and asks to confirm when a change would re-render finished 3D previews.
+nothing (only for the Blender already saved; a discovered one is always written), and asks to confirm when a change would re-render finished 3D previews.
 *Formats* suggests formats per target engine. *Storage budget* explains exactly what is
 counted, shows free space and current use (newest receipt or **Measure now**), presets
 with a recommendation and a whole-GiB field. *Descriptions* turns them on or off and
@@ -219,7 +219,10 @@ panel. Verification: `scripts/verify-agent-setup.py --run-name <unique-name>` (a
 client against an isolated project, light and dark).
 
 **Settings.** *General* has **Appearance** (Match Windows, Light, Dark), **Setup**
-(last run, the configured Blender, **Run setup**, **Run setup with my agent**), the storage budget (with the exact
+(last run, **Run setup**, **Run setup with my agent**), **Blender installation** (a *Saved*,
+*Not saved*, *Missing* or *Not found* badge with the path; **Check Blender** and **Change
+Blender…** open the wizard's Blender picker with **Save Blender**, the re-render confirmation and
+**Keep the saved Blender**; the picker is open by itself while no usable Blender is saved), the storage budget (with the exact
 definition of what it counts), formats to process, **Descriptions** (on/off and the
 engine, with the local server's address, model and **Test connection**) and the
 description batch size (built-in engine only). *Asset

@@ -34,6 +34,34 @@ for phrases such as "designed for use in games" or a cart "designed for carrying
   Storage receipts `data/storage/2026-10-28-caption-wording-before.json` → `-after.json`: +75.2 MiB
   unique project bytes (65.6 MiB new published catalog/index versions under `data/`).
 
+## October 28 — Setup saves a discovered Blender; Settings → Blender installation, branch `bugfix/blender-not-saved`
+
+On a fresh clone the wizard found Blender, but saving wrote nothing and the speed test stayed blocked
+("Set up Blender to test render speed"). `setup_core.blender_change` called a discovered, unsaved Blender
+"unchanged" because processing finds Blender by itself (`discover_blender`); the speed test and render
+pool use the saved `[tools].blender` only. Now only the saved path is "unchanged", so the wizard, agent
+proposals and `local-assets setup blender` write a discovered Blender after its check (decision 0014
+updated). The desktop's launch `Config` is frozen, so `config.with_saved_blender` lets the Speed test
+card and the `render-test` start check read the saved Blender without a restart. New **Settings →
+General → Blender installation** card (Saved / Not saved / Missing / Not found, **Check Blender**,
+**Change Blender…** with the wizard's picker, now shared as `frontend/src/ui/BlenderPicker.tsx`, and
+**Save Blender** through the new `DesktopBridge.save_blender`); the Setup card no longer repeats the
+Blender line. Verification: targeted setup/agent/render/owner tests 73 passed; full suite 725 passed,
+2 skipped (`Real-Blender tests: 8 passed`). `npm ci` (owner-approved; this clone had no
+`frontend/node_modules`) and `npm run build` (typecheck clean) regenerated `ui/build/`; `cache/npm` was
+cleaned afterwards. Storage receipts `data/storage/before-npm-ci-2026-10-28.json` →
+`after-npm-ci-2026-10-28.json`: allocated 391.0 → 569.6 MB (node_modules and GUI evidence).
+
+- **Real WebView2.** `scripts/verify-setup-wizard.py` now expects the discovered Blender to be written,
+  checks that Settings shows it *Saved* and **Test speed** is enabled in the same app session (no
+  restart), that **Change Blender…** offers **Keep the saved Blender**, that a missing configured
+  Blender opens the picker in Settings, and that the card follows a wizard save. Evidence:
+  `data/gui/blender-install-card-2026-10-28e/` passed both phases (fresh 25 checks, existing 11) when
+  run from a temporary copy without one assertion, the opening focus check
+  (`opens_by_itself_on_a_fresh_install` → `focus`). That assertion fails the same way on unchanged
+  `develop` (`data/gui/develop-baseline-wizard-2026-10-28/`) when launched from this session, so it
+  is pre-existing and not caused by this change; the unmodified script still fails on it here.
+
 ## October 27 — One-piece objects may list no parts, branch `bugfix/one-piece-caption-parts`
 
 Desert Pack's description run (local server, Qwen3-VL-2B F16) failed 4 of 63 assets with "Core visual

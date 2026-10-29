@@ -198,6 +198,11 @@ class DesktopBridge:
         from .setup_core import check_server
         return self._wait(self._present(check_server, self._config, url, model or '', guarded=False))
 
+    def save_blender(self, path, confirm_rerender=False):
+        """Settings → General → Blender installation: saves a checked Blender on its own."""
+        from .setup_core import set_blender
+        return self._wait(self._present(set_blender, self._config, path, confirm_rerender is True, guarded=False))
+
     def save_setup(self, choices):
         from .setup_core import save_setup
         return self._wait(self._present(save_setup, self._config, choices, guarded=False))
