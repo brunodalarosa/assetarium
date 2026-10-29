@@ -227,7 +227,7 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--subtle-fg);
 }
-/* Loading language (docs/gui/README.md → Loading states): ghosts for content whose shape is
+/* Loading language (KnowledgeBase/Architecture/Desktop App/Desktop app design.md → Loading states): ghosts for content whose shape is
    known, a sheen over content being refreshed, one comet spinner, and the top-bar activity mark. */
 .search-spinner {
   display: inline-block;

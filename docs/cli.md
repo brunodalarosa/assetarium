@@ -2,7 +2,7 @@
 
 Everything except visual browsing works from a terminal, the same way on Windows
 PowerShell and a Linux shell. On Linux the CLI plus the MCP server *is* Assetarium
-v1 ([decision 0013](decisions/0013-platform-support.md)). The commands call the
+v1 ([decision 0013](../KnowledgeBase/Decisions/0013-platform-support.md)). The commands call the
 same backend as the desktop app, so the rules (fault handling, budgets, what is
 processed) are identical.
 
@@ -86,11 +86,11 @@ rendering cancel                        # cancel a running speed test; the previ
 
 Limits only lower the number of renders at a time or change their memory allowance; rendering
 never goes past the fastest tested number or the memory free now
-([decision 0022](decisions/0022-parallel-rendering.md)).
+([decision 0022](../KnowledgeBase/Decisions/0022-parallel-rendering.md)).
 
 ## Setup
 
-The desktop app's setup wizard, in a terminal ([decision 0014](decisions/0014-setup-wizard.md));
+The desktop app's setup wizard, in a terminal ([decision 0014](../KnowledgeBase/Decisions/0014-setup-wizard.md));
 the same backend rules decide everything.
 
 ```text
@@ -105,7 +105,7 @@ setup agent end                        # end the agent's setup access
 ```
 
 `setup agent` is the terminal version of the app's **Set up with my agent**
-([decision 0016](decisions/0016-agent-setup.md)): it opens the setup session agents need for
+([decision 0016](../KnowledgeBase/Decisions/0016-agent-setup.md)): it opens the setup session agents need for
 any setup change and prints the client configuration and the prompt to give them. Opening a
 session and deciding proposals need an interactive terminal and have no flag, so an agent
 running commands cannot grant itself access.

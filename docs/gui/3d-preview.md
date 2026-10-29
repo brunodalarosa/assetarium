@@ -1,7 +1,7 @@
-# Interactive 3D preview within LAL
+# Interactive 3D preview
 
 The inspection card's image opens an interactive preview using the selected
-source format. **Open fullscreen** opens it across the LAL app window, rather
+source format. **Open fullscreen** opens it across the app window, rather
 than launching another application or entering operating-system fullscreen.
 The original image, view choices and inspection evidence remain available.
 
@@ -48,71 +48,5 @@ fault history disables 3D delivery while leaving normal browsing available.
 Fault history is never automatically cleared. Application/test-harness defects
 can be corrected under the normal repository policy.
 
-## Runtime and resource boundaries
-
-Online 3D Viewer **0.18.0** and the official Draco **1.5.7** JS/WASM decoder are
-bundled locally, together with a lighting cube and upstream license notices.
-The existing WebView2 and Python environments are reused. Runtime needs no npm,
-CDN, HTTP server, inference, model downloads or duplicate converted asset cache.
-See [vendored dependencies and attribution](../../src/local_asset_library/ui/vendor/README.md).
-
-The desktop bridge accepts asset IDs, source formats and opaque file tickets;
-it never accepts a caller-supplied path. Membership, publication generation,
-resolved source boundaries and the caller's browsing scope are checked before
-delivery. Each file's actual bytes are verified against its catalog hash.
-Library inspection respects enabled-source visibility. The explicit source
-contents view can inspect a registered disabled source's saved published assets
-without enabling it; it uses that source's membership and generation. Removed
-sources cannot issue or read tickets. Both views share retained viewer failures.
-Delivery is bounded to 64 files, 64 MiB per file, 128 MiB total and 128 filename
-aliases. Conflicting basenames with different contents are an explicit fault
-because the upstream importer resolves dependency filenames by basename.
-
-The scripts-only iframe has an opaque origin, no desktop bridge or parent DOM
-access, and no network resources. LAL validates the source window and session
-nonce on messages. The frame is created only on demand; removing it releases
-its WebGL context, object URLs, decoder, upstream document listeners and pending
-imports. The 90-second loading deadline records a timeout without a retry. Local
-file tickets expire after ten minutes for delivery and are released on exit.
-Already-loaded previews do not need their source files to be reread.
-
-## Verification
-
-Use the existing runtime wrapper, with a new evidence name for every native run:
-
-```powershell
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_interactive_preview.py tests/test_desktop.py tests/test_mcp_assets.py tests/test_sources.py
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/verify-interactive-preview.py --run-name unique-preview-run
-```
-
-The native harness uses tiny synthetic models and actual WebView2. It checks
-visible textured rendering, real mouse rotation/wheel zoom/keyboard orbit,
-fullscreen focus containment and return, resize without reimport, reduced-motion
-loading, display controls, selected-format changes, cancellation/stale completion,
-graphics/frame disposal and retained failures. Captures and reports are under
-`data/gui/<run-name>/`. It runs no inference and changes no real sources.
-
-The optional `--real-assets` mode reads six representative enabled/published
-sources once, disables automatic source scans in the harness, and records each
-result without retrying an asset fault. The initial run `preview-real-01` passed
-GLB (`building-d`), OBJ (`apple`), two FBX sources with existing texture bindings,
-DAE and STL. Twenty-three original model/dependency files remained hash-identical.
-These are representative format checks, not full-library compatibility approval.
-
-Synthetic native delivery evidence: `preview-native-final-delivery/verification.json`.
-Search regression evidence: `preview-search-regression-fixed/report.json`.
-The search harness now resolves the replayed search started by a publication
-refresh, fixing an existing harness deadlock without changing search behavior.
-Native source-navigation regression evidence: `source-settings-986e0ebf4b/report.json`.
-Owner usability/material acceptance and a full screen-reader audit remain pending.
-
-Storage receipts `data/storage/3d-preview-before-20261015.json` and
-`3d-preview-after-20261015.json` both passed. Unique allocated project storage
-increased by 120,007,440 bytes (114.45 MiB), including 108.49 MiB of isolated
-verification fixtures, about 3.97 MiB of reports/captures and 1.91 MiB of source
-files. The actual upstream viewer/lighting/decoder/license payload is 1,873,510
-bytes (1.79 MiB). The project was already above the historical 6 GiB pilot target
-before this change (8.42 GiB); no existing results or evidence were deleted.
-The redundant 3,551,087-byte downloaded archive was removed after verifying the
-vendored payload hashes. Cleanup, savings and accounting are recorded separately
-in `data/storage/3d-preview-comparison-20261015.json`. No runtime was installed.
+How the preview is isolated and verified is in the knowledge base:
+[3D preview](../../KnowledgeBase/Notebook/Desktop%20App/3D%20preview.md).

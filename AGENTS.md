@@ -4,9 +4,26 @@ adds codebase orientation only.
 
 ## Recorded decisions
 
-Read `docs/decisions/` before changing behavior. Those owner-approved decisions
+Read `KnowledgeBase/Decisions/` before changing behavior. Those owner-approved decisions
 bind future changes; if a change would contradict one, ask the owner first and
 update the decision record together with the code.
+
+## Knowledge base
+
+`KnowledgeBase/` (an Obsidian vault, also readable on GitHub) holds what the code doesn't
+say: `Home.md` (conventions), `Status.md`, `Notebook/` (working notes per area, agents first),
+`Architecture/` (how and why, humans first), `Decisions/` (binding owner decisions) and
+`Reference/` (external docs with a trust rating). User-facing guides stay in `docs/`.
+
+- For a task in an area, read its hub (`Notebook/<Area>/<Area>.md`) and the notes for the
+  systems involved first. `Notebook/Codebase.md` maps every module to its area.
+- Notes can be stale: the code wins. Report a wrong note and fix it in the same change.
+- At the end of each task, propose 0-3 learnings (target note, exact text, `code` anchors)
+  and 0-3 friction items for `Notebook/Improvements.md`. Write them only after the owner
+  approves. Learnings are what cost real effort to find or what the owner explained that
+  exists nowhere else, not a log of the work.
+- Architecture docs and decisions are human-owned: agent edits to Architecture stay
+  `status: draft`; decisions change only as described under "Recorded decisions".
 
 ## Required checkpoint before implementation
 
@@ -30,7 +47,7 @@ Application and test-harness defects may be diagnosed, fixed and verified normal
 
 ### Caption review severity
 
-Apply `docs/caption-quality.md` when processing or reviewing new assets. Do not
+Apply `KnowledgeBase/Architecture/Processing/Caption severity.md` when processing or reviewing new assets. Do not
 mark a usable caption or asset faulty solely because a visual detail is uncertain,
 an exact count is unsupported, a material is inferred, or owner review is pending.
 Record minor precision/appearance uncertainty as `review_note`; record meaningful
@@ -97,7 +114,7 @@ processing of other items; never edit originals to resolve them.
   partial results. Never recursively delete directories containing junctions or
   links without a reviewed containment check; never clear generic system caches.
 - Record cleanup targets, savings, verification and faults separately. The
-  one-time consolidation script refuses automatic reruns. See `docs/storage.md`.
+  one-time consolidation script refuses automatic reruns. See `KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
 
 ## Versioning
 

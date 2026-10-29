@@ -26,8 +26,8 @@ bytes and material/alpha settings stay intact. External consumers must apply the
 returned bindings. Additional resource kinds need a processing adapter; this
 feature currently handles external glTF/GLB image references.
 
-See [general capability policy](decisions/0009-general-capabilities.md) and
-[shared dependency decision](decisions/0010-shared-project-dependencies.md).
+See [general capability policy](../KnowledgeBase/Decisions/0009-general-capabilities.md) and
+[shared dependency decision](../KnowledgeBase/Decisions/0010-shared-project-dependencies.md).
 
 ## Explicit mappings within a source
 
@@ -67,17 +67,3 @@ through the normal processing ledger; unchanged failures are still retained.
 Successful stages clear their current stage fault while append-only ledger
 history preserves earlier failures. Source-owned caption retries retain their
 raw evidence under that source's metadata directory.
-
-## Cartoon City repair, October 18, 2026
-
-The owner approved mapping the four separate model add-ons to the supplied Core
-textures, retaining all successful processing, and producing only missing results.
-The audit identified 3,467 blocked models, 5,266 missing references, 28 distinct
-missing locations and 16 shared texture files. The 310 previously rendered models,
-930 previews, 308 usable descriptions and 1,238 vectors are protected.
-
-Receipts, original hashes, prior catalog and ledger, per-asset sample results,
-resumable processing logs and final verification belong under
-`data/repairs/cartoon-city-20261018/`. The approved growth ceiling is 4 GiB within
-the existing 24 GiB library budget; unique allocation receipts also include each
-source's generated metadata. Owner appearance and caption approval remain pending.

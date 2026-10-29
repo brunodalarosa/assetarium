@@ -1,4 +1,4 @@
-// The shared loading language (docs/gui/README.md → Loading states): ghosts stand where
+// The shared loading language (KnowledgeBase/Architecture/Desktop App/Desktop app design.md → Loading states): ghosts stand where
 // content of a known shape will appear, after a short delay so fast loads never flash.
 import { type CSSProperties, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";

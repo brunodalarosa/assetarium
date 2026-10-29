@@ -86,4 +86,4 @@ The current MCP workflow permits selection-manifest writes only under the librar
 
 The library tools do not copy, convert, or import assets. For a task that also requests integration, finish the selection, then follow the game project's authorized implementation workflow and required checkpoints. Keep library originals read-only; bring only the selected files and necessary dependencies into the established project asset structure, preserving provenance and license information. Engine validation and human visual approval remain separate from retrieval evidence.
 
-For contract questions, read [the local MCP guide](../../docs/mcp/README.md). For disputed caption severity, read [the caption-quality rules](../../docs/caption-quality.md). Read only the reference needed for the current question.
+For contract questions, read [the local MCP guide](../../docs/mcp/README.md). For disputed caption severity, read [the caption-quality rules](../../KnowledgeBase/Architecture/Processing/Caption%20severity.md). Read only the reference needed for the current question.

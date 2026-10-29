@@ -37,10 +37,6 @@ results or search vectors, and does not retry retained failures. Failure evidenc
 stays in the importing failures report. Saving preferences refreshes pending
 indicators from saved inventory without running a scan or starting models.
 
-After upgrading from the single-root version, reopen LAL and reconnect any agent
-server connections that were already running. They need to load the new code
-once; subsequent source toggles apply live without reconnecting or restarting.
-
 The app scans enabled sources in the background at startup. Enabling a source
 also scans it; reopen the app (or toggle the source) to rescan during a session. Scans detect
 added, changed and removed files; unchanged files reuse their verified hashes
@@ -82,7 +78,7 @@ read. Report notices lead to Asset processing. They are saved in
 
 **Asset processing** offers **Process assets** for each source that needs
 processing or publication (the rail item shows a dot). Missing or failed descriptions never count as pending work: descriptions are
-optional extra data ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)). The pending state remains visible through processing, publication, cancellation
+optional extra data ([decision 0008](../KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)). The pending state remains visible through processing, publication, cancellation
 and interruption while actionable work remains. A subsequent scan clears it
 when there is no unattempted work and current results have been published.
 Recorded failures appear in the importing failures report. Description failures,
@@ -132,7 +128,7 @@ audio. New candidate catalog databases use schema 2, allowing explicit parent an
 child records to share original paths. Old catalogs remain readable without a
 startup migration. Generic images, unsupported audio, file roles, relationships
 and adapter capabilities are documented in the
-[catalog contract](catalog-contract.md#expansion-step-1-shared-asset-foundation).
+[catalog contract](../KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#expansion-step-1-shared-asset-foundation).
 Expansion step 2 adds image enrollment as a per-source choice: tick **Include
 2D images** in *Settings → Asset sources* (stored as `import_types` in that
 source's `metadata-lal/source.json`). The source is rescanned; existing results
@@ -141,38 +137,10 @@ results. Model textures, previews, pack overview sheets, texture folders and
 atlas/tileset sheets stay out of the image assets with a visible inventory role.
 **Process assets** measures each image and writes its thumbnail, model input and
 image vector; **Generate descriptions** then works for images too. See the
-[catalog contract](catalog-contract.md#static-2d-images-expansion-step-2).
+[catalog contract](../KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#static-2d-images-expansion-step-2).
 
-The local registry is `data/library/sources.json`. Each source's
-`metadata-lal/source.json` stores its persistent identifier and catalog key.
-Directories must be separate and must not overlap LAL, shared model storage or
-one another. Directory links and metadata directory escapes are rejected.
 
-`metadata-lal` contains its catalog snapshots, working catalog, source inventory,
-processing/job history, vector snapshots, inspections, image previews, caption
-outputs, owner correction overlays, review classification, source operation logs,
-and source-specific historical evidence. Saved `data/...` references in records
-are logical references resolved to this directory. This preserves existing asset
-identities and vector fingerprints while moving files.
-
-LAL's central catalog and search index are derived combinations of source
-publications. Enabling/disabling sources filters the visible membership without
-copying model files, rerendering or reindexing. Central application logs, model
-capability receipts, runtime caches, shared historical reports and migration/storage
-receipts remain application-owned. Mixed-source JSON reports are also partitioned
-into each relevant source's historical evidence.
-
-The approved initial migration registers the 13 former top-level asset-pack
-directories as enabled sources. Individual result files move within C: with a
-per-file hash-checked journal. Original files, result bytes, vector bytes, reviews
-and fault evidence are preserved. Migration receipts are under
-`data/library/source-migration/`; it refuses automatic repetition.
-
-Storage receipts include unique allocated bytes across the project and all source
-metadata directories, deduplicating hard links. They exclude original asset files
-and shared model weights. Existing prepared runtimes and offline models are reused.
-
-### Source import restrictions
+## Source import restrictions
 
 An explicitly cleaned source can store an `import_formats` list in its
 `metadata-lal/source.json`, using the same `fbx`, `gltf`, and `obj` families as
@@ -186,14 +154,8 @@ source cleanup. Removing or changing a source import restriction is an explicit
 maintenance operation, followed by scanning and processing the restored formats.
 Sources without a restriction retain their previous inventory behavior.
 
-Nested source licenses are attached only to assets in the corresponding ancestor
-folders, together with applicable collection notes. Internet shortcuts are
-documentation rather than license evidence. Full originals and historical
-evidence are retained. Equal manifests in sibling `fbx`, `fbx(unity)`, `gltf` and
-`obj` export trees can establish a logical export group, preserving subpack and
-color namespaces; they do not establish measured geometry equivalence.
 
-### Excluded folders and duplicate export folders (decision 0019)
+## Excluded folders and duplicate export folders (decision 0019)
 
 Settings → Asset sources (or `local-assets sources exclude|include KEY PATTERN`) keeps a list of
 **excluded folders** per source in `source.json`: a folder name with `*` (`Unity*`, `*Godot*`,
@@ -215,7 +177,7 @@ names and a hash of the name list: if a folder's files change, its files become 
 and the suggestion returns. Grouped files carry their folder as a variant label
 (`get_asset` `source_variants` / `source_variant`).
 
-### Texture folder for models missing textures (decision 0021)
+## Texture folder for models missing textures (decision 0021)
 
 When inspected models could not find textures their files name, and the source has files with
 those exact names, the source row in Settings → Asset sources shows **Textures not found**: the
@@ -225,13 +187,6 @@ texture-repair recipe for each model whose every missing texture resolves; Proce
 renders those models once with the mapped files. **Undo** removes the choice. Originals never
 change. Command line: `local-assets sources textures KEY [--use FOLDER] [--single-copies] [--undo]`.
 
-The owner-approved KayKit glTF cleanup uses
-`scripts/historical/kaykit-gltf-maintenance.py`, with immutable receipts in
-`data/library/maintenance/kaykit-gltf-20261016/`. Its phases preserve glTF IDs,
-results and vectors, record original hashes, publish the restricted membership,
-then remove only manifest-listed generated imports and retired derived
-publications. Excluded fault records and their generated evidence are retained
-separately. Cleanup refuses links, out-of-root targets and automatic reruns.
 
 ## Maintenance commands
 
@@ -241,11 +196,9 @@ individual source. `python scripts/library-batch.py process --source KEY` starts
 the same source operation used by the app; it publishes automatically. The
 returned operation token identifies its durable log in that source's metadata.
 
-Earlier pilot/import commands and reports in this repository describe their
-historical configuration. Current source membership comes from Settings rather
-than the historical pack list (now `docs/history/library-membership-2026-10-14.json`,
-evidence only). The default storage budget (10 GiB total, the same value as that
-historical contract, `library_policy.DEFAULT_BUDGET`) applies until a user saves a
+## Storage budget
+
+The default storage budget (10 GiB total, `library_policy.DEFAULT_BUDGET`) applies until a user saves a
 budget in **Settings → General**. The saved whole-number GiB limit lives in `data/library/settings.json`
 and applies to the combined unique allocation of LAL and source metadata. Original
 assets and shared models are excluded. Saving does not start or retry processing.
@@ -264,4 +217,7 @@ The texture source need not contain models. Originals stay read-only; conflictin
 missing, changed or disabled providers remain visible faults. New registrations
 with the same convention use this feature automatically during normal scans.
 See [shared dependency behavior](dependency-path-overrides.md) and the binding
-[capability policy](decisions/0009-general-capabilities.md).
+[capability policy](../KnowledgeBase/Decisions/0009-general-capabilities.md).
+
+How sources are stored, identified and published internally is in the knowledge base:
+[Sources](../KnowledgeBase/Notebook/Sources%20and%20Catalog/Sources.md).

@@ -1,24 +1,18 @@
-# Local agent access — step 7
+# Local agent access (MCP)
 
-This server exposes `search_assets` and `get_asset`, plus the collection tools
+Assetarium's MCP server exposes `search_assets` and `get_asset`, plus the collection tools
 `list_collections`, `get_collection`, `edit_collection` and `tag_assets`
-([decision 0012](../decisions/0012-collections-and-tags.md); see
+([decision 0012](../../KnowledgeBase/Decisions/0012-collections-and-tags.md); see
 [Collections and tags](#collections-and-tags)) and the setup tools
 `get_setup_status`, `validate_blender`, `apply_setup`, `propose_setup` and
-`finish_setup` ([decision 0016](../decisions/0016-agent-setup.md); see
-[Agent setup](#agent-setup)), using local STDIO.
-Step 8 generalizes membership to the explicitly approved configured library and
-pins each request to one published catalog/index generation. It has no HTTP
-listener, export tool, arbitrary-path input, copy operation or source-writing API.
-The historical forty-asset pilot approval remains preserved; current expansion
-authorization and operations are in [`../library-updates.md`](../library-updates.md).
-Restart pre-update server connections to load the new membership/version/lease
-behavior. No client registration or unrelated process is changed.
+`finish_setup` ([decision 0016](../../KnowledgeBase/Decisions/0016-agent-setup.md); see
+[Agent setup](#agent-setup)), over local STDIO. Each request is pinned to one published
+catalog/index generation. There is no HTTP listener, export tool, arbitrary-path input,
+copy operation or source-writing API. Restart older server connections after an update to
+load new membership, version and lease behavior.
 
-Bruno's current client decision is **Codex for now**. OpenCode completion is not
-required for current use, and further OpenCode work is on hold pending his
-explicit request. Existing failure evidence remains valid. See
-`client-decision.json` and the later decision entry in `../progress.md`.
+How the server is built, how client registration is preserved and how it is verified are in
+the knowledge base: [MCP server](../../KnowledgeBase/Architecture/MCP/MCP%20server.md).
 
 ## Install and start
 
@@ -37,16 +31,6 @@ examples with a placeholder path. Do not wrap client startup in an installer. Th
 point resolves its own repository/configuration regardless of client cwd.
 `codex-setup.toml` and `opencode-setup.json` are recorded evidence from the original
 development machine, not current setup files.
-
-MCP SDK **2.3.0**, NumPy **2.3.4** and Pillow **12.1.0** are locked separately
-under `runtime/mcp/`. Semantic queries start one persistent private subprocess
-using the existing `.venv-embedding`, unchanged model/backend/lock/index
-contracts, offline weights and CUDA BF16. The worker only embeds the query text
-or reference image; the server verifies, scores and fuses rankings in-process
-(decision 0005). Its output is private JSON IPC with progress heartbeats; all
-diagnostics use stderr. The MCP server starts the worker on its first semantic
-query; only the desktop app pre-starts it. There is no automatic fallback/restart after a failed
-worker, model initialization, or unchanged failed query.
 
 The server entry point cannot process assets, scan/update the catalog, load
 remote images, or import into Play Shapes. Existing generated captions and
@@ -107,18 +91,18 @@ Caption summaries now expose `caption_status`: `clear`, `review_note`, `warning`
 or `fault`. `caption_faulty` is true only for an unusable caption; minor notes and
 meaningful descriptive warnings do not make a source unusable. Metadata details
 include `caption_quality` alongside original historical findings. See
-[`../caption-quality.md`](../caption-quality.md) for classification and evidence
+[Caption severity](../../KnowledgeBase/Architecture/Processing/Caption%20severity.md) for classification and evidence
 rules; owner approval and source faults remain separate.
 
 `get_asset` accepts an exact `asset_` + 32 lowercase hexadecimal ID. Optional
 `source_format` selects an existing export; the inspected source is preferred
 otherwise. A grouped asset also lists `source_variants` (each file's folder label and format,
-[decision 0019](../decisions/0019-source-folders-and-export-variants.md)); optional
+[decision 0019](../../KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)); optional
 `source_variant` picks one by label, for example `"Unity FBX"` when two files share a format.
 Labels come from the asset's own files; paths are never accepted. A file that cannot be used
 (for example its texture path points outside the source) is listed with `usable: false` and a
 `reason`, is never selected, and requesting it is refused with that reason
-([decision 0020](../decisions/0020-alternate-file-faults-and-recheck.md)). It returns the actual source path/hash, all known logical-asset
+([decision 0020](../../KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)). It returns the actual source path/hash, all known logical-asset
 dependencies with referring-source evidence, completeness limitations and faults.
 `include_metadata=true` requests observations, measured summary, license evidence,
 processing states and caption fault evidence. No incomplete dependency package is
@@ -170,7 +154,7 @@ them; `register-mcp.py` refuses to overwrite an existing entry.
 ## Agent setup
 
 An agent can set Assetarium up for the computer it runs on
-([decision 0016](../decisions/0016-agent-setup.md)); the procedure is the user-invoked skill
+([decision 0016](../../KnowledgeBase/Decisions/0016-agent-setup.md)); the procedure is the user-invoked skill
 [`skills/assetarium-setup`](../../skills/assetarium-setup/SKILL.md) and the server prompt
 `set_up_assetarium`. The tools wrap `setup_core`, the same rules as the app's wizard.
 
@@ -210,82 +194,10 @@ check can take up to two minutes. `codex-setup.toml` and `opencode-setup.json` a
 recorded snippets and are not rewritten. Verification: `scripts/verify-agent-setup-mcp.py
 --run-name NAME` drives the real STDIO server through the whole flow on an isolated project.
 
-## Client setup, preservation and restoration
+## Privacy
 
-Current official references, read October 11, 2026:
-
-- [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
-- [OpenCode MCP servers](https://opencode.ai/docs/mcp-servers/)
-- [OpenCode configuration precedence](https://opencode.ai/docs/config/)
-- [MCP server development](https://modelcontextprotocol.io/docs/develop/build-server)
-
-The active Codex user configuration was discovered at
-`C:\Users\backup pc\.codex\config.toml`; there was no project override or
-CODEX_HOME override. Existing node_repl, gimp and blender entries and model
-`gpt-6.1-sol` were retained. OpenCode's actual launcher sets OPENCODE_CONFIG to
-`C:\BrunoOS\OpenCode-local-agent\outputs\opencode-local.json` and relocates XDG
-directories; no additional global JSON configuration was found there. Its
-`ollama/qwen3.8:local-agent`, small model, provider, options, model setup and
-permissions were retained.
-
-`scripts/register-mcp.py` performs first registration only: copy original bytes
-to ignored `data/mcp/config-backups/<UTC>/`, verify them, add just this server,
-compare parsed unrelated settings, check for concurrent edits, then verify the
-write. Never rerun it blindly over an existing server entry. Exact setup snippets
-are versioned here; `data/mcp/registration.json` records paths, hashes and backups.
-Backups can contain private settings and must not be committed or sent to models.
-
-To restore, close the client. Check for later changes before restoring the whole
-file. If none exist, copy the exact backup bytes back to the corresponding
-receipt path. If later changes exist, remove only this server entry after review
-and preserve those later settings. Restart/reconnect the client to load changes.
-The existing desktop chat was not treated as having hot-reloaded new tools:
-verification used fresh installed CLI sessions with the same active configuration.
-
-## Verification and disclosure
-
-```powershell
-$env:PYTHONPATH = Join-Path (Get-Location) 'src'
-& '.\.venv-mcp\Scripts\python.exe' -m pytest tests\test_mcp_assets.py tests\test_retrieval.py tests\test_evaluation.py --basetemp scratch\pytest-mcp-new-run
-& '.\.venv-mcp\Scripts\python.exe' scripts\verify-mcp.py --run-name unique-run-name
-```
-
-Read previous faults before requesting any repeat. The protocol harness creates
-a distinct directory and captures real initialization, tool discovery, both
-tools, image decoding/hash, malformed ID/path/filter/cap errors, semantic default
-and clean EOF shutdown. This is explicitly **not agent-use evidence**. The
-initial harness incorrectly matched a Windows environment-launcher PID to its
-child Python PID; original faulty evidence is preserved. The corrected harness
-identifies the new audit directory instead.
-
-`scripts/historical/verify-agent-workflow.py codex|opencode` (original development machine only) performs one bounded real-client
-selection workflow and saves events/stderr plus final manifest in
-`data/exports/<client>-selection.json`. It runs installed clients as verification
-targets, without delegation/subagents. It never changes the persistent model or
-permission setup. Codex disables other MCPs for that one invocation; OpenCode's
-one-run inline permission overlay authorizes exactly the two read-only project
-tools. Neither changes unrelated saved configuration. A failed unchanged client
-workflow is not automatically retried.
-
-Each server process records returned text size/UTF-8 bytes, estimated tokens,
-image bytes/base64 length, errors, full fault evidence and timing under
-`data/mcp/runs/<id>/`. Preview PNGs are preserved separately. These are local
-evidence writes, not source edits. Tool-schema and full-client token usage are
-measured separately; reported client usage includes instructions, prior context,
-tool schemas, repeated context and images as accounted by that client. It cannot
-be used to claim retrieval-only token savings.
-
-Rendering/captioning/indexing/search inference remain local. Codex's configured
-cloud model receives returned candidate text, descriptions, source/dependency
-paths, requested metadata and PNG previews. OpenCode's existing provider is local
-Ollama on localhost. A local MCP transport does not keep cloud-requested results
-private. No full source model files or configuration backups are returned through
-these tools, and no public server was exposed.
-
-See `client-results.json`, `owner-review.json`, `preservation.json` and
-`../progress.md` for real outcomes and current limitations. Owner labels were
-validated and quality recomputed only from saved first-repeat rankings; frozen
-step 6 artifacts were preserved. The current session supplies the explicit
-bounded pilot decision recorded in those historical receipts. Step 8 received
-separate scope and runtime/storage approval; its current contract and coverage
-are documented in `../library-updates.md` and `../progress.md`.
+Rendering, captioning, indexing and search inference stay on this computer. Your agent's
+model receives what the tools return: candidate text, descriptions, source/dependency paths,
+requested metadata and PNG previews. If that model runs in the cloud, a local MCP transport
+does not keep those results private. No full source model files or configuration backups are
+returned through these tools, and no public server is exposed.

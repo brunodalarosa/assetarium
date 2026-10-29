@@ -65,3 +65,9 @@ npm-debug.log*
 # Blender autosave/backup files from local test fixtures.
 *.blend1
 *.blend2
+
+# Per-user Obsidian state for the knowledge base vault (its shared settings stay tracked).
+/KnowledgeBase/.obsidian/workspace*.json
+/KnowledgeBase/.obsidian/cache
+/KnowledgeBase/.obsidian/appearance.json
+/KnowledgeBase/.trash/

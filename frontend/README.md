@@ -1,7 +1,7 @@
 # Assetarium desktop interface (`frontend/`)
 
 The desktop app's UI: React 19, TypeScript, Vite, Tailwind v4, `motion`, Lucide
-icons and the Geist font ([decision 0011](../docs/decisions/0011-react-desktop-ui.md)).
+icons and the Geist font ([decision 0011](../KnowledgeBase/Decisions/0011-react-desktop-ui.md)).
 `npm run build` type-checks and writes one script and one stylesheet to
 `src/local_asset_library/ui/build/`. That bundle is committed: the app
 (`desktop.create_window`) inlines it into `ui/index.html` together with

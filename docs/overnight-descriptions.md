@@ -2,7 +2,7 @@
 
 For one source, the app's **Asset processing → Generate descriptions**
 does the same work in the background with progress, Cancel and a report
-notification ([decision 0008](decisions/0008-optional-descriptions-and-notifications.md)).
+notification ([decision 0008](../KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)).
 This runner remains for unattended runs across the whole library.
 
 In File Explorer, double-click **Generate overnight descriptions.cmd** in
@@ -100,7 +100,7 @@ remain available; simultaneous model-based searches may report busy.
 An approved repair run can select only recovered models with `--asset-ids-file`,
 pointing to a JSON array of configured asset IDs. This fresh-run allowlist is saved
 in the plan and excludes unrelated caption faults. Resume uses the saved selection.
-See `docs/texture-repairs.md` for the October 14 texture-repair evidence.
+See `docs/texture-repairs.md` (removed 2026-10-28; in git history at `b57bade`) for the October 14 texture-repair evidence.
 
 The estimate for 937 newly imported models is **3–6 hours**, based on approximately ten seconds
 per historical caption attempt plus indexing/checkpoints. The dry run scales its
