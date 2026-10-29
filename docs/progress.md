@@ -1,5 +1,39 @@
 # Progress
 
+## October 28 — Descriptions are no longer rejected for wording, branch `bugfix/caption-wording-rejections`
+
+The October 27 description runs failed 35 assets whose saved model output was a complete, accurate
+description: 15 Viking boats in *Medieval Megapack* with "Measured technical claim" because the
+validator read the ship's "rigging" (its ropes) as a character rig, and 20 with "Suggested use"
+for phrases such as "designed for use in games" or a cart "designed for carrying goods"
+(10 *Low Poly Nature*, 7 *Megapack*, 3 *Medieval Props*). Under the caption severity rule in
+`AGENTS.md` these are review notes at most, not unusable descriptions.
+
+- `captions.TECHNICAL` drops the bare word "rigging" and keeps `rigged`, `unrigged`, `armature` and
+  adds `skeletal/character/bone rig(ging)`. Use wording no longer rejects: `captions.use_notes`
+  records each match as a `review_note` (field and excerpt as evidence) in
+  `caption_provenance.validation_notes`, written by `incremental.run_captions`;
+  `caption_quality` lists them beside review findings, and reviews never replace them. Library
+  fingerprints do not hash `captions.py`, so nothing is re-queued; the prompt is unchanged.
+- **Owner-approved recovery without a model run.** `scripts/historical/revalidate-caption-wording.py`
+  checked every expected count first, saved each failure's result file, ledger row and stage fault
+  (`data/evidence/caption-wording-revalidation-2026-10-28/`), then checked the saved output with the
+  new validator and recorded it as complete with a `revalidation` provenance entry when the fingerprint
+  was unchanged; the failed attempt stays in the result and the ledger history. All 35 passed
+  (about a second). Process assets on the three sources then added 35 description vectors (0.9 s on
+  *Low Poly Nature*; the rest of its ~7 minutes re-checked all 13,792 existing vectors, published and
+  rescanned) and published: 0 failed descriptions in every source. Spot check through the MCP service:
+  `Boat_3_A_1` complete and clear, `Palm_Tree_1_1_FA` complete with one review note.
+- Worth an owner look (identity, not wording): `Trough_1_C` is described as a "wooden boat" and
+  `Rope_A_5` as a "wooden noose".
+- **Verification.** `tests/test_captions.py` (ship rigging accepted; rigged, armature, skeletal and
+  character rigs rejected; use wording gives notes), `tests/test_caption_quality.py` (validator notes
+  beside classified findings), `tests/test_sources.py` (notes published by the pipeline; the script
+  accepts once, keeps a still-rejected output failed, ignores other errors, refuses reruns and wrong
+  counts, dry run writes nothing). Full suite 727 passed, 2 skipped (`Real-Blender tests: 8 passed`).
+  Storage receipts `data/storage/2026-10-28-caption-wording-before.json` → `-after.json`: +75.2 MiB
+  unique project bytes (65.6 MiB new published catalog/index versions under `data/`).
+
 ## October 27 — One-piece objects may list no parts, branch `bugfix/one-piece-caption-parts`
 
 Desert Pack's description run (local server, Qwen3-VL-2B F16) failed 4 of 63 assets with "Core visual

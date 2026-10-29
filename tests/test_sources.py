@@ -450,6 +450,84 @@ def test_caption_publication_stores_logical_owner_overlay_path(managed,monkeypat
     assert work.output_path('data',published['caption_provenance']['owner_overlay_path'][5:]).exists()
 
 
+def test_use_wording_is_published_as_a_validation_note(managed,monkeypatch):
+    from local_asset_library.incremental import run_caption
+    import local_asset_library.captions as captions
+    config,backend,one,_=managed;work=ready_source(config,backend,one)
+    record=records(work)[0]
+    description={**record['description'],'description':record['description']['description']+'It is suitable for games.'}
+    outcome={'status':'complete','description':description,'suggested_uses':[],'attempts':[]}
+    monkeypatch.setattr(captions,'infer_captions',lambda *args,**kwargs:[outcome])
+    backend.settings={}
+    run_caption(work,record,'a'*64,backend)
+    published=detail(work,record['asset_id'])
+    assert published['processing']['caption']=='complete'
+    assert [n['severity'] for n in published['caption_provenance']['validation_notes']]==['review_note']
+    from local_asset_library.caption_quality import caption_quality
+    assert caption_quality(work,published)['status']=='review_note'
+
+
+def load_revalidation():
+    import importlib.util
+    path=Path(__file__).parents[1]/'scripts/historical/revalidate-caption-wording.py'
+    spec=importlib.util.spec_from_file_location('revalidate_caption_wording',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+
+def test_wording_revalidation_accepts_saved_outputs_once(managed,monkeypatch):
+    from local_asset_library.incremental import checkpoint, ledger, run_caption
+    import local_asset_library.captions as captions
+    config,backend,one,_=managed;work=ready_source(config,backend,one)
+    module=load_revalidation()
+    good,bad,other=records(work)[:3]
+    backend.settings={}
+    def fail(record,text,error='Measured technical claim in visual observations'):
+        raw=json.dumps({**record['description'],'description':text,'suggested_uses':['scenery']})
+        attempts=[{'status':'invalid_output','error':error,'raw':raw}]
+        monkeypatch.setattr(captions,'infer_captions',lambda *args,**kwargs:[{'status':'failed','description':None,'suggested_uses':[],'attempts':attempts}])
+        run_caption(work,record,'f'*64,backend)
+        failed=detail(work,record['asset_id'])
+        failed['stage_faults']={'caption':{'status':'failed','error':error}}
+        update_record(work,failed)
+        with closing(ledger(sources.bound(config,one))) as db:
+            checkpoint(db,record['asset_id'],'caption','f'*64,'failed',{'status':'failed','attempts':attempts})
+    fail(good,'A low-poly sailboat with a curved hull and rigging lines from the mast, designed for use in games.')
+    fail(bad,'A low-poly figure with an armature and a curved wooden body and a plain round head.')
+    fail(other,'A low-poly crate with plain planks and a simple square frame on every side.','Invalid string list: colors')
+    monkeypatch.setattr(module,'EXPECTED',{one['key']:2})
+    monkeypatch.setattr(module,'caption_input',lambda config,record:'f'*64)
+    out=config.output_path('data','evidence/revalidation-fixture')
+    dry=module.run(config,out,dry_run=True)
+    assert [a['asset_id'] for a in dry['sources'][one['key']]['accepted']]==[good['asset_id']]
+    assert not out.exists() and detail(work,good['asset_id'])['processing']['caption']=='failed'
+    receipt=module.run(config,out)
+    result=receipt['sources'][one['key']]
+    assert [a['asset_id'] for a in result['accepted']]==[good['asset_id']] and result['accepted'][0]['review_notes']==1
+    assert [k['asset_id'] for k in result['kept_failed']]==[bad['asset_id']]
+    assert result['kept_failed'][0]['reason'].startswith('Still rejected: Measured technical claim')
+    accepted=detail(work,good['asset_id'])
+    assert accepted['processing']['caption']=='complete' and 'caption' not in accepted['stage_faults']
+    assert 'rigging lines' in accepted['description']['description'] and accepted['suggested_uses']==['scenery']
+    provenance=accepted['caption_provenance']
+    assert provenance['revalidation']['previous_error'].startswith('Measured technical claim')
+    assert provenance['validation_notes'][0]['severity']=='review_note'
+    assert provenance['attempts'][0]['status']=='invalid_output'
+    for identifier in (bad['asset_id'],other['asset_id']):
+        assert detail(work,identifier)['processing']['caption']=='failed' and detail(work,identifier)['stage_faults']['caption']
+    with closing(ledger(sources.bound(config,one))) as db:
+        assert db.execute("SELECT status FROM jobs WHERE asset_id=? AND stage='caption'",(good['asset_id'],)).fetchone()==('complete',)
+        assert [r[0] for r in db.execute("SELECT status FROM history WHERE asset_id=? AND stage='caption' ORDER BY sequence",(good['asset_id'],))][-2:]==['failed','complete']
+    saved=json.loads((out/'before'/one['key']/good['asset_id']/('f'*64+'.json')).read_text(encoding='utf-8'))
+    assert saved['status']=='failed' and json.loads((out/'receipt.json').read_text(encoding='utf-8'))['sources']
+    assert not (out/'before'/one['key']/bad['asset_id']).exists()
+    with pytest.raises(SystemExit,match='never reruns'):
+        module.run(config,out)
+    monkeypatch.setattr(module,'EXPECTED',{one['key']:2})
+    with pytest.raises(ConfigError,match='expected 2'):
+        module.run(config,config.output_path('data','evidence/revalidation-fixture-2'))
+
+
 def test_combined_publication_is_reused_after_removing_and_readding_source(managed):
     from local_asset_library.publication import generation
     config,backend,one,two=managed

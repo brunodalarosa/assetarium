@@ -92,6 +92,9 @@ def caption_quality(config, record):
             for issue in issues:
                 issue["severity"] = "warning"
                 issue["reason"] = str(exc)
+    # The validator's own notes (use wording) are classified when written; reviews never replace them.
+    issues += [{k: note[k] for k in ("severity", "evidence", "reason")}
+               for note in (record.get("caption_provenance") or {}).get("validation_notes", [])]
     processing = (record.get("processing") or {}).get("caption", "missing")
     description = record.get("description")
     if (processing == 'pending' and description is None

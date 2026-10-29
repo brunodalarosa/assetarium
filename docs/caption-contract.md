@@ -29,7 +29,15 @@ explicit retry authorization.
 Changing this rule does not recover/revalidate stored failed responses or clear
 their original fault records; that requires a separate explicit operation.
 Duplicate JSON keys, wrong types, extra fields, truncated JSON and specified
-technical/use claims in observation fields are rejected. This validation cannot
+technical claims (geometry counts, character rigs and armatures, animation, UVs, file
+formats, dependencies, real dimensions) in observation fields are rejected. A ship's
+rigging is its visible ropes and is accepted. Use wording in observation fields ("designed
+for", "suitable for", "can be used"…) no longer rejects a usable description: each match is
+recorded in `caption_provenance.validation_notes` as a `review_note` with the phrase as
+evidence, shown with the other caption notes; reviews never replace these notes. The 35
+outputs the October 27 run rejected only for this wording were accepted as saved, without a
+new model run (`scripts/historical/revalidate-caption-wording.py`, provenance
+`revalidation`). This validation cannot
 prove the semantic truth of a visually plausible statement. Review can flag
 incorrect components, overconfident materials and wrong identities even when
 the schema passes.

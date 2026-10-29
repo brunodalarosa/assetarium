@@ -56,6 +56,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Descriptions are no longer rejected for wording alone. A sailing ship's "rigging" is its
+  ropes, not a character rig, and phrases such as "designed for use in games" in the
+  description are now kept with a review note instead of failing it. The 35 descriptions an
+  earlier run rejected this way were accepted from their saved output without running the
+  model again.
 - One-piece objects such as rocks, pebbles and grass clumps no longer fail their description
   because the model listed no separate parts; shape, colors and style are still required.
   Descriptions that already failed this way stay recorded until you retry them.

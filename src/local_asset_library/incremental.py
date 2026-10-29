@@ -436,7 +436,7 @@ def run_captions(config, batch, backend, batch_size=None):
     Every asset is re-checked, saved and published on its own. EngineStop (out of memory,
     engine unavailable) propagates before anything is recorded, so the batch stays pending.
     """
-    from .captions import infer_captions, publish
+    from .captions import infer_captions, publish, use_notes
     from .caption_batching import MODE
     # A model batch never mixes prompts: 3D views and 2D images use separate versioned prompts.
     groups = {}
@@ -454,7 +454,8 @@ def run_captions(config, batch, backend, batch_size=None):
         try:
             image_inputs(config, record)
             relative = f"captions/library/{record['asset_id']}/{fingerprint}.json"
-            provenance = {"fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
+            notes = use_notes(outcome["description"]) if outcome["status"] == "complete" else []
+            provenance = {**({"validation_notes": notes} if notes else {}), "fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
                 "prompt_version": version, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
                 "generation_mode": getattr(backend, 'generation_mode', MODE),
                 **({"engine": backend.identity} if getattr(backend, 'identity', None) else {}),

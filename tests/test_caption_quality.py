@@ -28,6 +28,20 @@ def write_classification(config, records, severity="review_note"):
     return path
 
 
+def test_validator_use_notes_are_review_notes_beside_classified_findings(tmp_path):
+    config, item = Config(tmp_path, tmp_path / "source", None), record()
+    note = {"severity": "review_note", "evidence": 'description: "designed for use in games."',
+            "reason": "Use wording in visual observations."}
+    item["caption_provenance"]["validation_notes"] = [note]
+    write_classification(config, [item], "warning")
+    quality = caption_quality(config, item)
+    assert quality["classification"] == "classified" and quality["issues"][1] == note
+    assert quality["status"] == "warning" and not quality["caption_faulty"]
+    item["caption_provenance"]["visual_faults"] = []
+    quality = caption_quality(config, item)
+    assert quality["status"] == "review_note" and quality["issues"] == [note] and not quality["caption_faulty"]
+
+
 @pytest.mark.parametrize("severity", ["review_note", "warning"])
 def test_classification_preserves_raw_evidence_and_caption(tmp_path, severity):
     config, item = Config(tmp_path, tmp_path / "source", None), record()

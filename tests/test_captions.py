@@ -9,7 +9,7 @@ from local_asset_library.config import Config, ConfigError
 from local_asset_library.caption_batching import GpuMemoryError
 from local_asset_library.captions import (validate_caption, parse_caption, infer_caption,
     image_inputs, merge_record, effective_caption, overlay_for, reuse_caption,
-    verify_calibration, caption_fingerprint)
+    verify_calibration, caption_fingerprint, use_notes)
 
 
 def caption():
@@ -90,12 +90,36 @@ def test_one_piece_object_may_have_no_parts():
             validate_caption({**value,key:[]})
 
 
+def test_ship_rigging_is_visible_but_character_rigs_stay_technical():
+    value=caption()
+    value['description']='A low-poly sailboat with a curved hull, a striped sail and rigging lines from the mast to the sail.'
+    value['parts']=['hull','mast','sail','rigging lines']
+    value['distinguishing_features']=['no visible rigging on the stern']
+    assert validate_caption(value)['parts'][-1]=='rigging lines'
+    for claim in ('A rigged figure stands upright.','The figure has an armature.','A figure with skeletal rigging.',
+                  'A character rig drives the arms.','An unrigged mesh has 120 triangles.'):
+        with pytest.raises(ValueError,match='Measured technical claim'):
+            validate_caption({**value,'description':claim+' '+value['description']})
+
+
+def test_use_wording_is_a_review_note_not_a_fault():
+    value=caption()
+    value['description']='A low-poly tree with a brown trunk and a green faceted canopy, designed for use in games.'
+    value['parts']=['trunk','canopy ideal for racing gameplay']
+    assert parse_caption(json.dumps(value))['description']==value['description']
+    notes=use_notes(value)
+    assert [n['severity'] for n in notes]==['review_note']*3
+    assert notes[0]['evidence'].startswith('description: "') and 'designed for use in games' in notes[0]['evidence']
+    assert 'Matched "designed for"' in notes[0]['reason'] and 'stays usable' in notes[0]['reason']
+    assert [n['evidence'].split(':')[0] for n in notes]==['description','parts','parts']
+    assert use_notes(caption())==[]
+
+
 @pytest.mark.parametrize("raw", ["{}", "not json", '{"identity":',
     json.dumps({**caption(), "technical": {"triangles": 12}}),
     json.dumps({**caption(), "uncertainties": []}),
     json.dumps({**caption(), "colors": "brown"}),
     json.dumps({**caption(), "identity": {"label": "unknown object", "certainty": "probable"}}),
-    json.dumps({**caption(), "parts": ["ideal for racing gameplay"]}),
     json.dumps({**caption(), "description": "An unrigged mesh has 120 triangles."}),
     '{"identity":{},"identity":{}}'])
 def test_malformed_or_unsupported_claims_rejected(raw):
