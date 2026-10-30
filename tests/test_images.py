@@ -83,7 +83,6 @@ def art(tmp_path):
     root = tmp_path / 'art/Game Icons'
     build_art(root)
     source = sources.add(config, str(root))
-    sources.set_import_types(config, source['key'], True)
     return config, backend, source, root
 
 
@@ -106,19 +105,22 @@ def inspect_images(config, source):
     return process(scoped, 'inspection', limit=100, asset_ids=ids)
 
 
-def test_enrollment_is_opt_in_and_never_promotes_model_dependencies_or_sheets(art, tmp_path):
+def test_every_image_is_enrolled_by_kind_and_model_dependencies_or_sheets_never_are(art, tmp_path):
     config, _, source, root = art
     sources.scan_source(config, source)
     found = scoped_records(config, source)
     images = {k: r for k, r in found.items() if r.get('asset_type') == 'image'}
     assert set(images) == {'image:PNG/White/arrow', 'image:PNG/Black/arrow', 'image:Pixel/potion', 'image:Pixel/copy',
                            'image:Pixel/damaged', 'image:Pixel/blink', 'image:Wide/banner', 'image:Wide/glow',
-                           'image:Vector/box', 'image:Vector/bare', 'image:Vector/linked'}
+                           'image:Vector/box', 'image:Vector/bare', 'image:Vector/linked', 'image:Textures/wood'}
     assert any(r.get('asset_type', 'model_3d') == 'model_3d' for r in found.values())
     roles = inventory_roles(config, source)
     assert roles['Models/crate_tex.png'] == 'model_dependency_image'
     assert roles['Spritesheet/sheet.png'] == 'deferred_sprite_sheet'
-    assert roles['Textures/wood.png'] == 'deferred_texture'
+    assert roles['Textures/wood.png'] == 'image_asset'
+    wood = images['image:Textures/wood']['type_metadata']['image_kind']
+    assert (wood['value'], wood['basis']) == ('material_texture', 'folder-name')  # Browsable by name, never described.
+    assert not sources.description_state(images['image:Textures/wood']) == 'missing'
     assert roles['Preview.png'] == 'pack_contact_sheet'
     potion = images['image:Pixel/potion']
     assert potion['type_metadata']['purpose'] == 'generic_image'
@@ -126,16 +128,15 @@ def test_enrollment_is_opt_in_and_never_promotes_model_dependencies_or_sheets(ar
     assert 'Game Icons' in potion['type_metadata']['suggested_purpose']['evidence']
     assert potion['type_metadata']['identical_content']['asset_ids'] == [images['image:Pixel/copy']['asset_id']]
     assert potion['processing']['caption'] == 'pending' and potion['file_roles'] == {potion['files'][0]['path']: 'primary'}
-    # IDs are stable across rescans; a source without the opt-in enrolls no images.
+    # IDs are stable across rescans; every source enrolls its images (decision 0023).
     assert {k: r['asset_id'] for k, r in scoped_records(config, source).items()} == {k: r['asset_id'] for k, r in found.items()}
     other = tmp_path / 'other'
     (other / 'Icons').mkdir(parents=True)
     icon((255, 0, 0, 255)).save(other / 'Icons/red.png')
     second = sources.add(config, str(other))
     sources.scan_source(config, second)
-    assert scoped_records(config, second) == {}
-    with pytest.raises(ConfigError, match='checkbox'):
-        sources.set_import_types(config, second['key'], 'yes')
+    [red] = scoped_records(config, second).values()
+    assert red['type_metadata']['image_kind'] == {'value': 'image', 'basis': 'pack-without-models', 'evidence': 'The pack holds no 3D models'}
 
 
 def test_processing_measures_derives_and_isolates_faults_without_blender(art, monkeypatch):
@@ -176,7 +177,7 @@ def test_processing_measures_derives_and_isolates_faults_without_blender(art, mo
     assert report['failed'] == 1 and report['unsupported'] == 2
     # Unchanged results and faults are retained, not retried; originals are untouched.
     again = inspect_images(config, source)
-    assert again['outcomes'] == [] and again['retained'] == {'complete': 8, 'failed': 1, 'unsupported': 2}
+    assert again['outcomes'] == [] and again['retained'] == {'complete': 9, 'failed': 1, 'unsupported': 2}
     assert originals(root) == before
     # A changed source file is new input.
     icon((250, 10, 10, 255)).save(root / 'PNG/White/arrow.png')
@@ -249,7 +250,7 @@ def test_image_vectors_search_filters_and_delivery_agree(art):
     assert [r['name'] for r in payload['results']] == ['potion']
     transparent = desktop.browse({'asset_type': 'image', 'transparent': True})
     assert {i['name'] for i in transparent['items']} == {'arrow', 'potion', 'copy', 'glow', 'box', 'bare'}
-    assert {i['name'] for i in desktop.browse({'size_class': 'tiny'})['items']} == {'potion', 'copy'}
+    assert {i['name'] for i in desktop.browse({'size_class': 'tiny'})['items']} == {'potion', 'copy', 'wood'}
     keyword = service.execute('search_assets', {'query': 'arrow', 'mode': 'keyword', 'filters': {'transparent': True}})[0]
     assert sorted(r['asset_id'] for r in keyword['results']) == sorted(
         i['asset_id'] for i in desktop.browse({'transparent': True})['items'] if i['name'] == 'arrow')
@@ -325,21 +326,13 @@ def test_image_descriptions_use_their_own_prompt_batches_and_optional_failures(a
     assert status['descriptions']['complete'] == 7 and status['descriptions']['failed'] == 1
 
 
-def test_switching_images_off_and_on_keeps_results_and_never_records_faults(art):
+def test_an_image_without_its_results_is_inspected_again_not_recorded_as_corrupt(art):
     config, backend, source, root = art
     work, _ = ready_images(config, backend, source)
-    before = {r['asset_id']: r for r in records(work) if r.get('asset_type') == 'image'}
-    sources.set_import_types(config, source['key'], False)
-    sources.scan_source(config, source)
-    assert not [r for r in records(work) if r.get('asset_type') == 'image']
-    sources.set_import_types(config, source['key'], True)
     status = sources.scan_source(config, source)
     after = {r['asset_id']: r for r in records(work) if r.get('asset_type') == 'image'}
-    assert after.keys() == before.keys()
-    assert all(after[k]['processing'] == before[k]['processing'] and after[k]['previews'] == before[k]['previews'] for k in after)
     assert not set(after) & set(status['pending_ids'])
     assert inspect_images(config, source)['outcomes'] == []
-    # Never published and re-enrolled without results: inspected again, not recorded as corrupt output.
     potion = next(r for r in after.values() if r['display_name'] == 'potion')
     potion.update(technical=None, previews=[])
     potion['processing'].update(inspection='pending', previews='pending')

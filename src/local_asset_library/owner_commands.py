@@ -34,9 +34,6 @@ def parser():
     sources.add_parser('remove', help='Stop listing a source (files and results stay on disk)').add_argument('key')
     for action in ('enable', 'disable'):
         sources.add_parser(action).add_argument('key')
-    images = sources.add_parser('images', help='Include 2D images from this source')
-    images.add_argument('key')
-    images.add_argument('state', choices=['on', 'off'])
     for action, text in (('exclude', 'Skip a folder when scanning (name pattern like "Unity*" or a path inside the source)'),
                          ('include', 'Stop excluding a folder pattern')):
         change = sources.add_parser(action, help=text)
@@ -296,10 +293,7 @@ def sources_command(args, config):
             say(args, 'No duplicate export folders found.')
         say(args, 'Answer with: sources exports KEY --group ID | --separate ID | --exclude ID   (undo: --undo ID)')
         return status
-    sources.set_import_types(config, args.key, args.state == 'on')
-    say(args, f"2D images {args.state} for {source['name']}; scanning.")
-    args.follow = False
-    return run_operation(args, config, 'scan', args.key)
+    raise ConfigError('Unknown sources command')
 
 
 def settings_command(args, config):

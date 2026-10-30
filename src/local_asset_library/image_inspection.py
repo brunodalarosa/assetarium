@@ -110,6 +110,12 @@ def run(config, record, fingerprint):
     # Recheck the source after decoding; a change during inspection is a fault, not a result.
     if inspection_input(config, record, recorded=fingerprint)[3] != fingerprint:
         raise ConfigError('Image source changed during inspection')
+    from .image_kinds import pixel_evidence, refine
+    # Pixel hints (normal map, seamless, cutout) decide the kind of an image nothing else classified (decision 0023).
+    metadata = dict(record.get('type_metadata') or {}, pixel_kind=pixel_evidence(rgba))
+    if metadata.get('image_kind'):
+        metadata['image_kind'] = refine(metadata['image_kind'], metadata['pixel_kind'])
+    record['type_metadata'] = metadata
     technical = {'version': 2, 'kind': 'image', **measured, 'inspected_path': source['path'],
                  'inspected_sha256': source['sha256'], 'inspected_format': source['format'], 'adapter': VERSION}
     record.update(technical=technical, primary_inspection_path=source['path'], primary_inspection_reason=reason,

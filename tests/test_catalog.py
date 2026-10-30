@@ -168,7 +168,8 @@ def test_variants_previews_texture_and_missing_dependency(catalog_config):
     assert any(d["role"] == "texture" and d["status"] == "available" for d in by_name["chair"]["dependencies"])
     assert any(d["status"] == "missing" for d in by_name["chair-round"]["dependencies"])
     assert any(r["role"] == "pack_contact_sheet" for r in rows)
-    assert any(r["role"] == "texture" for r in rows)
+    # The chair's texture is a model texture: a dependency with its evidence, not a selectable image (decision 0023).
+    assert any(r["role"] == "model_dependency_image" and "map_Kd" in r["deferred_reason"] for r in rows)
     assert all(a["description"] is None and not a["embeddings"] for a in assets)
 
 

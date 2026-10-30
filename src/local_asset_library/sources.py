@@ -114,54 +114,25 @@ def bound(config, source):
                    metadata_root=config.library_store() / "folders" / source["id"], catalog_generation=None)
 
 
-def import_formats(config):
-    """Optional source-specific inventory restriction, separate from work settings.
-
-    Processing checkboxes retain existing imports. A deliberate import cleanup
-    can additionally restrict a source so later scans do not recreate its imports.
-    """
-    if config.metadata_root is None:
-        return None
-    path = config.output_path('data', 'source.json')
-    if not path.exists():
-        return None
-    value = read_json(path)
-    if 'import_formats' not in value:
-        return None
-    from .settings import validate_formats
-    return validate_formats(value['import_formats'])
+def folder_answers(config):
+    """Owner answers saved on this library folder's folders and packs (``library_store.answers``)."""
+    if not config.source_key or not config.sources_registry:
+        return []
+    from .library_store import answers
+    source = next((s for s in registry(config)['sources'] + registry(config)['detached'] if s['key'] == config.source_key), None)
+    return answers(config, source['id']) if source else []
 
 
-IMPORT_TYPES = ('model_3d', 'image')
-
-
-def import_types(config):
-    """Asset types a source enrolls. Images are an explicit per-source choice."""
-    if config.metadata_root is None:
-        return ('model_3d',)
-    path = config.output_path('data', 'source.json')
-    value = read_json(path) if path.exists() else {}
-    types = value.get('import_types', ['model_3d'])
-    if not isinstance(types, list) or not set(types) <= set(IMPORT_TYPES) or 'model_3d' not in types:
-        raise ConfigError('Invalid saved source asset types; choose them again in Settings → Asset sources')
-    return tuple(t for t in IMPORT_TYPES if t in types)
-
-
-def set_import_types(config, key, images):
-    """Save whether a source enrolls images; existing results are never deleted."""
-    from .gpu_queue import lease
-    from .source_operations import active_operation
-    if type(images) is not bool:
-        raise ConfigError('Images must be a checkbox value')
+def answer_folder(config, key, folder, kind, value):
+    """Save a folder answer and let the caller rescan: pack overrides or how to treat the images in a folder."""
+    from .library_store import save_answer
+    from .packs import answer
+    if kind == 'pack':
+        return answer(config, key, folder, value)
+    if kind != 'image_kind' or value not in {'texture', 'image', None}:
+        raise ConfigError('Choose Treat images here as textures or as 2D assets')
     source = get_source(config, key)
-    scoped = bound(config, source)
-    if active_operation(scoped):
-        raise ConfigError("Wait for this source's operation to finish before changing its asset types")
-    with lease(config, 'source-settings', resource='sources'):
-        path = scoped.output_path('data', 'source.json')
-        value = read_json(path)
-        value['import_types'] = ['model_3d', 'image'] if images else ['model_3d']
-        atomic_json(path, value)
+    save_answer(config, source['id'], validate_exclusion(folder) if folder else '', 'image_kind', value)
     return source
 
 
@@ -570,7 +541,7 @@ def source_status(config, source):
     status['export_suggestions'] = [s for s in status.get('export_suggestions', []) if s['id'] not in answered]
     # Offline: the folder cannot be reached (a removed drive); its results and collection entries stay (decision 0023).
     status['offline'] = not Path(source['path']).is_dir()
-    return {**source, **status, 'import_formats': import_formats(scoped), 'import_types': list(import_types(scoped)),
+    return {**source, **status,
             'exclusions': excluded_folders(scoped), 'export_decisions': export_decisions(scoped),
             'texture_folder': texture_folder(scoped),
             "operation": operation_status(scoped)}
@@ -585,7 +556,7 @@ def unreadable_status(config, source, exc):
         operation = {'status': 'idle', 'progress': 0}
     return {**source, 'scanned': True, 'needs_processing': False, 'pending': 0, 'failed': 0, 'offline': not Path(source['path']).is_dir(),
             'scan_fault': f"This source's status could not be read ({type(exc).__name__}: {exc}). Its files and results are kept.",
-            'import_formats': [], 'import_types': [], 'exclusions': [], 'export_decisions': [], 'export_suggestions': [],
+            'exclusions': [], 'export_decisions': [], 'export_suggestions': [],
             'texture_folder': None, 'operation': operation}
 
 
@@ -713,7 +684,7 @@ def scan_source(config, source):
                      (read_records(working(child_scoped)) or read_records(child_scoped)) if r["asset_id"] not in mine]
     old = {r["asset_id"]: r for r in previous}
     suggestions = []
-    rows, fresh, _, _ = build_inventory(scoped, suggestions)
+    rows, fresh, _, _ = build_inventory(scoped, suggestions, previous)
     from .catalog import snapshot, walk_source
     if snapshot(rows) != snapshot(walk_source(scoped)):
         raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
@@ -746,8 +717,10 @@ def scan_source(config, source):
             kept['license_evidence'] = relevant_license_evidence(dict(record, license_evidence=list({
                 (e.get('path'), e.get('sha256')): e
                 for e in prior.get('license_evidence', []) + record.get('license_evidence', [])}.values())))
-            if not same or import_formats(scoped) is not None:
+            if not same:
                 kept['grouping'] = record['grouping']
+            if record.get('type_metadata', {}).get('image_kind'):  # Classification follows the latest evidence.
+                kept['type_metadata'] = {**kept.get('type_metadata', {}), 'image_kind': record['type_metadata']['image_kind']}
             if not same:
                 changed.add(record["asset_id"])
                 kept["dependencies"] = record["dependencies"]

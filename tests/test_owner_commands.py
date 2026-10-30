@@ -46,7 +46,7 @@ def test_settings_round_trip_and_validation(managed, capsys):
     assert run(config, 'settings', 'set') == 2
 
 
-def test_sources_list_enable_disable_images_and_failures(managed, monkeypatch, capsys):
+def test_sources_list_enable_disable_and_failures(managed, monkeypatch, capsys):
     config, _, one, _ = managed
     started = []
     monkeypatch.setattr(source_operations, 'start', lambda c, op, key: started.append((op, key)) or {'status': 'started'})
@@ -54,8 +54,7 @@ def test_sources_list_enable_disable_images_and_failures(managed, monkeypatch, c
     assert one['key'] in capsys.readouterr().out
     assert run(config, 'sources', 'disable', one['key']) == 0 and not sources.get_source(config, one['key'])['enabled']
     assert run(config, 'sources', 'enable', one['key']) in {0, 1} and sources.get_source(config, one['key'])['enabled']
-    assert run(config, 'sources', 'images', one['key'], 'on') in {0, 1}
-    assert started == [('scan', one['key'])] * 2  # Like the app: enabling and image changes rescan; disabling does not.
+    assert started == [('scan', one['key'])]  # Like the app: enabling rescans; disabling does not. Images are always in.
     capsys.readouterr()
     assert run(config, '--json', 'failures') == 0
     failures = json.loads(capsys.readouterr().out)

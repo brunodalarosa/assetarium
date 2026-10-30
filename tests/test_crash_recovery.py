@@ -92,7 +92,7 @@ def test_one_unreadable_source_never_hides_the_others(managed, monkeypatch):
     statuses = {s['key']: s for s in sources.source_statuses(config)}
     assert set(statuses) == {one['key'], two['key']}
     broken = statuses[two['key']]
-    assert 'RuntimeError: broken record' in broken['scan_fault'] and broken['import_formats'] == [] and broken['operation']
+    assert 'RuntimeError: broken record' in broken['scan_fault'] and broken['exclusions'] == [] and broken['operation']
 
 
 def test_the_desktop_source_list_shows_every_source_with_its_fault(managed, monkeypatch):

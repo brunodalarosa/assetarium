@@ -37,7 +37,11 @@ def supported_stage(record, stage):
 
 
 def description_supported(record):
-    return asset_type(record) in ('model_3d', 'image') and supported_stage(record, 'caption')
+    # Material textures are found by name in v1 (decision 0023); they are not described.
+    kind = ((record.get('type_metadata') or {}).get('image_kind') or {}).get('value')
+    return asset_type(record) in ('model_3d', 'image') and supported_stage(record, 'caption') and kind != 'material_texture'
+
+
 
 
 def file_roles(record):

@@ -563,8 +563,11 @@ def relevant_license_evidence(record):
              and any(PurePosixPath(entry['path']).parent in model.parents for model in models))]
 
 
-def build_inventory(config, suggestions=None):
-    """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``."""
+def build_inventory(config, suggestions=None, previous=()):
+    """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``.
+
+    ``previous`` are the folder's last records, whose Blender texture lists and pixel evidence classify images.
+    """
     rows = walk_source(config)
     from .sources import export_decisions
     decisions = export_decisions(config) if config.source_key else []
@@ -574,13 +577,6 @@ def build_inventory(config, suggestions=None):
     for row in rows:
         if row["role"] != "boundary_exclusion":
             row["role"] = classify(row["path"])
-    from .sources import import_formats
-    allowed = import_formats(config)
-    from .settings import format_group
-    if allowed is not None:
-        for row in rows:
-            if row['role'] in {'model', 'unsupported_candidate'} and format_group(PurePosixPath(row['path']).suffix[1:].lower()) not in allowed:
-                row['role'] = 'excluded_import_format'
     packs = sorted({row["path"].split("/")[0] for row in rows
                     if "/" in row["path"] and row["role"] in {"model", "unsupported_candidate"}})
     assets, ambiguities = [], []
@@ -650,12 +646,11 @@ def build_inventory(config, suggestions=None):
                                               "origin": "supplied", "association": "exact stem with directional suffix in Isometric layout" if directional else "exact stem under pack preview layout"})
             asset["provenance"]["inventory_fingerprint"] = digest(asset["files"])
             assets.append(asset)
-    from .sources import import_types
-    if 'image' in import_types(config):
-        from .image_catalog import image_assets
-        licenses = {}
-        assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
-            pack, license_evidence(config, pack, inventory))))
+    from .image_catalog import image_assets
+    from .sources import folder_answers
+    licenses = {}
+    assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
+        pack, license_evidence(config, pack, inventory)), previous, folder_answers(config)))
     # Never merge remaining same names; report within-pack collisions and cross-pack repeated names.
     by_name = defaultdict(list)
     for asset in assets:
