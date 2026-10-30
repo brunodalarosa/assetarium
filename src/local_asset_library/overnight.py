@@ -194,7 +194,8 @@ def apply_saved(config, identifier, asset_id):
     saved = read_json(raw_path)
     record = detail(work, asset_id)
     provenance = saved['provenance']
-    relative = ('data/' + raw_path.relative_to(config.metadata_root).as_posix() if config.metadata_root
+    from .result_store import logical
+    relative = ('data/' + logical(config, raw_path) if config.metadata_root
                 else raw_path.relative_to(config.project_root).as_posix())
     provenance = {**provenance, 'result_path': relative}
     status = saved['status']

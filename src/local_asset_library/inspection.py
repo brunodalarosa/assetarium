@@ -184,7 +184,8 @@ def validate_result(config, job, result):
         for view in result["previews"]:
             if view["quality"]["empty"] or view["quality"]["off_frame"]:
                 raise ConfigError("Worker claimed successful invalid preview")
-            relative = (Path(job["output"]) / view["filename"]).relative_to(config.metadata_root or config.project_root / "data").as_posix()
+            from .result_store import logical
+            relative = logical(config, Path(job["output"]) / view["filename"])
             path = config.output_path("data", relative)
             if not path.is_file():
                 raise ConfigError("Preview file missing")

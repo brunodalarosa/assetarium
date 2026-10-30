@@ -72,6 +72,11 @@ class Config:
     sources_registry: Path | None = None
     source_key: str | None = None
     metadata_root: Path | None = None
+    library_root: Path | None = None
+
+    def library_store(self) -> Path:
+        """The central library store (decision 0023): ``[storage].library``, else ignored ``data/library-store``."""
+        return self.library_root or self.storage_root("data") / "library-store"
 
     def source_directory(self, relative: str) -> Path:
         if self.sources_registry:
@@ -180,6 +185,22 @@ def with_saved_blender(config: Config) -> Config:
     return replace(config, blender=saved) if saved else config
 
 
+def _library_root(value, root, source_root):
+    """``[storage].library``: absent or ``data/library-store`` (the default), else an absolute directory."""
+    if value in (None, "data/library-store"):
+        return None
+    windows = PureWindowsPath(value) if isinstance(value, str) else None
+    if (windows is None or not Path(value).is_absolute() or ".." in windows.parts
+            or any(ntpath.isreserved(p) or ":" in p or p.endswith((".", " ")) for p in windows.parts[1:])):
+        raise ConfigError("The library store must be an absolute directory")
+    library = Path(value).resolve()
+    if library != Path(value).absolute():
+        raise ConfigError("The library store must not be a link")
+    if any(library.is_relative_to(other) or other.is_relative_to(library) for other in (root, source_root)):
+        raise ConfigError("The library store must not overlap the project or asset folders")
+    return library
+
+
 def load_config(path: Path, project_root: Path) -> Config:
     root = project_root.resolve()
     try:
@@ -202,6 +223,7 @@ def load_config(path: Path, project_root: Path) -> Config:
         if source_root.is_relative_to(root) or root.is_relative_to(source_root):
             raise ConfigError("Source and repository roots must not overlap")
         storage_settings = dict(raw["storage"])
+        library_root = _library_root(storage_settings.pop("library", None), root, source_root)
         model_setting = storage_settings.get("models")
         models_root = None
         if model_setting != "models":
@@ -229,8 +251,10 @@ def load_config(path: Path, project_root: Path) -> Config:
             if raw["sources"].get("registry") != "data/library/sources.json":
                 raise ConfigError("Sources registry must use data/library/sources.json")
             registry = _inside(root, "data/library/sources.json")
+        if library_root and models_root and (library_root.is_relative_to(models_root) or models_root.is_relative_to(library_root)):
+            raise ConfigError("The library store must not overlap shared models")
         config = Config(root, source_root, Path(blender) if blender else None, models_root,
-                        sources_registry=registry)
+                        sources_registry=registry, library_root=library_root)
         for area in STORAGE_NAMES:
             config.output_path(area, "boundary-check")
         return config

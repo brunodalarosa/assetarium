@@ -1,4 +1,6 @@
-"""Journaled same-volume migration from the legacy combined asset root.
+"""Journaled same-volume migration from the legacy combined asset root (October 14, 2026; history).
+
+Superseded by the central library store (decision 0023); kept for its receipts, not run again.
 
 Original assets are only read. Existing individual results move without changing
 their bytes; combined historical reports remain shared evidence and are also
@@ -14,13 +16,13 @@ import re
 import sqlite3
 import uuid
 
-from .config import ConfigError
-from .catalog import walk_source, file_hash, digest, encoded
-from .publication import atomic_json, read_json
-from .sources import (registry, bound, now, write_catalog, write_membership,
+from local_asset_library.config import ConfigError
+from local_asset_library.catalog import walk_source, file_hash, digest, encoded
+from local_asset_library.publication import atomic_json, read_json
+from local_asset_library.sources import (registry, bound, now, write_catalog, write_membership,
                       read_records, scan_source, aggregate, validate_directory)
-from .incremental import working, ledger, checkpoint, inspection_input
-from .source_operations import publish_source
+from local_asset_library.incremental import working, ledger, checkpoint, inspection_input
+from local_asset_library.source_operations import publish_source
 
 
 def rows(config):
@@ -32,7 +34,7 @@ def rows(config):
 
 
 def split_index(legacy, scoped, identifiers):
-    from .retrieval import index_database
+    from local_asset_library.retrieval import index_database
     source = legacy.output_path('data', 'embeddings/index.sqlite')
     with closing(index_database(scoped)) as destination, destination:
         if source.exists():
@@ -74,8 +76,8 @@ def _partition(value, key, ownership):
 def migrate(legacy, config_path=None):
     if legacy.sources_registry:
         raise ConfigError('Sources are already configured; migration is not automatically repeated')
-    from .source_storage import receipt
-    from .gpu_queue import lease
+    from local_asset_library.source_storage import receipt
+    from local_asset_library.gpu_queue import lease
     with lease(legacy, 'source-migration', timeout=0, resource='operations'):
         identifier = uuid.uuid4().hex
         evidence = legacy.project_root / 'data/library/source-migration' / identifier
@@ -118,7 +120,7 @@ def migrate(legacy, config_path=None):
                 write_membership(destination, selected)
                 split_index(origin, destination, {r['asset_id'] for r in selected})
             # The original published snapshot remains distinct from unfinished work.
-            from .incremental import copy_database
+            from local_asset_library.incremental import copy_database
             published = replace(scoped, catalog_generation='v_' + uuid.uuid4().hex)
             staging = replace(scoped, catalog_generation='migration')
             for relative in ('catalog.sqlite', 'embeddings/index.sqlite'):

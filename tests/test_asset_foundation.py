@@ -148,7 +148,7 @@ def test_png_dispatch_no_blender_and_audio_remains_explicitly_unsupported(media,
     item = catalog.detail(work, image['asset_id'])
     assert import_outcome(item, False)['state'] == 'complete'
     # Only bounded derived files are written; the original is never copied.
-    derived = sorted(p.name for p in config.output_path('data', 'inspection').glob('**/*.png'))
+    derived = sorted(p.name for p in config.output_path('data', 'results/inspection').glob('**/*.png'))
     assert derived == ['model-input.png', 'thumbnail.png']
 
 

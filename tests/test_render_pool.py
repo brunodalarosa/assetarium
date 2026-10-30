@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+
 import subprocess
 import sys
 import threading
@@ -16,6 +17,7 @@ import pytest
 from local_asset_library import incremental, inspection, render_pool
 from local_asset_library.config import ConfigError
 from local_asset_library.incremental import ledger, process, working
+from local_asset_library.result_store import result_path
 from local_asset_library.membership import records
 from test_blender_integration import BLENDER, small_fixture  # noqa: F401 -- real-Blender fixture
 from test_incremental import library  # noqa: F401 -- shared synthetic library fixture
@@ -200,7 +202,7 @@ def test_result_cut_off_by_an_interruption_is_rendered_again(library, monkeypatc
     work = working(config)
     record = records(work)[0]
     fp = incremental.inspection_input(work, record)[3]
-    output = work.output_path('data', f"inspection/{record['asset_id']}/obj/{fp[:16]}")
+    output = work.output_path('data', result_path('inspection', fp))
     output.mkdir(parents=True)
     (output / 'result.json').write_text('{"status": "comp')
     monkeypatch.setattr(incremental, '_blender_runtime', {})
@@ -381,7 +383,7 @@ def test_a_device_failure_in_the_worker_is_a_machine_fault_not_an_asset_fault(li
     work = working(config)
     record = records(work)[0]
     fp = incremental.inspection_input(work, record)[3]
-    output = work.output_path('data', f"inspection/{record['asset_id']}/obj/{fp[:16]}")
+    output = work.output_path('data', result_path('inspection', fp))
     monkeypatch.setattr(incremental, '_blender_runtime', {})
     monkeypatch.setattr(incremental, 'discover_blender', lambda c: (Path('blender'), {'version_output': 'Blender'}))
 

@@ -314,6 +314,10 @@ def _owners(config):
 def generated_path(config, relative):
     if relative in SHARED_DATA:
         return None
+    from .result_store import shared_area
+    if shared_area(relative):
+        # Results keyed by inputs belong to the whole library store, whichever folder an asset is in (decision 0023).
+        return _inside(config.library_store(), relative)
     if config.metadata_root:
         root = config.metadata_root
         # The source root and its metadata directory are revalidated for every

@@ -8,7 +8,7 @@ import sqlite3
 import pytest
 from PIL import Image
 
-from test_incremental import library
+from test_incremental import library, view_image
 from local_asset_library.config import ConfigError
 from local_asset_library import sources
 from local_asset_library.catalog import digest, detail, save_json
@@ -48,7 +48,7 @@ def ready_source(config, backend, source):
         for view in ('front','side','three_quarter'):
             relative = f'inspection/{r["asset_id"]}/obj/fixture/{view}.png'
             path = work.output_path('data',relative);path.parent.mkdir(parents=True, exist_ok=True)
-            Image.new('RGB',(32,32),'red').save(path)
+            view_image(r, view).save(path)
             r['previews'].append({'path':'data/'+relative,'sha256':file_hash(path),'view_label':view,
                                   'origin':'rendered','coordinate_convention':'synthetic'})
         r['caption_provenance']={'fingerprint':'synthetic','input_views':[],'visual_faults':[]}
@@ -252,7 +252,8 @@ def test_independent_roots_and_source_owned_results(managed):
     assert len(records(config))==6
     r=records(work)[0]
     preview=config.output_path('data',r['previews'][0]['path'][5:])
-    assert preview.is_relative_to(Path(one['path'])/'metadata-lal')
+    # Results live in the central library store, never in the asset folder (decision 0023).
+    assert preview.is_relative_to(config.library_store()) and not preview.is_relative_to(Path(one['path']))
     assert config.source_file(r['files'][0]['path']).parent==Path(one['path'])
     assert not sources.source_status(config,one)['needs_processing']
     with pytest.raises(ConfigError):config.source_file(one['key']+'/metadata-lal/source.json')
@@ -377,37 +378,6 @@ def test_cancel_embeddings_saves_all_views_of_current_asset(managed):
         assert db.execute('SELECT count(DISTINCT asset_id) FROM vectors').fetchone()[0]==1
         assert db.execute('SELECT count(*) FROM vectors').fetchone()[0]==4
         assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
-
-
-def test_migration_preserves_identities_pixels_vectors_and_originals(tmp_path,monkeypatch):
-    from test_incremental import ready
-    from local_asset_library.incremental import publish
-    from local_asset_library.source_migration import migrate
-    import local_asset_library.source_storage as storage
-    legacy,backend=library.__wrapped__(tmp_path)
-    work=ready(legacy)
-    # Use the actual production inspection layout, rather than the legacy test
-    # suite's separate test-views fixture directory.
-    for record in records(work):
-        for preview in record['previews']:
-            old=work.output_path('data',preview['path'][5:])
-            rel='inspection/'+record['asset_id']+'/fixture/'+old.name
-            target=work.output_path('data',rel);target.parent.mkdir(parents=True,exist_ok=True);old.rename(target)
-            preview['path']='data/'+rel
-        update_record(work,record)
-    index_library(work,backend);publish(legacy)
-    before_ids={r['asset_id'] for r in records(legacy)}
-    with closing(sqlite3.connect(legacy.output_path('data','embeddings/index.sqlite'))) as db:
-        before_vectors=dict(db.execute('SELECT job_id,vector_sha256 FROM vectors'))
-    monkeypatch.setattr(storage,'receipt',lambda *args:{'totals':{'allocated_bytes':0}})
-    config,report=migrate(legacy)
-    assert report['status']=='passed' and report['originals_unchanged']
-    assert before_ids=={r['asset_id'] for r in records(config)}
-    with closing(sqlite3.connect(config.output_path('data','embeddings/index.sqlite'))) as db:
-        assert before_vectors==dict(db.execute('SELECT job_id,vector_sha256 FROM vectors'))
-    for source in sources.registry(config)['sources']:
-        assert not sources.source_status(config,source)['needs_processing']
-    with pytest.raises(ConfigError):migrate(config)
 
 
 def test_atomic_metadata_writer_supports_long_source_paths(tmp_path):

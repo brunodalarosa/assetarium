@@ -30,7 +30,8 @@ def library(tmp_path):
     for pack in ('one', 'two'):
         (source / pack).mkdir()
         for i in range(3):
-            (source / pack / f'item{i}.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
+            # Distinct bytes: equal inputs share one result (decision 0023), which test_result_store covers.
+            (source / pack / f'item{i}.obj').write_text(f'# {pack} {i}\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
     for path in ('src/local_asset_library/blender_worker.py', 'src/local_asset_library/render_math.py',
                  'src/local_asset_library/caption_backend.py', 'src/local_asset_library/caption_batching.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt', 'prompts/caption-v4.txt'):
         target = root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_text('synthetic contract')
@@ -41,6 +42,14 @@ def library(tmp_path):
     backend = SyntheticBackend()
     save_json(config.output_path('data', 'embeddings/capability.json'), {'contract_fingerprint': digest(backend.contract), 'actual_text_and_image_inference': True})
     return config, backend
+
+
+def view_image(record, view):
+    """A red synthetic view whose bytes differ per asset and view, so descriptions are not shared."""
+    image = Image.new('RGB', (32, 32), 'red')
+    image.putpixel((0, 0), tuple(bytes.fromhex(record['asset_id'][6:12])))
+    image.putpixel((1, 0), (len(view), 0, 0))
+    return image
 
 
 def ready(config):
@@ -54,7 +63,7 @@ def ready(config):
         for view in ('front','side','three_quarter'):
             relative = f'test-views/{record["asset_id"]}-{view}.png'
             path = config.output_path('data',relative); path.parent.mkdir(parents=True,exist_ok=True)
-            Image.new('RGB',(32,32),'red').save(path)
+            view_image(record, view).save(path)
             record['previews'].append({'path':'data/'+relative,'sha256':file_hash(path),'view_label':view,'origin':'rendered','coordinate_convention':'synthetic'})
         record['caption_provenance']={'fingerprint':'synthetic','input_views':[], 'visual_faults':[]}
         update_record(work,record)

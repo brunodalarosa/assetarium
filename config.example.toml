@@ -17,6 +17,9 @@ cache = "cache"
 logs = "logs"
 scratch = "scratch"
 environment = ".venv"
+# Generated results (previews, descriptions, search data) live in one library store and are never
+# written into asset folders. Unset, it is the ignored data/library-store. Another drive:
+#   library = 'E:\Assetarium library'
 
 [tools]
 # Unset: Blender is discovered on PATH and in the usual install locations
