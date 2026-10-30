@@ -41,6 +41,11 @@ live in `search_policy.py`.
 - Search used to re-hash every member's files on every request (about 8,000 files per search on the
   original library). [Hash reuse and caches](Hash%20reuse%20and%20caches.md) explains what replaced it;
   don't reintroduce per-request full verification.
+- "Query/index embedding contract mismatch": before reindexing, diff the published index contract
+  (`data/library/embedding-contract.json`) with `engines.embedder_contract`. If only
+  `adapter_sha256` or `runtime_lock_sha256` differ, it is almost always line endings (hash the LF
+  and CRLF forms of the file, see `publication.line_ending_hashes`), which
+  `retrieval.recorded_contract` should reconcile; reindexing would re-embed everything for nothing.
 
 ## Related
 
