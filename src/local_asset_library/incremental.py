@@ -45,6 +45,10 @@ EQUIVALENT_WORKERS = {
         'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
     '6a2996d6d709982917b2b34dcd7535eab7c27a05799cb9313e9ced8e2df53072':  # The same with CRLF endings
         'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
+    'e94e9d675e8b13dc97a2ed0d7a6b2e1d8afef3d9aa585a96be549dbd915a4c5a':  # Output root from the job (LF)
+        'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
+    'ce85b5325c0c83fa0e7d8712032c7edfe1b356568271b295c9f8822686740c63':  # The same with CRLF endings
+        'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
 }
 
 
@@ -381,7 +385,8 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
         "asset_id": record["asset_id"], "source_path": source["path"], "format": source["format"],
         "source_sha256": source["sha256"], "output": str(output), "resolution": resolution}
     if config.source_key:
-        job.update(source_prefix=config.source_key, metadata_root=str(config.metadata_root))
+        from .library_migration import LEGACY_METADATA_DIR
+        job.update(source_prefix=config.source_key, output_root=str(config.metadata_root), excluded_dirs=[LEGACY_METADATA_DIR])
     from . import render_pool
     device = render_pool.job_device(config)
     if device:

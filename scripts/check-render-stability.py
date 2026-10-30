@@ -71,6 +71,10 @@ def compare(production, rendered, prefix):
     a, b = (json.loads((folder / 'result.json').read_text(encoding='utf-8')) for folder in (production, rendered))
     # The library ran with its source prefix; this run is unprefixed, so texture paths drop it.
     technical = json.loads(json.dumps(a['technical']).replace(f'"{prefix}/', '"'))
+    # Absolute texture paths record where the library was then (a moved drive changes them), not a render input.
+    for value in (technical, b['technical']):
+        for texture in (value or {}).get('textures', []):
+            texture.pop('original_path', None)
     differences = [name for name, same in (('status', a['status'] == b['status']), ('technical', technical == b['technical']))
                    if not same]
     largest = 0
@@ -134,7 +138,7 @@ def main():
             output = probe.output_path('data', record['asset_id'])
             output.mkdir(parents=True, exist_ok=True)
             prefix = job.pop('source_prefix')
-            job.pop('metadata_root', None)
+            job.pop('metadata_root', None), job.pop('output_root', None)
             job.update(project_root=str(probe.project_root), output=str(output),
                        source_path=job['source_path'].removeprefix(prefix + '/'), source_root=str(scoped.source_root))
             if device:
