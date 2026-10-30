@@ -7,8 +7,9 @@ created: 2026-10-29
 ---
 # ASSETRM-0002
 
-**Brainstorm done (2026-10-30):** the agreed design and phased implementation handoff is
-[ASSETRM-0002 plan](ASSETRM-0002%20plan.md).
+**Brainstorm done (2026-10-30):** a central library store with results keyed by inputs, identity
+by recognition, packs and an implicit processing queue ([decision 0023](../../../Decisions/0023-central-asset-library.md)).
+The phased implementation handoff is [ASSETRM-0002 plan](ASSETRM-0002%20plan.md).
 
 Brainstorm a rework of the Asset Source management implementation.
 

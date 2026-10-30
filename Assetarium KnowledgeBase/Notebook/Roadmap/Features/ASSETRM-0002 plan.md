@@ -4,505 +4,408 @@ id: ASSETRM-0002
 type: plan
 status: agreed
 created: 2026-10-30
-code: [sources.add, sources.registry, src/local_asset_library/blender_worker.py, incremental.EQUIVALENT_WORKERS, texture_folders.py, texture_repair.py, hash_cache.py, sources.bound, sources.generated_path, sources.validate_directory, sources.import_types, sources.import_formats, sources.source_status, sources.processing_summary, catalog.walk_source, catalog.asset_id, asset_structure.new_record, incremental.inspection_input, source_operations.start, source_operations.worker_stage, desktop.DesktopBridge.source_action, frontend/src/ui/Shell.tsx, frontend/src/pages/Settings.tsx, frontend/src/pages/Processing.tsx, frontend/src/pages/SourceBrowser.tsx]
+code: [sources.py, sources.generated_path, sources.owners, sources.add, catalog.asset_id, catalog.walk_source, image_catalog.py, incremental.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, image_inspection.inspection_input, hash_cache.py, publication.py, source_operations.py, gpu_queue.py, overnight.py, library_policy.py, src/local_asset_library/blender_worker.py, frontend/src/ui/Shell.tsx, frontend/src/ui/AssetGrid.tsx, frontend/src/pages/Processing.tsx, frontend/src/pages/Settings.tsx, frontend/src/pages/SourceBrowser.tsx]
 ---
-# ASSETRM-0002 plan: Asset sources rework
+# ASSETRM-0002 plan: Asset library rework
 
-Implementation handoff for [ASSETRM-0002](ASSETRM-0002.md). The owner settled the decisions
-below on October 30, 2026. An agent that picks this up still runs the **`AGENTS.md`
-scope-and-plan checkpoint once per phase** (duration, disk, risks) before editing code, and
-reads the [Sources and Catalog hub](../../Sources%20and%20Catalog/Sources%20and%20Catalog.md),
-[Sources](../../Sources%20and%20Catalog/Sources.md), [decision 0019](../../../Decisions/0019-source-folders-and-export-variants.md)
-and the [Catalog contract](../../../Architecture/Sources%20and%20Catalog/Catalog%20contract.md) first.
+Implementation handoff for [ASSETRM-0002](ASSETRM-0002.md), from a brainstorm with the owner on
+October 30, 2026. The binding summary is [decision 0023](../../../Decisions/0023-central-asset-library.md).
+Every phase still goes through the **`AGENTS.md` scope-and-plan checkpoint** (scope, duration,
+disk, risks) before code changes. Read the [Sources and Catalog hub](../../Sources%20and%20Catalog/Sources%20and%20Catalog.md),
+[Sources](../../Sources%20and%20Catalog/Sources.md), [Stage ledger and fingerprints](../../Processing/Stage%20ledger%20and%20fingerprints.md),
+decisions 0004, 0006, 0019–0022 and the [Catalog contract](../../../Architecture/Sources%20and%20Catalog/Catalog%20contract.md)
+first.
 
-## 1. Owner decisions (2026-10-30)
+## 1. Owner decisions
 
 | # | Topic | Decision |
 | --- | --- | --- |
-| D1 | Where generated data lives | Keep it **inside each source**, in a hidden folder renamed from `metadata-lal/` to **`.assetarium/`** (on Windows, also set the hidden attribute). |
-| D2 | Old nested metadata folders | The migration **merges** them into a parent root the owner names. |
-| D3 | Adding a folder that contains existing sources | **Absorb** the contained sources into the new root. |
-| D4 | How absorbed results survive | **Pack anchors**: absorbed assets keep their asset IDs and every result. Nothing is reprocessed. |
-| D5 | Asset types | A source always includes **every supported type**. Per-source `import_types` and `import_formats` are removed. The global processing-format checkboxes only set the **default selection** in the processing picker. |
-| D6 | Excluded folders | Kept (decision 0019 behavior unchanged). |
-| D7 | Processing scope | **Start processing…** opens **one multi-root picker** covering all sources. The checked items run as one queued run, source by source, one GPU job at a time. |
-| D8 | Descriptions | The same picker has an **"Also generate descriptions"** toggle, shown only when the descriptions feature is on. |
-| D9 | Unchecked items | The picker is per run and saves nothing. Unchecked work **stays visibly pending**; to never process something, the user excludes it. |
-| D10 | Migration targets | The migration script takes the merge roots as arguments (`--root`, repeatable). It shows a dry-run report by default and asks for an interactive confirmation before applying. Any old folder under no named root is converted in place. |
-| D11 | Estimate | The picker shows **counts per stage, an estimated time range and projected disk use**, and says "no measurement yet" when it cannot estimate. |
-| D12 | Tree rows | A compact **icon strip** with tooltips (§5.3). |
-| D13 | Navigation | A new **Asset sources** rail item with a folder icon, placed **above Settings** in the bottom group. **Settings → Asset sources is removed.** |
-| D14 | Moved sources | The migration also **repairs sources whose folders moved** (for example the owner's move from drive C to drive D), and the app gets a **Locate folder…** action for a source whose folder is missing (§4.1, §5.5). |
-| D15 | One name in code | **No hardcoded `metadata-lal` remains** in the project: one constant, a legacy constant for reading and migrating, and a test that enforces it (§3.5). |
+| D1 | Generated data | **One central library store**; nothing is written into asset folders. It counts against the **Settings storage budget**, the only storage limit (ASSETRM-0003 removes the pilot-era target). |
+| D2 | Results | **A cache keyed by inputs** (content, dependencies, settings, code), never by asset ID or path. An asset points to its results. |
+| D3 | Identity | **By recognition.** IDs are assigned once at first sight and kept through moves and reorganizations. Existing IDs are kept. |
+| D4 | Structure | **Library folders → bundles → packs → folders.** A pack is a light object: a name, a cover, an auto-detected license. No tags, and never in collections (collections are smaller than packs). |
+| D5 | Types | **Every supported type is always included.** Images are classified as **model texture**, **material texture** (its own kind in v1) or **2D image**. |
+| D6 | Excluded folders | Kept, along with duplicate-export answers (0019) and the texture folder (0021), now attached to packs and folders. |
+| D7 | 3D thumbnails | No automatic rendering. A clear **"no previews yet"** card state plus a pack-level **Make previews** action. 2D images display their original file and need no processing to be seen. |
+| D8 | Processing levels | **Make previews** (inspection, views and search data, never split) and **Generate descriptions** (only when descriptions are on). |
+| D9 | Queue | **Implicit queue**: actions start at once or wait in line, and the scope is resolved when the item starts. **Previews always run ahead of descriptions.** An **overnight** switch holds descriptions until a chosen window. |
+| D10 | Confirmation | Under 10 min: starts on a click. 10–30 min: starts, with an **Undo toast**. Over 30 min: a **popover asks first** (estimate: counts, time range, disk, budget). |
+| D11 | Missing and offline | An unreachable library folder is **Offline**; vanished files are **Missing**. Results and collection entries are kept until **Forget missing**. Unreferenced results are removed only by an explicit action. |
+| D12 | Tabs | **(C)**: Home = search, the **Asset sources** tab = browse by place. One shared grid and inspector; search results offer **Show in pack**. The folder-icon rail item sits above Settings; **Settings → Asset sources is removed**. |
+| D13 | Migration | A one-time script **re-keys** existing `metadata-lal/` results into the store (no re-render, no regeneration), merges nested old sources, relinks moved ones (the owner's C → D move). Removing the old folders is a **separate interactive owner-only step**. |
+| D14 | Old name | **No hardcoded `metadata-lal`** outside the migration and frozen history; a test enforces it. |
+| D15 | Roadmap step 4 | This rework delivers texture recognition as a kind. Afterwards, rewrite [step 4](../../../Architecture/Roadmap/Prompts/04-textures-and-materials.md) to cover only material sets on top of it. |
 
-D1–D4, D14 and D15 are recorded in [decision 0023](../../../Decisions/0023-assetarium-metadata-folder.md).
+Still binding: originals are read only; scans never run models; processing starts only from an
+owner action; faults keep their evidence and are never retried automatically; changing settings
+never deletes results.
 
-Binding decisions that stay: originals are read only (only the source's own `.assetarium/` is
-written); scans never run models; processing never starts automatically; faults stay visible,
-keep their evidence and are never retried automatically; changing settings never deletes results.
+## 2. Why this shape (brainstorm record)
 
-## 2. Why the in-source folder stays (brainstorm record)
-
-The central registry `data/library/sources.json` already identifies a source by its path. The
-in-source folder is not needed for *recognition*. It is kept because it gives three things a
-central store cannot:
-
-1. **Identity that survives moves.** The KayKit pack moved from one drive to another and kept
-   every result. Records store logical `data/...` paths (`sources.generated_path`), and the
-   absolute paths inside inspection `job.json` files are stale evidence that nothing reads.
-2. **Portability.** A processed pack (or an external drive) carries its previews and
-   descriptions to another install or developer.
-3. **Removing and re-adding is lossless.** Removing a source keeps the folder, and re-adding the
-   folder recovers everything.
-
-Accepted costs: Assetarium writes into the asset folders, and read-only media cannot be a source.
-A dot-folder is skipped by Godot and Unity imports and hidden by default on Linux. Cloud-synced
-folders will sync hundreds of MiB of previews (KayKit's folder is ~716 MiB and ~12k files). The
-Add-folder flow should **warn** when a path is inside a known sync root (OneDrive, Dropbox, Google
-Drive; detect by path and environment variables, never by guessing). Rejected options: a hybrid
-(identity in the source, results central) and central-only storage. Both lose portability and
-need a multi-GB move.
-
-**Migration finding:** renaming the folder is enough for the data itself. No record needs
-rewriting, and the `metadata-lal` strings inside `job.json`, batch files and `jobs.sqlite` are
-evidence that stays untouched.
+- **The problem was identity, not the folder.** Today `catalog.asset_id(pack, identity)` hashes the
+  source key and the path inside it, and inspection fingerprints include the asset ID and file
+  paths. That one choice is why nested old sources, moved drives and "add a parent folder" each
+  needed their own repair mechanism (pack anchors, relink, absorb). Recognition plus input-keyed
+  results removes all of them.
+- **Rejected: a hidden `.assetarium/` folder in each source** (the first plan). Its only real
+  advantage was carrying results along with a pack. The owner rarely moves packs; they **add
+  files over time**. Its costs were writes into user folders, no read-only media, cloud-sync bloat
+  and nesting.
+- **Rejected: a separate thumbnail tier.** KayKit's inspections take a median of about 4 s per
+  asset for 3 views, mostly file import and setup. A one-view tier would save little and then be
+  redone.
+- **Rejected: a start-time picker and an explicit basket.** With two processing levels, actions on
+  the tree or grid plus the confirmation thresholds give the same control with less ceremony.
+- **Rejected: one merged browser (route B).** Search and browsing are different moods; a shared
+  grid stops them from drifting apart.
 
 ## 3. Target model
 
-### 3.1 `.assetarium/` and `source.json` schema 2
+### 3.1 Library store
 
-The folder keeps today's internal layout (`captions/`, `inspection/`, `library/`…). Changes:
-
-```jsonc
-// <source>/.assetarium/source.json
-{
-  "schema_version": 2,
-  "id": "<32 hex>", "key": "<source key>",
-  "excluded_folders": [...], "export_decisions": [...], "texture_folder": {...},  // unchanged meaning
-  "anchors": [                       // D4, §3.2; empty for an ordinary source
-    {"id": "<old source id>", "key": "<old key = logical prefix>", "path": "<subfolder relative to root, POSIX>",
-     "excluded_folders": [...], "export_decisions": [...], "texture_folder": {...},
-     "absorbed_utc": "...", "evidence": "absorbed/<old id>/"}
-  ],
-  "migrated_from": {"schema_version": 1, "folder": "metadata-lal", "utc": "...", "receipt": "..."}  // optional
-}
-```
-
-- `import_types` and `import_formats` are gone (D5). When `sources.import_types` /
-  `sources.import_formats` read a schema 1 file, they return "everything", so an unmigrated folder
-  behaves like the new model. Its other faults are still reported (§3.4).
-- Name constants and the removal of every hardcoded `metadata-lal`: see §3.5.
-- On Windows, set `FILE_ATTRIBUTE_HIDDEN` on `.assetarium` when it is created or migrated
-  (`ctypes` `SetFileAttributesW`). A failure to set it is a recorded warning, never a fault.
-
-### 3.2 Pack anchors: absorbing without changing asset IDs
-
-`catalog.asset_id(pack, identity)` hashes the **source key** (the pack: the first segment of a
-record path) and the path inside it. The inspection fingerprint (`incremental.inspection_input`)
-includes the record's `asset_id`, `pack_id` and file `path`s. So changing a source's root would
-change every ID and fingerprint. That would orphan the previews, descriptions, collections and
-owner overlays, and re-queue every render.
-
-**Design: an anchor is a logical prefix mapped to a physical subfolder.** If the parent root
-`R` (key `Q`) absorbs a child at `R/P` (key `K`), files under `R/P` keep their **logical paths
-`K/…`**. They do not become `Q/P/…`. Because logical paths are unchanged, `pack_id`,
-`source_relative_identity`, `asset_id`, the file paths in records and every fingerprint stay
-byte-identical. Only path resolution changes:
-
-- `catalog.walk_source` emits `K/<path relative to R/P>` for files under an anchor, and
-  `Q/<path relative to R>` for everything else. The parent's own excludes never reach inside an
-  anchor unless they name it. Inside an anchor, the anchor's own `excluded_folders`,
-  `export_decisions` and `texture_folder` apply, because they were written relative to the child's
-  root.
-- A single resolver maps a logical path to disk: `K/x` → `R/P/x` and `Q/x` → `R/x`. Today
-  `sources.source_for_path` splits the key from the first segment, and every disk access must go
-  through the resolver. **Audit every `split('/')[0]`, `relative.parts[0] != pack`
-  (`asset_structure.new_record`) and `source_root /` join**, plus dependency and texture
-  resolution (`dependency_resolution`, `texture_folders`, `texture_repair`). A dependency may cross
-  from an anchor into the parent's folders, and that must resolve.
-- `sources.owners` and `generated_path` map an asset to its registered source. Absorbed asset IDs
-  now map to `R`, so their results resolve to `R/.assetarium`.
-- Anchors nest: absorbing a root that has its own anchors lifts those anchors into the new root,
-  with their paths composed.
-- Collisions are refused, never guessed: an anchor key equal to the root key, to another anchor
-  or to a registered or detached source key, and overlapping anchor paths.
-- Search vectors may rebuild if their source fingerprint covers the root's file list. That is
-  cheap and acceptable. Previews, inspections and descriptions must not re-queue (§7 test).
-
-UI and display names stay physical. The tree shows real folders, and an anchor is just a folder
-with a small "merged source" tooltip.
-
-```mermaid
-flowchart LR
-  A["R/P/tree.fbx on disk"] -- walker --> B["logical K/tree.fbx"]
-  B --> C["asset_id(K, tree.fbx): unchanged"]
-  B -- resolver --> A
-  C --> D["R/.assetarium/inspection/asset_…: moved, not re-rendered"]
-```
-
-### 3.3 Absorb operation (shared by the app and the migration)
-
-`sources.absorb(config, root, children)` runs under the `source-settings` lease, refuses while any
-involved source has an active operation, and is journaled so a crash can resume
-(`R/.assetarium/migration/journal.json`):
-
-1. Make sure `R/.assetarium` exists with an identity. If `R` itself has a legacy folder, convert
-   it first (§4).
-2. For each child, deepest first: move each per-asset result directory (`inspection/asset_*`,
-   `captions/asset_*` and every other per-asset tree in the child's metadata) into
-   `R/.assetarium/` **by rename**. Everything is on the same volume, because links and junctions
-   are rejected. **If an asset ID already exists in `R`, stop that child and record the fault;
-   never overwrite.**
-3. Merge the child's stage-ledger rows (`library/jobs.sqlite` `jobs` and `history`) into `R`'s
-   ledger. Move everything else (generations, batches, operations, logs, `source.json`) into
-   `R/.assetarium/absorbed/<child id>/` as evidence (decision 0006 retention). Remove the emptied
-   child metadata directory with a plain `rmdir`, which only succeeds when the directory is empty.
-4. Write the anchor entry. In the registry, register `R`, drop the children from `sources` and
-   `detached`, and record them in the anchor.
-5. Rescan `R`. A scan runs no models. **Verify that every asset ID the children had published is
-   still present in `R`**, and record any that is missing as a visible fault. Do not repair it.
-
-### 3.4 Asset state taxonomy (fixes the known ASSETRM-0002 problems)
-
-Each asset has exactly one **work state** and a few **overlays**. This splits "can be resolved by
-processing" from "cannot":
-
-| Work state | Meaning | Action offered |
-| --- | --- | --- |
-| `processed` | Every applicable stage is complete and published | none |
-| `pending` | Runnable work exists | Process… |
-| `blocked` | Work exists but a prerequisite is missing (search runtime not installed, Blender missing, description engine not set up) | The fix ("Install search runtime", "Set up Blender"…), **never Process** |
-| `failed` | Recorded fault (evidence kept) | Copy error · Recheck (decision 0020, explicit) |
-| `excluded` | Inside an excluded folder | Include again |
-| (non-asset) | Not a recognized asset (README, HTML…) | none |
-
-Overlays: `warning` (caption warnings and the `review_note`/`warning` findings from
-[Caption severity](../../../Architecture/Processing/Caption%20severity.md); only `warning` is shown
-as ⚠), `description` (complete / missing / failed; shown only when descriptions are on),
-`collections` (count). Derive the state from the existing `sources.import_outcome` /
-`processing_summary` / `description_state` rather than building a parallel model.
-`processing_summary` gains a `blocked` count with reasons. The Kenney case (previews done, search
-stage cannot run) becomes `blocked: search runtime not installed` instead of a Process action that
-always fails.
-
-With D5, `pending` counts **every** unprocessed asset, whatever its format. The global format
-checkboxes keep two roles only: they set the picker's default selection, and they set the format
-preference `incremental.choose_source` uses to pick which file of a grouped asset is rendered. The
-"Processing paused: no formats selected" state goes away. With nothing checked by default, the
-picker simply opens empty.
-
-### 3.5 Removing every hardcoded `metadata-lal` (D15)
-
-Introduce `METADATA_DIR = ".assetarium"` and `LEGACY_METADATA_DIR = "metadata-lal"` once (in
-`sources.py`, or `config.py` if `config` must not import `sources`), plus a
-`RESERVED_METADATA_DIRS` pair. `validate_exclusion`, `validate_directory`, `add`, `bound`,
-`generated_path`, `config` (logical path checks) and `catalog.walk_source` treat both names as
-reserved and never walk either one.
-
-Every tracked occurrence of the literal (counted with `git grep -c metadata-lal` on 2026-10-30),
-and what happens to it:
-
-| Where | Occurrences | Change |
-| --- | --- | --- |
-| `src/local_asset_library/sources.py` (12), `config.py`, `catalog.py`, `retrieval.py` (docstring), `owner_commands.py` (storage budget text), `source_migration.py` | 18 | Use the constants. UI and CLI text says "each source's `.assetarium` folder". `source_migration.py` (the October 14 one-time move, which refuses reruns) checks both names through the constant. |
-| `src/local_asset_library/blender_worker.py` | 2 | **Special case, see below.** |
-| `frontend/src/app/format.ts` (storage budget help) | 1 | New wording, then `npm run build`. The literal also leaves `ui/build/`. |
-| `tests/` (`test_sources.py` 5, `test_settings.py` 2, `test_sources_blender.py`, `test_source_exports.py`, `test_processing_formats.py`, `test_images.py`, `test_cpu_embedder.py`) | 12 | Use the constant. Add tests for the legacy name: it is reserved, read-only and reported as needing migration. |
-| `scripts/verify-*.py` (texture-folders 2, source-folders 2, show-in-explorer, notifications, image-browser, collections), `scripts/smoke-headless.py` | 9 | Import the constant. |
-| `scripts/historical/kaykit-gltf-maintenance.py` | 1 | Frozen one-time script that refuses reruns: **leave it**, allowlisted. |
-| `.gitignore` | 1 | `.assetarium/` added. Keep `metadata-lal/` so unmigrated fixtures never get committed (allowlisted). |
-| `README.md`, `CLAUDE.md`, `docs/asset-sources.md` (4), `docs/dependency-path-overrides.md` | 7 | Say `.assetarium`. Mention the migration in `docs/asset-sources.md`. |
-| Vault: Sources (5), Sources and Catalog, Stage ledger and fingerprints (2), Storage discipline, `_Templates/System Note.md`, Catalog contract, Embedding contract, Expansion plan, Library updates, decisions 0006 and 0019 | 15 | Say `.assetarium`. Decisions 0006 and 0019 get a "folder renamed by [0023]" note; their rules are unchanged. |
-| `docs/history/progress-2026-10.md` (4), ASSETRM notes, decision 0023, CHANGELOG migration entry | — | Frozen or historical: **keep**, allowlisted. |
-
-**The Blender worker** builds `output_root = source_root / "metadata-lal"` and rejects relative
-paths that contain the name. The worker's hash is part of every inspection fingerprint, so any edit
-re-queues every inspection unless it is proven equivalent ([decision 0022](../../../Decisions/0022-parallel-rendering.md)).
-Edit it **once** so it never names the folder again:
-- The output root comes from the job's existing `metadata_root`. That value must be a direct child
-  of `source_root`, and its name must be in a `reserved_metadata` list the job also carries.
-- The relative-path check uses that list.
-- Then register the new hash (LF and CRLF) in `incremental.EQUIVALENT_WORKERS`, proven with
-  `scripts/check-render-stability.py`, which shows identical CPU renders.
-The batch worker and the repair workers do not contain the literal. Confirm that again when
-implementing.
-
-**Enforcement:** a test (`tests/test_metadata_name.py`) runs `git ls-files` and fails if any
-tracked text file outside an explicit allowlist (the constant's definition, the migration script,
-`scripts/historical/`, `docs/history/`, `.gitignore`, `CHANGELOG.md`, decision 0023 and the
-ASSETRM-0002 notes) contains `metadata-lal`. Skip `ui/vendor/` and the hash-bound `docs/mcp/*.json`
-(none contain it today). The check also covers `src/local_asset_library/ui/build/`.
-
-## 4. One-time migration script
-
-`scripts/migrate-metadata-folders.py`, run with the base runtime (`.\scripts\uv.ps1 run --locked
-python scripts/migrate-metadata-folders.py …`, same arguments under `uv.sh` on Linux). It is for
-every existing install, not just the owner's library, so it stays out of `scripts/historical/`
-until a release no longer supports schema 1. Model it on `source_migration.py` and
-`scripts/historical/kaykit-gltf-maintenance.py`: refuse links, out-of-root targets and reruns, and
-work from a manifest.
+`[storage].library` in `config.local.toml`; the default is `data/library-store/` (ignored).
+Proposed layout (the implementer refines it at the phase 1 checkpoint, reusing `publication.py`
+generations and `atomic_json`):
 
 ```
-migrate-metadata-folders.py [--root PATH ...] [--search PATH ...] [--apply]
+library-store/
+  library.sqlite            library folders, bundles, packs, assets, file locations, recognition history
+  results/<stage>/<kk>/<key>/   inspection and previews, image derivatives, captions (key = input hash)
+  ledger.sqlite             stage ledger and history (today each source's jobs.sqlite)
+  generations/              published catalog and search index (immutable, decision 0006 retention)
+  queue/                    processing queue and run records
+  absorbed/<old source id>/ migration evidence (old operation logs, batches, receipts)
 ```
 
-`--root` names a folder that becomes one source and absorbs every old folder under it. `--search`
-only adds a place to look (for example the drive a pack moved to). Nothing under a search folder is
-absorbed.
+- `sources.generated_path` (today's resolver from logical `data/...` paths to `metadata-lal`)
+  becomes a resolver into the store. **All result access goes through it**, so the earlier
+  "logical paths in records" design carries over.
+- The storage budget (`library_policy`) measures the store instead of the `metadata-lal` folders.
+  The budget help text (`frontend/src/app/format.ts`, `owner_commands.py`) changes with it.
 
-1. **Preflight (read only).** The app and MCP server are not running (the existing leases and
-   locks), no source operation is active, and a storage receipt is saved before applying
-   (`scripts/storage-report.py --output <new>.json`).
-2. **Discover.** Deep-search every registered and detached source path that exists, every
-   `--root` and every `--search` for directories named `metadata-lal`, at any depth, without
-   following links or junctions (count them and report them). Validate each one: a regular
-   directory, `source.json` schema 1 valid, and no sibling `.assetarium` (if one exists, report a
-   conflict and skip).
-3. **Relink moved sources (D14, §4.1).** Match the found folders to the registry by identity
-   (`source.json` `id`), never by name. When a registered or detached entry's `path` differs from
-   the one folder carrying its `id`, the plan relinks the entry to that folder; this covers the
-   C → D move. Two folders with the same `id` (a copied pack) are a conflict: report both and
-   relink neither. A missing entry that no found folder matches is reported with "pass the folder
-   that now contains it with `--search`". Relinking happens before any absorb.
-4. **Plan.** Group the found folders: those under a `--root` are absorbed into it (§3.3). Each
-   top-most folder under no root is converted in place, and a folder nested inside another found
-   folder outside any root is absorbed by its nearest found ancestor. Per folder, report the asset
-   counts and what D5 does to it:
-   - `import_types` without `image`: N images will enroll as **pending** at the next scan.
-   - `import_formats` (KayKit: `["gltf"]`): **propose exclusion patterns** for folders whose
-     recognized files are all of a dropped format (for example KayKit's `fbx/`, `obj/` export
-     trees). Files of dropped formats in mixed folders cannot be excluded by folder; list them as
-     "will enroll as pending". Proposed exclusions are applied only on confirmation.
-   Write the plan as JSON to `data/library/metadata-migration/plan-<utc>.json`. Without
-   `--apply`, stop here (dry run).
-5. **Apply.** Interactive confirmation only (type `yes`; no `--yes` bypass, per the owner-only rule
-   for state-changing owner commands). Relink registry paths. Convert in place: rename
-   `metadata-lal` → `.assetarium` (atomic `os.rename`), set the hidden attribute, keep the old
-   `source.json` as `.assetarium/migration/source.v1.json`, and write schema 2. Then absorb
-   (§3.3) and update the registry.
-6. **Verify and receipt.** Rescan the affected sources (no models), check that all previously
-   published asset IDs are present (§3.3 step 5), and save the receipt
-   `data/library/metadata-migration/<utc>.json`. Then save a storage receipt after; the unique
-   bytes should be about equal. Print what changed and any faults.
+### 3.2 Input-keyed results and the fingerprint redefinition (riskiest part)
 
-**Run once:** each folder named in a receipt is never converted again. A later run is allowed only
-for `metadata-lal` folders that no receipt names, so missed drives can still be migrated. A fault
-in one root group stops that group (journal kept, resumable) and lets the others continue. The
-script never deletes data and never edits originals.
+The current fingerprints contain location:
+- `incremental.inspection_input` hashes `asset_id`, `pack`, `name` and file `path`s
+  (source-key-prefixed) together with content hashes, worker hashes and settings.
+- `incremental.caption_input` hashes view `path`s, which embed `asset_<id>` folders.
+- `image_inspection.inspection_input` hashes the image `path`.
 
-**App behavior before migration:** a registered source that still has `metadata-lal/` keeps
-working read-only, and shows one clear notice with the exact command to run. The app never
-migrates silently.
+New result keys: **file content hashes, dependency content hashes and their paths relative to the
+inspected file, settings and code hashes.** No asset ID, no pack and no absolute or source-prefixed
+paths. Relative dependency paths stay in the key because they change what Blender resolves.
+Caption keys use view content hashes, not view paths.
 
-### 4.1 What a moved source leaves behind (checked 2026-10-30 on the owner's C → D move)
+**Re-keying, never re-queuing:** for each existing result, the migration recomputes its old
+fingerprint from its record (proving it is current, as `recorded_fingerprint` does today), then
+computes the new key from the same inputs and files the result under it. A result whose old
+fingerprint no longer matches its record is filed as **stale** and stays pending, exactly as it
+would today. Phase 1 must prove on a copy of the owner's library that the **pending count after
+re-keying equals the pending count before**.
 
-Because records use logical paths, a move needs very little repair. The script fixes what does
-break and reports, without rewriting, what only looks broken:
+The Blender worker builds its output root from `source_root / "metadata-lal"`, and its hash is
+part of the inspection fingerprint. It must take its output root from the job instead. That edit
+keeps results only through `incremental.EQUIVALENT_WORKERS`, proven with
+`scripts/check-render-stability.py` ([decision 0022](../../../Decisions/0022-parallel-rendering.md)).
+Land it in its own commit with the stability receipt. Confirm the batch and repair workers again
+during implementation (today they do not contain the literal).
 
-| Leftover | Effect | Script |
-| --- | --- | --- |
-| Registry `path` (registered or detached) still pointing at the old drive | The source is unavailable and leaves search; re-adding it by hand was the only fix | **Relinks by identity** (step 3). In the app, the Source panel of an unavailable source offers **Locate folder…**: pick the new folder, the app checks that its `source.json` `id` matches, then relinks and rescans. |
-| Old absolute paths inside evidence: inspection `job.json`, `blender.log`, `result.json`, `library/batches/*.json`, operation logs, `jobs.sqlite` history (about 1.8k rows for KayKit) | None. Nothing reads these paths back | **Not rewritten**: they are evidence of the run that produced them. |
-| `technical.textures[].original_path` in catalog records (about 1.5k for KayKit, in the published and `work` generations) | None. `texture_folders` and `texture_repair` read only the file **name** from it; texture `path`s are logical | **Not rewritten**; reported as "historical, harmless" with a count. |
-| Combined central catalog under `data/library/generations/` | Rebuilt by `sources.aggregate` | Rebuilt by the rescan in step 6. |
-| Stat identities in each source's `scan-cache.json` and `cache/file-hashes.sqlite` (file ID and change time differ after a copy between drives) | The first scan after the move re-hashes the files (slow once, correct) | The rescan in step 6 pays this once. Stale cache rows are reported, not pruned. |
+### 3.3 Identity by recognition
 
-The implementing agent re-runs this survey at the phase 2 checkpoint (search `data/`, the
-`config.local.toml` texture providers, every metadata folder and the `.sqlite` files for the old
-drive prefix). Any **new** kind of absolute path that code reads back gets a repair step in the
-plan before applying. Test fixture: a synthetic source copied to a new path, with an unmatched
-registry entry, a moved detached entry and a duplicated `id`.
+- `library.sqlite` holds every asset's ID and its current file locations, content hashes and
+  stat identities (seeded from `cache/file-hashes.sqlite`, decision 0004).
+- **New asset:** the ID is computed **once** with today's formula (`asset_id(pack, identity)` at
+  first sight), then stored and never recomputed. That keeps IDs deterministic for a fresh install
+  of the same pack.
+- **On each scan:**
+  - A file at a known path with a known stat identity is the same asset (no hashing).
+  - A new path whose content matches a Missing asset is that asset, **moved**: the ID, results,
+    overlays and collections are kept.
+  - A new path whose content matches an asset that still exists is a **duplicate**: a new ID that
+    shares the cached results through D2.
+  - A known path with new content is the same asset, **edited**: its results no longer match, so
+    it becomes pending.
+  - A vanished path with no match becomes **Missing**.
+- Grouped assets (export variants, decision 0019) are recognized by their reference file. Their
+  other files follow the group.
+- Record the evidence for each recognition (moved, duplicate, edited) in the recognition history,
+  so an unexpected identity can be explained.
 
-## 5. Asset sources page (new rail tab)
+### 3.4 Library folders, bundles, packs
 
-### 5.1 Placement and shell
+- A **library folder** is a watched root (today's source registry, `data/library/sources.json`,
+  becomes rows in `library.sqlite`). Overlap rules: adding a folder **inside** a library folder is
+  refused ("already covered", with Show it). Adding one that **contains** library folders replaces
+  them: recognition keeps every ID and result, so this is just a registry change plus a rescan.
+- **Pack detection** (structure only, never publisher names; decision 0019's rule):
+  - A pack is the folder closest to the assets that carries pack markers (license, readme,
+    preview image, `.url` shortcuts, versioned names such as `Name_1.0_FREE` or `Name 3.7.0`).
+  - A folder whose children are packs is a **bundle**.
+  - Without markers, the first folder under the library folder that contains assets is the pack.
+  - Owner overrides **Make this a pack** and **Merge into parent pack** are saved and survive
+    rescans.
+  - Checked against the owner's library: `Kenney All-in-1` → `2D assets` (a category inside the
+    bundle) → `Tiny Dungeon` (a pack); `KayKit_Free_pack` → 13 packs; `Cartoon City Massive
+    Pack` → 5 `CCMP_*` parts the owner would merge.
+- A **pack object**: display name (editable, defaults to the folder name), cover (the pack's
+  preview image if any, else the first processed asset), license evidence (today's nested
+  license attachment, `catalog` license rows), counts, last processed, and "+N new since last
+  visit". No tags and no collection membership.
+- Exclusions, duplicate-export answers and the texture folder move from `source.json` to the pack
+  or folder they name. Their meaning is unchanged.
 
-- `Shell.tsx`: add a `RailItem` "Asset sources" (lucide `Folder`, same stroke as the others) in the
-  bottom group **above Settings**. Its attention dot means **the owner must answer or fix
-  something**: a scan fault, an unavailable source, a pending duplicate-export suggestion or
-  texture-folder question, or an un-migrated folder. Pending work keeps its dot on Asset
-  processing, so the two dots never mean the same thing.
-- Page id `sources`. Retire the `source` page (`SourceBrowser.tsx`) and the
-  `settings`/`asset-sources` tab. Their deep links and the "back to Settings → Asset sources"
-  logic in `SourceBrowser.tsx` and `RailItem` must move to the new page. Delete `AssetSources` from
-  `Settings.tsx`. If only General is left, render Settings without a tab strip.
+### 3.5 Image classification
+
+Every layer records `{value, basis, evidence}` like `image_catalog.suggested_purpose`, never a
+bare fact. Kinds: `model_texture` (a dependency, not a selectable asset), `material_texture` (its
+own kind, browsable and searchable by name in v1), `image` (2D asset).
+
+1. **At scan** (no decoding, as `image_catalog` requires):
+   - Model references: glTF image URIs, `.mtl` `map_*` lines, ASCII FBX `RelativeFilename` and
+     the filename strings in binary FBX. A match means `model_texture`.
+   - **Pack prior:** a pack with no models means its images are `image` (with material-name
+     images as `material_texture`).
+   - Material naming: `_albedo`, `_basecolor`, `_diffuse`, `_normal`/`_nrm`, `_roughness`,
+     `_metallic`, `_ao`, `_height`, `_orm`, `_emission`, `_d`/`_n`.
+   - Proximity: beside models or sharing a model's stem leans texture. Folder words (`textures`,
+     `materials`, `maps` vs `icons`, `sprites`, `ui`, `logos`) and sprite-sheet sidecars count too.
+2. **When decoded** (previews): normal-map mean color (about 128/128/255), single-channel
+   grayscale, seamless edges, cutout alpha.
+3. **Inspection:** Blender's texture list overrides any guess for that model's files.
+4. **Owner answer:** "Treat images here as textures / as 2D assets" on a folder.
+
+The vision model is not used for this.
+
+### 3.6 States
+
+**Work state (one per asset):** `no previews yet` (pending) · `queued` · `running` · `ready`
+(previews and search done) · `blocked` (a prerequisite is missing, such as the search runtime or
+Blender, shown with its fix and **never** a process action) · `failed` (recorded fault: Copy
+error, Recheck per decision 0020) · `missing` · `excluded`.
+**Overlays:** `warning` (a caption warning; review notes are not shown as warnings), `description`
+(complete, missing or failed, only when descriptions are on), collections count, `new`.
+**Non-asset files** (README, HTML…) are grey and faded.
+
+Derive the states from `sources.import_outcome`, `processing_summary` and `description_state`,
+and add `blocked` with its reasons. This fixes the Kenney case (previews done, search stage
+cannot run) and the mixed failures-and-pending banner.
+
+### 3.7 No hardcoded `metadata-lal` (D14)
+
+The literal stays only in the migration script (as `LEGACY_METADATA_DIR`), frozen history
+(`docs/history/`, `scripts/historical/`), `CHANGELOG.md` and the ASSETRM notes. `.gitignore`
+keeps `metadata-lal/` so unmigrated fixtures are never committed. On 2026-10-30 `git grep -c`
+found it in 41 tracked files:
+- `src` (`sources.py` 12, plus `blender_worker.py`, `config.py`, `catalog.py`, `retrieval.py`,
+  `owner_commands.py`, `source_migration.py`)
+- `tests` (7 files) and `scripts` (`verify-*` 6, `smoke-headless.py`)
+- `frontend/src/app/format.ts`, `README.md`, `CLAUDE.md`, `docs/asset-sources.md`,
+  `docs/dependency-path-overrides.md`
+- 15 vault pages, including decisions 0006 and 0019
+
+Most of these disappear with the store. The rest switch to the store vocabulary. Enforcement:
+`tests/test_metadata_name.py` runs `git ls-files` and fails on the literal outside the allowlist
+(including `ui/build/`).
+
+## 4. One-time migration
+
+`scripts/migrate-library.py`, run with the base runtime (`.\scripts\uv.ps1 run --locked python
+scripts/migrate-library.py …`, same arguments with `uv.sh`). Model it on `source_migration.py`:
+refuse links and out-of-root targets, write receipts, never edit originals.
+
+```
+migrate-library.py [--library-folder PATH ...] [--search PATH ...] [--apply]
+```
+
+1. **Preflight:** the app and MCP server are not running, no operation is active, and a storage
+   receipt is saved (`scripts/storage-report.py --output <new>.json`).
+2. **Discover:** deep-search registered and detached source paths, `--library-folder` and
+   `--search` for `metadata-lal` at any depth, without following links. Validate each one
+   (`source.json` schema 1).
+3. **Library folders:** each `--library-folder` becomes one, and everything found under it joins
+   it (nested old sources need no special handling under recognition). Old sources under no named
+   folder become their own library folder.
+4. **Relink moved sources:** match found folders to registry entries by `source.json` `id`. A
+   registry path that differs is the C → D case and is corrected. Two folders with the same `id`
+   are a conflict, and neither is used. An entry that nothing matches is reported with "pass the
+   folder that now contains it with `--search`".
+5. **Plan (dry run, the default):** per old folder, the asset count, results to re-key, stale
+   results, and what D5 enrolls newly. Images previously off: N images. `import_formats` (KayKit
+   `["gltf"]`): N files of other formats, proposed as exclusions where whole folders hold only
+   those formats. The plan is saved to `data/library/migration/plan-<utc>.json`.
+6. **Apply (interactive `yes`, no bypass):** create the store, import the registry, packs,
+   exclusions and answers, and assets with **their existing IDs**. Re-key every result (§3.2),
+   merge the stage ledgers, keep old logs, batches and generations under `absorbed/<id>/` as
+   evidence. **Copy, never move**: the old folders stay intact until step 8.
+7. **Verify and receipt:** rescan (no models), check that every previously published asset ID is
+   present and that the pending count is unchanged (§3.2), then save
+   `data/library/migration/<utc>.json` and a storage receipt.
+8. **Cleanup (separate command, `migrate-library.py --remove-old`, interactive and owner-only):**
+   only for folders whose import receipt verified. It lists each `metadata-lal` with its size and
+   removes it on confirmation.
+
+**Once per folder:** a folder named in a receipt is never imported again; later runs only take
+folders no receipt names. A fault stops only its own folder, with evidence, and the others
+continue.
+
+**C → D findings (checked 2026-10-30):** the only real breakage of a move is a registry path to
+the old drive (step 4). The old absolute paths in `job.json`, `blender.log`, `result.json`,
+batches, operation logs and `jobs.sqlite` history are evidence and stay unread. The
+`technical.textures[].original_path` values (about 1.5k for KayKit) are read only for their file
+name (`texture_folders`, `texture_repair`). Stat identities change between drives, so the first
+scan re-hashes once. The implementer repeats this survey at the phase 3 checkpoint.
+
+**Before migration, the app** shows one notice with the exact command and keeps working from the
+old folders, read only. It never migrates by itself.
+
+## 5. Asset sources tab
+
+### 5.1 Shell and pages
+
+- `Shell.tsx`: add a rail item **Asset sources** (lucide `Folder`) in the bottom group **above
+  Settings**. Its dot means **the owner must act**: a folder offline, an unanswered export or
+  texture question, files missing, or a migration needed. Pending work keeps its dot on Asset
+  processing.
+- Retire `SourceBrowser.tsx` (page `source`) and `Settings` → Asset sources (`AssetSources`). If
+  General is the only tab left, Settings shows no tab strip. Move every deep link and the
+  `RailItem` special case.
+- **Shared grid (D12):** the new tab and Home use the same `AssetGrid` and `Inspector`. Search
+  results get **Show in pack**, which opens this tab with the asset selected and its folder
+  expanded.
 
 ### 5.2 Layout
 
-Header: **Add folder** (primary), root **sort** (Name · Recently added · Most pending · Most
-assets · Last processed), **type filter** chips (3D models · Images, and later Audio, built from
-the supported types list, not hardcoded), and a **status filter** (Has pending · Has failures ·
-Blocked). The type filter hides roots that contain no asset of the chosen types, and **dims
-non-matching files** inside the shown roots. A filter-by-name box is optional (see §9).
+- **Header:** Add library folder · sort (Name · Recently added · Most without previews · Most
+  assets · Last processed) · type chips (3D models · Images · Material textures; built from the
+  supported-types list, so audio can be added later) · status filter (Has new · Needs previews ·
+  Blocked · Failures · Missing).
+- **Left:** a virtualized tree of library folders → bundles → packs → folders (**folders only**),
+  using the [beUI motion file tree](https://beui.dev/components/motion/file-tree) vendored into
+  `frontend/src/components/beui/` (MIT, see `frontend/README.md`). Each row shows a thin
+  **coverage bar** ("73% have previews") and **+N new**. A pack row shows its cover thumbnail and
+  display name. Offline library folders are dimmed with an "Offline" label.
+- **Right:** the shared grid for the selected folder or pack (list view toggle). Cards carry the
+  §3.6 icon strip with tooltips (shape and label, never color alone), and "no previews yet" is a
+  designed state (format glyph, name, quiet label), not a broken image. Non-asset files come last,
+  faded, behind a **Show other files** toggle that is on by default.
+- **Pack header** above the grid: cover, name, license, counts, and the main action for the state
+  ("312 models without previews · Make previews"). Previews fill in progressively with a soft
+  fade-in.
+- **Inspector:** an asset → today's inspection panel. A pack or library folder → its panel (name,
+  path, license, exclusions, export answers, texture folder, enable/disable, Rescan, Remove,
+  Forget missing).
+- Animations: expand and collapse, staggered first reveal, preview fade-in; respect
+  `prefers-reduced-motion`.
+- Empty state: a short illustration with "Point Assetarium at a folder of game assets" and Add
+  library folder.
 
-Body: a virtualized file tree of all roots. The right-hand slot reuses the existing **Inspector**
-panel (`ui/Inspector.tsx`), the same one Home uses. Selecting a root shows a **Source panel** in
-the same slot, which takes over everything Settings → Asset sources did: path, availability,
-asset and pending counts, enable/disable, Rescan, Remove, the excluded folders list (add, remove),
-duplicate-export suggestions (Group / Keep separate / Exclude, decision 0019), the texture-folder
-question (decision 0021) and merged-source anchors (read-only list). An unavailable source shows
-**Locate folder…** (§4.1) next to Remove.
+### 5.3 Interaction
 
-Empty state: a short illustration and line ("Point Assetarium at a folder of game assets") with Add
-folder. Animations follow the owner's taste (visual, elegant, not verbose): beUI motion expand and
-collapse, a subtle row stagger on first expand, an inline progress ring on a root while it scans
-or processes. Respect `prefers-reduced-motion`.
+Click an asset to inspect it · click a folder or pack to show it · **double-click any file or folder
+to show it in Explorer** (`desktop.show_in_explorer`) · Ctrl- or Shift-click for multi-select in
+the grid (for queue actions, Add to collection and Exclude) · keyboard: arrows, Enter, Shift+F10 or
+the menu key. Use `tree`/`treeitem` and grid roles.
 
-### 5.3 Tree rows
-
-Use the beUI motion file tree (https://beui.dev/components/motion/file-tree), vendored into
-`frontend/src/components/beui/` like the others (MIT, adapted where marked "Assetarium"; see
-`frontend/README.md`). Add virtualization, because Kenney-sized roots have tens of thousands of
-files.
-
-```
-▾ 📁 Nature                 ● 12 pending  ✕ 1  ⚠ 2      ← folder roll-up (worst state colors the dot)
-   ◆ tree_01.fbx    FBX     ✓  ✎  ▣2
-   ◆ rock_03.glb    GLB     ○
-   ◆ bush_02.obj    OBJ     ✕  ⧉                         ← ⧉ blocked shows its reason in the tooltip
-   · README.txt                                          ← non-asset: grey, ~55% opacity
-```
-
-- Extension chip = asset type at a glance. State icons: ✓ processed · ○ pending · ⧉ blocked · ✕
-  failed · ⚠ warning · ✎ description (only when descriptions are on; outlined when missing) · ▣N
-  in N collections. Each icon has a tooltip with the plain-language reason. Color is never the only
-  signal (icon shape and aria-label too).
-- Excluded folders are shown collapsed, struck or dimmed with an "Excluded" label and a file
-  count. `.assetarium` is never shown.
-- A grouped asset (export variants, decision 0019) is one row under its reference folder. Its
-  other files show in their own folders with a "variant of …" link, never as separate pending
-  assets.
-- Folder roll-ups (pending, failed, blocked, warning counts) are **precomputed at scan and
-  publish time**, not summed in the browser.
-- Interaction: click an asset to inspect it; click a folder to expand it; **double-click any file
-  or folder to show it in Explorer** (`desktop.show_in_explorer` selects the file). Keyboard:
-  arrows move and expand, Enter inspects, Shift+F10 or the menu key opens the context menu.
-  Accessible tree roles (`tree`/`treeitem`, `aria-expanded`, `aria-level`).
-
-### 5.4 Context menus (beUI context menu, existing collection flyout)
+### 5.4 Context menus
 
 | Target | Items |
 | --- | --- |
-| Asset | Inspect · Show in Explorer · Open with default app · Copy path · Add to collection ▸ · Process… (pending) · Fix… (blocked: the prerequisite action) · Copy error and Recheck (failed) · Generate description (descriptions on, missing; opens the picker preset) · Exclude containing folder |
+| Asset (one or several) | Inspect · Show in Explorer · Open with default app · Copy path · Add to collection ▸ · Make previews (when missing) · Generate descriptions (descriptions on, missing) · Fix… (blocked) · Copy error, Recheck (failed) · Exclude containing folder |
 | Non-asset file | Open · Show in Explorer · Copy path |
-| Folder | Process folder… (picker preset to this folder) · Exclude folder · Show in Explorer · Copy path · Expand all / Collapse all · Duplicate-export answer (when a suggestion involves it) |
+| Folder | Make previews · Generate descriptions · Make this a pack · Merge into parent pack · Treat images here as textures / as 2D assets · Exclude folder · Show in Explorer · Copy path · Expand / collapse all · Duplicate-export answer (when suggested) |
+| Pack | Make previews · Generate descriptions · Rename · Merge into parent pack · Forget missing · Show in Explorer |
 | Excluded folder | Include again · Show in Explorer |
-| Root | Process… · Rescan · Enable / Disable · Show in Explorer · Copy path · Remove source… (confirm; keeps `.assetarium`, as today) |
+| Library folder | Rescan · Enable / Disable · Show in Explorer · Copy path · Remove… (confirm; results stay in the store) |
 
-Only offer what can resolve the shown state (AGENTS.md UX rule). For example, never offer Process
-on a blocked or processed asset.
+Offer only what can resolve the shown state. Never offer Make previews on a ready, blocked or
+missing asset.
 
-### 5.5 Add folder
+## 6. Processing
 
-The native folder picker, then validation (`sources.validate_directory`) with plain-language
-errors:
-- **Inside an existing source:** refuse, and say it is already covered with a "Show it" button
-  that scrolls the tree to it.
-- **Contains existing (registered or detached) sources, or old `metadata-lal` folders:** the
-  absorb dialog (D3) names each contained source with its asset counts and says "Results are kept;
-  nothing is reprocessed". It runs `sources.absorb` on confirm. Contained legacy folders are
-  converted as part of it, the same as the migration.
-- Inside a cloud-sync root: a warning about synced previews (§2), with Continue / Cancel.
-- After adding, a scan starts (as today). Processing never starts.
+### 6.1 Queue (backend)
 
-## 6. Processing rework
+- A queue item is `{action: previews | descriptions, scope: pack | folder | asset list, added_utc}`
+  in `library-store/queue/`. The **scope is resolved when the item starts**: "whatever in
+  Tiny Dungeon still lacks previews".
+- Previews items always run before description items (D9). Otherwise items run in the owner's
+  order (drag to reorder, remove). One GPU job at a time (`gpu_queue`). Renders keep the parallel
+  Blender pool (decision 0022).
+- Each item runs through today's durable operations (`source_operations`, `incremental.process`
+  with `asset_ids`). Results publish progressively. Cancel stops the current item cleanly.
+- **Overnight:** a switch on Up next holds description items until the overnight window, reusing
+  `overnight.py`.
+- After a restart, a leftover queue is **Paused** with Resume. It never resumes by itself.
+- **Estimate:** counts per stage; a time range from the render speed test (`render_devices`,
+  `data/library/rendering.json`) and recent ledger durations; description throughput from recent
+  caption batches; disk from the median store bytes per processed asset of that type; whether the
+  storage budget would be reached. With no history, say "no measurement yet". If only blocked work
+  is in scope, the action is disabled and shows the fix.
 
-### 6.1 Backend: processing runs
+### 6.2 Confirmation (D10)
 
-A **run** is an ordered list of `{source key, asset_ids, stages}` plus `describe: bool`, stored
-centrally at `data/library/runs/<run id>.json`, because one run spans several sources. Execute it
-source by source through the existing durable per-source operations
-(`source_operations.start` / `process_source` / `describe_source`). Those already pass an asset
-subset (`worker_stage(..., only)` and `incremental.process(asset_ids=...)`), so the subset must
-reach every stage, publication included. Publish each source when its part finishes, so results
-appear progressively. One GPU job at a time via `gpu_queue` (unchanged). Cancel stops the current
-source cleanly and marks the rest `not started`. **An interrupted run (app closed) never resumes
-by itself**: it shows as Interrupted with "Process remaining…", which reopens the picker preset to
-the leftovers. `check_budget` storage checks stay.
-
-Estimates (D11), from saved data only:
-- Counts per stage: renders and inspections, descriptions, search vectors.
-- Time range: render throughput from the speed test (`render_devices`, `data/library/rendering.json`)
-  and recent ledger history durations (`jobs.sqlite` `history.updated`); description throughput
-  from recent caption batches. Show low and high bounds. With no history, say "no measurement yet".
-- Disk: median bytes per processed asset of that type, measured in that source's `.assetarium`,
-  falling back to the library-wide median.
-- Blocked stages for the selection are listed with their fix. If only blocked work is selected,
-  Start is disabled.
-
-### 6.2 Picker UI ("Start processing…")
-
-A large sheet or dialog reusing the §5 tree component, with tri-state checkboxes. It shows **only
-nodes with pending work** (processed, failed and blocked items are not checkable; failed work goes
-through Recheck, decision 0020). The default selection is the pending assets whose formats are
-checked in global settings (D5), or the folder or asset the picker was opened from. Per-folder
-and per-root counts update live. The footer shows the estimate (§6.1), the "Also generate
-descriptions" toggle (D8, only when descriptions are on), and a primary button that names the
-amount ("Process 1,240 assets"). Above a size threshold (suggested: estimated time over 1 h or
-projected disk over 5 GiB), one short confirmation restates the time and disk numbers. Unchecked
-items stay pending (D9).
+Under 10 min: starts on a click. 10–30 min: starts, with a toast "Started · ~18 min · Undo" for a
+few seconds. Over 30 min, or when the budget would be reached: a popover with the estimate and
+**Make previews (1,240 models)**.
 
 ### 6.3 Asset processing tab
 
-Replace the per-source cards (`Processing.tsx`) with:
-- **Now:** the active run, with per-source progress and phase, Cancel, and a live log with **copy
-  buttons on errors and warnings** (the open friction item). Errors come from the run and
-  operation records, not only from `logs/gui-worker.log`.
-- **Ready to process:** totals across sources ("1,240 assets pending in 3 sources") and **Start
-  processing…**. Per source: a one-line count that opens the picker preset to that source.
-- **Blocked:** grouped by reason, each with its fix action and the counts it would unblock.
-- **Recorded failures:** grouped by stage and reason, with Copy and Recheck, and a link to show the
-  assets in the Asset sources tree (filtered).
-- **Recent runs:** outcome, counts, duration, log.
-Failures and pending work are **never in one banner** (fixes the known problem).
+**Running** (progress, phase, Cancel, a live log with **copy buttons on errors and warnings**; the
+errors come from run records, not only `logs/gui-worker.log`) · **Up next** (reorder, remove,
+overnight switch) · **Blocked** (grouped by reason, each with its fix and the count it unblocks) ·
+**Recorded failures** (by stage and reason; Copy, Recheck, Show in Asset sources) · **Recent**
+(outcome, counts, duration, log). Pending and failures are never in one banner. The global format
+checkboxes stay in Settings only as the format preference (`incremental.choose_source`) for
+grouped assets.
 
 ## 7. CLI, MCP, docs
 
-- CLI (`owner_commands.py`): remove `sources images`. Make `process` take `--asset-source KEY`
-  (repeatable), `--path REL` (repeatable, folder or file), `--asset ID`, `--descriptions` and
-  `--dry-run` (prints the §6.1 estimate). `sources add` with contained sources asks to absorb
-  interactively. `sources show KEY` lists anchors and states with blocked separated. Update
-  `docs/cli.md`.
-- MCP stays read-only. Source and asset payloads lose `import_types` and `import_formats`. Check
-  the MCP tests and **do not rewrite the hash-bound `docs/mcp/*.json`**: if a contract output
-  changes, raise it at the checkpoint.
-- Docs: `docs/asset-sources.md` (rewrite for the tree, absorb and migration), `docs/gui/README.md`,
-  `CHANGELOG.md` `Unreleased` entries (renamed folder plus migration command, all types always
-  included, the new tab, partial processing). Vault: the [Sources](../../Sources%20and%20Catalog/Sources.md)
-  note, the Catalog contract enrollment section, [decision 0019](../../../Decisions/0019-source-folders-and-export-variants.md)
-  (path name) and the Settings → Asset sources pointers in decisions 0008 and 0021.
-  [Decision 0023](../../../Decisions/0023-assetarium-metadata-folder.md) already records D1–D4,
-  D14 and D15. D5–D13 (types, picker, runs, the new tab) get their own decision record, which
-  the owner approves at the phase 4 or 5 checkpoint.
+- **CLI** (`owner_commands.py`):
+  - `library add|remove|list` replaces `sources add|remove`; `sources images` goes away.
+  - `packs list|rename|merge|split`.
+  - `previews PATH|--pack|--asset [--dry-run]` and `describe …` add to the queue. `queue
+    list|move|remove|pause|resume`.
+  - `forget-missing --pack`.
+  - Keep the 0019 and 0021 commands, re-scoped to packs and folders.
+  - Update `docs/cli.md`.
+- **MCP** stays read only. Payloads gain `pack` and lose `import_types` and `import_formats`. Do
+  not rewrite the hash-bound `docs/mcp/*.json`: raise any contract change at the checkpoint.
+- **Docs:** rewrite `docs/asset-sources.md` (library folders, packs, migration). Update
+  `docs/gui/README.md` and add `CHANGELOG.md` `Unreleased` entries. In the vault, update Sources,
+  the Sources and Catalog hub, Stage ledger and fingerprints, Storage discipline and the Catalog
+  contract enrollment section, and add "folder replaced by decision 0023" notes to decisions 0006,
+  0019 and 0021.
+- **Roadmap step 4** is rewritten after delivery (D15).
 
-## 8. Phases (one PR each into `develop`, `feature/<name>` branches)
+## 8. Phases (one PR each into `develop`)
 
 | Phase | Content | Done when |
 | --- | --- | --- |
-| 1 Backend model | §3.5 name removal (constants, Blender worker edit with `EQUIVALENT_WORKERS` proof, `test_metadata_name.py`), `.assetarium` for new sources, Locate folder… relink (`sources.relink`, bridge and CLI), schema 2, D5 (remove import types and formats, pending counts all types), `blocked` state, pack anchors (walker, resolver, owners) and `sources.absorb` | Tests: an absorbed fixture keeps asset IDs, **inspection and caption fingerprints are unchanged (no re-queue)**, collections still resolve, cross-anchor dependency resolves, collisions are refused, a crash mid-absorb resumes from the journal; Kenney-like fixture shows `blocked`; `check-render-stability.py` proves identical CPU renders for the worker edit and nothing re-queues; `test_metadata_name.py` passes; relink refuses a folder whose `id` differs. Full suite green, with the real-Blender line reported. |
-| 2 Migration | `scripts/migrate-metadata-folders.py` (§4) | Synthetic fixtures: a nested tree, a KayKit-style `import_formats` fixture, a schema 1 folder with no images, a conflict (both folders), a moved source relinked by `id` (and a duplicated `id` refused), a rerun refused, a partial-fault group, links refused. Dry-run on the owner's real library reviewed by the owner **before** `--apply`. Storage receipts before and after. |
-| 3 Tree API | Bridge `source_tree(key, folder, filters)` (lazy per folder, from saved inventory, precomputed roll-ups), `source_roots(sort, filters)`, state and overlay fields | Response bounded for 50k-file roots (time it in a test). |
-| 4 Asset sources page | §5 UI, the new rail item, Settings tab and SourceBrowser removed, `npm run build` | `scripts/verify-asset-sources.py --run-name …` (WebView2): tree, filters, sort, context menus, double-click reveal, add, absorb, exclude. Existing verify scripts are updated (`verify-source-folders.py`, `verify-image-browser.py`, `verify-show-in-explorer.py` and others that open Settings → Asset sources) and still pass. `test_ui_encoding.py` passes. |
-| 5 Processing runs | §6 backend, picker, Processing tab | Tests: subset processing touches only the selected assets, multi-source ordering, cancel, interrupted run never resumes alone, estimate with and without history, blocked-only selection disables Start. `scripts/verify-processing-picker.py`. |
-| 6 CLI, docs | §7 | Docs and CHANGELOG updated; `local-assets` help matches. |
+| 1 Input-keyed results | §3.2 new keys, re-key routine, worker output-root edit with the `EQUIVALENT_WORKERS` proof, store resolver behind `generated_path` | On a **copy** of the owner's library: the pending count is unchanged after re-keying, nothing re-renders, duplicates share results; `check-render-stability.py` receipt; full suite green with the real-Blender line |
+| 2 Recognition and store | §3.1, §3.3, library folders replace the source registry, Missing/Offline, `test_metadata_name.py` | Tests for move, duplicate, edit, vanish and a contained-folder add (IDs, overlays and collections kept); budget measures the store |
+| 3 Migration | §4 | Synthetic fixtures: nested old sources, a moved source relinked by `id`, a duplicate `id` refused, `import_formats`, images off, a rerun refused, a fault isolated, links refused, cleanup refused before verification. The owner reviews the dry run on the real library before `--apply`. Storage receipts before and after |
+| 4 Packs and classification | §3.4, §3.5, pack overrides, settings moved to packs and folders | Fixtures shaped like Kenney All-in-1, KayKit and CCMP; texture classifier tests per layer (glTF, OBJ, FBX references, no-model pack, names, pixels) |
+| 5 Asset sources tab | §5, shared grid, Show in pack, Settings tab and SourceBrowser removed, `npm run build` | `scripts/verify-asset-sources.py --run-name …` (WebView2); existing verify scripts updated (`verify-source-folders`, `verify-image-browser`, `verify-show-in-explorer`, …) and passing; `test_ui_encoding.py` |
+| 6 Queue and Processing tab | §6 | Tests: scope resolved at start, previews before descriptions, overnight hold, paused after a restart, thresholds, blocked-only scope disabled, estimate with and without history; `scripts/verify-processing-queue.py` |
+| 7 CLI and docs | §7, ASSETRM-0003 if not done yet | Help and docs match; CHANGELOG |
 
-Phases 1→2 and 1→3→4 are ordered. Phase 5 needs phases 1 and 3 (it reuses the tree); phase 6
-can trail.
+Phase 1 is first because it is the riskiest. Order: 1 → 2 → 3, then 4, 5 (needs 4) and 6 (needs
+2), then 7.
 
-## 9. Risks and open points for the checkpoint
+## 9. Risks and open points
 
-- **Anchors are the riskiest part.** Any code path that assumes "first path segment = the
-  registered source" breaks silently for absorbed assets. Mitigation: route all disk access
-  through one resolver, and add a test that walks every record's files of an absorbed fixture
-  through the real inspection, preview, reveal, export and dependency paths.
-- The Blender worker edit (§3.5) re-queues **every inspection in every source** if its
-  equivalence is not proven and registered. Land it alone in its own commit with the stability
-  receipt, and check on a real source that the pending count stays at 0.
-- Moving result directories must never overwrite. An asset ID collision stops that child.
-- Tree performance on huge roots: virtualize, load lazily per folder, precompute roll-ups.
-- Pending counts rise after D5 (images and dropped formats now enroll). The migration dry run
-  states this per source, so it is no surprise.
-- Questions still open for the owner (ask at the relevant phase's checkpoint): multi-select in the
-  tree (Ctrl or Shift for bulk Add to collection or Exclude); a name filter box; whether a single
-  click on a non-asset file (README) shows a text preview; whether enable/disable of a whole source
-  is still wanted now that the picker controls processing.
+- **Re-keying correctness** (§3.2): a wrong key silently re-queues thousands of renders and
+  descriptions, or worse, attaches results to the wrong file. Prove it on a copy of the library;
+  compare per-asset result sets before and after; refuse to apply if any count differs.
+- **Recognition mistakes:** two different files with the same content are a duplicate by
+  definition, which is fine. Moved and edited at once becomes a new asset plus a Missing one, which
+  is acceptable and recoverable with Forget missing.
+- **Store size on the project drive:** the store can be pointed at another drive with
+  `[storage].library`; the budget warns before a job would exceed it.
+- **Classification errors** flood or hide images. The pack prior and model references cover most
+  cases; folder answers fix the rest. Report the counts per kind after a scan, so surprises show.
+- **Tree and grid scale:** Kenney-sized libraries have tens of thousands of files. Precompute
+  roll-ups and coverage at scan and publish time; virtualize both panes.
+- **Open for the owner at phase checkpoints:**
+  - The pack-cover fallback when a pack ships no preview image.
+  - Whether "+N new" resets on visit or on processing.
+  - Whether the 10-minute and 30-minute thresholds should be settings.
