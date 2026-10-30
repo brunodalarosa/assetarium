@@ -33,3 +33,4 @@ ask the owner first, then update the file (do not silently contradict it).
 | [0020](0020-alternate-file-faults-and-recheck.md) | A broken alternate file fails alone; owner-confirmed recheck of check failures (app and CLI) | 2026-10-26 |
 | [0021](0021-texture-folder-choice.md) | Owner-chosen texture folder per source for models whose textures were not found (exact names, all or nothing) | 2026-10-26 |
 | [0022](0022-parallel-rendering.md) | Parallel kept-open Blender renders on the CPU or a GPU; speed test picks device and count; owner limits never slower; proven-equivalent worker edits keep fingerprints | 2026-10-26 |
+| [0023](0023-assetarium-metadata-folder.md) | Hidden `.assetarium` metadata folder per source (was `metadata-lal`), one name constant, one-time migration with move relinking, absorbing sources through pack anchors | 2026-10-30 |

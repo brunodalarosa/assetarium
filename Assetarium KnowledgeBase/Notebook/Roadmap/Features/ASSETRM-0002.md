@@ -2,10 +2,13 @@
 tags: [roadmap]
 id: ASSETRM-0002
 type: feature
-status: open
+status: planned
 created: 2026-10-29
 ---
 # ASSETRM-0002
+
+**Brainstorm done (2026-10-30):** the agreed design and phased implementation handoff is
+[ASSETRM-0002 plan](ASSETRM-0002%20plan.md).
 
 Brainstorm a rework of the Asset Source management implementation.
 
