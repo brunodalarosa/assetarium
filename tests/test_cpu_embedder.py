@@ -93,7 +93,7 @@ def test_line_ending_tolerance_follows_the_contracts_own_hashed_files(config):
 
 def fake_runtime(config, torch_version):
     python = venv_python(config.project_root, '.venv-embedding')
-    python.parent.mkdir(parents=True)
+    python.parent.mkdir(parents=True, exist_ok=True)
     python.write_bytes(b'')
     site = config.project_root / '.venv-embedding/Lib/site-packages'
     for name, version in (('torch', torch_version), ('sentence_transformers', '6.1.0')):
@@ -115,6 +115,39 @@ def test_search_readiness_follows_the_device(config):
     assert {i['id']: i for i in engines.search_readiness(config, no_gpu, 'cpu')}['embedding_runtime']['ready']
     mismatch = {i['id']: i for i in engines.search_readiness(config, no_gpu, 'cuda')}['embedding_runtime']
     assert not mismatch['ready'] and 'CPU-only' in mismatch['detail'] and 'runtime/embedding ' in mismatch['command'] + ' '
+
+
+def test_incomplete_search_runtime_names_its_fix_and_is_not_retained(config):
+    import asyncio
+    from local_asset_library.mcp_assets import TransientFault
+    from local_asset_library.mcp_server import Gateway
+    python = venv_python(config.project_root, '.venv-embedding')
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b'')
+    # What a wrapper sync without --project leaves behind: the base project, no torch or sentence-transformers.
+    info = config.project_root / '.venv-embedding/Lib/site-packages/numpy-2.3.4.dist-info'
+    info.mkdir(parents=True)
+    (info / 'METADATA').write_text('Metadata-Version: 2.1\nName: numpy\nVersion: 2.3.4\n', encoding='utf-8')
+    gateway = Gateway(config)
+    async def search():
+        with pytest.raises(TransientFault, match='sync --locked --project runtime/embedding$') as fault:
+            await gateway.embed({'op': 'text', 'text': 'x', 'role': 'query'})
+        assert 'missing torch, sentence-transformers' in str(fault.value)
+        assert gateway.worker is None and gateway.worker_fault is None  # The next search tries again.
+        await gateway.close()
+    asyncio.run(search())
+    save_general_settings(config, 8, None, None, None, None, None, 'cpu')
+    assert engines.search_runtime_fault(config).endswith('--project runtime/embedding-cpu')  # The saved device's lock.
+    fake_runtime(config, '2.10.0+cpu')
+    assert engines.search_runtime_fault(config) is None
+
+
+def test_runtime_wrappers_refuse_project_commands_without_a_project():
+    import subprocess
+    from local_asset_library.config import runtime_command
+    for runtime in ('mcp', 'caption', 'embedding'):
+        result = subprocess.run([*runtime_command(ROOT, runtime), 'sync', '--locked'], capture_output=True, text=True, timeout=60)
+        assert result.returncode == 2 and '--project runtime/' + runtime in result.stderr
 
 
 def test_capability_receipt_must_match_the_device(config):

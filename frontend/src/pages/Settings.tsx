@@ -12,11 +12,12 @@ import {
   searchTestText, searchThreadsText, setupRecordText, sourceMessage, SPEED_TEST_HELP,
 } from "../app/format";
 import {
-  cancelBlenderCheck, checkBlenderInstallation, chooseBlenderInstallation, chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, renderTest, saveBlenderInstallation, saveGeneralSettings, saveRenderSettings, setAppearance, type SettingsTab,
+  cancelBlenderCheck, checkBlenderInstallation, checkSearchReadiness, chooseBlenderInstallation, chooseSourceDirectory, confirmRemoveSource, navigate, openAgentSetupFromSettings, openProcessing, openSetup, renderTest, saveBlenderInstallation, saveGeneralSettings, saveRenderSettings, setAppearance, type SettingsTab,
   sourceAction, sourceFolders, updateBlenderInstallation, useApp,
 } from "../app/store";
 import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { Skeleton, SkeletonLines } from "../ui/Loading";
+import { ReadinessList } from "../ui/Readiness";
 import { BlenderChecks, BlenderPicker } from "../ui/BlenderPicker";
 import { Badge, Banner, Button, Card, RadioCards, SelectField, Spinner, TextField } from "../ui/primitives";
 
@@ -228,6 +229,24 @@ function SpeedTest() {
   );
 }
 
+/** What the chosen search device needs installed; a missing runtime is why search cannot start. */
+function SearchReadiness({ device }: { device: string }) {
+  const check = useApp((s) => s.searchCheck);
+  useEffect(() => {
+    if (!check.devices && !check.checking && !check.error) void checkSearchReadiness();
+  }, []);
+  return (
+    <div id="search-readiness-card" className="grid gap-3">
+      <p className="font-medium text-[12.5px]">What is installed</p>
+      {check.error ? <Banner tone="fault">{check.error}</Banner> : <ReadinessList id="search-readiness" items={check.checking ? undefined : check.devices?.[device]} />}
+      <div className="flex flex-wrap items-center gap-4">
+        <Button type="button" variant="secondary" id="search-readiness-check" disabled={check.checking} onClick={() => void checkSearchReadiness()}>Check again</Button>
+        <p className="hint text-[12.5px] leading-relaxed text-muted-foreground">Run a missing command in a terminal in the Assetarium folder, then check again.</p>
+      </div>
+    </div>
+  );
+}
+
 function General() {
   const general = useApp((s) => s.general);
   const render = useApp((s) => s.render.values);
@@ -309,6 +328,7 @@ function General() {
         )}
         <Card id="search-card" title="Search" help={SEARCH_HELP}>
           <SearchDeviceField value={device} onChange={setDevice} devices={devices} disabled={disabled} idPrefix="settings" />
+          <SearchReadiness device={device} />
           {device === "cpu" && search && (
             <div id="search-threads-field" className="grid gap-2">
               <SelectField id="search-threads" label="CPU threads for search data" value={threads} onChange={setThreads} disabled={disabled} className="w-64"

@@ -144,7 +144,9 @@ progress through a final verification scan; **Cancel** finishes and saves the
 renders already running first (several run at once, decision 0022). **Settings → General →
 Rendering** says what renders now and why ("Now: AMD Radeon RX 6800 (HIP), 2 renders at a time
 (fastest in the speed test)") and offers the render device, renders at a time and memory for
-rendering (saved with the form; empty memory is automatic). When search runs on the CPU, the
+rendering (saved with the form; empty memory is automatic). The **Search** card lists **What is
+installed** for the chosen device (GPU, search runtime, model weights, search check), with a copyable
+command for anything missing and **Check again**; it installs nothing. When search runs on the CPU, the
 **Search** card adds **CPU threads for search data** (Automatic = the speed test's choice, or 1 to
 every logical thread) with "Now: 24 of 32 threads (…)". Both cards link to the **Speed test** card,
 which shows when the test last ran, one line per tested render device, the search-data line (each

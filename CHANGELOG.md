@@ -41,6 +41,9 @@ All notable changes to Assetarium are listed here. The project follows
   the file check and, after you confirm, retries failures that came from it and pass it now.
 - `scripts/record-embedding-capability.py`, the one-time search check on two of your own
   processed assets. Setup lists it, and Process assets names it when it is missing.
+- **Settings → General → Search** lists what search needs on the chosen device (GPU, search
+  runtime, model weights, search check) with the command for anything missing, and **Check again**.
+  `local-assets setup status` lists search on its own, whichever description engine you use.
 
 ### Changed
 
@@ -71,6 +74,13 @@ All notable changes to Assetarium are listed here. The project follows
   description are now kept with a review note instead of failing it. The 35 descriptions an
   earlier run rejected this way were accepted from their saved output without running the
   model again.
+- Search no longer fails with "Embedding worker exited without result" when the search runtime is
+  incomplete. It names the missing packages and the command that installs them, starts no worker,
+  and works on the next search once the runtime is installed. A worker that exits names its exit
+  code and log file, and a kept worker fault says to restart Assetarium.
+- The runtime wrappers (`mcp-runtime`, `caption-runtime`, `embedding-runtime`, `.ps1` and `.sh`)
+  refuse `sync`, `run` and other project commands without `--project`. Without it uv installed the
+  base project into the runtime's environment and removed the runtime's own packages.
 - The setup wizard now saves the Blender it found when none was saved yet. It used to treat a
   discovered Blender as already in use and write nothing, so a fresh install had no saved Blender
   and the speed test stayed blocked ("Set up Blender to test render speed"). The speed test also

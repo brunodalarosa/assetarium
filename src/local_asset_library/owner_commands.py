@@ -400,8 +400,15 @@ def show_checks(args, result):
                'failed': 'Blender cannot be used.', 'cancelled': 'Check cancelled.'}[result['status']])
 
 
+def checklist(args, items, indent='  '):
+    for item in items:
+        say(args, f"{indent}[{'ok  ' if item['ready'] else 'miss'}] {item['label']}"
+                  + (f"\n{indent}       {item['command']}" if item.get('command') else '')
+                  + (f" — {item['detail']}" if item.get('detail') and not item['ready'] else ''))
+
+
 def status_lines(args, config):
-    from . import setup_core
+    from . import engines, setup_core
     env = setup_core.environment_report(config)
     blender = setup_core.blender_report(config)
     gpu = env['gpu']
@@ -412,10 +419,11 @@ def status_lines(args, config):
               + (f" ({blender['candidates'][0]['origin']})" if blender['candidates'] else ''))
     for key, value in env['engines'].items():
         say(args, f"Engine {key}:")
-        for item in value['items'] + (value['search'] if key == 'builtin' else []):
-            say(args, f"  [{'ok  ' if item['ready'] else 'miss'}] {item['label']}"
-                      + (f"\n         {item['command']}" if item.get('command') else '')
-                      + (f" — {item['detail']}" if item.get('detail') and not item['ready'] else ''))
+        checklist(args, value['items'])
+    # Search is needed whichever description engine is used, so it is listed on its own.
+    device = engines.search_device(config)
+    say(args, f"Search on {engines.SEARCH_DEVICES[device]['label']}:")
+    checklist(args, env['search_devices'][device])
     return {'status': 'ready', 'environment': env, 'blender': blender}
 
 
@@ -486,6 +494,9 @@ def wizard(args, config):
               'slower to index, same results).' + ('' if nvidia else ' No NVIDIA GPU with BF16 was found, so cpu is suggested.'))
     choices['search_device'] = ask('Search device (cuda/cpu)', current['search_device'] if nvidia or current['search_device'] == 'cpu'
                                    else 'cpu').lower()
+    if choices['search_device'] in status['environment']['search_devices']:
+        say(args, '   What search needs on this device (setup installs nothing; run a missing command yourself):')
+        checklist(args, status['environment']['search_devices'][choices['search_device']], '   ')
     say(args, '\nReview:\n' + json.dumps({k: v for k, v in choices.items() if k != 'confirm_rerender'}, indent=2, ensure_ascii=False))
     if ask('Save these choices? (yes/no)', 'yes').lower() != 'yes':
         say(args, 'Nothing was saved.')

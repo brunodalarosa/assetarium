@@ -41,6 +41,10 @@ environments that share one hard-linked cache. Always go through the wrappers in
 
 - The owner CLI runs from `.venv-mcp` (`scripts/local-assets.ps1` / `.sh`), not the base `.venv`.
 - A local-server description run uses `.venv-mcp`, so AMD and other GPUs need no caption runtime.
+- Without `--project`, uv uses the base `pyproject.toml`, and an exact sync replaces the runtime's
+  packages with the base project's. So the runtime wrappers refuse `sync`/`run`/`lock`/`add`/`remove`/
+  `tree`/`export` without it (exit 2). `uv.ps1`/`uv.sh` are for the base project and have no guard.
+  The search gateway checks `engines.search_runtime_fault` before it starts the worker.
 
 ## Related
 

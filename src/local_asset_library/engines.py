@@ -178,6 +178,16 @@ def readiness(config, engine_id, gpu=None):
     return {'engine': engine_id, 'items': items, 'search': search_readiness(config, gpu)}
 
 
+def search_runtime_fault(config):
+    """Why the saved search device's runtime cannot start, with the command that installs it; None when ready."""
+    item = next(i for i in search_readiness(config) if i['id'] == 'embedding_runtime')
+    if item['ready']:
+        return None
+    runtime = runtime_ready(config, 'embedding')
+    reason = item['detail'] or 'missing ' + ', '.join(runtime['missing_packages'])
+    return f"The search runtime ({runtime['environment']}) is not installed correctly: {reason}. Install it with: {item['command']}"
+
+
 def capability_ready(config, device):
     """The recorded text/image capability check matches the chosen device (static read; the contract is re-checked at use)."""
     try:

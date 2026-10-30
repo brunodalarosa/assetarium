@@ -1,6 +1,7 @@
 """SDK-based STDIO transport with isolated embedding worker and local evidence."""
 import asyncio
 import base64
+import contextlib
 from datetime import datetime, timezone
 import json
 import os
@@ -158,12 +159,18 @@ class Gateway:
         if self.closing:
             raise ConfigError('Gateway is closing; no new worker can start')
         if self.worker_fault:
-            raise ConfigError('Embedding worker fault retained; explicit retry required: ' + self.worker_fault)
+            raise ConfigError('Search stopped after an embedding worker fault (restart Assetarium to try again): ' + self.worker_fault)
         if self.worker and self.worker.returncode is None:
             return
         executable = venv_python(self.config.project_root, '.venv-embedding')
         if not executable.is_file():
             raise ConfigError('Verified embedding runtime executable missing')
+        # A metadata check, so an incomplete runtime is named with its fix instead of a worker crash.
+        # Not retained as a worker fault: the next search after the install starts the worker.
+        from .engines import search_runtime_fault
+        fault = search_runtime_fault(self.config)
+        if fault:
+            raise ConfigError(fault)
         env = os.environ.copy()
         env.update(PYTHONPATH=str(self.config.project_root / 'src'), PYTHONIOENCODING='utf-8',
             HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1',
@@ -234,7 +241,11 @@ class Gateway:
                             raise ConfigError('Embedding worker stopped responding (no heartbeat for '
                                               f'{WORKER_SILENCE_SECONDS} s)')
                 if message is None:
-                    raise ConfigError('Embedding worker exited without result')
+                    with contextlib.suppress(asyncio.TimeoutError):
+                        await asyncio.wait_for(self.worker.wait(), 5)
+                    log = getattr(self.diagnostic_stream, 'name', '')
+                    raise ConfigError(f'Embedding worker exited without result (exit code {self.worker.returncode})'
+                                      + (f'; its output is in {log}' if os.path.isabs(str(log)) else ''))
             except Exception as exc:
                 self.worker_fault = str(exc) or type(exc).__name__
                 self.worker_phase = 'faulty'
@@ -253,7 +264,7 @@ class Gateway:
         if batch_requested(self.config):
             raise ConfigError('Inference queue busy with an owned batch; browse/keyword/detail remain available.')
         if self.worker_fault:
-            raise ConfigError('Embedding worker fault retained; explicit retry required: ' + self.worker_fault)
+            raise ConfigError('Search stopped after an embedding worker fault (restart Assetarium to try again): ' + self.worker_fault)
         self.loop = asyncio.get_running_loop()
         payload, image, evidence = await asyncio.to_thread(self.service.execute, name, args)
         return {'payload': payload, 'image': image, 'evidence': evidence, 'is_error': False}

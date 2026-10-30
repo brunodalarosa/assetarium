@@ -229,6 +229,8 @@ export interface AppState {
   /** Rendering (decision 0022): device, renders at a time, memory and the speed test. */
   render: { loading: boolean; busy: boolean; message: string; values: Json | null };
   setup: SetupState;
+  /** Settings → General → Search: the installed-runtime checklist per search device (read only). */
+  searchCheck: { checking: boolean; devices: Json | null; error: string | null };
   /** Settings → General → Blender installation: its own choice and check, saved on its own. */
   blender: BlenderState;
   appearance: string;
@@ -277,6 +279,7 @@ let state: AppState = {
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
   setup: emptySetup(),
+  searchCheck: { checking: false, devices: null, error: null },
   blender: emptyBlender(),
   appearance: boot.appearance, runReport: null, imageBackground: "checker", coverage: "",
   worker: "not_started", previews: 0,
@@ -925,6 +928,16 @@ function savedDraft(info: Json): SetupDraft {
     searchDevice: values.search_device || "cuda",
     batch: String(values.caption_batch_size ?? 8),
   };
+}
+/** Reads what is installed for each search device; never installs or starts the model. */
+export async function checkSearchReadiness() {
+  setState((s) => ({ searchCheck: { ...s.searchCheck, checking: true, error: null } }));
+  try {
+    const env = await api().setup_environment();
+    setState({ searchCheck: env.status === "faulty" ? { checking: false, devices: null, error: env.reason } : { checking: false, devices: env.search_devices, error: null } });
+  } catch (error) {
+    setState({ searchCheck: { checking: false, devices: null, error: (error as Error).message } });
+  }
 }
 export async function openSetup() {
   setNotificationsOpen(false);
