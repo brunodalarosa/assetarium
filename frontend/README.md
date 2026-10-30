@@ -30,8 +30,8 @@ Commit `src/local_asset_library/ui/build/` with every source change; the encodin
 - `src/app/api.ts`, `src/app/format.ts`: bridge types and presentation helpers.
 - `src/ui/`: shell (rail, top bar), search and filters, asset grid, inspection
   sidebar, image viewer, notifications, toasts and run reports.
-- `src/pages/`: Home, Collections and a collection, Asset processing, Settings,
-  source browser, the Library placeholder. `src/ui/Menus.tsx` holds the shared
+- `src/pages/`: Home, Collections and a collection, Asset sources (`FolderTree`, `FolderPanel`
+  in `src/ui/`), Asset processing (the queue), Settings, the Library placeholder. `src/ui/Menus.tsx` holds the shared
   right-click menu (beUI context menu) with its collection flyout, the red
   deletion confirmation, the new-collection dialog and the batch-selection bar.
 - `src/components/beui/`, `src/lib/`: [beUI](https://beui.dev) components and

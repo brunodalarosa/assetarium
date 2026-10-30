@@ -3,7 +3,7 @@
 Recorded failures are never retried on their own. A recheck lists, per source, the failed stage jobs
 whose recorded reason was the pre-stage file/dependency check (``retrieval.source_check``) and runs
 that check again, read only. Releasing them needs an explicit owner action and the preview it saw:
-each released job keeps its earlier evidence and becomes pending, so the next Process assets tries
+each released job keeps its earlier evidence and becomes pending, so the next Make previews tries
 it once. Failures from Blender, rendering or models are never released here.
 """
 import json
@@ -90,4 +90,4 @@ def release(config, key, preview_id):
         held.__exit__(None, None, None)
     return {"status": "released", "source": source["key"], "retried": len(ready),
             "reason": f"{len(ready):,} {'asset is' if len(ready) == 1 else 'assets are'} ready to process again; "
-                      "Process assets tries each once. Other recorded failures are unchanged."}
+                      "Make previews tries each once. Other recorded failures are unchanged."}

@@ -33,7 +33,7 @@ def dependency_file(config, item):
     source = get_source(config, consumer_key)
     provider = get_source(config, target.split('/', 1)[0])
     if not provider['enabled']:
-        raise ConfigError('Shared dependency source is disabled; enable it in Asset sources')
+        raise ConfigError('The library folder that holds this texture is not included in search; include it on the Asset sources tab')
     if (provider['id'] != evidence.get('provider_id') or provider['key'] == consumer_key
             or item.get('sha256') != evidence.get('sha256')):
         raise ConfigError('Shared dependency provider identity or hash changed')

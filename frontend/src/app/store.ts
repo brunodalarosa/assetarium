@@ -1092,7 +1092,7 @@ export async function saveGeneralSettings(budget: string, formats: string[], bat
     const described = !result.descriptions_enabled ? " Descriptions are off; existing descriptions are kept."
       : result.description_engine === "local-server" ? " Descriptions use the local model server." : ` Description batch size: ${result.caption_batch_size}.`;
     const searched = previousDevice && previousDevice !== result.search_device
-      ? ` Search now runs on the ${result.search_device === "cpu" ? "CPU" : "NVIDIA GPU"}: run the search check again, then Process assets to rebuild search data.` : "";
+      ? ` Search now runs on the ${result.search_device === "cpu" ? "CPU" : "NVIDIA GPU"}: run the search check again, then Make previews to rebuild search data.` : "";
     setState({
       general: {
         loading: false, busy: false, values: result,
@@ -1307,7 +1307,7 @@ export async function saveBlenderInstallation() {
   const result = await api().save_blender(path, confirmRerender);
   if (result.status === "faulty") return patchBlender({ saving: false, message: result.reason });
   patchBlender({ saving: false, editing: false, check: null, confirmRerender: false });
-  pushToast({ tone: "success", title: "Blender saved", body: result.status === "saved" ? `Saved to ${result.file}. Process assets and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
+  pushToast({ tone: "success", title: "Blender saved", body: result.status === "saved" ? `Saved to ${result.file}. Make previews and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
   await Promise.all([loadBlenderInstallation(), loadRenderSettings(), loadSetupState().catch(() => undefined)]);
 }
 export async function measureSetupStorage() {
@@ -1416,7 +1416,7 @@ export async function decideProposal(proposal: Json, decision: "apply" | "reject
   patchSetup({ agentBusy: null });
   if (result.status === "faulty") pushToast({ tone: "fault", title: "Proposal not decided", body: result.reason });
   else if (result.status === "applied")
-    pushToast({ tone: "success", title: "Blender applied", body: result.blender?.status === "saved" ? `Saved to ${result.blender.file}. Process assets and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
+    pushToast({ tone: "success", title: "Blender applied", body: result.blender?.status === "saved" ? `Saved to ${result.blender.file}. Make previews and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
   else if (result.status === "failed") pushToast({ tone: "fault", title: "Blender not applied", body: `${result.proposal.reason}. Ask your agent to check it again.` });
   else pushToast({ tone: "info", title: "Proposal rejected", body: "Nothing was saved. Your agent sees that you rejected it." });
   await Promise.all([loadAgentSetup(), loadSetupState(), loadRenderSettings(), loadBlenderInstallation()]);
@@ -1875,7 +1875,7 @@ export async function recheckFailures(source: Json) {
     askConfirm({
       tone: "neutral",
       title: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}?`,
-      body: `${count} ${found.retry === 1 ? "asset" : "assets"} in “${source.name}” failed only because a file ${found.retry === 1 ? "it is" : "they are"} not rendered from had a problem (for example ${found.examples.slice(0, 3).join(", ")}). ${found.retry === 1 ? "It" : "They"} can be processed now.${still} Retrying marks them pending; nothing runs until you click Process assets. Other recorded failures stay as they are.`,
+      body: `${count} ${found.retry === 1 ? "asset" : "assets"} in “${source.name}” failed only because a file ${found.retry === 1 ? "it is" : "they are"} not rendered from had a problem (for example ${found.examples.slice(0, 3).join(", ")}). ${found.retry === 1 ? "It" : "They"} can be processed now.${still} Retrying marks them pending; nothing runs until you click Make previews. Other recorded failures stay as they are.`,
       confirmLabel: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}`,
       run: async () => {
         const result = await api().retry_failures(source.key, found.preview_id);

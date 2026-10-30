@@ -137,34 +137,43 @@ also appear as a toast with the same actions for 8 s (paused while hovered or
 focused). The bell shows a dot for unread notices or a running job. Escape or a
 click outside closes the panel and marks its notices read.
 
-**Asset processing** lists every source with its import state and optional
-descriptions. **Process assets** (offered only when there is pending work or a
-scan fault) runs inspection/previews and search vectors, then publishes, with
-progress through a final verification scan; **Cancel** finishes and saves the
-renders already running first (several run at once, decision 0022). **Settings → General →
-Rendering** says what renders now and why ("Now: AMD Radeon RX 6800 (HIP), 2 renders at a time
-(fastest in the speed test)") and offers the render device, renders at a time and memory for
-rendering (saved with the form; empty memory is automatic). The **Search** card lists **What is
-installed** for the chosen device (GPU, search runtime, model weights, search check), with a copyable
-command for anything missing and **Check again**; it installs nothing. When search runs on the CPU, the
-**Search** card adds **CPU threads for search data** (Automatic = the speed test's choice, or 1 to
-every logical thread) with "Now: 24 of 32 threads (…)". Both cards link to the **Speed test** card,
-which shows when the test last ran, one line per tested render device, the search-data line (each
-tested thread count's seconds per test image and the count chosen, or why it is not tested), and
-**Test speed** / **Test again** and **Cancel test** with the test's phase. **Generate descriptions** runs the optional describe
-operation per source with progress and **Cancel** (decision 0008); disabled
-buttons say why. Run reports open as a dialog; a GPU-memory stop suggests lowering
-**Settings → General → Description batch size** (1, 2, 4 or 8; default 8)
-before **Continue**. When descriptions are turned off, each source says so (existing
-descriptions stay stored and searchable) and offers **Open Settings → General**
-instead of **Generate descriptions**; report notices drop **Continue**. The page also
-shows the published library (coverage,
-catalog/index versions, **Refresh published view**) and the **Importing failures
-report**, a list of original asset paths with recorded failures, kept separate
-from pending work. A source with recorded failures offers **Recheck failures**: it reruns the
-file/dependency check, read only, and a dialog offers **Retry N assets** for failures that came
-from that check and pass it now (or **Nothing to retry** with Close); retried assets become pending
-for the next **Process assets** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)).
+**Asset sources** (the folder icon above Settings; [decision 0023](../../Assetarium%20KnowledgeBase/Decisions/0023-central-asset-library.md))
+browses by place: a tree of library folders, bundles, packs and folders (folders only; coverage bars,
+**+N new** since your last visit, **Offline** labels, excluded folders faded with **Include again**), the
+same cards and inspection as Home for the selected folder or pack, and the folder's other files listed
+last, faded. Cards show one work state (No previews yet, Queued, Making previews, Ready, Blocked, Recorded
+failure, Missing) and overlays as labeled icons; "no previews yet" is a designed card, and 2D images show
+their original file before any processing. A pack header shows the cover, license and counts with the one
+action its state calls for (**312 without previews · Make previews**). Clicking a folder, pack or library
+folder shows its panel in inspection: Make this a pack, Merge into parent pack, Rename, Treat images here as
+textures / 2D assets, Exclude folder, Show in Explorer, Copy path, and for a library folder the search
+switch, **Rescan**, **Remove…**, **Forget missing**, duplicate-export answers, **Textures not found**
+([decision 0021](../../Assetarium%20KnowledgeBase/Decisions/0021-texture-folder-choice.md)) and excluded folders
+([decision 0019](../../Assetarium%20KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)). Double-click
+shows any file or folder in Explorer; Ctrl/Shift-click picks cards; right-click menus offer only what can
+resolve the shown state. The header sorts the tree and filters by type and status. **Add library folder**
+refuses a folder inside a library folder (**Show it**) and replaces library folders inside a new one. The
+rail dot means you must act (a folder offline, an answer to give, files missing, the one-time migration).
+Search results gain **Show in pack**. See [asset sources](../asset-sources.md).
+
+**Asset processing** is the queue. **Make previews** and **Generate descriptions** (from the Asset sources
+tab) start at once or wait in **Up next**; previews always go first, items can be moved or removed, and
+**Hold descriptions for overnight** keeps descriptions waiting for the window. Jobs under 10 minutes start on
+the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones ask first with the estimate.
+Work left over when the app closed shows **Paused** with **Resume**. **Running** shows progress, **Cancel**
+(the running renders finish and are saved first; decision 0022) and a live log with copy buttons on errors
+and warnings. **Blocked** groups work that can't run here by reason, with the fix and how many assets it
+unblocks; it is never offered as something to process. **Recorded failures** groups faults by stage and
+reason with **Copy**, **Recheck…** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md))
+and **Show in Asset sources**; **Recent** lists finished jobs with their outcome and duration. The page also
+shows the published library (coverage, catalog/index versions, **Refresh published view**). **Settings →
+General → Rendering** says what renders now and why and offers the render device, renders at a time and
+memory for rendering. The **Search** card lists **What is installed** for the chosen device, with a copyable
+command for anything missing and **Check again**; it installs nothing. The **Speed test** card shows the
+last test per device, the search-data line, and **Test speed** / **Test again** / **Cancel test**. Run
+reports open as a dialog; a GPU-memory stop suggests lowering **Settings → General → Description batch
+size** (1, 2, 4 or 8; default 8) before **Continue**. When descriptions are turned off, nothing offers
+Generate descriptions (existing descriptions stay stored and searchable).
 
 **Setup** ([decision 0014](../../Assetarium%20KnowledgeBase/Decisions/0014-setup-wizard.md)). A full-window
 overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions and
@@ -218,22 +227,11 @@ Blender…** open the wizard's Blender picker with **Save Blender**, the re-rend
 **Keep the saved Blender**; the picker is open by itself while no usable Blender is saved), the storage budget (with the exact
 definition of what it counts), formats to process, **Descriptions** (on/off and the
 engine, with the local server's address, model and **Test connection**) and the
-description batch size (built-in engine only). *Asset
-sources* adds directories (**Choose folder…**), and per source shows format
-counts, the **Enabled** switch, **Include 2D images** (saves and rescans without
-deleting results), **Excluded folders** (pattern chips; adding or removing one rescans),
-**Possible duplicate exports** suggestions with **Group as alternate files**, **Exclude extra
-folders** and **Keep separate**, saved answers with **Undo**, **Textures not found** with a folder choice, live counts, **Apply** and **Undo** ([decision 0021](../../Assetarium%20KnowledgeBase/Decisions/0021-texture-folder-choice.md))
-([decision 0019](../../Assetarium%20KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)), and **Remove**
-(keeps files and saved metadata). The Asset processing card points to unanswered suggestions. Click a source
-name or its 🔍 icon to browse that source's saved assets, including disabled
-sources, with the same cards and inspection; it loads forty at a time as you
-scroll (**Load more assets** is the keyboard alternative) and never scans,
-processes or publishes. **Back to asset sources** returns focus to that source.
-See [asset sources](../asset-sources.md).
+description batch size (built-in engine only). Settings has no Asset sources section any more: library
+folders live in the Asset sources tab.
 
-Enabled sources are scanned at startup; the app watches cheap file stamps every
-1.5 s and reloads library or source data only when one changes (decision 0002).
+Enabled library folders are scanned at startup; the app watches cheap file stamps every
+1.5 s and reloads library or folder data only when one changes (decision 0002).
 Processing never starts automatically.
 
 **Keyboard.** Tab/Shift+Tab move between controls, arrows/Home/End move within

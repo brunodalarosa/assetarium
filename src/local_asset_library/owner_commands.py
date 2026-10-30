@@ -1,4 +1,4 @@
-"""Owner commands for a terminal: sources, processing, settings, failures and collections.
+"""Owner commands for a terminal: library folders, packs, the processing queue, settings, failures and collections.
 
 Thin wrappers over the backend calls the desktop app makes, so no rule lives here
 (decision 0011: the backend is the authority). Works the same in PowerShell and a
@@ -13,7 +13,8 @@ import time
 
 from .config import ConfigError, load_config, project_config_path
 
-COMMANDS = {'sources', 'settings', 'rendering', 'process', 'describe', 'cancel', 'failures', 'recheck', 'collections', 'setup'}
+COMMANDS = {'library', 'sources', 'packs', 'previews', 'queue', 'forget-missing', 'settings', 'rendering', 'process', 'describe',
+            'cancel', 'failures', 'recheck', 'collections', 'setup'}
 ENDED_OK = {'complete'}
 
 
@@ -28,29 +29,44 @@ def parser():
     root.add_argument('--config', type=Path)
     root.add_argument('--json', action='store_true', help='Print the backend result as JSON (for scripts)')
     commands = root.add_subparsers(dest='command', required=True)
-    sources = commands.add_parser('sources', help='List, add, remove, enable or disable asset sources').add_subparsers(dest='action', required=True)
-    sources.add_parser('list')
-    sources.add_parser('add', help='Register a folder and scan it').add_argument('path')
-    sources.add_parser('remove', help='Stop listing a source (files and results stay on disk)').add_argument('key')
-    for action in ('enable', 'disable'):
-        sources.add_parser(action).add_argument('key')
-    for action, text in (('exclude', 'Skip a folder when scanning (name pattern like "Unity*" or a path inside the source)'),
-                         ('include', 'Stop excluding a folder pattern')):
-        change = sources.add_parser(action, help=text)
+    for name in ('library', 'sources'):  # "sources" is the old name, kept for scripts.
+        library_parser(commands.add_parser(name, help='List, add, remove, enable or disable library folders'
+                                           if name == 'library' else argparse.SUPPRESS))
+    packs = commands.add_parser('packs', help='Packs detected in a library folder: list, rename, merge or split'
+                                ).add_subparsers(dest='action', required=True)
+    packs.add_parser('list').add_argument('key')
+    rename = packs.add_parser('rename', help='Give a pack a display name (empty restores the folder name)')
+    rename.add_argument('key')
+    rename.add_argument('folder', help='The pack folder inside the library folder ("" for the library folder itself)')
+    rename.add_argument('name')
+    for action, text in (('merge', 'Merge a pack into its parent pack'), ('split', 'Make a folder a pack of its own'),
+                         ('reset', 'Forget a merge or split; detection decides again')):
+        change = packs.add_parser(action, help=text)
         change.add_argument('key')
-        change.add_argument('pattern')
-    textures = sources.add_parser('textures', help='Models missing textures: list folder suggestions, or choose one')
-    textures.add_argument('key')
-    textures.add_argument('--use', metavar='FOLDER', help='A suggested texture folder (path inside the source)')
-    textures.add_argument('--single-copies', action='store_true', help='Also use textures that exist only once in the source')
-    textures.add_argument('--undo', action='store_true', help='Remove the choice; its repairs are dropped on the rescan')
-    exports = sources.add_parser('exports', help='Folders that look like other exports of the same models: list or answer')
-    exports.add_argument('key')
-    answer = exports.add_mutually_exclusive_group()
-    answer.add_argument('--group', metavar='ID', help='Group the suggested folders as alternate files of the same assets')
-    answer.add_argument('--separate', metavar='ID', help='Keep them separate; not suggested again')
-    answer.add_argument('--exclude', metavar='ID', help='Exclude the extra folders from scanning')
-    answer.add_argument('--undo', metavar='ID', help='Forget a saved answer; the folders are suggested again')
+        change.add_argument('folder')
+    for name, text in (('previews', 'Make previews (inspection, previews, search data) for a folder, pack or assets'),
+                       ('describe', 'Generate missing descriptions for a folder, pack or assets with the configured engine')):
+        command = commands.add_parser(name, help=text + '; it starts at once or waits in the queue')
+        command.add_argument('target', nargs='?', metavar='KEY[/FOLDER]', help='A library folder, or a folder or pack inside it')
+        command.add_argument('--asset', action='append', default=[], metavar='ID', help='Picked assets (repeatable; needs KEY)')
+        command.add_argument('--asset-source', metavar='KEY', help=argparse.SUPPRESS)  # The old form: the whole folder.
+        command.add_argument('--dry-run', action='store_true', help='Print what it would do and its estimate; queue nothing')
+        command.add_argument('--yes', action='store_true', help='Accept the estimate of a long job (over 30 minutes)')
+    queue = commands.add_parser('queue', help='The processing queue: list, move, remove, pause, resume, overnight'
+                                ).add_subparsers(dest='action', required=True)
+    queue.add_parser('list')
+    move = queue.add_parser('move')
+    move.add_argument('item')
+    move.add_argument('position', type=int)
+    queue.add_parser('remove', help='Remove a waiting item, or cancel the running one cleanly').add_argument('item')
+    queue.add_parser('pause')
+    queue.add_parser('resume')
+    overnight = queue.add_parser('overnight', help='Hold descriptions until a window (for example 22:00-07:00)')
+    overnight.add_argument('state', choices=['on', 'off'])
+    overnight.add_argument('--window', metavar='HH:MM-HH:MM')
+    forget = commands.add_parser('forget-missing', help='Forget assets whose files vanished (their history stays)')
+    forget.add_argument('key')
+    forget.add_argument('--pack', metavar='FOLDER', help='Only under this folder or pack')
     settings =commands.add_parser('settings', help='Show or change Settings → General').add_subparsers(dest='action', required=True)
     settings.add_parser('show')
     change = settings.add_parser('set')
@@ -85,11 +101,9 @@ def parser():
     save.add_argument('path')
     save.add_argument('--confirm-rerender', action='store_true',
                       help='Accept that finished 3D previews are rendered again with the new Blender')
-    for name, text in (('process', 'Process assets: previews, search data, publish'),
-                       ('describe', 'Generate missing descriptions with the configured engine')):
-        command = commands.add_parser(name, help=text)
-        command.add_argument('--asset-source', required=True, metavar='KEY')
-        command.add_argument('--follow', action='store_true', help='Watch the running operation instead of starting one')
+    command = commands.add_parser('process', help='Process a whole library folder now (previews, search data, publish)')
+    command.add_argument('--asset-source', required=True, metavar='KEY')
+    command.add_argument('--follow', action='store_true', help='Watch the running operation instead of starting one')
     commands.add_parser('cancel', help='Cancel the running operation safely').add_argument('--asset-source', required=True, metavar='KEY')
     commands.add_parser('failures', help='Original paths of assets whose import failed')
     recheck = commands.add_parser('recheck', help='Recheck failures from the file/dependency check; retry those that pass (asks first)')
@@ -102,6 +116,123 @@ def parser():
     export.add_argument('--output', help='File under data/exports (default: data/exports/collections/<name>)')
     collections.add_parser('delete').add_argument('collection_id')
     return root
+
+
+def library_parser(command):
+    sources = command.add_subparsers(dest='action', required=True)
+    sources.add_parser('list')
+    sources.add_parser('add', help='Watch a folder and scan it (one inside a library folder is refused; '
+                                   'one around library folders replaces them, keeping their assets)').add_argument('path')
+    sources.add_parser('remove', help='Stop watching a folder (its results stay in the library store)').add_argument('key')
+    for action in ('enable', 'disable'):
+        sources.add_parser(action).add_argument('key')
+    for action, text in (('exclude', 'Skip a folder when scanning (name pattern like "Unity*" or a path inside the folder)'),
+                         ('include', 'Stop excluding a folder pattern')):
+        change = sources.add_parser(action, help=text)
+        change.add_argument('key')
+        change.add_argument('pattern')
+    images = sources.add_parser('images', help='Treat the images in a folder as textures or as 2D assets (or forget the answer)')
+    images.add_argument('key')
+    images.add_argument('folder', help='A folder inside the library folder ("" for all of it)')
+    images.add_argument('kind', choices=['textures', '2d', 'auto'])
+    textures = sources.add_parser('textures', help='Models missing textures: list folder suggestions, or choose one')
+    textures.add_argument('key')
+    textures.add_argument('--use', metavar='FOLDER', help='A suggested texture folder (path inside the library folder)')
+    textures.add_argument('--single-copies', action='store_true', help='Also use textures that exist only once in the folder')
+    textures.add_argument('--undo', action='store_true', help='Remove the choice; its repairs are dropped on the rescan')
+    exports = sources.add_parser('exports', help='Folders that look like other exports of the same models: list or answer')
+    exports.add_argument('key')
+    answer = exports.add_mutually_exclusive_group()
+    answer.add_argument('--group', metavar='ID', help='Group the suggested folders as alternate files of the same assets')
+    answer.add_argument('--separate', metavar='ID', help='Keep them separate; not suggested again')
+    answer.add_argument('--exclude', metavar='ID', help='Exclude the extra folders from scanning')
+    answer.add_argument('--undo', metavar='ID', help='Forget a saved answer; the folders are suggested again')
+
+
+def packs_command(args, config):
+    from . import packs, sources
+    source = sources.get_source(config, args.key)
+    if args.action == 'list':
+        detected = packs.structure(config, source)
+        names = packs.names_of(config, source)
+        result = {'status': 'ready', 'packs': [{**p, 'name': names.get(p['path']) or p['name'] or source['name']}
+                                              for p in sorted(detected['packs'].values(), key=lambda p: p['path'])],
+                  'bundles': detected['bundles']}
+        for pack in result['packs']:
+            evidence = ', '.join(m['evidence'] for m in pack['markers'][:3]) or pack['basis']
+            say(args, f"{pack['path'] or '(the library folder)'}  “{pack['name']}”  {len(pack['folders'])} folder(s) · {evidence}")
+        for bundle in result['bundles']:
+            say(args, f"{bundle}  (bundle)")
+        if not result['packs']:
+            say(args, 'No packs yet; scan the library folder first.')
+        return result
+    if args.action == 'rename':
+        packs.rename(config, args.key, args.folder, args.name)
+        say(args, f"Renamed {args.folder or 'the library folder'} to “{args.name}”." if args.name else 'Name reset.')
+        return {'status': 'saved'}
+    packs.answer(config, args.key, args.folder, {'merge': 'merge', 'split': 'make_pack', 'reset': None}[args.action])
+    say(args, {'merge': 'Merged into its parent pack', 'split': 'Made a pack of its own', 'reset': 'Answer forgotten'}[args.action]
+              + '; scanning (no rendering or models).')
+    args.follow = False
+    return run_operation(args, config, 'scan', args.key)
+
+
+def queue_scope(args):
+    target = args.target or args.asset_source
+    if not target:
+        raise ConfigError('Name a library folder (KEY), a folder in it (KEY/FOLDER), or KEY with --asset')
+    key, _, folder = target.replace('\\', '/').partition('/')
+    return {'key': key, 'path': folder.strip('/'), 'asset_ids': args.asset}
+
+
+def queue_command(args, config):
+    """Make previews and Generate descriptions as the app does: a queue item, an estimate, the same thresholds."""
+    from . import processing_queue as queue
+    action = 'previews' if args.command in {'previews', 'process'} else 'descriptions'
+    scope = queue_scope(args)
+    if args.dry_run:
+        source, scope = queue.validate_scope(config, scope)
+        found = queue.resolve(config, action, scope)
+        estimate = queue.estimate(config, action, found) if found['ids'] else None
+        say(args, (queue.describe_estimate(estimate) if estimate else 'Nothing to do here.')
+            + ''.join(f"\n{n:,} blocked: {reason}" for reason, n in found['blocked'].items()))
+        return {'status': 'ready', 'assets': len(found['ids']), 'blocked': found['blocked'], 'estimate': estimate}
+    result = queue.add(config, action, scope, confirmed=args.yes)
+    if result['status'] == 'confirm':
+        say(args, result['body'])
+        say(args, 'This is a long job. Run it again with --yes to start it, or --dry-run to look first.')
+        return {**result, 'status': 'cancelled'}
+    say(args, f"{result['title']}. {result['body']}")
+    say(args, 'Follow it with: queue list')
+    return {**result, 'status': 'saved'}
+
+
+def queue_list(args, config):
+    from . import processing_queue as queue
+    if args.action == 'list':
+        state = queue.state(config)
+    elif args.action == 'move':
+        state = queue.control(config, 'move', args.item, args.position)
+    elif args.action == 'remove':
+        state = queue.control(config, 'remove', args.item)
+    elif args.action == 'overnight':
+        start, _, end = (args.window or '').partition('-')
+        state = queue.control(config, 'overnight', value={'enabled': args.state == 'on', **({'start': start, 'end': end} if args.window else {})})
+    else:
+        state = queue.control(config, args.action)
+    running = state['running']
+    if running:
+        operation = running.get('operation') or {}
+        say(args, f"Running: {running['action']} · {running['label']} ({running['id'][:8]}) {progress_line(operation)}")
+    for index, item in enumerate(state['up_next']):
+        say(args, f"{index}. {item['action']} · {item['label']} ({item['id'][:8]}){' · held for tonight' if item['held'] else ''}")
+    if state['paused']:
+        say(args, 'Paused: resume with "queue resume".')
+    for group in state['blocked']:
+        say(args, f"Blocked: {group['reason']} — {group['fix']}")
+    if not running and not state['up_next']:
+        say(args, 'Nothing running or waiting.')
+    return state
 
 
 def say(args, text):
@@ -121,7 +252,7 @@ def recheck_command(args, config):
         return found
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise ConfigError('Retrying recorded failures needs your answer in an interactive terminal; run it yourself')
-    if input(f"Retry these {found['retry']:,} assets on the next Process assets? Type \"yes\" to confirm: ").strip().lower() != 'yes':
+    if input(f"Retry these {found['retry']:,} assets on the next Make previews? Type \"yes\" to confirm: ").strip().lower() != 'yes':
         say(args, 'Nothing was changed.')
         return {**found, 'status': 'cancelled'}
     result = recheck.release(config, args.key, found['preview_id'])
@@ -207,7 +338,7 @@ def sources_command(args, config):
             say(args, f"{s['key']}  {'enabled ' if s['enabled'] else 'disabled'}  {s['pending']} pending · "
                       f"{s.get('failed', 0)} failed  {s['path']}\n    {s.get('scan_fault') or s.get('reason', '')}")
         if not result['sources']:
-            say(args, 'No asset sources yet. Add one with: sources add PATH')
+            say(args, 'No library folders yet. Add one with: library add PATH')
         return result
     if args.action == 'add':
         source = sources.add(config, args.path)
@@ -247,7 +378,7 @@ def sources_command(args, config):
                 sources.forget_texture_folder(config, args.key)
             else:
                 sources.set_texture_folder(config, args.key, args.use, args.single_copies)
-            say(args, 'Saved; scanning. Repaired models wait for Process assets; originals are not changed.')
+            say(args, 'Saved; scanning. Repaired models wait for Make previews; originals are not changed.')
             args.follow = False
             return run_operation(args, config, 'scan', args.key)
         status = sources.source_status(config, source)
@@ -291,9 +422,15 @@ def sources_command(args, config):
             say(args, f"{d['id']}  answered {d['decision']}: {d['anchor'] or 'root'} / {', '.join(d['folders'])}")
         if not status.get('export_suggestions') and not status.get('export_decisions'):
             say(args, 'No duplicate export folders found.')
-        say(args, 'Answer with: sources exports KEY --group ID | --separate ID | --exclude ID   (undo: --undo ID)')
+        say(args, 'Answer with: library exports KEY --group ID | --separate ID | --exclude ID   (undo: --undo ID)')
         return status
-    raise ConfigError('Unknown sources command')
+    if args.action == 'images':
+        value = {'textures': 'texture', '2d': 'image', 'auto': None}[args.kind]
+        sources.answer_folder(config, args.key, args.folder, 'image_kind', value)
+        say(args, f"Images in {args.folder or source['name']}: {args.kind}; scanning (no rendering or models).")
+        args.follow = False
+        return run_operation(args, config, 'scan', args.key)
+    raise ConfigError('Unknown library command')
 
 
 def settings_command(args, config):
@@ -498,7 +635,7 @@ def wizard(args, config):
     choices['skipped_steps'] = skipped
     result = setup_core.save_setup(config, choices)
     say(args, 'Saved.' + (f" {result['blender']['reason']}" if result['blender']['status'] == 'faulty' else '')
-              + ' Next: sources add PATH, then process --asset-source KEY.')
+              + ' Next: library add PATH, then previews KEY.')
     return result
 
 
@@ -561,7 +698,7 @@ def setup_command(args, config):
     if args.blender_action == 'check' or result['status'] not in {'passed', 'warning'}:
         return dict(result, status='ready' if result['status'] in {'passed', 'warning'} else 'faulty')
     saved = setup_core.set_blender(config, result['path'], args.confirm_rerender)
-    say(args, 'Saved to config.local.toml; the next Process assets run uses it.' if saved['status'] == 'saved'
+    say(args, 'Saved to config.local.toml; the next Make previews uses it.' if saved['status'] == 'saved'
         else 'Already the Blender Assetarium uses; nothing was written.')
     return saved
 
@@ -625,15 +762,33 @@ def main(argv, config=None):
         config = config or load_config(args.config or project_config_path(root), root)
         if not config.sources_registry:
             raise ConfigError('Owner commands need managed asset sources (schema_version 2 configuration)')
-        if args.command == 'sources':
+        if args.command in {'sources', 'library'}:
             result = sources_command(args, config)
+        elif args.command == 'packs':
+            result = packs_command(args, config)
+        elif args.command in {'previews', 'describe'}:
+            result = queue_command(args, config)
+        elif args.command == 'queue':
+            result = queue_list(args, config)
+            result = {**result, 'status': 'ready'}
+        elif args.command == 'forget-missing':
+            from .library_store import forget_missing
+            from .sources import get_source
+            source = get_source(config, args.key)
+            if not confirm(f"Forget the missing assets in {source['name']}{' under ' + args.pack if args.pack else ''}? Their "
+                           "collection entries become unavailable; their results stay until you remove unreferenced results."):
+                say(args, 'Nothing was forgotten.')
+                return 0
+            count = forget_missing(config, source['id'], args.pack)
+            say(args, f"Forgot {count} missing asset(s); their recognition history is kept.")
+            result = {'status': 'saved', 'forgotten': count}
         elif args.command == 'settings':
             result = settings_command(args, config)
         elif args.command == 'rendering':
             result = rendering_command(args, config)
         elif args.command == 'setup':
             result = setup_command(args, config)
-        elif args.command in {'process', 'describe'}:
+        elif args.command == 'process':
             result = run_operation(args, config, args.command, args.asset_source)
         elif args.command == 'cancel':
             from .source_operations import cancel

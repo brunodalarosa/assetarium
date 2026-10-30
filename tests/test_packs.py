@@ -109,3 +109,4 @@ def test_scans_use_gltf_obj_and_fbx_references_and_pack_answers(managed):
     assert logo['type_metadata']['image_kind']['basis'] == 'owner'
     packs.rename(config, one['key'], '', 'My library')
     assert packs.pack_of(config, one, logo)['name'] == 'My library'
+    assert packs.fields(config, logo) == {'pack_name': 'My library', 'pack_path': ''}  # What agents get with each asset.

@@ -118,6 +118,9 @@ function TreeRow({ row, selected, focused, onFocus }: { row: Row; selected: bool
       <Icon className={cn("size-4 shrink-0", row.node.kind === "pack" ? "text-primary" : "text-muted-foreground")} strokeWidth={1.75} aria-hidden />
       <span className="min-w-0 flex-1 truncate">{row.node.name || row.folder.name}</span>
       {offline && <span className="text-[11px] text-muted-foreground">Offline</span>}
+      {row.depth === 0 && !offline && row.folder.scan_fault && (
+        <Tooltip content={row.folder.scan_fault} delay={200}><span className="unreadable text-[11px] text-fault">Can’t be read</span></Tooltip>
+      )}
       {excluded && <span className="text-[11px] text-muted-foreground">Excluded</span>}
       {row.node.new > 0 && (
         <Tooltip content={`${row.node.new} new since your last visit`} delay={300}>
@@ -141,6 +144,8 @@ export function FolderTree() {
   const scroller = useRef<HTMLDivElement>(null);
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const [focus, setFocus] = useState<string | null>(null);
+  // Rows reveal once; rows that scroll back into view (or re-render) appear without replaying it.
+  const shown = useRef(new Set<string>());
   const selectedId = view.key ? view.key + ":" + view.path : null;
   useLayoutEffect(() => {
     const element = scroller.current;
@@ -201,11 +206,15 @@ export function FolderTree() {
     >
       <div style={{ height: rows.length * ROW, position: "relative" }}>
         <div style={{ transform: `translateY(${first * ROW}px)` }}>
-          {rows.slice(first, last).map((row, index) => (
-            <div key={row.id} className="tree-enter" style={{ animationDelay: `${Math.min(first + index, 12) * 18}ms` }}>
+          {rows.slice(first, last).map((row, index) => {
+            const fresh = !shown.current.has(row.id);
+            shown.current.add(row.id);
+            return (
+            <div key={row.id} className={fresh ? "tree-enter" : undefined} style={fresh ? { animationDelay: `${Math.min(index, 12) * 18}ms` } : undefined}>
               <TreeRow row={row} selected={row.id === selectedId} focused={row.id === focused} onFocus={() => setFocus(row.id)} />
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

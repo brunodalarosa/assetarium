@@ -1,7 +1,7 @@
 ---
 area: Sources and Catalog
 tags: [hub]
-code: [sources.py, source_operations.py, catalog.py, membership.py, publication.py, library_policy.py]
+code: [sources.py, library_store.py, packs.py, image_kinds.py, library_view.py, library_migration.py, source_operations.py, catalog.py, membership.py, publication.py, library_policy.py]
 ---
 # Sources and Catalog
 
@@ -11,6 +11,8 @@ assets, and how each source's results combine into one read-only catalog. Up: [N
 ## Systems
 
 - [Sources](Sources.md): library folders, the library store, recognition, scans, exclusions and duplicate export folders.
+  Packs (`packs.py`), image kinds (`image_kinds.py`) and the Asset sources tab's data (`library_view.py`) are
+  described there too.
 - [Publication](Publication.md) *(gap)*: per-source publications, the combined catalog and index, pinned immutable generations (`publication.py`, `membership.py`).
 - [Logical assets](Logical%20assets.md) *(gap)*: grouping files into one asset, alternate files and variants (`catalog.py`, `asset_structure.py`).
 

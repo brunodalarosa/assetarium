@@ -313,6 +313,16 @@
     transform: scale(1.04);
   }
 }
+/* Folder tree rows (Asset sources): a staggered first reveal; the delay comes from the row. */
+.tree-enter {
+  animation: tree-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes tree-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
 .page-enter {
   animation: page-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
@@ -389,6 +399,7 @@
   .activity-sweep,
   .ghost-enter,
   .reveal-img,
+  .tree-enter,
   .page-enter {
     animation: none;
   }

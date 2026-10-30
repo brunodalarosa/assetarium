@@ -2,10 +2,14 @@
 tags: [roadmap]
 id: ASSETRM-0002
 type: feature
-status: planned
+status: implemented
 created: 2026-10-29
 ---
 # ASSETRM-0002
+
+**Implemented (2026-10-30, `feature/library-view`, phases 1–7 of the plan):** the library store,
+input-keyed results, recognition, the one-time migration, packs and image kinds, the Asset sources tab
+and the processing queue. The owner runs the migration and reviews the result.
 
 **Brainstorm done (2026-10-30):** a central library store with results keyed by inputs, identity
 by recognition, packs and an implicit processing queue ([decision 0023](../../../Decisions/0023-central-asset-library.md)).

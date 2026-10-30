@@ -1,10 +1,17 @@
 ---
 tags: [reference]
+status: draft
 parent: "[Expansion plan](../Expansion%20plan.md)"
 ---
-# Expansion step 4 - Textures and material sets
+# Expansion step 4 - Material sets
 
 Up: [Expansion plan](../Expansion%20plan.md).
+
+**Rewritten after ASSETRM-0002 (decision 0023, D15; draft for the owner's review).** Texture recognition is done:
+every image is classified with evidence as a model texture (a dependency of its model), a **material
+texture** (its own browsable kind, found by name, not described) or a 2D image (`image_kinds.py`,
+`image_catalog.py`), with owner folder answers. This step now covers only **material sets** built on top
+of those material textures: grouping maps into sets, their roles and previews.
 
 Work in this repository and implement only expansion step 4 of [Project_v2_expansion.md](../Expansion%20plan.md). Verify steps 1-2 and reuse step 3's relationship conventions where available. Do not spawn subagents. This prompt does not approve source processing or implementation.
 
@@ -16,7 +23,8 @@ Read-only inspection should identify supplied material manifests, naming convent
 
 ## Implement after approval
 
-Support individual textures and linked material sets without copying originals. Record map roles, resolution, color-space evidence, channel packing, normal conventions, scale/tiling evidence, and completeness. Unknown facts stay unknown. Treat filename-derived groupings as tentative unless supported by a reviewed convention or manifest; do not silently combine unrelated maps.
+Group existing material-texture assets into linked material sets without copying originals; individual
+material textures already exist and keep their IDs. Record map roles, resolution, color-space evidence, channel packing, normal conventions, scale/tiling evidence, and completeness. Unknown facts stay unknown. Treat filename-derived groupings as tentative unless supported by a reviewed convention or manifest; do not silently combine unrelated maps.
 
 Build reproducible plane/sphere previews for narrowly supported mappings. Record tool/version, geometry, lighting, bindings, and settings. Do not silently supply missing required maps, reinterpret packed channels, flip normal conventions, or edit original textures. Preserve usable individual records and partial results when material assembly fails; retain fault evidence without automatic retries.
 

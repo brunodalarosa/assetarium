@@ -10,7 +10,7 @@ branch: feature/library-view
 Hub: [Sources and Catalog](Sources%20and%20Catalog.md). A library folder (in code still a "source") is
 one watched root. Start reading at `sources.py` (folders, scans, the combined catalog),
 `library_store.py` (folders, recognized assets and their history) and `source_operations.py`
-(durable, cancellable Process assets operations). User guide: [Asset sources](../../../docs/asset-sources.md).
+(durable, cancellable operations the [processing queue](../Processing/Processing%20queue.md) starts). User guide: [Asset sources](../../../docs/asset-sources.md).
 Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
 
 ## How it works
@@ -50,7 +50,15 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   rejected (`sources.validate_directory`).
 - An old generated folder (`library_migration.LEGACY_METADATA_DIR`) is never scanned or read as an
   original; only `library_migration.py` names it (`tests/test_metadata_name.py`).
-- **Processing never starts from a scan**; Process assets is always an explicit action.
+- **Processing never starts from a scan**; Make previews and Generate descriptions are always explicit actions.
+
+- **Packs** (`packs.detect`, cached by `packs.structure`) come from folder structure only and are never
+  stored in records, so detecting them never makes assets pending. Owner answers (`pack`, `pack_name`,
+  `image_kind`, `visit`) live in `library.sqlite` `answers`.
+- **Image kinds** (`image_kinds.classify`, called from `image_catalog.image_assets`): model references,
+  then an owner answer, then the pack prior, model stems, material names, folder words and neighbours;
+  decoded pixel hints (`pixel_evidence`, recorded by `image_inspection.run`) decide only an image with no
+  other evidence. Model textures become `model_dependency_image` inventory rows, not assets.
 
 ## Gotchas
 

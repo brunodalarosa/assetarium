@@ -141,8 +141,9 @@ try:
     report['failures'] = {'assets': failures['assets'], 'paths': len(failures['paths'])}
     for word in ('disable', 'enable'):
         cli('sources', word, key)
-    cli('sources', 'images', key, 'on')
-    report['checks'].append('sources disable / enable / images on, and failures, through the CLI')
+    cli('packs', 'list', key)
+    cli('queue', 'list')
+    report['checks'].append('sources disable / enable, packs list, queue list and failures, through the CLI')
     wire = Wire(out / 'mcp-stderr.log')
     try:
         found = wire.call('search_assets', {'query': 'lantern', 'mode': 'keyword', 'limit': 5})

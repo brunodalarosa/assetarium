@@ -32,10 +32,17 @@ read it first. Up: [Notebook](Notebook.md).
   `verified_hash`), `hash_cache` (shared stat-identity hash record), `library_policy` (neutral
   membership and budget defaults), `retention`, `maintenance_files`, `model_storage`,
   `notifications`.
-- **Sources and catalog:** `sources`, `source_operations`, `source_storage`, `source_browser`,
-  `source_migration`, `catalog`, `catalog_migration`, `asset_structure`, `image_catalog`,
-  `membership`, `recheck`, `texture_folders`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
-- **Processing:** `incremental` (stage ledger and publication), `inspection`, `blender_worker`,
+- **Sources and catalog:** `sources` (library folders, scans, the combined catalog), `library_store`
+  (`library.sqlite`: folders, recognized assets, recognition history, owner answers), `packs`
+  (packs and bundles from folder structure), `image_kinds` (model texture, material texture or 2D
+  image), `library_view` (the Asset sources tab's tree, states and folder contents),
+  `library_migration` (the one-time move into the store; the only code naming the old folder),
+  `source_operations`, `source_storage`, `source_browser`, `catalog`, `catalog_migration`,
+  `asset_structure`, `image_catalog`, `membership`, `recheck`, `texture_folders`. The October 14
+  migration is `scripts/historical/source_migration.py`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
+- **Processing:** `incremental` (stage ledger and publication), `result_store` (results keyed by
+  inputs, the result index, reuse for duplicates and moved files), `processing_queue` (Make
+  previews / Generate descriptions queue), `inspection`, `blender_worker`,
   `blender_batch_worker`, `render_pool`, `render_devices`, `render_math`, `texture_repair`,
   `blender_repair_worker`, `blender_shared_dependency_worker`, `dependency_resolution`,
   `dependency_overrides`, `image_inspection`, `image_media`, `svg_worker`, `captions`,

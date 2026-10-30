@@ -625,8 +625,9 @@ class SearchEngine:
                     break
                 except (OSError, ValueError):
                     continue
+            from .packs import fields
             results.append({"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
-                            "asset_type": asset_type(record),
+                            **fields(self.config, record), "asset_type": asset_type(record),
                             "excerpt": excerpt, "formats": sorted({f["format"] for f in record["files"]}),
                             "preview": preview, "availability": "available", "matching_channels": matching,
                             "score": candidate["score"], "match_status": "keyword_match" if "keyword" in matching else "weak_unvalidated",

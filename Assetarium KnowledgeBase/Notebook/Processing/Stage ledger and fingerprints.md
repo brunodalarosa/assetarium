@@ -1,8 +1,8 @@
 ---
 area: Processing
 tags: [system]
-code: [incremental.ledger, incremental.checkpoint, incremental.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.prompt_hash, incremental.EQUIVALENT_WORKERS, incremental.process, incremental.publish, retrieval.recorded_contract, publication.line_ending_hashes, scripts/check-render-stability.py, scripts/check-engine-stability.py]
-verified: 2026-10-28
+code: [result_store.py, result_store.adopt, result_store.reattach, result_store.first_sight_key, library_migration.rekey, scripts/check-rekey.py, incremental.ledger, incremental.checkpoint, incremental.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.prompt_hash, incremental.EQUIVALENT_WORKERS, incremental.process, incremental.publish, retrieval.recorded_contract, publication.line_ending_hashes, scripts/check-render-stability.py, scripts/check-engine-stability.py]
+verified: 2026-10-30
 branch: feature/library-view
 ---
 # Stage ledger and fingerprints
@@ -12,6 +12,17 @@ embeddings); the ledger records each stage's input fingerprint and outcome, and 
 when its fingerprint changes. Start at `incremental.inspection_input` and `incremental.caption_input`.
 
 ## How it works
+
+- **Keys hold inputs, never locations (decision 0023).** The inspection key hashes the inspected file's
+  content and format, each dependency's content with its path *relative to the inspected file*, the
+  texture-repair recipe without asset IDs, and the settings/code below; the caption key hashes view
+  contents, not view paths; the image key hashes content only. No asset ID, pack or source-prefixed
+  path. One ledger (`library-store/ledger.sqlite`) serves every library folder.
+- `result_store` indexes finished results by (stage, key). New results go to
+  `results/<stage>/<kk>/<key>/`. A record whose key has a finished result adopts it (a duplicate, a
+  moved file, a folder added around others) at scan time (`reattach`) or when processing runs; nothing
+  renders. Publishing an inspection adds the textures Blender found to the record, which changes its
+  key, so both the key a fresh copy has (`first_sight_key`) and the finished key are indexed.
 
 - Per-folder state: `library/import-status.json` in the folder's working data holds each asset's current file and
   dependency fingerprint, attempted state and outcome; the ledger keeps append-only history.
@@ -24,6 +35,11 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
   work stays pending. Captions are not part of import readiness (descriptions are optional, decision 0008).
 
 ## Rules
+
+- **A fingerprint-definition change re-keys, never re-queues.** `library_migration.rekey` recomputes
+  the old fingerprint (kept verbatim as `legacy_*` in `library_migration.py`), and only a row it still
+  matches gets the new key; stale rows keep theirs and stay pending. `scripts/check-rekey.py` proves it on
+  copies of the ledgers (receipt `data/evidence/rekey/rekey-proof-20261030.json`: nothing newly pending).
 
 - **Editing a fingerprinted file re-queues every finished result that depends on it.** That covers
   `blender_worker.py`, `render_math.py`, the repair workers, caption code and prompts, the embedding

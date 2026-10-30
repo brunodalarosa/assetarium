@@ -88,7 +88,7 @@ export function descriptionSummary(source: Json) {
 
 export function descriptionBlocked(source: Json) {
   const d = source.descriptions || {};
-  if (!source.enabled) return "Enable this source in Settings → Asset sources to generate descriptions.";
+  if (!source.enabled) return "Include this library folder in search on the Asset sources tab to generate descriptions.";
   if (source.processing_paused) return "Processing is paused. Select formats in Settings → General to generate descriptions.";
   if (operationActive(source.operation)) return "Available when the current operation for this source finishes.";
   if (!d.missing) return d.failed ? "Nothing left to generate. Failed descriptions are recorded and not retried." : "Nothing to generate right now.";
@@ -146,13 +146,13 @@ export const notificationKey = (item: Json) => item.id + "@" + item.created_utc;
 
 /* Setup and Settings → General share this copy (decision 0014). */
 export const BUDGET_HELP =
-  "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus the library store that holds every preview, description and search result, wherever it is, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Process assets and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
+  "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus the library store that holds every preview, description and search result, wherever it is, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Make previews and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
 export const DESCRIPTIONS_OFF =
   "Generate descriptions is hidden and no ready-to-generate notices appear. Descriptions already written stay stored and searchable; nothing is deleted or redone. Turn it back on any time.";
 export const ENGINE_NOTE =
   "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Where search by description and by image runs is a separate choice below.";
 export const SEARCH_HELP =
-  "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Process assets to rebuild search data. Until then, names, filters and keyword search keep working.";
+  "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Make previews to rebuild search data. Until then, names, filters and keyword search keep working.";
 export const SEARCH_THREADS_HELP =
   "How many CPU threads build search data. More are faster until the processor is saturated; fewer leave the computer more responsive. Search results are identical at any number, so changing it never redoes work. Automatic uses the speed test's choice: the fewest threads within 3% of the fastest.";
 /** "Now: 24 of 32 threads (fastest in the speed test)." */

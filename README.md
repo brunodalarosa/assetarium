@@ -132,16 +132,18 @@ or let your AI agent do it (see [Use with AI agents](#use-with-ai-agents)).
 
 ### 3. Add your asset folders
 
-Go to **Settings → Asset sources** and add the folders that hold your packs. Assetarium
-scans them right away; scanning only reads file information and never runs Blender or AI
-models.
+Open **Asset sources** (the folder icon above Settings) and choose **Add library folder** for the
+folder that holds your packs. Assetarium scans it right away and finds the packs inside;
+scanning only reads file information, never writes into your folders and never runs Blender
+or AI models.
 
 ### 4. Process your assets
 
-Open **Asset processing** and click **Process assets** on a source. Assetarium renders
-previews in Blender and makes the assets searchable. Processing only starts when you ask
-for it, shows its progress, and can be cancelled. If a file can't be processed, it's
-listed with the reason and everything else keeps working.
+Pick a pack (or a whole library folder) and click **Make previews**. Assetarium renders
+previews in Blender and makes the assets searchable; 2D images show right away. Processing
+only starts when you ask for it, waits in line on **Asset processing** with its progress,
+and can be cancelled. If a file can't be processed, it's listed with the reason and
+everything else keeps working.
 
 ### 5. Optional: turn on AI descriptions and appearance search
 
@@ -155,7 +157,7 @@ command to install each piece. With the built-in engine that is:
 .\scripts\embedding-runtime.ps1 run --locked --no-sync --project runtime/embedding python scripts/prepare_embedding_model.py
 ```
 
-Then use **Generate descriptions** on a source. Descriptions are optional: names, keyword
+Then use **Generate descriptions** on a pack or folder. Descriptions are optional: names, keyword
 search, previews and the 3D viewer work without them. More on engines in
 [Description engines](docs/description-engines.md).
 
@@ -165,8 +167,8 @@ Setup, sources, processing, descriptions and collection exports also work from a
 on Windows and Linux (use `./scripts/local-assets.sh` there):
 
 ```powershell
-.\scripts\local-assets.ps1 sources add D:\Assets\Kenney
-.\scripts\local-assets.ps1 process --asset-source <key>
+.\scripts\local-assets.ps1 library add D:\Assets\Kenney
+.\scripts\local-assets.ps1 previews <key>
 .\scripts\local-assets.ps1 setup status
 ```
 

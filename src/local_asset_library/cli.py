@@ -71,7 +71,7 @@ def main() -> int:
                 result={'sources':source_statuses(config)}
                 print(json.dumps(result,ensure_ascii=False));return 0
             if args.command == 'process' and source is None:
-                raise ConfigError('Choose --asset-source or use its Process assets card in LAL')
+                raise ConfigError('Choose --asset-source or use Make previews on the Asset sources tab')
             if source:
                 config=bound(config,source)
         if args.command=='embed-index' and library_mode(config):

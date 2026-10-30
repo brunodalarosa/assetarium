@@ -1,223 +1,186 @@
 # Asset sources
 
-The Windows app opens **Settings → General**. Select **Asset sources** to manage
-asset directories. Add a directory using its
-folder picker or path field. Every source has an **Enabled** checkbox and a
-**Remove** action. Changes apply to browsing, current searches and subsequent
-agent requests while the app stays open. Removing or disabling a source preserves
-its original files and generated metadata. Re-adding its directory recovers its
-saved identity and published results.
+The **Asset sources** tab (the folder icon above Settings in the rail) is where you browse your assets
+by place and decide what to process. **Home** is for searching; both share the same cards and the same
+inspection panel, and a search result's menu offers **Show in pack** to jump here.
+
+Nothing is ever written into your asset folders. Previews, descriptions and search data live in one
+**library store**: by default the ignored `data/library-store/` in the project; another drive can be set
+with `[storage].library` in `config.local.toml`. The store counts against the storage budget in
+**Settings → General**. Read-only drives, network shares and asset repositories work as library folders.
+
+## Library folders, bundles, packs and folders
+
+**Add library folder** watches a folder. Add the top folder of your collection (for example the folder
+that holds all your packs); Assetarium finds the structure inside it:
+
+- A **pack** is the folder closest to the assets that carries pack markers: a license file, a readme, a
+  preview image, internet shortcuts or a versioned name such as `Name_1.0_FREE` or `Name 3.7.0`. Without
+  markers, the first folder with assets under the library folder is the pack. Publisher names are never
+  used. A pack shows its cover (its own preview image), its license file and its counts.
+- A folder that holds several packs is a **bundle** (for example `Kenney All-in-1` → `2D assets` →
+  `Tiny Dungeon`).
+- You correct detection on any folder: **Make this a pack** and **Merge into parent pack** are saved and
+  survive rescans, and **Rename** gives a pack a display name. Packs have no tags and are never added to
+  collections.
+
+Adding a folder **inside** a library folder is refused as already covered, with **Show it**. Adding a folder
+**around** library folders replaces them: their assets keep their IDs, results, collection entries and
+your reviews. **Remove…** stops watching a folder; its results stay in the store, and adding the same
+folder again restores everything. An unreachable folder (a removed drive) shows **Offline**; its results
+and collection entries are kept.
+
+## What is found
+
+Every supported type is always included: 3D models (FBX, glTF/GLB, OBJ, BLEND, STL, DAE) and still images
+(PNG, JPEG, WebP, SVG and others). Images are sorted into three kinds, each with the evidence shown:
+
+- **Model textures** belong to a model and are not separate assets: a glTF image, an MTL map, a file name
+  inside an FBX, or a texture Blender reported when it inspected the model.
+- **Material textures** (`brick_normal.png`, a `Textures` folder, normal-map colors) are browsable and
+  found by name; they are not described.
+- **2D images**: everything else, for example a pack with no models, icons, sprites and UI.
+
+When the guess is wrong for a folder, **Treat images here as textures** or **as 2D assets** decides for it.
+
+Scans run in the background at startup, after you add a folder and after each change you make. They never
+run models or renders. Unchanged files reuse their verified hashes (decision 0004).
+
+## Identity: moves, copies and edits
+
+An asset's ID is assigned once, when it is first seen, and kept by recognizing it:
+
+- A file **moved or renamed** inside your library keeps its ID, its previews and descriptions (found again
+  by content), your reviews and its collection entries. Its search data is rebuilt by the next Make previews.
+- A **copy** of an asset is a new asset that shares the copied asset's finished results: nothing renders twice.
+- A file **edited** in place keeps its ID and needs previews again.
+- A file that **vanished** becomes **Missing**: shown faded with when it was last seen, with its results and
+  collection entries kept until you choose **Forget missing** on its library folder or pack.
+
+## States on the cards
+
+Each card has one state and a few overlays, shown as labeled icons (never color alone):
+
+| State | Meaning | What you can do |
+| --- | --- | --- |
+| No previews yet | Found, not processed. 2D images already show their original file | Make previews |
+| Search data pending | Previews exist; search data is missing | Make previews |
+| Queued / Making previews | In the processing queue / running | Cancel on Asset processing |
+| Ready | Previews and search data done | — |
+| Blocked | Its next step can't run on this computer (Blender not set up, the search runtime not installed) | **Fix…** shows what to install; it is never offered as something to process |
+| Recorded failure | A fault with its evidence | **Copy error**, **Recheck…** (decision 0020) |
+| Missing | The file is gone | **Forget missing** |
+
+Overlays: a description warning (review notes are not shown as warnings), the description state when
+descriptions are on, how many collections hold it, and **new** since your last visit to that library folder.
+Files that are not assets (readmes, HTML, licenses) are listed after the cards, faded, behind **Show other files**.
+
+## Working with the tab
+
+- Click a folder or pack to show its assets and its panel in inspection; click an asset to inspect it.
+- **Double-click** any file or folder to show it in Explorer.
+- **Ctrl-click** or **Shift-click** picks several cards for Make previews, Generate descriptions or Add to collection.
+- Right-click (or Shift+F10, or the menu key) for everything a folder, pack, library folder, asset or file
+  offers. Menus only offer what can resolve the shown state.
+- Arrow keys move in the tree: Right expands, Left collapses or goes to the parent, Enter shows the folder.
+- The header sorts the tree (Name, Recently added, Most without previews, Most assets) and filters the cards
+  by type (3D models, Images, Material textures) and status (Has new, Needs previews, Blocked, Failures, Missing).
+
+## Making previews and descriptions
+
+**Make previews** (inspection, preview images and search data, never split) and **Generate descriptions**
+(only when descriptions are on in Settings → General) act on a library folder, a pack, a folder or picked
+assets. They start at once or wait in line on **Asset processing**:
+
+- What an item covers is decided when it starts: "whatever in this pack still lacks previews".
+- Previews always run before descriptions; otherwise items run in your order (move or remove them in **Up next**).
+- One job at a time; renders use the parallel Blender processes of decision 0022.
+- Under about 10 minutes a job starts on the click. From 10 to 30 minutes it starts with an **Undo** toast.
+  Longer jobs, or jobs that would reach the storage budget, ask first with an estimate (counts, a time range,
+  disk). The estimate comes from the render speed test and recent runs; without either it says
+  "no measurement yet".
+- **Hold descriptions for overnight** keeps description jobs waiting until the window (22:00–07:00 by default).
+- Queued work left over when the app closed shows as **Paused** with **Resume**. It never resumes by itself.
+- Each finished job starts the next one, with or without the app open.
+
+**Asset processing** shows **Running** (progress, Cancel, a live log with copy buttons on errors and
+warnings), **Up next**, **Blocked** (by reason, with the fix and how many assets it unblocks), **Recorded
+failures** (by stage and reason, with Copy, Recheck and Show in Asset sources) and **Recent**. Pending work
+and failures are never mixed in one message.
+
+Cancel requests a graceful stop: the current asset finishes, its checkpoint is saved, and nothing else
+starts. Unchanged faults are kept with their evidence and skipped; they are never retried automatically.
 
 ## Processing formats
 
-In **Settings → General**, **Formats to process** offers **FBX**, **glTF / GLB**
-and **OBJ** checkboxes. All three start enabled. Save applies the selection to
-new processing batches in the desktop and command-line processing flows,
-including new overnight description runs. A running batch keeps its selection
-until the next batch. Unchecking everything pauses processing; scanning,
-browsing and existing search results remain available.
-
-Scanning always inventories every supported model format. **Asset sources**
-shows logical asset counts for each format, including disabled formats and
-other inventoried types such as BLEND. glTF combines `.gltf` and `.glb`; an asset
-with both counts once in that group. An asset with alternate formats counts
-once under each applicable group, so the counts need not add up to the source's
-total asset count. Counts reflect the latest saved scan and remain visible when
-a source is disabled.
-
-For a new logical asset, inspection selects an enabled source file using the
-existing format preference. Disabled formats and other inventoried types create
-no actionable processing work. Alternate formats are not converted or processed
-as separate copies of that logical asset. Downstream descriptions and search
-data belong to the file actually inspected: disabling that format defers its
-unfinished work even if an enabled alternate exists.
-
-Changing these checkboxes does not clean up, regenerate, hide or remove existing
-results or search vectors, and does not retry retained failures. Failure evidence
-stays in the importing failures report. Saving preferences refreshes pending
-indicators from saved inventory without running a scan or starting models.
-
-The app scans enabled sources in the background at startup. Enabling a source
-also scans it; reopen the app (or toggle the source) to rescan during a session. Scans detect
-added, changed and removed files; unchanged files reuse their verified hashes
-when file ID, size, modification time and NTFS change time agree. Scans seed the
-shared `cache/file-hashes.sqlite` record that searches and detail checks reuse
-(decision 0004). Nothing is
-written into a source; an old generated folder awaiting the library migration is never scanned. Scanning runs no model
-inference or rendering. Removed and changed assets are excluded from searches
-when discovered; their prior generated evidence is retained.
-
-An unavailable source is recorded in LAL's availability diagnostics, excluded from
-searches, and left on disk as-is; other sources still scan. It is never recreated
-just to write an error. A later successful scan clears the current availability
-warning while retaining the original diagnostic history.
+**Settings → General → Formats to process** (FBX, glTF/GLB, OBJ) chooses which file of a grouped asset is
+inspected when several formats exist. Unchecking everything pauses processing; browsing and search keep working.
+Changing formats never deletes results or retries faults.
 
 ## Descriptions
 
-Descriptions are optional. Assets are searchable by name and image as soon as
-they are processed; descriptions add a third signal to the default search, and a
-missing, stale or invalid description is skipped without a fault.
-
-Each source on **Asset processing** shows its description counts
-(written · missing · failed) and a **Generate descriptions** button. It is enabled
-when the source is enabled, formats are selected, no operation is running for it
-and at least one asset with usable renders lacks a description. The run happens
-in the background: it writes descriptions in batches (decision 0007), builds their
-search vectors and publishes. Its progress and **Cancel** appear on that source
-in Asset processing and under the notification bell. Recorded description failures are kept and
-not retried. A cancelled or stopped run still publishes what it finished.
-
-Notifications (bell in the top bar) report two things: a source that finished
-processing with descriptions ready to generate, and the outcome of each
-description run. A new notice also shows a short toast. **Not now** hides a
-ready notice until more descriptions are missing; closing the panel marks notices
-read. Report notices lead to Asset processing. They are saved in
-`data/library/notifications.json`.
-
-## Pending work on Asset processing
-
-**Asset processing** offers **Process assets** for each source that needs
-processing or publication (the rail item shows a dot). Missing or failed descriptions never count as pending work: descriptions are
-optional extra data ([decision 0008](../Assetarium%20KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)). The pending state remains visible through processing, publication, cancellation
-and interruption while actionable work remains. A subsequent scan clears it
-when there is no unattempted work and current results have been published.
-Recorded failures appear in the importing failures report. Description failures,
-caption review notes, warnings and pending owner approval do not count as import
-failures.
-
-Click **Process assets** to inspect/render pending assets, create search vectors
-and publish usable results for that source. It does not generate descriptions. The progress
-bar includes processing, source publication, combined search publication and the
-verification scan. Other sources retain their published results. New asset
-processing remains an explicit action; adding a source only registers/scans it.
-The former **Process pending** and **Publish ready work** buttons are replaced by
-this source-specific action.
-
-**Cancel** requests a graceful stop. The worker finishes its current asset in
-the current stage, commits its checkpoint, then stops before beginning another
-asset. During embedding, all views/channels of the current asset finish together.
-An atomic publication already in progress finishes safely. Completed checkpoints
-are reused by the next explicit processing action. Workers are never killed to
-cancel a source operation. Closing the app requests the same graceful stop for
-its outstanding source operations.
-
-Unchanged faulty assets are retained with evidence and skipped, including on a
-subsequent **Process assets** click. Other usable assets can finish and publish.
-Recorded failures do not keep import work pending. The **Importing failures
-report** on Asset processing lists the original asset paths from all configured
-sources, including disabled sources. Removed sources retain their metadata but
-are excluded from this view. An asset with several source formats lists each
-original model path. Usable partial results remain available after publication.
-
-Readiness uses saved stage outcomes, rather than assuming every incomplete stage
-has never been attempted. Failed/unsupported stages block dependent work; other
-unfinished work stays pending. The caption stage is not part of import readiness;
-an embeddings outcome that misses only the description vector counts as complete. Every scan saves each asset's current
-file/dependency fingerprint, attempted state and outcome in
-`library/import-status.json` in the folder's working data in the library store. New or changed inputs become pending;
-unchanged failures are retained. Unpublished results still require publication
-before the pending state clears. Processing is not permission to repair originals
-or retry unchanged failures. GPU processing shares the existing
-inference lease with semantic search. Browsing and keyword search remain available.
-
-## Storage and identity
-
-Expansion step 1 adds a backward-compatible shared asset structure. Existing
-sources/3D IDs and saved results remain unchanged; it does not enroll images or
-audio. New candidate catalog databases use schema 2, allowing explicit parent and
-child records to share original paths. Old catalogs remain readable without a
-startup migration. Generic images, unsupported audio, file roles, relationships
-and adapter capabilities are documented in the
-[catalog contract](../Assetarium%20KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#expansion-step-1-shared-asset-foundation).
-Expansion step 2 adds image enrollment as a per-source choice: tick **Include
-2D images** in *Settings → Asset sources* (stored as `import_types` in that
-source's saved settings in the library store). The source is rescanned; existing results
-are never deleted, and an unchanged image that returns later resumes its saved
-results. Model textures, previews, pack overview sheets, texture folders and
-atlas/tileset sheets stay out of the image assets with a visible inventory role.
-**Process assets** measures each image and writes its thumbnail, model input and
-image vector; **Generate descriptions** then works for images too. See the
-[catalog contract](../Assetarium%20KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#static-2d-images-expansion-step-2).
-
-
-## Source import restrictions
-
-An explicitly cleaned source can store an `import_formats` list in its
-saved settings in the library store, using the same `fbx`, `gltf`, and `obj` families as
-processing preferences. `gltf` includes GLB. This restricts which original models
-become catalog entries during future scans; excluded originals remain read only.
-Settings shows the source's import restriction beside its format counts.
-
-This is separate from the General processing checkboxes, which retain saved
-imports and only select work. Changing those checkboxes does not undo a deliberate
-source cleanup. Removing or changing a source import restriction is an explicit
-maintenance operation, followed by scanning and processing the restored formats.
-Sources without a restriction retain their previous inventory behavior.
-
+Descriptions are optional (decision 0008). Assets are searchable by name and image as soon as their previews
+are made; descriptions add a third signal. Description runs write in batches (decision 0007), build their
+search vectors and publish. Recorded description failures are kept and not retried; a cancelled run still
+publishes what it finished. Notifications (the bell) report descriptions ready to generate and each run's outcome.
 
 ## Excluded folders and duplicate export folders (decision 0019)
 
-Settings → Asset sources (or `local-assets sources exclude|include KEY PATTERN`) keeps a list of
-**excluded folders** per source in `source.json`: a folder name with `*` (`Unity*`, `*Godot*`,
-any level) or a path from the source root (`Models/Unity FBX`), case ignored. Excluded folders
-are not walked or hashed; the source shows how many files they hold. Their files cannot be
-textures for other models. Removing a pattern brings the files back on the rescan.
+**Exclude folder** (menu or panel; `library exclude KEY PATTERN`) skips a folder: a name with `*` (`Unity*`) or
+a path inside the library folder (`Models/Unity FBX`). Excluded folders are listed in the tree, faded, with
+**Include again**. Their files are not hashed and cannot be textures for other models.
 
-Each scan also compares **sibling folders by the names of their model files** (extension, case and
-subfolders ignored; each name once per folder; at least 3). Equal sets not already grouped by the
-recognized layouts become a suggestion on the source row and a line on its Asset processing card
-(`local-assets sources exports KEY`). Near misses are suggested too: folders whose shared names
-cover at least 90% of each folder's model files (an engine copy missing a few models, or a name
-repeated in two subfolders of one folder). The suggestion says how many names they share and which
-stay as they are; Group groups only the shared names. **Group as alternate files** attaches each copy to the asset
-of the reference folder's file, keeping its ID, inspection, previews and description (search
-vectors are rebuilt); **Exclude extra folders** adds the non-reference folders to the exclusions;
-**Keep separate** stops suggesting them. Answers can be undone. An answer is bound to the folder
-names and a hash of the name list: if a folder's files change, its files become separate again
-and the suggestion returns. Grouped files carry their folder as a variant label
-(`get_asset` `source_variants` / `source_variant`).
+Each scan compares sibling folders by the names of their model files. Equal or nearly equal sets (an engine
+copy missing a few models) become a suggestion in the library folder's panel: **Group as alternate files**
+(each copy joins the reference folder's asset, keeping its ID and results), **Exclude extra folders** or
+**Keep separate**. Answers can be undone.
 
 ## Texture folder for models missing textures (decision 0021)
 
-When inspected models could not find textures their files name, and the source has files with
-those exact names, the source row in Settings → Asset sources shows **Textures not found**: the
-candidate folders (for example `Textures/PBR`, `URP`, `HDRP`, `Unreal`), how many models each
-fixes, and **Also use textures that have only one version in this source**. **Apply** writes a
-texture-repair recipe for each model whose every missing texture resolves; Process assets then
-renders those models once with the mapped files. **Undo** removes the choice. Originals never
-change. Command line: `local-assets sources textures KEY [--use FOLDER] [--single-copies] [--undo]`.
-
-
-## Maintenance commands
-
-From the prepared runtime, `python -m local_asset_library.cli status` reports
-source state, and `scan` scans enabled sources. `--asset-source KEY` selects an
-individual source. `python scripts/library-batch.py process --source KEY` starts
-the same source operation used by the app; it publishes automatically. The
-returned operation token identifies its durable log in that source's metadata.
-
-## Storage budget
-
-The default storage budget (10 GiB total, `library_policy.DEFAULT_BUDGET`) applies until a user saves a
-budget in **Settings → General**. The saved whole-number GiB limit lives in `data/library/settings.json`
-and applies to the combined unique allocation of LAL and source metadata. Original
-assets and shared models are excluded. Saving does not start or retry processing.
-The saved total replaces both historical total and per-operation growth limits;
-explicit reserves on legacy command-line jobs still bound those jobs. Processing
-reads the setting at its storage checks, including between stages, and preserves
-completed work when it stops at the limit. Raise the budget and explicitly choose
-**Process assets** to continue pending work. Unchanged asset faults remain skipped.
+When inspected models can't find textures their files name and the library has files with those exact names,
+the library folder's panel shows **Textures not found** with candidate folders (`Textures/PBR`, `URP`, …) and
+how many models each fixes. **Apply** writes a texture-repair recipe for those models; Make previews then
+renders them once with the mapped files. **Undo** removes the choice. Originals never change.
 
 ## Shared project dependencies
 
-Split exports can register their model and shared-texture folders separately.
-Missing external glTF/GLB images resolve across enabled sources when the complete
-project-relative directory layout matches and all candidates have identical bytes.
-The texture source need not contain models. Originals stay read-only; conflicting,
-missing, changed or disabled providers remain visible faults. New registrations
-with the same convention use this feature automatically during normal scans.
-See [shared dependency behavior](dependency-path-overrides.md) and the binding
-[capability policy](../Assetarium%20KnowledgeBase/Decisions/0009-general-capabilities.md).
+Split exports can be separate library folders. Missing external glTF/GLB images resolve across enabled
+library folders when the project-relative layout matches and all candidates have identical bytes. See
+[shared dependency behavior](dependency-path-overrides.md) and
+[decision 0009](../Assetarium%20KnowledgeBase/Decisions/0009-general-capabilities.md).
 
-How sources are stored, identified and published internally is in the knowledge base:
+## Storage budget
+
+The storage budget in **Settings → General** (10 GiB until you save one) caps Assetarium's own disk use:
+the project folder and the library store, counting hard-linked files once. Original assets and shared models
+don't count. Jobs measure before they start and between stages; at the budget they stop and keep finished work.
+
+## Moving results into the library store
+
+An install from before the library store kept results in a generated folder inside each source. Until they
+are moved, the app shows a notice with the command and keeps showing your last published search, read only.
+Close the app and MCP servers, then run (base runtime; same arguments with `./scripts/uv.sh` on Linux):
+
+```powershell
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
+```
+
+This **dry run** finds every old folder at any depth (`--search PATH` adds places to look, for example a drive
+your library moved to) and writes a plan to `data/library/migration/plan-<time>.json`: assets and finished
+results per folder, sources relinked after a move (matched by their saved identity), folders whose identity
+two copies share (refused), images newly included and, for sources that imported only some formats, the
+folders proposed as exclusions so nothing new floods in. Review it, then add `--apply`:
+
+- It asks for a typed `yes` (no bypass), checks the app and MCP servers are closed, and saves storage receipts
+  before and after.
+- Results are copied, never moved: immutable files are hard-linked on the same drive. Each finished result is
+  re-keyed by its inputs, so **nothing renders or is described again**; a result that was already out of date
+  stays pending, as before.
+- Every asset keeps its ID. Old sources inside a `--library-folder` become part of it.
+- It rescans without models and checks that every published asset is present and nothing newly pending, then
+  writes `data/library/migration/<time>.json`. A fault stops only its own folder. A folder is imported once.
+
+`--remove-old` then deletes the old generated folders whose import a receipt verified, asking for each one.
+
+How library folders, recognition and the store work internally is in the knowledge base:
 [Sources](../Assetarium%20KnowledgeBase/Notebook/Sources%20and%20Catalog/Sources.md).

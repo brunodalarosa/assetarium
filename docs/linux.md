@@ -2,7 +2,7 @@
 
 Assetarium v1 on Linux x86_64 (glibc) is **command line plus the MCP server**, with
 no desktop app ([decision 0013](../Assetarium%20KnowledgeBase/Decisions/0013-platform-support.md)). Every owner
-action except visual browsing runs from the [CLI](cli.md): sources, Process assets,
+action except visual browsing runs from the [CLI](cli.md): library folders, packs, Make previews,
 settings, failures and collection exports, plus scans, Blender previews, keyword
 search, the STDIO MCP server and the test suite. Windows stays the fully verified
 primary platform. GPU descriptions and semantic/image search are **not verified on
@@ -89,8 +89,8 @@ links); it reports them as `excluded_file_links`.
 See [Command line](cli.md). In short:
 
 ```bash
-./scripts/local-assets.sh sources add /path/to/assets
-./scripts/local-assets.sh process --asset-source <key>     # Ctrl+C cancels safely
+./scripts/local-assets.sh library add /path/to/assets
+./scripts/local-assets.sh previews <key>                  # queued; follow with: queue list
 ./scripts/local-assets.sh search lantern
 ```
 

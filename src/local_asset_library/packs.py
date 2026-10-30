@@ -131,6 +131,21 @@ def pack_of(config, source, record, detected=None):
     return {'id': pack['id'], 'path': path, 'name': names.get(path) or pack['name'] or source['name']}
 
 
+def fields(config, record):
+    """``pack_name`` and ``pack_path`` for agents (the detected pack); empty when it cannot be told."""
+    from .sources import registry
+    if not config.sources_registry or not record.get('files'):
+        return {}
+    try:
+        source = next((s for s in registry(config)['sources'] + registry(config)['detached'] if s['key'] == record['pack_id']), None)
+        if source is None:
+            return {}
+        pack = pack_of(config, source, record)
+        return {'pack_name': pack['name'], 'pack_path': pack['path']}
+    except Exception:  # Pack detection never breaks search or detail; the folder key is still there.
+        return {}
+
+
 def names_of(config, source):
     from .library_store import answers
     return {a['path']: a['value'] for a in answers(config, source['id'], 'pack_name')}

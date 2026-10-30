@@ -85,7 +85,7 @@ function BlenderStep() {
       <Paragraph>Assetarium uses Blender in the background to inspect 3D files and render their previews. It starts Blender with scripts and add-ons turned off and never changes your Blender settings or your files. Without Blender you can still browse, search by name and keyword, and view previews that were already rendered; new 3D assets just can’t be processed.</Paragraph>
       <Card title="Blender executable" help={`Tested with Blender ${blender?.tested_version || "5.2"}; other versions show a warning but can be used.`}>
         <BlenderPicker idPrefix="setup" report={blender} path={draft.blenderPath} check={check} checking={checking} confirmRerender={draft.confirmRerender}
-          saveNote="Saved to config.local.toml when you finish. Process assets and the speed test use it right away; no restart needed."
+          saveNote="Saved to config.local.toml when you finish. Make previews and the speed test use it right away; no restart needed."
           onPath={(value) => updateSetupDraft({ blenderPath: value, confirmRerender: false })} onConfirm={(checked) => updateSetupDraft({ confirmRerender: checked })}
           onCheck={() => void checkBlender()} onCancel={() => void cancelBlenderCheck()} onChoose={() => void chooseBlenderExecutable()} />
       </Card>
@@ -265,11 +265,11 @@ function Review() {
           <li className="flex items-center gap-2"><Check className="size-4 text-success" aria-hidden />Settings saved to Settings → General.</li>
           <li className="flex items-start gap-2" id="setup-blender-result">
             {result.blender.status === "faulty" ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-fault" aria-hidden /> : <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />}
-            <span>{result.blender.status === "saved" ? `Blender saved to ${result.blender.file}. Process assets uses it from its next run.`
+            <span>{result.blender.status === "saved" ? `Blender saved to ${result.blender.file}. Make previews uses it from its next run.`
               : result.blender.status === "faulty" ? `${result.blender.reason} Your other choices were saved.` : "Blender unchanged; nothing was written."}</span>
           </li>
         </ul>
-        <Paragraph>Next: add a folder of assets in Settings → Asset sources, then run Process assets.</Paragraph>
+        <Paragraph>Next: add a library folder on the Asset sources tab, then choose Make previews on a pack.</Paragraph>
         <div className="flex flex-wrap gap-3">
           <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Asset sources</Button>
           <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>

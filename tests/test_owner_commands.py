@@ -180,3 +180,33 @@ def test_search_threads_setting(managed, capsys, monkeypatch):
     assert run(config, 'settings', 'set', '--search-threads', 'auto') == 0
     assert 'Search CPU threads: 32 of 32 (every logical thread (not speed-tested yet))' in capsys.readouterr().out
     assert run(config, 'settings', 'set', '--search-threads', '40') == 2 and '1 to 32 CPU threads' in capsys.readouterr().err
+
+
+def test_library_packs_queue_and_forget_missing_from_a_terminal(managed, monkeypatch, capsys):
+    """The commands of decision 0023: the same backend calls as the Asset sources tab and the queue."""
+    from local_asset_library import library_view, processing_queue
+    config, _, one, _ = managed
+    monkeypatch.setattr(library_view, 'blockers', lambda config: {})
+    started = []
+    monkeypatch.setattr(source_operations, 'start', lambda config, operation, key=None, **kw: started.append((operation, key, len(kw.get('asset_ids') or [])))
+                        or {'status': 'started', 'token': 't'})
+    monkeypatch.setattr(source_operations, 'operation_status', lambda scoped: {'status': 'processing', 'token': 't'})
+    sources.scan_source(config, one)
+    assert run(config, 'library', 'list') == 0 and one['key'] in capsys.readouterr().out
+    assert run(config, '--json', 'packs', 'list', one['key']) == 0
+    assert json.loads(capsys.readouterr().out)['packs']
+    assert run(config, 'previews', one['key'], '--dry-run') == 0
+    assert 'model' in capsys.readouterr().out and not started
+    assert run(config, 'previews', one['key']) == 0 and started == [('process', one['key'], 3)]
+    capsys.readouterr()
+    assert run(config, '--json', 'queue', 'list') == 0
+    assert json.loads(capsys.readouterr().out)['running']['action'] == 'previews'
+    assert run(config, 'queue', 'overnight', 'on', '--window', '23:00-06:00') == 0
+    assert processing_queue.load(config)['overnight'] == {'enabled': True, 'start': '23:00', 'end': '06:00'}
+    (Path(one['path']) / 'item0.obj').unlink()
+    sources.scan_source(config, one)
+    monkeypatch.setattr('sys.stdin', io.StringIO('yes\n'))
+    assert run(config, 'forget-missing', one['key']) == 2  # Not an interactive terminal: refused, nothing forgotten.
+    monkeypatch.setattr('sys.stdin', Terminal('yes\n'))
+    monkeypatch.setattr('sys.stdout', Terminal())
+    assert run(config, 'forget-missing', one['key']) == 0

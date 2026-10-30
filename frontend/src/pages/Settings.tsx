@@ -144,7 +144,7 @@ function BlenderInstallation() {
           {b.editing ? (
             <>
               <BlenderPicker idPrefix="settings" report={report} path={b.path} check={b.check} checking={b.checking} confirmRerender={b.confirmRerender}
-                saveNote="Save writes it to config.local.toml. Process assets and the speed test use it right away; no restart needed."
+                saveNote="Save writes it to config.local.toml. Make previews and the speed test use it right away; no restart needed."
                 onPath={(path) => updateBlenderInstallation({ path, confirmRerender: false })} onConfirm={(checked) => updateBlenderInstallation({ confirmRerender: checked })}
                 onCheck={() => void checkBlenderInstallation()} onCancel={() => void cancelBlenderCheck()} onChoose={() => void chooseBlenderInstallation()} />
               {(writes || saved) && (

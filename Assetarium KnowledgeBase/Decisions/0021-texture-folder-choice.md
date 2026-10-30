@@ -33,3 +33,7 @@ texture dependencies"; `Textures/PBR` alone resolves 49, and with the two textur
 
 **Keep true.** Exact file names only, never similar names. One decision per source, applied only by
 the owner. All or nothing per model. Originals and the inspection worker stay unchanged.
+
+> **Since [decision 0023](0023-central-asset-library.md) (October 30, 2026):** the per-source generated folder named
+> here is replaced by the central library store; the rules of this decision are unchanged and now apply to
+> library folders, packs and folders.

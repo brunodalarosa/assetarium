@@ -51,3 +51,7 @@ and an `OBJ/` folder whose subfolder is spelled `Landscape` instead of `Landscap
 **Keep true.** Structure and owner answers, never publisher names. Never regroup without a current
 answer; an answer that no longer matches is inert. Exclusions never delete anything. A
 variant is chosen from an asset's own files only.
+
+> **Since [decision 0023](0023-central-asset-library.md) (October 30, 2026):** the per-source generated folder named
+> here is replaced by the central library store; the rules of this decision are unchanged and now apply to
+> library folders, packs and folders.

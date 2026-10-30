@@ -72,6 +72,10 @@ def originals(root):
 def test_dry_run_plans_and_apply_imports_without_re_queuing(old_install):
     config, one, two, published = old_install
     assert migration.needed(config)['needed']
+    # Before the migration the last published search stays usable, read only, with its previews.
+    assert {r['asset_id'] for r in records(config)} == published
+    item = next(r for r in records(config) if r['previews'])
+    assert config.output_path('data', item['previews'][0]['path'][5:]).is_file()
     before = {s['key']: originals(s['path']) for s in (one, two)}
     (Path(two['path']) / 'Extra').mkdir()
     (Path(two['path']) / 'Extra/only.fbx').write_text('synthetic')

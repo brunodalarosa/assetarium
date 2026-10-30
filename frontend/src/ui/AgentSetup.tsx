@@ -103,10 +103,10 @@ function ProposalCard({ proposal }: { proposal: Json }) {
         <span className="break-all font-mono text-[12px]">{proposal.path}</span>
         <span className="text-muted-foreground">, checked as Blender {proposal.version}{proposal.check === "warning" ? " (works; not the tested version)" : ""} with glTF · FBX · OBJ importers.</span>
       </p>
-      <p className="text-[12.5px] text-muted-foreground">Apply checks it again on this computer, then saves it to config.local.toml. Process assets uses it from its next run.</p>
+      <p className="text-[12.5px] text-muted-foreground">Apply checks it again on this computer, then saves it to config.local.toml. Make previews uses it from its next run.</p>
       {proposal.rerender > 0 && (
         <Banner tone="warning" role="status" className="grid gap-3">
-          <span>Changing Blender marks {plural(proposal.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Process assets renders them again.</span>
+          <span>Changing Blender marks {plural(proposal.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Make previews renders them again.</span>
           <Checkbox id={"agent-confirm-" + proposal.id} label="I understand; render them again with this Blender" checked={confirmed} onCheckedChange={setConfirmed} />
         </Banner>
       )}

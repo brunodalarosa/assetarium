@@ -10,11 +10,11 @@ Run them through the launcher, which uses the prepared `mcp` environment (it has
 Pillow for PNG and Markdown exports) and installs nothing:
 
 ```powershell
-.\scripts\local-assets.ps1 sources list
+.\scripts\local-assets.ps1 library list
 ```
 
 ```bash
-./scripts/local-assets.sh sources list
+./scripts/local-assets.sh library list
 ```
 
 `.\scripts\uv.ps1 run --locked --no-sync --offline local-assets …` (or `uv.sh`)
@@ -22,36 +22,76 @@ works too; only PNG and Markdown exports need the launcher. Add `--json` before
 the command for machine-readable output. Exit codes: `0` done, `1` finished with
 recorded faults or still running, `2` refused or invalid.
 
-## Sources
+## Library folders
+
+A library folder is a watched folder of assets; nothing is ever written into it. `sources …` still works
+as the old name of `library …`.
 
 | Command | Same as in the app |
 | --- | --- |
-| `sources list` | Settings → Asset sources (status, pending, failed, reason) |
-| `sources add PATH` | Add a folder; scans it (no rendering or models) |
-| `sources enable KEY` / `sources disable KEY` | Enabled switch (enabling rescans) |
-| `sources images KEY on\|off` | Include 2D images (rescans; nothing is deleted) |
-| `sources exclude KEY PATTERN` / `sources include KEY PATTERN` | Excluded folders: a folder name with `*` or a path inside the source (rescans; nothing is deleted) |
-| `sources textures KEY` | Models missing textures: folder suggestions with counts; choose with `--use FOLDER` and/or `--single-copies`, undo with `--undo` (rescans; originals never change) |
-| `sources exports KEY` | Duplicate export folder suggestions and saved answers; answer with `--group ID`, `--separate ID`, `--exclude ID`, undo with `--undo ID` (rescans) |
-| `sources remove KEY` | Remove: stops listing the source; files and results stay on disk |
+| `library list` | Asset sources tab: each library folder with pending, failed and its reason |
+| `library add PATH` | Add library folder; scans it (no rendering or models). A folder inside a library folder is refused as already covered; one around library folders replaces them and keeps their assets, IDs and results |
+| `library enable KEY` / `library disable KEY` | Included in search switch (enabling rescans) |
+| `library exclude KEY PATTERN` / `library include KEY PATTERN` | Exclude folder / Include again: a folder name with `*` or a path inside the folder (rescans; nothing is deleted) |
+| `library images KEY FOLDER textures\|2d\|auto` | Treat images here as textures / as 2D assets, or let detection decide (rescans) |
+| `library textures KEY` | Models missing textures: folder suggestions with counts; choose with `--use FOLDER` and/or `--single-copies`, undo with `--undo` (rescans; originals never change) |
+| `library exports KEY` | Duplicate export folder suggestions and saved answers; answer with `--group ID`, `--separate ID`, `--exclude ID`, undo with `--undo ID` (rescans) |
+| `library remove KEY` | Remove: stops watching the folder; its results stay in the library store and adding it again restores them |
+| `forget-missing KEY [--pack FOLDER]` | Forget missing: assets whose files vanished are forgotten (interactive `yes`; their history stays) |
+
+## Packs
+
+| Command | Same as in the app |
+| --- | --- |
+| `packs list KEY` | The packs and bundles detected in a library folder, with the evidence (license, readme, preview, versioned name) |
+| `packs rename KEY FOLDER NAME` | Rename a pack (an empty name restores the folder name) |
+| `packs merge KEY FOLDER` | Merge into parent pack (rescans) |
+| `packs split KEY FOLDER` | Make this a pack (rescans) |
+| `packs reset KEY FOLDER` | Forget a merge or split; detection decides again (rescans) |
 
 ## Processing
 
 | Command | Same as in the app |
 | --- | --- |
-| `process --asset-source KEY` | Asset processing → Process assets: previews and search data, then publish |
-| `describe --asset-source KEY` | Generate descriptions (built-in engine: the caption runtime and an NVIDIA CUDA GPU; local model server: only the running server) |
+| `previews KEY[/FOLDER]` | Make previews for a library folder, folder or pack: inspection, previews and search data. It starts at once or waits in the queue |
+| `previews KEY --asset ID …` | Make previews for picked assets |
+| `describe KEY[/FOLDER]` | Generate descriptions (built-in engine: the caption runtime and an NVIDIA CUDA GPU; local model server: only the running server) |
+| `previews … --dry-run` | What it would do: counts, an estimated time range and disk, and what is blocked with its fix |
+| `queue list` | Asset processing: Running, Up next, Blocked |
+| `queue move ID POSITION` / `queue remove ID` | Reorder or remove an item; removing the running one cancels it cleanly |
+| `queue pause` / `queue resume` | A queue left over after a restart is paused and never resumes by itself |
+| `queue overnight on\|off [--window 22:00-07:00]` | Hold descriptions until the overnight window |
+| `process --asset-source KEY` | Process a whole library folder now, watching its progress |
 | `cancel --asset-source KEY` | Cancel |
-| `process --asset-source KEY --follow` | Watch an operation that is already running |
 | `refresh --asset-source KEY` | Refresh published view (publishes usable partial results) |
-| `failures` | Importing failures report: original paths of assets whose import failed |
-| `recheck --asset-source KEY` | Recheck failures: lists failures from the file/dependency check that pass it now and, after a typed `yes`, retries them on the next Process assets (decision 0020) |
+| `failures` | Original paths of assets whose import failed |
+| `recheck --asset-source KEY` | Recheck failures: lists failures from the file/dependency check that pass it now and, after a typed `yes`, retries them on the next Make previews (decision 0020) |
 
-`process` and `describe` wait and print progress. **Ctrl+C cancels safely**: the
-current asset finishes (descriptions finish their batch) and saved work is kept;
-a second Ctrl+C only stops watching while the cancel completes. The work runs as
-its own process, so closing the terminal does not stop it; `--follow` reattaches.
-Recorded failures are never retried by these commands.
+Previews always run ahead of descriptions, one item at a time; each finished item starts the next, so
+the queue runs without the app or the terminal. The scope is resolved when an item starts ("whatever in
+this pack still lacks previews"). An item estimated over 30 minutes, or one that would reach the storage
+budget, prints its estimate and starts only with `--yes`. Blocked work (Blender not set up, the search
+runtime missing) is never queued: the command names the fix instead.
+
+`process` waits and prints progress. **Ctrl+C cancels safely**: the current asset finishes and saved work
+is kept; a second Ctrl+C only stops watching while the cancel completes. The work runs as its own process,
+so closing the terminal does not stop it; `--follow` reattaches. Recorded failures are never retried by
+these commands.
+
+## The one-time library migration
+
+Results from before the library store live in a `metadata` folder inside each old source. Move them into
+the store once, with the app and MCP servers closed (base runtime; nothing renders or is described again):
+
+```powershell
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets" --apply
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --remove-old
+```
+
+The first run is a dry run that writes a plan to `data/library/migration/`; `--apply` asks for a typed `yes`,
+imports, verifies and writes a receipt; `--remove-old` deletes only verified old folders, asking for each.
+See [Asset sources](asset-sources.md#moving-results-into-the-library-store).
 
 `process --stage inspection|caption|embeddings` is the existing stage-level
 maintenance command (used by `library-batch.py`) and is unchanged.
@@ -127,7 +167,7 @@ tools (`edit_collection`, `tag_assets`) and in the desktop app.
 
 ## Confirmations
 
-`sources remove` and `collections delete` ask you to type `yes`, like the app's red
+`library remove` and `collections delete` ask you to type `yes`, like the app's red
 confirmations. They refuse to run without an interactive terminal and have no
 bypass flag: agents can run commands, and only the owner deletes (decision 0012).
 Replacing an existing export file asks the same way.

@@ -32,3 +32,7 @@ verification folders about 3.4 GB, with no policy that stopped the growth.
 **Keep true.** Never retire the active generation or anything outside these
 exact locations. Do not widen retention (fewer generations, other evidence
 folders) without the owner. Keep receipts.
+
+> **Since [decision 0023](0023-central-asset-library.md) (October 30, 2026):** the per-source generated folder named
+> here is replaced by the central library store; the rules of this decision are unchanged and now apply to
+> library folders, packs and folders.

@@ -160,7 +160,7 @@ def excluded_folders(config):
     """Folders a scan skips entirely (decision 0019): not walked, hashed or imported."""
     value = _source_settings(config).get('excluded_folders', [])
     if not isinstance(value, list) or len(value) > 50:
-        raise ConfigError('Invalid saved excluded folders; set them again in Settings → Asset sources')
+        raise ConfigError('Invalid saved excluded folders; set them again on the Asset sources tab')
     return [validate_exclusion(item) for item in value]
 
 
@@ -169,7 +169,7 @@ def export_decisions(config):
     value = _source_settings(config).get('export_decisions', [])
     if not isinstance(value, list) or any(not isinstance(item, dict) or item.get('decision') not in {'group', 'separate'}
                                           for item in value):
-        raise ConfigError('Invalid saved export folder decisions; answer the suggestions again in Settings → Asset sources')
+        raise ConfigError('Invalid saved export folder decisions; answer the suggestions again on the Asset sources tab')
     return value
 
 
@@ -225,7 +225,7 @@ def texture_folder(config):
         return None
     if (not isinstance(value, dict) or not (value.get('folder') is None or isinstance(value.get('folder'), str))
             or type(value.get('single_copies')) is not bool or (value.get('folder') is None and not value['single_copies'])):
-        raise ConfigError('Invalid saved texture folder; choose it again in Settings → Asset sources')
+        raise ConfigError('Invalid saved texture folder; choose it again on the Asset sources tab')
     return value
 
 
@@ -614,6 +614,10 @@ def _format_status(scoped, formats, signature):
 def visible(config, records):
     if not config.sources_registry or config.source_key:
         return records
+    if not registry(config)['sources']:
+        from .library_migration import needed
+        if needed(config)['needed']:
+            return records  # Before the one-time migration: the last published search stays usable, read only.
     allowed = {}
     for source in registry(config)["sources"]:
         if not source["enabled"]:

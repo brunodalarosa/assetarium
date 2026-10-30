@@ -161,6 +161,10 @@ Done when: a user can select a sheet, inspect known frames, play a defined seque
 
 ### Step 4 - Textures and material sets
 
+> **Draft change for owner review (ASSETRM-0002, decision 0023, D15):** individual texture records exist
+> now: images are classified as model textures, **material textures** (browsable, found by name) or 2D
+> images. This step covers only linked **material sets** on top of them ([prompt](Prompts/04-textures-and-materials.md)).
+
 Support individual texture records and linked material sets. Record resolution, map role, color-space evidence, channel packing, tiling/scale evidence, normal convention, and dependency completeness. Keep unsupported/unknown details explicit. Use manifests or reviewed conventions for grouping; same-stem names alone are tentative evidence.
 
 Generate bounded, reproducible plane/sphere previews for supported mappings, with renderer/version, lighting, geometry, map bindings, and any substitutions stated. Do not silently fill missing required maps or change normal/channel conventions. Preserve usable individual images when assembly fails. Do not feed normal/roughness maps to Qwen as if they directly depict the final surface.

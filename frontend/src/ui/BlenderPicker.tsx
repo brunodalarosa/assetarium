@@ -85,7 +85,7 @@ export function BlenderPicker({ idPrefix, report, path, check, checking, confirm
       {usable && current.change === "write" && <p className="text-[12.5px] text-muted-foreground">{saveNote}</p>}
       {usable && current.change === "write" && current.rerender > 0 && (
         <Banner tone="warning" role="status" className="grid gap-3">
-          <span>Changing Blender marks {plural(current.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Process assets renders them again.</span>
+          <span>Changing Blender marks {plural(current.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Make previews renders them again.</span>
           <Checkbox id={`${idPrefix}-confirm-rerender`} label="I understand; render them again with this Blender" checked={confirmRerender} onCheckedChange={onConfirm} />
         </Banner>
       )}

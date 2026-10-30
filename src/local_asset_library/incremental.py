@@ -726,7 +726,7 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                         stack.enter_context(lease(config, 'batch-source-inspection', timeout=GPU_WAIT))
                     except ConfigError as exc:
                         raise render_pool.DeviceUnavailable('The GPU is busy with another job (descriptions or search). '
-                            'Process assets again when it finishes, or choose CPU in Settings → General') from exc
+                            'Make previews again when it finishes, or choose CPU in Settings → General') from exc
                 stack.enter_context(render_pool.opened(work, plan['processes'], plan['threads'], plan['device']))
                 if plan['processes'] > 1:
                     parallel = plan['processes']

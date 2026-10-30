@@ -2,7 +2,7 @@
 tags: [roadmap]
 id: ASSETRM-0002
 type: plan
-status: agreed
+status: implemented
 created: 2026-10-30
 code: [sources.py, sources.generated_path, sources.owners, sources.add, catalog.asset_id, catalog.walk_source, image_catalog.py, incremental.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, image_inspection.inspection_input, hash_cache.py, publication.py, source_operations.py, gpu_queue.py, overnight.py, library_policy.py, src/local_asset_library/blender_worker.py, frontend/src/ui/Shell.tsx, frontend/src/ui/AssetGrid.tsx, frontend/src/pages/Processing.tsx, frontend/src/pages/Settings.tsx, frontend/src/pages/SourceBrowser.tsx]
 ---

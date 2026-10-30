@@ -17,6 +17,8 @@ descriptions, search vectors, then publication. Up: [Notebook](../Notebook.md).
   explicit overrides, texture repairs.
 - [Descriptions](Descriptions.md): Qwen3-VL captions, batching, caption severity, overnight runs.
 - [GPU lease](GPU%20lease.md): one GPU job at a time across processes.
+- [Processing queue](Processing%20queue.md): Make previews and Generate descriptions as queue items
+  whose scope resolves at start; previews first, overnight hold, paused after a restart.
 - [Search vectors](Search%20vectors.md) *(gap)*: `library_index.py` vector jobs and the index contract.
 
 ## Read first

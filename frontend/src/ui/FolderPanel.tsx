@@ -32,7 +32,7 @@ function TextureChoice({ source, busy }: { source: Json; busy: boolean }) {
     <div className="texture-choice grid gap-3 rounded-2xl bg-surface-2 p-4">
       {chosen && (
         <p className="texture-chosen flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
-          <span>Textures from {chosen.folder || "no folder"}{chosen.single_copies ? " and single copies" : ""}. Repaired models wait for Process assets; originals are not changed.</span>
+          <span>Textures from {chosen.folder || "no folder"}{chosen.single_copies ? " and single copies" : ""}. Repaired models wait for Make previews; originals are not changed.</span>
           <button type="button" className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="textures-undo" onClick={() => void run(true)}>Undo</button>
         </p>
       )}
@@ -55,7 +55,7 @@ function TextureChoice({ source, busy }: { source: Json; busy: boolean }) {
           <div className="flex flex-wrap gap-2">
             <Button className="h-9 px-4" disabled={disabled || !fixes} data-action="textures-apply" onClick={() => void run(false)}>Apply</Button>
           </div>
-          <p className="hint text-[11.5px] leading-relaxed text-subtle">Applying records your choice with each repaired model and scans again. Nothing is rendered until you click Process assets, and original files are never changed. Undo removes the choice.</p>
+          <p className="hint text-[11.5px] leading-relaxed text-subtle">Applying records your choice with each repaired model and scans again. Nothing is rendered until you choose Make previews, and original files are never changed. Undo removes the choice.</p>
         </>
       )}
     </div>
@@ -182,6 +182,7 @@ export function FolderPanel() {
         <p className="truncate text-[12px] text-muted-foreground" title={full}>{full}</p>
         {kind === "pack" && <PackName folderKey={folder.key} path={view.path} name={name} />}
       </header>
+      {folder.scan_fault && <Banner><span id="folder-fault">{folder.scan_fault}</span></Banner>}
       {folder.offline && <Banner tone="warning"><span>Offline: this folder can’t be reached (a removed drive?). Its results and collection entries are kept.</span></Banner>}
       <dl className="grid grid-cols-2 gap-3 text-[12.5px]">
         <div><dt className="text-muted-foreground">Assets</dt><dd className="font-medium tabular-nums">{(node.assets || 0).toLocaleString()}</dd></div>

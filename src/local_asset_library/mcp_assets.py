@@ -393,7 +393,9 @@ class AssetService:
         deps = result["dependencies"]
         if len(deps) > 64:
             raise ConfigError("Dependency count exceeds 64; cannot return an incomplete usable package")
+        from .packs import fields
         payload = {"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
+                   **fields(self.config, record),  # The detected pack inside the library folder (decision 0023).
                    'asset_type': record.get('asset_type', 'model_3d'), 'parent_asset_id': record.get('parent_asset_id'),
                    "availability": "available", "status": "available", "usable": True,
                    "selected_source": result["selected_source"], "dependencies": deps,

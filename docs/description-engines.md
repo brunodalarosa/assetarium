@@ -54,7 +54,7 @@ Qwen3-VL-2B-Instruct (caption quality rules were calibrated on Qwen).
 no fallback between them. Settings → General → Search, the setup wizard, `apply_setup` or
 `local-assets settings set --search-device cpu`. The CPU embedder is the same EmbeddingGemma
 revision in BF16 with its own contract (device, adapter and lock hashes), so its vectors are a
-separate index: after switching, record the search check again and Process assets.
+separate index: after switching, record the search check again and Make previews.
 
 CPU setup, from the Assetarium folder:
 

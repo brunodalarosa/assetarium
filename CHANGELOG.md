@@ -8,6 +8,30 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Asset sources** tab (the folder icon above Settings): browse by place through library folders,
+  bundles, packs and folders, with coverage, "+N new", a card state for every asset (no previews
+  yet, queued, ready, blocked with its fix, recorded failure, missing), a pack header with its
+  cover and license, folder and pack panels, context menus, double-click to Explorer and Show in
+  pack from search results (decision 0023).
+- Packs are detected from folder structure (license, readme, preview image, versioned names), and
+  you can make a folder a pack, merge it into its parent or rename it (`local-assets packs`).
+- **Make previews** and **Generate descriptions** on a pack, folder or picked assets go to a
+  processing queue: they start at once or wait in line, previews go first, long jobs show an
+  estimate and ask first, descriptions can wait for an overnight window, and work left from a
+  previous session waits paused (`local-assets previews`, `describe`, `queue`).
+- Asset processing shows Running (with a copyable live log), Up next, Blocked (with the fix),
+  Recorded failures (by stage and reason) and Recent.
+- Every supported type is always included. Images are sorted into model textures (kept with their
+  model), material textures and 2D images, with the evidence for each; "Treat images here as
+  textures / as 2D assets" corrects a folder (`local-assets library images`).
+- 2D images show their original file before any processing.
+- Files that move or are renamed keep their ID, previews, descriptions, reviews and collection
+  entries; copies share finished previews and descriptions instead of rendering again; vanished
+  files are listed as Missing until you forget them (`local-assets forget-missing`).
+- `scripts/migrate-library.py` moves existing results into the library store once, with a dry run
+  first, without rendering or describing anything again.
+- Agents get each asset's detected `pack_name` and `pack_path` from `search_assets` and `get_asset`.
+
 - **Settings → General → Blender installation** shows whether a Blender is saved (Saved, Not
   saved, Missing, Not found), checks it on request and changes it with the same choose, check and
   confirm steps as the setup wizard, without running setup again.
@@ -46,6 +70,15 @@ All notable changes to Assetarium are listed here. The project follows
   `local-assets setup status` lists search on its own, whichever description engine you use.
 
 ### Changed
+
+- Nothing is written into asset folders any more: previews, descriptions and search data live in
+  one library store (`data/library-store/`, or `[storage].library` in `config.local.toml`), which
+  counts against the storage budget. Run `scripts/migrate-library.py` once to move existing
+  results (see Asset sources in the docs).
+- Library folders replace asset sources: `local-assets library …` replaces `sources …` (still
+  accepted). Adding a folder around library folders replaces them and keeps their assets.
+- Settings has no Asset sources section and the per-source **Include 2D images** checkbox and
+  import format restrictions are gone; the source browser page is replaced by the Asset sources tab.
 
 - Contributor documentation moved into `Assetarium KnowledgeBase/`, an Obsidian vault that also reads on
   GitHub: decisions, current status, contracts, the roadmap and per-area notes. `docs/` keeps the
