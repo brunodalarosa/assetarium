@@ -1,7 +1,8 @@
-"""Source registration, source-owned metadata and the combined read-only catalog.
+"""Library folders, their working data in the library store and the combined read-only catalog.
 
-Logical data/ paths are retained in records so moving results never changes an
-embedding input. Only this resolver translates them to metadata-lal directories.
+Nothing is written into a library folder (decision 0023). Each folder's working data lives in the store
+under ``folders/<id>/``; results keyed by inputs are shared by the whole store. Logical data/ paths are
+retained in records, and only this resolver translates them to store directories.
 """
 from contextlib import closing
 from copy import deepcopy
@@ -31,38 +32,36 @@ def now():
 
 
 def registry(config):
+    """Library folders as ``{'sources': [...], 'detached': [...]}`` from the store's ``library.sqlite``."""
     if not config.sources_registry:
         return {"schema_version": 1, "revision": "legacy", "sources": [], "detached": []}
     from .publication import request_memo
-    return request_memo(("registry", str(config.sources_registry), str(config.models_root)), lambda: _registry(config))
+    return request_memo(("registry", str(config.library_store()), str(config.models_root)), lambda: _registry(config))
 
 
 def _registry(config):
-    if not config.sources_registry.exists():
+    from .library_store import database_path
+    path = database_path(config)
+    if not path.exists():
         return {"schema_version": 1, "revision": "empty", "sources": [], "detached": []}
-    stat = config.sources_registry.stat()
-    return _registry_file(config.sources_registry, stat.st_mtime_ns, stat.st_size,
-                          config.project_root, config.models_root)
+    stat = path.stat()
+    return _registry_file(config, stat.st_mtime_ns, stat.st_size)
 
 
 @lru_cache(maxsize=16)
-def _registry_file(path, stamp, size, project_root, models_root):
-    from .config import Config
-    config = Config(project_root, project_root.parent / '.lal-managed-sources', None, models_root)
-    value = read_json(path)
-    if value.get("schema_version") != 1 or not isinstance(value.get("sources"), list):
-        raise ConfigError("Invalid source settings")
+def _registry_file(config, stamp, size):
+    from .library_store import folders
+    value = folders(config)
     seen, identifiers, roots = set(), set(), []
     for item in value["sources"]:
         key = item.get("key", "")
         if (not key or key in seen or item.get('id') in identifiers or len(Path(key).parts) != 1 or "/" in key or "\\" in key
-                or key in {".", "..", "metadata-lal"} or not re.fullmatch(r"[0-9a-f]{32}", item.get("id", ""))
-                or type(item.get("enabled")) is not bool):
-            raise ConfigError("Invalid or duplicate asset source")
+                or key in {".", ".."} or not re.fullmatch(r"[0-9a-f]{32}", item.get("id", ""))):
+            raise ConfigError("Invalid or duplicate library folder")
         _relative(key)
         root = validate_directory(config, item["path"], require_exists=False)
         if any(root.is_relative_to(p) or p.is_relative_to(root) for p in roots):
-            raise ConfigError("Asset source directories overlap")
+            raise ConfigError("Library folders overlap")
         roots.append(root)
         seen.add(key)
         identifiers.add(item['id'])
@@ -86,12 +85,9 @@ def _validate_directory(config, value, require_exists=True):
         raise ConfigError("Asset source directory links are not supported")
     if require_exists and not resolved.is_dir():
         raise ConfigError("Asset source directory is unavailable")
-    for other in (config.project_root, config.models_root):
+    for other in (config.project_root, config.models_root, config.library_root):
         if other and (resolved.is_relative_to(other) or other.is_relative_to(resolved)):
-            raise ConfigError("Asset sources must not overlap LAL or shared models")
-    metadata = resolved / "metadata-lal"
-    if metadata.is_symlink() or metadata.is_junction() or metadata.resolve() != metadata:
-        raise ConfigError("metadata-lal must be a regular directory inside its source")
+            raise ConfigError("Library folders must not overlap Assetarium, its library store or shared models")
     return resolved
 
 
@@ -112,9 +108,10 @@ def source_for_path(config, relative):
 
 
 def bound(config, source):
+    """``config`` scoped to one library folder; its working data lives in the store, never in the folder."""
     path = validate_directory(config, source["path"], require_exists=False)
     return replace(config, source_root=path, source_key=source["key"],
-                   metadata_root=path / "metadata-lal", catalog_generation=None)
+                   metadata_root=config.library_store() / "folders" / source["id"], catalog_generation=None)
 
 
 def import_formats(config):
@@ -181,8 +178,9 @@ def validate_exclusion(pattern):
         raise ConfigError('Enter a folder name or a path inside the source')
     value = pattern.strip().replace('\\', '/').strip('/')
     parts = value.split('/')
+    from .library_migration import LEGACY_METADATA_DIR
     if (not value or len(value) > 200 or any(ord(c) < 32 for c in value) or ':' in value
-            or any(part in {'', '.', '..'} for part in parts) or value.casefold() == 'metadata-lal'):
+            or any(part in {'', '.', '..'} for part in parts) or value.casefold() == LEGACY_METADATA_DIR):
         raise ConfigError('Enter a folder name like "Unity*" or a path inside the source like "Models/Unity FBX"')
     return value
 
@@ -315,9 +313,17 @@ def generated_path(config, relative):
     if relative in SHARED_DATA:
         return None
     from .result_store import shared_area
-    if shared_area(relative):
+    from .library_migration import LEGACY_METADATA_DIR
+    # An old generated folder read by the one-time migration holds its results too.
+    legacy = config.metadata_root and config.metadata_root.name.casefold() == LEGACY_METADATA_DIR
+    if shared_area(relative) and not legacy:
         # Results keyed by inputs belong to the whole library store, whichever folder an asset is in (decision 0023).
-        return _inside(config.library_store(), relative)
+        target = _inside(config.library_store(), relative)
+        if not config.source_key and not target.exists():
+            from .library_migration import legacy_path
+            # Before the one-time migration, the last published search still shows its previews, read only.
+            return legacy_path(config, relative) or target
+        return target
     if config.metadata_root:
         root = config.metadata_root
         # The source root and its metadata directory are revalidated for every
@@ -334,7 +340,7 @@ def generated_path(config, relative):
         key = owners(config).get(match[1])
         if key:
             source = get_source(config, key, include_detached=True)
-            return _inside(validate_directory(config, source["path"], False) / "metadata-lal", relative)
+            return _inside(bound(config, source).metadata_root, relative)
     return None
 
 
@@ -353,71 +359,85 @@ def write_changed(path, value, ignore=()):
 
 
 def save_registry(config, value):
-    value["revision"] = uuid.uuid4().hex
-    atomic_json(config.sources_registry, value)
+    """Replace the whole folder list (tools and tests); the app adds and removes folders one at a time."""
+    from . import library_store
+    with closing(library_store.connect(config)) as db, db:
+        db.execute("DELETE FROM folders WHERE state<>'replaced'")
+        for source in value["sources"]:
+            library_store.save_folder(db, source)
+        for source in value.get("detached", []):
+            library_store.save_folder(db, source, state="removed")
+    _registry_file.cache_clear()
+
+
+class Covered(ConfigError):
+    """The chosen folder is already inside a library folder; ``folder`` names it so the app can show it."""
+
+    def __init__(self, folder):
+        super().__init__(f"Already covered by the library folder \u201c{folder['name']}\u201d")
+        self.folder = folder
 
 
 def add(config, directory):
+    """Add a library folder. Inside one is refused; around some, it replaces them and keeps their assets' IDs."""
     from .gpu_queue import lease
+    from .library_migration import LEGACY_METADATA_DIR
+    from . import library_store
     with lease(config, "source-settings", resource="sources"):
         root = validate_directory(config, directory)
-        value = deepcopy(registry(config))
+        if root.name.casefold() == LEGACY_METADATA_DIR:
+            raise ConfigError("Choose a folder of original assets")
+        value = registry(config)
         for source in value["sources"]:
-            other = Path(source["path"])
-            if root.is_relative_to(other) or other.is_relative_to(root):
-                raise ConfigError("That directory overlaps an existing asset source")
-        identity_path = root / "metadata-lal/source.json"
-        if identity_path.parent.exists() and not identity_path.exists():
-            raise ConfigError('metadata-lal already exists without a LAL source identity; it was left unchanged')
-        if identity_path.exists():
-            identity = read_json(identity_path)
-            key, identifier = identity.get("key"), identity.get("id")
-            if (not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{32}", identifier or "")
-                    or identity.get("schema_version") != 1):
-                raise ConfigError("Existing metadata-lal source identity is invalid; preserved for review")
-            _relative(key)
-            if "/" in key or "\\" in key or any(s["key"] == key or s['id'] == identifier for s in value["sources"]):
-                raise ConfigError("Existing source identity conflicts with a registered source")
-        else:
-            identifier = uuid.uuid4().hex
-            key = root.name
-            if key == "metadata-lal":
-                raise ConfigError("Select an original asset source, not metadata-lal")
-            if any(s["key"] == key for s in value["sources"] + value.get("detached", [])):
-                key += "-" + identifier[:8]
-            atomic_json(identity_path, {"schema_version": 1, "id": identifier, "key": key})
+            if root.is_relative_to(Path(source["path"])):
+                raise Covered(source)
+        inner = [s for s in value["sources"] if Path(s["path"]).is_relative_to(root)]
+        known = next((s for s in value.get("detached", []) if Path(s["path"]) == root), None)
+        identifier = known["id"] if known else uuid.uuid4().hex
+        key = known["key"] if known else root.name
+        if not known and any(s["key"] == key for s in value["sources"] + value.get("detached", [])):
+            key += "-" + identifier[:8]
         source = {"id": identifier, "key": key, "name": root.name, "path": str(root), "enabled": True}
-        value["sources"].append(source)
-        value["detached"] = [s for s in value.get("detached", []) if s["id"] != identifier]
-        save_registry(config, value)
-    return source
+        with closing(library_store.connect(config)) as db, db:
+            library_store.save_folder(db, source)
+            for child in inner:
+                # Recognition keeps every ID and result: the child's assets now live one level down.
+                prefix = Path(child["path"]).relative_to(root).as_posix()
+                library_store.save_folder(db, child, state="replaced", replaced_by=identifier)
+                library_store.relocate(db, child, identifier, prefix)
+        atomic_json(bound(config, source).output_path("data", "source.json"), {"schema_version": 1, "id": identifier, "key": key})
+    _registry_file.cache_clear()
+    return dict(source, replaced=[c["key"] for c in inner])
 
 
 def set_enabled(config, key, enabled):
     from .gpu_queue import lease
+    from . import library_store
     if type(enabled) is not bool:
         raise ConfigError("Enabled must be a checkbox value")
     with lease(config, "source-settings", resource="sources"):
-        value = deepcopy(registry(config))
-        source = next((s for s in value["sources"] if s["key"] == key), None)
+        source = next((s for s in registry(config)["sources"] if s["key"] == key), None)
         if source is None:
-            raise ConfigError("Unknown asset source")
-        source["enabled"] = enabled
-        save_registry(config, value)
+            raise ConfigError("Unknown library folder")
+        source = dict(source, enabled=enabled)
+        with closing(library_store.connect(config)) as db, db:
+            library_store.save_folder(db, source)
+    _registry_file.cache_clear()
     return source
 
 
 def remove(config, key):
+    """Stop watching a folder; its results and recognized assets stay in the store (adding it again restores them)."""
     from .gpu_queue import lease
     from .source_operations import active_operation
+    from . import library_store
     source = get_source(config, key)
     if active_operation(bound(config, source)):
-        raise ConfigError("Cancel this source's operation and wait for it to finish before removing it")
+        raise ConfigError("Cancel this folder's operation and wait for it to finish before removing it")
     with lease(config, "source-settings", resource="sources"):
-        value = deepcopy(registry(config))
-        value["sources"] = [s for s in value["sources"] if s["key"] != key]
-        value.setdefault("detached", []).append(source)
-        save_registry(config, value)
+        with closing(library_store.connect(config)) as db, db:
+            library_store.save_folder(db, source, state="removed")
+    _registry_file.cache_clear()
 
 
 def read_records(config):
@@ -548,6 +568,8 @@ def source_status(config, source):
         status = dict(status, **read_json(fault_path), needs_processing=True)
     answered = {d['id'] for d in export_decisions(scoped)}  # Hidden at once; the rescan the answer starts confirms it.
     status['export_suggestions'] = [s for s in status.get('export_suggestions', []) if s['id'] not in answered]
+    # Offline: the folder cannot be reached (a removed drive); its results and collection entries stay (decision 0023).
+    status['offline'] = not Path(source['path']).is_dir()
     return {**source, **status, 'import_formats': import_formats(scoped), 'import_types': list(import_types(scoped)),
             'exclusions': excluded_folders(scoped), 'export_decisions': export_decisions(scoped),
             'texture_folder': texture_folder(scoped),
@@ -561,7 +583,7 @@ def unreadable_status(config, source, exc):
         operation = operation_status(bound(config, source))
     except Exception:  # The fault below already explains this source.
         operation = {'status': 'idle', 'progress': 0}
-    return {**source, 'scanned': True, 'needs_processing': False, 'pending': 0, 'failed': 0,
+    return {**source, 'scanned': True, 'needs_processing': False, 'pending': 0, 'failed': 0, 'offline': not Path(source['path']).is_dir(),
             'scan_fault': f"This source's status could not be read ({type(exc).__name__}: {exc}). Its files and results are kept.",
             'import_formats': [], 'import_types': [], 'exclusions': [], 'export_decisions': [], 'export_suggestions': [],
             'texture_folder': None, 'operation': operation}
@@ -681,12 +703,22 @@ def scan_source(config, source):
     scoped = bound(config, source)
     work = working(scoped)
     previous = read_records(work) or read_records(scoped)
+    from . import library_store
+    for child in library_store.replaced(config, source["id"]):
+        # A folder this one was added around: its records carry over with their results (decision 0023).
+        prefix = Path(child["path"]).relative_to(Path(source["path"])).as_posix()
+        child_scoped = bound(config, child)
+        mine = {r["asset_id"] for r in previous}
+        previous += [library_store.carried(r, child, source, prefix) for r in
+                     (read_records(working(child_scoped)) or read_records(child_scoped)) if r["asset_id"] not in mine]
     old = {r["asset_id"]: r for r in previous}
     suggestions = []
     rows, fresh, _, _ = build_inventory(scoped, suggestions)
     from .catalog import snapshot, walk_source
     if snapshot(rows) != snapshot(walk_source(scoped)):
         raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
+    # Identity by recognition: kept IDs for known places, moves and edits; new IDs only at first sight.
+    fresh, recognized = library_store.recognize(config, source, fresh, previous)
     # Isolate file failures to their assets; other assets in the source continue.
     rejected = [r for r in rows if r.get("status") == "rejected"]
     merged, changed = [], set()
@@ -704,7 +736,7 @@ def scan_source(config, source):
         if prior:
             same = prior["files"] == record["files"] and [d for d in prior["dependencies"] if not d.get("inspection_version")] == record["dependencies"]
             kept = deepcopy(prior)
-            for key in ("files", "availability", "variants", "dependency_inspection"):
+            for key in ("files", "availability", "variants", "dependency_inspection", "pack_id", "source_relative_identity"):
                 kept[key] = record[key]
             from .dependency_overrides import synchronize_recipe
             synchronize_recipe(kept, record)
@@ -745,6 +777,9 @@ def scan_source(config, source):
         target.parent.mkdir(parents=True, exist_ok=True)
         os.replace(candidate.output_path("data", "catalog.sqlite"), target)
         write_membership(work, merged)
+        from .result_store import reattach
+        if reattach(work, changed):
+            merged = read_records(work)
     published = {r["asset_id"]: r for r in read_records(scoped)}
     incomplete, failed, unpublished, imports = [], [], [], {}
     vector_faults = embedding_failures(work)
@@ -772,6 +807,7 @@ def scan_source(config, source):
               "assets": len(merged), "pending": len(pending_ids), "failed": len(failed),
               "pending_ids": pending_ids, "searchable_ids": sorted(searchable),
               "needs_processing": bool(pending_ids), "removed": len(set(old) - {r["asset_id"] for r in merged}),
+              "recognized": recognized, "missing": len(library_store.missing_assets(config, source["id"])),
               # Decision 0019: owner-excluded folders and unanswered duplicate export folder suggestions.
               "excluded_folders": [{"path": r["path"].split("/", 1)[1], "files": r["excluded_files"]}
                                    for r in rows if r.get("status") == "excluded_folder"],
@@ -782,7 +818,7 @@ def scan_source(config, source):
     status.update(processing_summary(merged, published, formats, vector_faults), processing_paused=not formats,
                   processing_formats=formats)
     # An unchanged scan keeps its earlier receipt time and leaves views untouched.
-    write_changed(status_path, status, ignore=("scanned_utc",))
+    write_changed(status_path, status, ignore=("scanned_utc", "recognized"))
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
     if fault_path.exists():
         fault_path.unlink()  # A successful explicit/startup scan resolves this application availability diagnostic.

@@ -10,7 +10,7 @@ assets, and how each source's results combine into one read-only catalog. Up: [N
 
 ## Systems
 
-- [Sources](Sources.md): registry, source-owned `metadata-lal/`, scans, exclusions and duplicate export folders.
+- [Sources](Sources.md): library folders, the library store, recognition, scans, exclusions and duplicate export folders.
 - [Publication](Publication.md) *(gap)*: per-source publications, the combined catalog and index, pinned immutable generations (`publication.py`, `membership.py`).
 - [Logical assets](Logical%20assets.md) *(gap)*: grouping files into one asset, alternate files and variants (`catalog.py`, `asset_structure.py`).
 

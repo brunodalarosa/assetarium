@@ -13,7 +13,7 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
 
 ## How it works
 
-- Per-source state: `metadata-lal/library/import-status.json` holds each asset's current file and
+- Per-folder state: `library/import-status.json` in the folder's working data holds each asset's current file and
   dependency fingerprint, attempted state and outcome; the ledger keeps append-only history.
 - The **inspection** fingerprint hashes the source content, the render resolution, the raw bytes of
   `blender_worker.py` and `render_math.py` (plus the repair worker when a texture repair applies),
@@ -44,7 +44,7 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
   `publication.line_ending_hashes` accept LF/CRLF-only differences against the recorded value
   (added October 18, 2026, after it nearly re-queued 11,635 results). Any other byte change still counts.
   For search the recorded value is the search check's receipt, or else the published index's
-  contract: vectors from another checkout's `metadata-lal` with no receipt used to fail every query
+  contract: vectors from another checkout's generated data with no receipt used to fail every query
   with "Query/index embedding contract mismatch" (fixed October 30, 2026).
 - Editing `incremental.py`, `overnight.py` or `library_index.py` changes the overnight code
   contract: an overnight run planned before the edit refuses to continue.

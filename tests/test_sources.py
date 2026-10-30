@@ -88,7 +88,7 @@ def test_source_import_restriction_survives_scans_without_affecting_other_source
     value = json.loads(identity_path.read_text())
     value['import_formats'] = ['gltf']
     sources.atomic_json(identity_path, value)
-    originals = {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+    originals = {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file()}
     for _ in range(2):
         assert sources.scan_source(config, one)['assets'] == 1
         rows = records(working(scoped))
@@ -256,7 +256,8 @@ def test_independent_roots_and_source_owned_results(managed):
     assert preview.is_relative_to(config.library_store()) and not preview.is_relative_to(Path(one['path']))
     assert config.source_file(r['files'][0]['path']).parent==Path(one['path'])
     assert not sources.source_status(config,one)['needs_processing']
-    with pytest.raises(ConfigError):config.source_file(one['key']+'/metadata-lal/source.json')
+    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    with pytest.raises(ConfigError):config.source_file(one['key']+'/'+LEGACY_METADATA_DIR+'/source.json')
 
 
 def test_live_toggle_and_agent_gui_agreement(managed):
@@ -298,7 +299,8 @@ def test_scan_add_change_remove_and_card_until_published(managed):
     new.unlink()
     sources.scan_source(config,one)
     assert len(records(config))==2
-    assert (Path(one['path'])/'metadata-lal').is_dir()
+    # Working data lives in the library store; the folder holds only its originals (decision 0023).
+    assert sources.bound(config,one).metadata_root.is_dir() and not [p for p in Path(one['path']).iterdir() if p.is_dir()]
 
 
 def test_remove_and_readd_preserves_identity_and_generated_files(managed):
@@ -338,7 +340,9 @@ def test_empty_source_and_metadata_are_excluded_from_scans(managed,tmp_path):
     config,_,_,_=managed
     root=tmp_path/'empty-source';root.mkdir()
     source=sources.add(config,str(root))
-    (root/'metadata-lal'/'invented.obj').write_text('not an original')
+    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    (root/LEGACY_METADATA_DIR).mkdir()  # An old generated folder awaiting migration is never scanned.
+    (root/LEGACY_METADATA_DIR/'invented.obj').write_text('not an original')
     result=sources.scan_source(config,source)
     assert result['assets']==0 and not result['needs_processing']
     assert not records(working(sources.bound(config,source)))

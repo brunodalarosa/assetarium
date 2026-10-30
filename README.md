@@ -192,8 +192,9 @@ never change or delete your asset files. Details: [MCP tools](docs/mcp/README.md
 
 ## Your files are safe
 
-- Original assets are **only ever read**. Previews, descriptions and search data go to a
-  `metadata-lal` folder next to each source and to the project's `data` folder.
+- Original assets are **only ever read**, and nothing is written into your asset folders.
+  Previews, descriptions and search data go to one library store, by default inside the
+  project's `data` folder (another drive can be set in `config.local.toml`).
 - Nothing runs in the background without you: no automatic processing, no model loading
   at startup, no network access for your library.
 - Faults are recorded and shown, never hidden or silently retried.

@@ -38,7 +38,7 @@ Read-only investigation may prepare this checkpoint. Confirm it again if the sco
 | This reference | `KnowledgeBase/Architecture/Roadmap/Expansion plan.md` |
 | Expansion launch prompts | `KnowledgeBase/Architecture/Roadmap/Prompts/01-asset-foundation.md` through `08-shaders.md` |
 | Source originals | Existing configured source roots; read only |
-| Source-generated results | The corresponding source's existing `metadata-lal` storage |
+| Generated results | The library store (`[storage].library`, decision 0023) |
 | Combined indexes, caches, settings, reports | Existing project-local configured storage |
 | Shared model revisions | Configured `[storage].models` |
 | Implementation agent | Scoped implementation, migrations, verification, receipts, and handoff |

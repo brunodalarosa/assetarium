@@ -129,7 +129,8 @@ def test_exclusion_patterns_match_names_or_paths_and_reject_unsafe_values(source
     sources.set_excluded_folders(config, added['key'], ['Other/Engine Copy'])  # A path matches only that path.
     sources.scan_source(config, added)
     assert len(state(config, added)[0]) == 6
-    for bad in ('', '..', 'a/../b', 'metadata-lal', 'C:/assets', 'x' * 201):
+    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    for bad in ('', '..', 'a/../b', LEGACY_METADATA_DIR, 'C:/assets', 'x' * 201):
         with pytest.raises(ConfigError):
             sources.set_excluded_folders(config, added['key'], [bad])
     assert sources.validate_exclusion('\\Exports\\Engine Copy\\') == 'Exports/Engine Copy'

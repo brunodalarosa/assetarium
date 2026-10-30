@@ -275,8 +275,11 @@ class DesktopBridge:
         from . import sources
         from .source_operations import cancel
         if action == 'add':
-            source = sources.add(self._config, directory)
-            return self._start_source_operation('scan', source['key'])
+            try:
+                source = sources.add(self._config, directory)
+            except sources.Covered as exc:  # Inside a library folder: the app offers to show that folder.
+                return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.folder['key']}
+            return {**self._start_source_operation('scan', source['key']), 'replaced': source['replaced']}
         if action == 'images':
             sources.set_import_types(self._config, key, enabled)
             return self._start_source_operation('scan', key)
@@ -434,8 +437,9 @@ class DesktopBridge:
                    stamp(config.output_path('data', 'library/source-cancel.json'))]
         if config.sources_registry:
             from .sources import registry, bound, revision
+            from .library_store import database_path
             library.append(revision(config))
-            sources.append(stamp(config.sources_registry))
+            sources.append(stamp(database_path(config)))
             for source in registry(config)['sources']:
                 scoped = bound(config, source)
                 sources.append([stamp(scoped.output_path('data', 'library/' + name)) for name in

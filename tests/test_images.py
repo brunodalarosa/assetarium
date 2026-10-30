@@ -97,7 +97,7 @@ def inventory_roles(config, source):
 
 
 def originals(root):
-    return {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+    return {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file()}
 
 
 def inspect_images(config, source):

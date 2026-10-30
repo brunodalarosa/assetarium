@@ -22,7 +22,7 @@ processing/publication progress bar, and graceful **Cancel**. The pending
 state clears after a scan verifies that no actionable work remains and current
 results are published. Retained failures appear in the **Importing failures
 report** on Asset processing, a list of original paths, instead of keeping work pending.
-Generated source information now lives in each directory's `metadata-lal`.
+Generated results live in the central library store, never in asset folders (decision 0023).
 See [asset sources](../../../docs/asset-sources.md) for storage, cancellation and fault rules.
 
 **Settings → General → Formats to process** limits new processing batches to

@@ -79,6 +79,8 @@ class Config:
         return self.library_root or self.storage_root("data") / "library-store"
 
     def source_directory(self, relative: str) -> Path:
+        if self.source_key and relative.replace("\\", "/").split("/", 1)[0] == self.source_key:
+            return self.source_root  # A folder-bound config reads its own files without the folder registry.
         if self.sources_registry:
             from .sources import source_for_path
             return Path(source_for_path(self, relative)["path"])
@@ -117,7 +119,8 @@ class Config:
         if self.sources_registry:
             root = self.source_directory(relative)
             parts = relative.replace("\\", "/").split("/", 1)
-            if len(parts) != 2 or "metadata-lal" in (p.casefold() for p in Path(parts[1]).parts):
+            from .library_migration import LEGACY_METADATA_DIR
+            if len(parts) != 2 or LEGACY_METADATA_DIR in (p.casefold() for p in Path(parts[1]).parts):
                 raise ConfigError("Generated metadata is not an original asset")
             target = _inside(root, parts[1])
         else:

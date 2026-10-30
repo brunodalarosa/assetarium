@@ -42,8 +42,8 @@ also scans it; reopen the app (or toggle the source) to rescan during a session.
 added, changed and removed files; unchanged files reuse their verified hashes
 when file ID, size, modification time and NTFS change time agree. Scans seed the
 shared `cache/file-hashes.sqlite` record that searches and detail checks reuse
-(decision 0004). The
-source's own `metadata-lal` directory is always excluded. Scanning runs no model
+(decision 0004). Nothing is
+written into a source; an old generated folder awaiting the library migration is never scanned. Scanning runs no model
 inference or rendering. Removed and changed assets are excluded from searches
 when discovered; their prior generated evidence is retained.
 
@@ -114,7 +114,7 @@ has never been attempted. Failed/unsupported stages block dependent work; other
 unfinished work stays pending. The caption stage is not part of import readiness;
 an embeddings outcome that misses only the description vector counts as complete. Every scan saves each asset's current
 file/dependency fingerprint, attempted state and outcome in
-`metadata-lal/library/import-status.json`. New or changed inputs become pending;
+`library/import-status.json` in the folder's working data in the library store. New or changed inputs become pending;
 unchanged failures are retained. Unpublished results still require publication
 before the pending state clears. Processing is not permission to repair originals
 or retry unchanged failures. GPU processing shares the existing
@@ -131,7 +131,7 @@ and adapter capabilities are documented in the
 [catalog contract](../Assetarium%20KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#expansion-step-1-shared-asset-foundation).
 Expansion step 2 adds image enrollment as a per-source choice: tick **Include
 2D images** in *Settings → Asset sources* (stored as `import_types` in that
-source's `metadata-lal/source.json`). The source is rescanned; existing results
+source's saved settings in the library store). The source is rescanned; existing results
 are never deleted, and an unchanged image that returns later resumes its saved
 results. Model textures, previews, pack overview sheets, texture folders and
 atlas/tileset sheets stay out of the image assets with a visible inventory role.
@@ -143,7 +143,7 @@ image vector; **Generate descriptions** then works for images too. See the
 ## Source import restrictions
 
 An explicitly cleaned source can store an `import_formats` list in its
-`metadata-lal/source.json`, using the same `fbx`, `gltf`, and `obj` families as
+saved settings in the library store, using the same `fbx`, `gltf`, and `obj` families as
 processing preferences. `gltf` includes GLB. This restricts which original models
 become catalog entries during future scans; excluded originals remain read only.
 Settings shows the source's import restriction beside its format counts.

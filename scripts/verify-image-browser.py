@@ -36,7 +36,7 @@ config, backend, source, art_root = art.__wrapped__(fixture)
 ready_images(config, backend, source)
 sources.scan_source(config, source)
 saved = {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
-         for p in art_root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+         for p in art_root.rglob('*') if p.is_file()}
 assert saved
 
 

@@ -96,7 +96,8 @@ def initialize(config):
 
 
 def ledger(config):
-    path = config.output_path("data", "library/jobs.sqlite")
+    # One stage ledger for the whole store: a recognized asset keeps its history in any library folder.
+    path = config.library_store() / "ledger.sqlite" if config.source_key else config.output_path("data", "library/jobs.sqlite")
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(path)
     db.executescript("""
@@ -558,7 +559,7 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                 "pending_ids": [], "descriptions_disabled": True,
                 "reason": "Descriptions are turned off in Settings → General"}
     pending, retained, restored = [], Counter(), 0
-    from .result_store import KEY_STAGES, adopt, lookup, remember
+    from .result_store import KEY_STAGES, adopt, current_key, lookup, remember
     from .asset_structure import asset_type
     keyed = lambda record: stage in KEY_STAGES and (stage == 'caption' or asset_type(record) == 'model_3d')
     leaders, followers, reused = set(), [], []
@@ -569,8 +570,9 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
             return keyed(record) and lookup(config, stage, fp) is not None
         outcome = adopt(work, record, stage, fp) if keyed(record) else None
         if outcome:
-            outcome['fault_content'] = stage_content(work, detail(work, record['asset_id']), stage)
-            checkpoint(db, record['asset_id'], stage, fp, 'complete', outcome)
+            updated = detail(work, record['asset_id'])
+            outcome['fault_content'] = stage_content(work, updated, stage)
+            checkpoint(db, record['asset_id'], stage, current_key(work, updated, stage), 'complete', outcome)
             reused.append(record['asset_id'])
         return bool(outcome)
     with closing(ledger(config)) as db:
@@ -684,7 +686,10 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
             checkpoint(db, identifier, stage, final_fp, outcome["status"], outcome)
             if outcome['status'] == 'complete' and keyed(updated):
                 saved = (updated.get('inspection_run') or {}).get('result_path', '') if stage == 'inspection' else outcome.get('result_path')
-                remember(config, stage, final_fp, saved.removesuffix('/result.json') if stage == 'inspection' else saved, identifier)
+                saved = saved.removesuffix('/result.json') if stage == 'inspection' else saved
+                # Under the key it ran with (what a fresh duplicate has) and the key it finished with.
+                for key in {fp, final_fp}:
+                    remember(config, stage, key, saved, identifier)
             report["outcomes"].append({"asset_id": identifier, **outcome})
             atomic_json(status_path,{'status':'running','stage':stage,'selected':len(chosen),'completed':len(report['outcomes']),'pid':os.getpid(),'last_asset':identifier,'last_status':outcome['status']})
 

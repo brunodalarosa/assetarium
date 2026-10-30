@@ -23,7 +23,7 @@ def test_disabled_source_browsing_reuses_inspection_without_enabling_search(mana
     ready_source(config, backend, one)
     ready_source(config, backend, two)
     sources.set_enabled(config, one['key'], False)
-    before = config.sources_registry.read_bytes()
+    before = sources.registry(config)
     main, _, contents = browser(config)
     assert {i['pack'] for i in main.browse()['items']} == {two['key']}
     page = contents.call('browse', one['key'], 0, 2)
@@ -34,7 +34,7 @@ def test_disabled_source_browsing_reuses_inspection_without_enabling_search(mana
     detail = contents.call('asset', one['key'], identifier, 'obj', 'front', page['generation'])
     assert detail['payload']['usable'] and detail['image']
     assert detail['payload']['presentation']['name'] == page['items'][0]['name']
-    assert config.sources_registry.read_bytes() == before
+    assert sources.registry(config) == before  # Browsing never changes which folders are enabled.
     assert main.backend is None and contents.session(one['key'])[1][0].backend is None
     with pytest.raises(ValueError, match='disabled'):
         main.asset(identifier)

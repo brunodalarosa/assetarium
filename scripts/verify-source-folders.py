@@ -39,7 +39,7 @@ sources.scan_source(config, added)
 # A near miss: Unity FBX lacks prop_19 and repeats prop_0 in a second subfolder.
 near = sources.add(config, str(near_kit(fixture / 'near', copy=TWENTY[:19], repeated=('prop_0',))))
 sources.scan_source(config, near)
-originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
 
 
 def assets():
@@ -141,7 +141,7 @@ def verify():
         ui.capture('05-narrow.png')
         report['checks'].append('Narrow layout has no horizontal overflow')
         assert not bridge._gateway.model_requested
-        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
         assert now == originals
         report['checks'].append('Original files are byte-identical; no inference worker or model was loaded')
         report.update(status='passed')

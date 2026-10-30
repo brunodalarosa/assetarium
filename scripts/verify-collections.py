@@ -38,7 +38,7 @@ ready_source(config, backend, two)
 EXPORTS = config.storage_root('data') / 'exports/collections'
 # Originals only: generated metadata and app data may change, source asset files never.
 originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for root in (one['path'], two['path'])
-             for p in Path(root).rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+             for p in Path(root).rglob('*') if p.is_file()}
 
 
 class FixtureBridge(DesktopBridge):

@@ -31,7 +31,6 @@ def main():
     if report_path.exists():
         raise SystemExit(f'{report_path} exists; choose a new --run-name (existing outputs are evidence)')
     from local_asset_library import incremental, library_migration
-    from local_asset_library.sources import bound
     scratch = config.output_path('scratch', f'rekey/{args.run_name}')
     shutil.rmtree(scratch, ignore_errors=True)
     store = replace(config, library_root=scratch / 'store')
@@ -40,18 +39,17 @@ def main():
         if found.get('fault'):
             folders.append(found)
             continue
-        source = {'id': found['id'], 'key': found['key'], 'name': found['key'], 'path': found['path'], 'enabled': True}
-        work = incremental.working(bound(store, source))
+        work = incremental.working(library_migration.legacy_bound(config, found))
         copy = scratch / found['id'] / 'jobs.sqlite'
         copy.parent.mkdir(parents=True, exist_ok=True)
-        with closing(sqlite3.connect(work.output_path('data', 'library/jobs.sqlite'))) as src, closing(sqlite3.connect(copy)) as dst:
+        with closing(sqlite3.connect(Path(found['metadata']) / 'library/jobs.sqlite')) as src, closing(sqlite3.connect(copy)) as dst:
             src.backup(dst)
         incremental.ledger = lambda _config, copy=copy: sqlite3.connect(copy)
         entry = {'path': found['path'], 'key': found['key'], 'stages': {}}
         try:
             before = {stage: library_migration.pending(work, stage, legacy=True) for stage in ('inspection', 'caption')}
             with closing(sqlite3.connect(copy)) as db:
-                entry['rekeyed'] = library_migration.rekey(work, db)
+                entry['rekeyed'] = library_migration.rekey(work, db, store)
             for stage in ('inspection', 'caption'):
                 after = library_migration.pending(work, stage)
                 reused = sorted(before[stage] - after)

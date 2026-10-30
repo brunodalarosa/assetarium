@@ -155,9 +155,9 @@ reads as follows. Images are first-class **generic images** in sources that opt
 in, with measured facts, derived display/model inputs, optional descriptions and
 the same retrieval as models.
 
-**Enrollment.** `metadata-lal/source.json` may hold `import_types`
-(`["model_3d"]` by default, `["model_3d", "image"]` when the owner ticks
-**Include 2D images** for that source). Existing sources keep their bytes and
+**Enrollment.** Every supported type is always enrolled (decision 0023); the
+per-source `import_types` choice (`["model_3d"]` by default, `["model_3d", "image"]` with
+**Include 2D images**) is history, imported once by the library migration. Existing sources keep their bytes and
 records unchanged. In an image-enabled source the scanner (no decoding) makes
 one `image` record per folder + stem, with these files left out as visible
 inventory roles: files a model references as a dependency or preview

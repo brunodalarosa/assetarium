@@ -243,7 +243,7 @@ def recorded_contract(config, contract):
     Search and indexing compare contracts exactly; a git checkout that swaps line
     endings changes neither inference nor vectors, so it must not force a re-embed.
     The references are the search check's receipt, then the published index's contract:
-    a source's metadata-lal brings vectors built on another checkout without a receipt.
+    a library store brings vectors built on another checkout without a receipt.
     """
     if not contract:
         return contract

@@ -471,7 +471,7 @@ def wizard(args, config):
     choices['processing_formats'] = [f.strip().lower() for f in formats.split(',') if f.strip()]
     use = setup_core.storage_use(config)
     budget = setup_core.recommended_budget(use.get('allocated_gib'), status['environment']['disk']['free_gib'])
-    say(args, '\n3. The storage budget caps the disk space Assetarium uses (its folder plus each source’s metadata-lal; '
+    say(args, '\n3. The storage budget caps the disk space Assetarium uses (its folder, including the library store; '
               'originals and shared models are not counted).' + (f" Current use: {use['allocated_gib']:g} GiB." if use.get('allocated_gib') else ''))
     choices['storage_budget_gib'] = int(ask('Budget in GiB', budget['gib'] if budget else int(current['storage_budget_gib'])))
     say(args, '\n4. Descriptions are optional AI-written texts per asset; without them names, filters, keyword and image search still work.')

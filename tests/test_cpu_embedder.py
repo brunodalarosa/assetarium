@@ -92,7 +92,7 @@ def test_line_ending_tolerance_follows_the_contracts_own_hashed_files(config):
 
 
 def test_published_index_contract_reconciles_line_endings_without_a_receipt(config):
-    # Vectors from a source's metadata-lal built on an LF checkout, searched from a CRLF one with no search check yet.
+    # Vectors from a library store built on an LF checkout, searched from a CRLF one with no search check yet.
     lock = config.project_root / 'runtime/embedding-cpu/uv.lock'
     lock.parent.mkdir(parents=True)
     lock.write_bytes(b'version = 1\r\n')

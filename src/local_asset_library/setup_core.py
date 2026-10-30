@@ -467,7 +467,7 @@ def first_run(config):
     """Open automatically only on a genuinely fresh install."""
     from .settings import settings_path
     reasons = {'setup_record': setup_path(config).exists(), 'settings': settings_path(config).exists(),
-               'sources': bool(config.sources_registry and config.sources_registry.exists()
+               'sources': bool(config.sources_registry
                                and _registered(config))}
     return {'fresh': not any(reasons.values()), 'existing': reasons}
 
@@ -478,7 +478,8 @@ def _registered(config):
         value = registry(config)
     except (OSError, ValueError, KeyError, TypeError):
         return True  # A registry that exists but cannot be read is not a fresh install.
-    return bool(value['sources'] or value.get('detached'))
+    from .library_migration import _legacy_registry
+    return bool(value['sources'] or value.get('detached') or _legacy_registry(config))  # Or an install awaiting migration.
 
 
 def setup_state(config):

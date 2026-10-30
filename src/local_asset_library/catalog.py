@@ -122,6 +122,7 @@ def walk_source(config):
             cached = read_json(cache_path, SCAN_CACHE_LIMIT).get("files", {})
     next_cache = {}
     from .sources import excluded_folders
+    from .library_migration import LEGACY_METADATA_DIR
     patterns = excluded_folders(config) if config.source_key else []
     def walk_error(exc):
         raise ConfigError("Source directory cannot be scanned: " + str(exc))
@@ -129,7 +130,7 @@ def walk_source(config):
         dirs.sort()
         for name in list(dirs):
             path = Path(directory) / name
-            if name.casefold() == "metadata-lal":
+            if name.casefold() == LEGACY_METADATA_DIR:  # An old generated folder awaiting migration, never originals.
                 dirs.remove(name)
                 continue
             folder = path.relative_to(config.source_root).as_posix()

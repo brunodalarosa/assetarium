@@ -92,7 +92,7 @@ and reindex, not automatic migration. A backend source or runtime lock that diff
 from `data/embeddings/capability.json`, or else from the published index's
 `data/library/embedding-contract.json`, only by LF/CRLF line endings (a git checkout)
 keeps its recorded hash (`retrieval.recorded_contract`); any other byte change is
-still a contract change. The published index counts because a source's `metadata-lal`
+still a contract change. The published index counts because a library store
 can bring vectors built on another checkout to an install with no search check yet;
 the search check then records that reconciled form.
 

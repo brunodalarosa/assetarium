@@ -39,7 +39,7 @@ sources.scan_source(config, added)
 work = working(sources.bound(config, added))
 inspected(work)
 sources.scan_source(config, added)
-originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
 
 
 def repaired():
@@ -118,7 +118,7 @@ def verify():
         ui.capture('03-narrow.png')
         report['checks'].append('Narrow layout has no horizontal overflow')
         assert not bridge._gateway.model_requested
-        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
         assert now == originals
         report['checks'].append('Original files are byte-identical; no inference worker or model was loaded')
         report.update(status='passed')

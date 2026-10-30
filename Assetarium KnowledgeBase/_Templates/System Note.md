@@ -10,7 +10,7 @@ branch:
 Hub: [<Area>](<Area>.md). One or two lines: what this system is for and where to start reading (`module.function`, `path/to/folder`).
 
 ## How it works
-Only what isn't obvious from the code: flow across modules and processes, ownership/lifetime, threads and leases, data and config dependencies, what lives in `data/` vs a source's `metadata-lal/`.
+Only what isn't obvious from the code: flow across modules and processes, ownership/lifetime, threads and leases, data and config dependencies, what lives in `data/` vs the library store.
 
 ## Rules
 Invariants and must-dos. **Bold** the ones that cause bugs when ignored (fingerprints, read-only originals, no fallbacks).

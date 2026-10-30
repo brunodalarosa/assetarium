@@ -43,6 +43,18 @@ def location_free(value, base, prefix):
     return value
 
 
+def first_sight_key(config, record):
+    """The inspection key a not yet inspected copy of this asset has: without the textures Blender reported."""
+    from .incremental import inspection_input
+    fresh = dict(record, dependencies=[d for d in record.get('dependencies', []) if not d.get('inspection_version')])
+    return inspection_input(config, fresh)[3]
+
+
+def current_key(config, record, stage):
+    from .incremental import caption_input, inspection_input
+    return inspection_input(config, record)[3] if stage == 'inspection' else caption_input(config, record)
+
+
 def result_path(stage, key):
     """Where a new result for ``key`` is written (logical, without ``data/``)."""
     return f'results/{stage}/{key[:2]}/{key}'
@@ -150,3 +162,33 @@ def adopt(config, record, stage, key):
     except (OSError, ValueError, KeyError):
         forget(config, stage, key)  # Missing or changed files: the stage runs normally instead.
         return None
+
+
+def reattach(work, identifiers):
+    """At scan time, finished results with the same inputs fill in recognized assets (moved, carried over from a
+    replaced folder, duplicated). Nothing renders or runs a model; a miss leaves the asset pending as before."""
+    from .asset_structure import asset_type
+    from .catalog import detail
+    from .incremental import caption_input, checkpoint, inspection_input, ledger, stage_content
+    if not identifiers or not (store_root(work) / 'results/index.sqlite').exists():
+        return []
+    filled = []
+    with closing(ledger(work)) as db:
+        for identifier in sorted(identifiers):
+            record = detail(work, identifier)
+            for stage in KEY_STAGES:
+                if record['processing'].get(stage) == 'complete' or (stage == 'inspection' and asset_type(record) != 'model_3d'):
+                    continue
+                try:
+                    key = inspection_input(work, record)[3] if stage == 'inspection' else caption_input(work, record)
+                except (OSError, ValueError, KeyError):
+                    continue
+                if lookup(work, stage, key) is None:
+                    continue
+                outcome = adopt(work, record, stage, key)
+                if outcome:
+                    record = detail(work, identifier)
+                    checkpoint(db, identifier, stage, current_key(work, record, stage), 'complete',
+                               {**outcome, 'fault_content': stage_content(work, record, stage)})
+                    filled.append((identifier, stage))
+    return filled

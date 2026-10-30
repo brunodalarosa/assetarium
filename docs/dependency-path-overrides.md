@@ -31,8 +31,9 @@ See [general capability policy](../Assetarium%20KnowledgeBase/Decisions/0009-gen
 
 ## Explicit mappings within a source
 
-After owner authorization, a source can have
-`metadata-lal/library/dependency-overrides.json`:
+After owner authorization, a library folder can have
+`library/dependency-overrides.json` in its working data in the library store
+(`library-store/folders/<folder id>/`):
 
 ```json
 {

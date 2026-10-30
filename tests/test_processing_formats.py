@@ -32,7 +32,7 @@ def test_legacy_defaults_roundtrip_pause_and_storage_only_save(library):
     assert processing_formats(config) == ['fbx', 'gltf', 'obj']
     assert select(config, ['gltf'])['processing_formats'] == ['gltf']
     assert save_general_settings(config, 25)['processing_formats'] == ['gltf']
-    rebound = replace(config, source_key='one', metadata_root=config.source_root / 'one/metadata-lal')
+    rebound = replace(config, source_key='one', metadata_root=config.library_store() / 'folders/one')
     assert processing_formats(rebound) == ['gltf']
     select(config, [])
     assert general_settings(config)['processing_formats'] == []

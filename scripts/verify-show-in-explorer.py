@@ -36,7 +36,7 @@ config, backend, one, two = managed.__wrapped__(fixture)
 ready_source(config, backend, one)
 ready_source(config, backend, two)
 originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for root in (one['path'], two['path'])
-             for p in Path(root).rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+             for p in Path(root).rglob('*') if p.is_file()}
 launched = []
 desktop.show_in_explorer = launched.append  # Looked up at call time; nothing opens on the desktop.
 

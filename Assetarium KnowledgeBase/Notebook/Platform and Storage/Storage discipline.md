@@ -9,9 +9,9 @@ branch:
 
 Hub: [Platform and Storage](Platform%20and%20Storage.md). Moved from `docs/storage.md` on 2026-10-28; the binding rules are in `AGENTS.md` → Storage discipline.
 
-Current source storage: generated asset results now belong to the corresponding
-source's `metadata-lal` folder. Source processing/migration receipts measure unique
-allocation across this project **and** those folders, deduplicating file identities.
+Generated asset results live in the library store (decision 0023), by default the ignored
+`data/library-store/`. Processing and migration receipts measure unique allocation across this
+project **and** the store when it lives elsewhere, deduplicating file identities.
 The standalone `storage-report.py` still reports just the selected project root;
 combined receipts are saved as `data/storage/sources-*.json`. Original asset files
 and shared model weights remain excluded. See [asset sources](../../../docs/asset-sources.md).
