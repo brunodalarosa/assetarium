@@ -74,6 +74,11 @@ All notable changes to Assetarium are listed here. The project follows
   description are now kept with a review note instead of failing it. The 35 descriptions an
   earlier run rejected this way were accepted from their saved output without running the
   model again.
+- Search failed with "Query/index embedding contract mismatch; reindex explicitly" when a source's
+  search data was built on a checkout with other line endings (LF vs CRLF) and no search check had
+  been recorded on this install. The search code and runtime lock were identical, so search now
+  accepts that data without reindexing, and a later search check records the same contract. A
+  real code or lock change still requires a reindex.
 - Search no longer fails with "Embedding worker exited without result" when the search runtime is
   incomplete. It names the missing packages and the command that installs them, starts no worker,
   and works on the next search once the runtime is installed. A worker that exits names its exit

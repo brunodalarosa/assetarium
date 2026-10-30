@@ -242,13 +242,21 @@ def recorded_contract(config, contract):
 
     Search and indexing compare contracts exactly; a git checkout that swaps line
     endings changes neither inference nor vectors, so it must not force a re-embed.
+    The references are the search check's receipt, then the published index's contract:
+    a source's metadata-lal brings vectors built on another checkout without a receipt.
     """
     if not contract:
         return contract
+    references = []
     try:
-        recorded = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))["contract"]
+        references.append(json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))["contract"])
     except (OSError, ValueError, KeyError, TypeError):
-        return contract  # The existing capability checks report the fault.
+        pass  # The existing capability checks report the fault.
+    try:
+        published = json.loads((config.project_root / "data/library/embedding-contract.json").read_text(encoding="utf-8"))
+        references.append(json.loads(published["contract"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     result = dict(contract)
     # A contract may name its own hashed files (the CPU embedder, decision 0018); CUDA keeps these two.
     files = contract.get("hashed_files") or {"adapter_sha256": "src/local_asset_library/embedding_backend.py",
@@ -256,13 +264,18 @@ def recorded_contract(config, contract):
     package = "src/local_asset_library/"
     for key, path in ((key, Path(__file__).with_name(relative[len(package):]) if relative.startswith(package)
                        else config.project_root / relative) for key, relative in files.items()):
-        old = recorded.get(key) if isinstance(recorded, dict) else None
-        if old and contract.get(key) and contract[key] != old:
+        for recorded in references:
+            old = recorded.get(key) if isinstance(recorded, dict) else None
+            if not old or not contract.get(key):
+                continue
+            if contract[key] == old:
+                break
             try:
                 if old in line_ending_hashes(path):
                     result[key] = old
+                    break
             except OSError:
-                pass
+                break
     return result
 
 

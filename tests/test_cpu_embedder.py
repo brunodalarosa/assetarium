@@ -91,6 +91,27 @@ def test_line_ending_tolerance_follows_the_contracts_own_hashed_files(config):
     assert recorded_contract(config, changed) == changed
 
 
+def test_published_index_contract_reconciles_line_endings_without_a_receipt(config):
+    # Vectors from a source's metadata-lal built on an LF checkout, searched from a CRLF one with no search check yet.
+    lock = config.project_root / 'runtime/embedding-cpu/uv.lock'
+    lock.parent.mkdir(parents=True)
+    lock.write_bytes(b'version = 1\r\n')
+    lf = hashlib.sha256(b'version = 1\n').hexdigest()
+    crlf = hashlib.sha256(b'version = 1\r\n').hexdigest()
+    files = {'runtime_lock_sha256': 'runtime/embedding-cpu/uv.lock'}
+    published = config.project_root / 'data/library/embedding-contract.json'
+    atomic_json(published, {'contract': json.dumps({'device': 'cpu', 'runtime_lock_sha256': lf, 'hashed_files': files})})
+    current = {'device': 'cpu', 'runtime_lock_sha256': crlf, 'hashed_files': files}
+    assert recorded_contract(config, current)['runtime_lock_sha256'] == lf
+    changed = dict(current, runtime_lock_sha256=hashlib.sha256(b'version = 2\r\n').hexdigest())
+    lock.write_bytes(b'version = 2\r\n')
+    assert recorded_contract(config, changed) == changed  # A real change still needs a reindex.
+    lock.write_bytes(b'version = 1\r\n')
+    # A search check recorded with the current bytes decides first.
+    atomic_json(config.output_path('data', 'embeddings/capability.json'), {'contract': current})
+    assert recorded_contract(config, current) == current
+
+
 def fake_runtime(config, torch_version):
     python = venv_python(config.project_root, '.venv-embedding')
     python.parent.mkdir(parents=True, exist_ok=True)

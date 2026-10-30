@@ -12,12 +12,12 @@ import numpy as np
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'src'))
-from local_asset_library.catalog import save_json  # noqa: E402
+from local_asset_library.catalog import digest, save_json  # noqa: E402
 from local_asset_library.config import load_project_config  # noqa: E402
 from local_asset_library.engines import embedder  # noqa: E402
 from local_asset_library.gpu_queue import lease  # noqa: E402
 from local_asset_library.incremental import working  # noqa: E402
-from local_asset_library.retrieval import preview_file  # noqa: E402
+from local_asset_library.retrieval import preview_file, recorded_contract  # noqa: E402
 from local_asset_library.sources import bound, read_records, registry  # noqa: E402
 
 config = load_project_config(root)
@@ -57,7 +57,9 @@ with lease(config, 'batch-capability'):
     metrics.append(dict(backend.last_metrics))
     if np.allclose(image_vectors[0], image_vectors[1]) or np.allclose(text_vectors[0], text_vectors[1]):
         raise SystemExit('Two different inputs gave the same vector; nothing was recorded.')
-    report = {'contract': backend.contract, 'contract_fingerprint': backend.fingerprint, 'inputs': inputs,
+    # The form the existing vectors were built with when the files differ only by line endings.
+    contract = recorded_contract(config, backend.contract)
+    report = {'contract': contract, 'contract_fingerprint': digest(contract), 'inputs': inputs,
               'actual_text_and_image_inference': True, 'reference_image_query_support': True,
               'text_image_similarities': (np.array(text_vectors) @ np.array(image_vectors).T).tolist(),
               'image_image_similarities': (np.array(image_vectors) @ np.array(image_vectors).T).tolist(),

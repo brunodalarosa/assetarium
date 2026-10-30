@@ -43,6 +43,9 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
   `incremental.recorded_fingerprint`, `retrieval.recorded_contract` and
   `publication.line_ending_hashes` accept LF/CRLF-only differences against the recorded value
   (added October 18, 2026, after it nearly re-queued 11,635 results). Any other byte change still counts.
+  For search the recorded value is the search check's receipt, or else the published index's
+  contract: vectors from another checkout's `metadata-lal` with no receipt used to fail every query
+  with "Query/index embedding contract mismatch" (fixed October 30, 2026).
 - Editing `incremental.py`, `overnight.py` or `library_index.py` changes the overnight code
   contract: an overnight run planned before the edit refuses to continue.
 

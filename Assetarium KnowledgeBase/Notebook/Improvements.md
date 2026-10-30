@@ -16,7 +16,7 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
   `incremental.recorded_fingerprint` and `retrieval.recorded_contract` tolerate LF/CRLF-only
   differences, and `EQUIVALENT_WORKERS` lists both forms, but any new fingerprinted file needs the
   same care. A `.gitattributes` `eol` rule for fingerprinted files would remove the trap (the owner
-  chose not to add one in October 2026). Seen: 2026-10-18, 2026-10-28
+  chose not to add one in October 2026). Seen: 2026-10-18, 2026-10-28, 2026-10-30
 - **The full test suite takes minutes and needs real Blender**: a skipped Blender fixture counts as
   unverified. Targeted runs (`tests/test_<area>.py`) are the everyday path. Seen: 2026-10-28
 
