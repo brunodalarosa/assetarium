@@ -38,6 +38,9 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 
 ## Codebase-wide
 
+- **Error and warning text can't be copied easily**: users need to paste fault reasons into bug
+  reports or searches. Every error or warning label and message in the app should have a copy
+  button next to it. Seen: 2026-10-29
 - **Pilot-era names**: "step N" and "pilot" in docstrings and doc titles mislead new readers into
   thinking code is pilot-only ([Codebase](Codebase.md#misleading-or-historical-names)). Renaming
   docstrings is cheap, but check fingerprinted files first: editing them re-queues work. Seen: 2026-10-28
