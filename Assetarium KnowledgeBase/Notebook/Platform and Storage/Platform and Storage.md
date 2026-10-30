@@ -1,7 +1,7 @@
 ---
 area: Platform and Storage
 tags: [hub]
-code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, scripts/storage-report.py, retention.py]
+code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, scripts/storage-report.py, retention.py, scripts/check-caption-classification.py]
 ---
 # Platform and Storage
 
@@ -22,3 +22,9 @@ Up: [Notebook](../Notebook.md).
 - `AGENTS.md` → Storage discipline (binding for every agent).
 - Decisions: [0006](../../Decisions/0006-retention.md), [0010](../../Decisions/0010-shared-project-dependencies.md),
   [0013](../../Decisions/0013-platform-support.md).
+
+## Gotchas
+
+- Links into the vault from outside it must spell the folder `Assetarium%20KnowledgeBase/…`: a
+  plain space breaks Markdown links on GitHub. `docs/caption-contract.md` keeps the old
+  `KnowledgeBase/` path because `scripts/check-caption-classification.py` hashes its contents.

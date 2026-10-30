@@ -30,6 +30,8 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **Evidence lives in the owner's ignored `data/`**: verification reports, receipts and
   screenshots cited in docs and pull requests can't be opened by other contributors. Summarize
   the outcome in the PR; cite `data/` paths only as the owner's local record. Seen: 2026-10-28
+- **Roadmap notes have no list of allowed `status:` values**: agents guess (ASSETRM-0001 used
+  `done`). A short status vocabulary in `Home.md` or a roadmap template would settle it. Seen: 2026-10-29
 - **Search capability receipt on a fresh install**: `scripts/historical/embedding_capability.py`
   uses the original pilot asset IDs, so a fresh install can't record it the historical way (see
   [Inference ports](../Architecture/Setup%20and%20Engines/Inference%20ports.md#known-debt-and-direction)). Seen: 2026-10-26
