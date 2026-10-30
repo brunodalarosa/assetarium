@@ -44,10 +44,13 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
-- Contributor documentation moved into `KnowledgeBase/`, an Obsidian vault that also reads on
+- Contributor documentation moved into `Assetarium KnowledgeBase/`, an Obsidian vault that also reads on
   GitHub: decisions, current status, contracts, the roadmap and per-area notes. `docs/` keeps the
   user guides; the October 2026 progress journal is frozen in `docs/history/`, and the one-time
   pilot reports were removed (they remain in git history).
+- `CLAUDE.md` and `AGENTS.md` no longer describe one computer. Each contributor's hardware, tool
+  paths and Linux check setup go in an ignored `MACHINE.local.md`, which agents create when it is
+  missing.
 - Duplicate export folder suggestions also catch near misses: folders that share at least 90% of
   their model names, such as a `Unity FBX` copy missing a few models or repeating one name in two
   subfolders. The suggestion says which names stay as they are, and Group groups only the shared

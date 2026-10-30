@@ -62,7 +62,7 @@ def plan():
             retained.append({'folder': folder.name, 'reason': 'Contains a link pointing outside its folder'})
             continue
         folders.append({'folder': folder.name, 'links': found})
-    value = {'schema_version': 1, 'utc': datetime.now(timezone.utc).isoformat(), 'policy': 'KnowledgeBase/Decisions/0006-retention.md',
+    value = {'schema_version': 1, 'utc': datetime.now(timezone.utc).isoformat(), 'policy': 'Assetarium KnowledgeBase/Decisions/0006-retention.md',
              'folders': folders, 'retained': retained}
     path = ROOT / 'data/maintenance' / f'scratch-plan-{datetime.now(timezone.utc):%Y%m%dT%H%M%S}.json'
     path.parent.mkdir(parents=True, exist_ok=True)

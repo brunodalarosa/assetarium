@@ -1,7 +1,7 @@
 schema_version = 2
 
 # Shared default. Copy to the ignored config.local.toml for machine-specific paths;
-# config.local.toml wins when it exists (KnowledgeBase/Decisions/0001).
+# config.local.toml wins when it exists (Assetarium KnowledgeBase/Decisions/0001).
 
 [sources]
 registry = "data/library/sources.json"

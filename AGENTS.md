@@ -4,13 +4,13 @@ adds codebase orientation only.
 
 ## Recorded decisions
 
-Read `KnowledgeBase/Decisions/` before changing behavior. Those owner-approved decisions
+Read `Assetarium KnowledgeBase/Decisions/` before changing behavior. Those owner-approved decisions
 bind future changes; if a change would contradict one, ask the owner first and
 update the decision record together with the code.
 
 ## Knowledge base
 
-`KnowledgeBase/` (an Obsidian vault, also readable on GitHub) holds what the code doesn't
+`Assetarium KnowledgeBase/` (an Obsidian vault, also readable on GitHub) holds what the code doesn't
 say: `Home.md` (conventions), `Status.md`, `Notebook/` (working notes per area, agents first),
 `Architecture/` (how and why, humans first), `Decisions/` (binding owner decisions) and
 `Reference/` (external docs with a trust rating). User-facing guides stay in `docs/`.
@@ -24,6 +24,25 @@ say: `Home.md` (conventions), `Status.md`, `Notebook/` (working notes per area, 
   exists nowhere else, not a log of the work.
 - Architecture docs and decisions are human-owned: agent edits to Architecture stay
   `status: draft`; decisions change only as described under "Recorded decisions".
+
+## Local machine
+
+Tracked files (this one, `CLAUDE.md`, the vault, `docs/`) describe no particular computer: no
+CPU, GPU, drive, user name, distro or install path. Each developer's machine is described in
+`MACHINE.local.md` at the repository root, which git ignores.
+
+- Read `MACHINE.local.md` before any decision that depends on the machine: GPU backend and
+  device, render or batch sizes, memory limits, Blender or tool paths, which runtime to use, and
+  how to run the Linux suite.
+- If it is missing, create it before that decision by probing the machine with read-only
+  commands (never install anything to fill it). Record: OS, shell and architecture; CPU with
+  cores/threads; RAM; each GPU with VRAM, driver and compute backend (CUDA, HIP or none); free
+  space on the repository drive; Python, uv and Node versions; the Blender executable and version
+  (from `config.local.toml` `[tools].blender` or discovery); `[storage].models`; the limits in
+  `data/library/rendering.json`; and the Linux check setup if there is one (WSL distro, clone
+  path, Linux Blender). Date the probe.
+- If an entry turns out wrong (the hardware changed, a path moved), correct it and say so.
+  Never copy its contents into tracked files.
 
 ## Required checkpoint before implementation
 
@@ -47,7 +66,7 @@ Application and test-harness defects may be diagnosed, fixed and verified normal
 
 ### Caption review severity
 
-Apply `KnowledgeBase/Architecture/Processing/Caption severity.md` when processing or reviewing new assets. Do not
+Apply `Assetarium KnowledgeBase/Architecture/Processing/Caption severity.md` when processing or reviewing new assets. Do not
 mark a usable caption or asset faulty solely because a visual detail is uncertain,
 an exact count is unsupported, a material is inferred, or owner review is pending.
 Record minor precision/appearance uncertainty as `review_note`; record meaningful
@@ -114,7 +133,7 @@ processing of other items; never edit originals to resolve them.
   partial results. Never recursively delete directories containing junctions or
   links without a reviewed containment check; never clear generic system caches.
 - Record cleanup targets, savings, verification and faults separately. The
-  one-time consolidation script refuses automatic reruns. See `KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
+  one-time consolidation script refuses automatic reruns. See `Assetarium KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
 
 ## Versioning
 

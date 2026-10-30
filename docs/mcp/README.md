@@ -2,17 +2,17 @@
 
 Assetarium's MCP server exposes `search_assets` and `get_asset`, plus the collection tools
 `list_collections`, `get_collection`, `edit_collection` and `tag_assets`
-([decision 0012](../../KnowledgeBase/Decisions/0012-collections-and-tags.md); see
+([decision 0012](../../Assetarium%20KnowledgeBase/Decisions/0012-collections-and-tags.md); see
 [Collections and tags](#collections-and-tags)) and the setup tools
 `get_setup_status`, `validate_blender`, `apply_setup`, `propose_setup` and
-`finish_setup` ([decision 0016](../../KnowledgeBase/Decisions/0016-agent-setup.md); see
+`finish_setup` ([decision 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md); see
 [Agent setup](#agent-setup)), over local STDIO. Each request is pinned to one published
 catalog/index generation. There is no HTTP listener, export tool, arbitrary-path input,
 copy operation or source-writing API. Restart older server connections after an update to
 load new membership, version and lease behavior.
 
 How the server is built, how client registration is preserved and how it is verified are in
-the knowledge base: [MCP server](../../KnowledgeBase/Architecture/MCP/MCP%20server.md).
+the knowledge base: [MCP server](../../Assetarium%20KnowledgeBase/Architecture/MCP/MCP%20server.md).
 
 ## Install and start
 
@@ -91,18 +91,18 @@ Caption summaries now expose `caption_status`: `clear`, `review_note`, `warning`
 or `fault`. `caption_faulty` is true only for an unusable caption; minor notes and
 meaningful descriptive warnings do not make a source unusable. Metadata details
 include `caption_quality` alongside original historical findings. See
-[Caption severity](../../KnowledgeBase/Architecture/Processing/Caption%20severity.md) for classification and evidence
+[Caption severity](../../Assetarium%20KnowledgeBase/Architecture/Processing/Caption%20severity.md) for classification and evidence
 rules; owner approval and source faults remain separate.
 
 `get_asset` accepts an exact `asset_` + 32 lowercase hexadecimal ID. Optional
 `source_format` selects an existing export; the inspected source is preferred
 otherwise. A grouped asset also lists `source_variants` (each file's folder label and format,
-[decision 0019](../../KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)); optional
+[decision 0019](../../Assetarium%20KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)); optional
 `source_variant` picks one by label, for example `"Unity FBX"` when two files share a format.
 Labels come from the asset's own files; paths are never accepted. A file that cannot be used
 (for example its texture path points outside the source) is listed with `usable: false` and a
 `reason`, is never selected, and requesting it is refused with that reason
-([decision 0020](../../KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)). It returns the actual source path/hash, all known logical-asset
+([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)). It returns the actual source path/hash, all known logical-asset
 dependencies with referring-source evidence, completeness limitations and faults.
 `include_metadata=true` requests observations, measured summary, license evidence,
 processing states and caption fault evidence. No incomplete dependency package is
@@ -154,7 +154,7 @@ them; `register-mcp.py` refuses to overwrite an existing entry.
 ## Agent setup
 
 An agent can set Assetarium up for the computer it runs on
-([decision 0016](../../KnowledgeBase/Decisions/0016-agent-setup.md)); the procedure is the user-invoked skill
+([decision 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)); the procedure is the user-invoked skill
 [`skills/assetarium-setup`](../../skills/assetarium-setup/SKILL.md) and the server prompt
 `set_up_assetarium`. The tools wrap `setup_core`, the same rules as the app's wizard.
 

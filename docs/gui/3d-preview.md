@@ -49,4 +49,4 @@ Fault history is never automatically cleared. Application/test-harness defects
 can be corrected under the normal repository policy.
 
 How the preview is isolated and verified is in the knowledge base:
-[3D preview](../../KnowledgeBase/Notebook/Desktop%20App/3D%20preview.md).
+[3D preview](../../Assetarium%20KnowledgeBase/Notebook/Desktop%20App/3D%20preview.md).

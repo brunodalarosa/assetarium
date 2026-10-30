@@ -51,9 +51,9 @@ relicensing rights described above.
 
 ## Before you open a pull request
 
-- Read [AGENTS.md](AGENTS.md) and [`KnowledgeBase/Decisions/`](KnowledgeBase/Decisions/Decisions.md);
+- Read [AGENTS.md](AGENTS.md) and [`Assetarium KnowledgeBase/Decisions/`](Assetarium%20KnowledgeBase/Decisions/Decisions.md);
   they are binding for behavior changes. Contributor knowledge (where things are, rules,
-  gotchas, how systems work) is in [`KnowledgeBase/`](KnowledgeBase/Home.md); update the notes
+  gotchas, how systems work) is in [`Assetarium KnowledgeBase/`](Assetarium%20KnowledgeBase/Home.md); update the notes
   you touch in the same pull request.
 - Run the tests through the runtime wrappers (see [CLAUDE.md](CLAUDE.md)):
 

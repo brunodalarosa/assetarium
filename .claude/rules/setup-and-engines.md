@@ -9,6 +9,6 @@ paths:
   - "src/local_asset_library/config.py"
   - "config.example.toml"
 ---
-This code belongs to the **Setup and Engines** area. Before changing it, read `KnowledgeBase/Notebook/Setup and Engines/Setup and Engines.md` and the notes it lists
-for the systems you touch, plus `KnowledgeBase/Notebook/Codebase.md` when a module is unfamiliar.
+This code belongs to the **Setup and Engines** area. Before changing it, read `Assetarium KnowledgeBase/Notebook/Setup and Engines/Setup and Engines.md` and the notes it lists
+for the systems you touch, plus `Assetarium KnowledgeBase/Notebook/Codebase.md` when a module is unfamiliar.
 Notes can be stale: the code wins; report a wrong note and fix it in the same change.

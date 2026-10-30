@@ -26,8 +26,8 @@ bytes and material/alpha settings stay intact. External consumers must apply the
 returned bindings. Additional resource kinds need a processing adapter; this
 feature currently handles external glTF/GLB image references.
 
-See [general capability policy](../KnowledgeBase/Decisions/0009-general-capabilities.md) and
-[shared dependency decision](../KnowledgeBase/Decisions/0010-shared-project-dependencies.md).
+See [general capability policy](../Assetarium%20KnowledgeBase/Decisions/0009-general-capabilities.md) and
+[shared dependency decision](../Assetarium%20KnowledgeBase/Decisions/0010-shared-project-dependencies.md).
 
 ## Explicit mappings within a source
 

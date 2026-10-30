@@ -1,10 +1,10 @@
 # Windows desktop app (Assetarium)
 
-The desktop app is a React interface ([decision 0011](../../KnowledgeBase/Decisions/0011-react-desktop-ui.md))
+The desktop app is a React interface ([decision 0011](../../Assetarium%20KnowledgeBase/Decisions/0011-react-desktop-ui.md))
 in a native Windows window. This page describes how to use it. How it is built, its runtime
 boundaries and its verification are in the knowledge base:
-[Desktop app design](../../KnowledgeBase/Architecture/Desktop%20App/Desktop%20app%20design.md); processing and
-publication are in [Library updates](../../KnowledgeBase/Architecture/Processing/Library%20updates.md).
+[Desktop app design](../../Assetarium%20KnowledgeBase/Architecture/Desktop%20App/Desktop%20app%20design.md); processing and
+publication are in [Library updates](../../Assetarium%20KnowledgeBase/Architecture/Processing/Library%20updates.md).
 
 Double-click `Local Asset Library.vbs` in the checkout.
 It opens a normal, resizable Windows window without an extra terminal. The
@@ -24,7 +24,7 @@ activity indicator (only while something runs), the notifications bell and the
 inspection toggle. Asset processing shows a dot while a source needs
 processing or an operation runs.
 
-**Collections** ([decision 0012](../../KnowledgeBase/Decisions/0012-collections-and-tags.md)). The
+**Collections** ([decision 0012](../../Assetarium%20KnowledgeBase/Decisions/0012-collections-and-tags.md)). The
 Collections tab shows every collection as a card (four member covers, name, asset
 count, a small "Updated …" date), newest first, with **New collection** and a
 search over names, descriptions and what is inside (member names, labels, notes,
@@ -162,12 +162,12 @@ report**, a list of original asset paths with recorded failures, kept separate
 from pending work. A source with recorded failures offers **Recheck failures**: it reruns the
 file/dependency check, read only, and a dialog offers **Retry N assets** for failures that came
 from that check and pass it now (or **Nothing to retry** with Close); retried assets become pending
-for the next **Process assets** ([decision 0020](../../KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)).
+for the next **Process assets** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)).
 
-**Setup** ([decision 0014](../../KnowledgeBase/Decisions/0014-setup-wizard.md)). A full-window
+**Setup** ([decision 0014](../../Assetarium%20KnowledgeBase/Decisions/0014-setup-wizard.md)). A full-window
 overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions and
 search, Batch size, Review and finish; the descriptions step also chooses **Where search
-runs**, NVIDIA GPU or CPU, with its own checklist, [decision 0018](../../KnowledgeBase/Decisions/0018-cpu-search-embedder.md)), **Back** / **Skip step** / **Next**, and **Skip setup**
+runs**, NVIDIA GPU or CPU, with its own checklist, [decision 0018](../../Assetarium%20KnowledgeBase/Decisions/0018-cpu-search-embedder.md)), **Back** / **Skip step** / **Next**, and **Skip setup**
 at any time. It opens by itself only on a genuinely fresh install (no setup record, no
 saved settings, no source); otherwise **Settings → General → Run setup** opens it
 pre-filled. Nothing is saved until **Save** on the review step, and setup never
@@ -188,7 +188,7 @@ own result (a failed Blender write keeps the other settings) and **Go to Asset
 sources** leads to the next step. Verification: `scripts/verify-setup-wizard.py
 --run-name <unique-name>`.
 
-**Setup with an AI agent** ([decision 0016](../../KnowledgeBase/Decisions/0016-agent-setup.md)). *Welcome*
+**Setup with an AI agent** ([decision 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)). *Welcome*
 offers two equal cards, **Set up with my agent** and **Set it up yourself** (the manual
 steps above). The agent card opens a 60-minute setup session — the only way an agent's setup
 tools may change anything — and shows the agent panel: the session line with minutes left
@@ -221,8 +221,8 @@ sources* adds directories (**Choose folder…**), and per source shows format
 counts, the **Enabled** switch, **Include 2D images** (saves and rescans without
 deleting results), **Excluded folders** (pattern chips; adding or removing one rescans),
 **Possible duplicate exports** suggestions with **Group as alternate files**, **Exclude extra
-folders** and **Keep separate**, saved answers with **Undo**, **Textures not found** with a folder choice, live counts, **Apply** and **Undo** ([decision 0021](../../KnowledgeBase/Decisions/0021-texture-folder-choice.md))
-([decision 0019](../../KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)), and **Remove**
+folders** and **Keep separate**, saved answers with **Undo**, **Textures not found** with a folder choice, live counts, **Apply** and **Undo** ([decision 0021](../../Assetarium%20KnowledgeBase/Decisions/0021-texture-folder-choice.md))
+([decision 0019](../../Assetarium%20KnowledgeBase/Decisions/0019-source-folders-and-export-variants.md)), and **Remove**
 (keeps files and saved metadata). The Asset processing card points to unanswered suggestions. Click a source
 name or its 🔍 icon to browse that source's saved assets, including disabled
 sources, with the same cards and inspection; it loads forty at a time as you

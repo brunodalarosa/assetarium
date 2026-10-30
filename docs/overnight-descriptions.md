@@ -2,7 +2,7 @@
 
 For one source, the app's **Asset processing → Generate descriptions**
 does the same work in the background with progress, Cancel and a report
-notification ([decision 0008](../KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)).
+notification ([decision 0008](../Assetarium%20KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)).
 This runner remains for unattended runs across the whole library.
 
 In File Explorer, double-click **Generate overnight descriptions.cmd** in

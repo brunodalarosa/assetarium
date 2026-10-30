@@ -1,7 +1,7 @@
 # Linux (CLI + MCP)
 
 Assetarium v1 on Linux x86_64 (glibc) is **command line plus the MCP server**, with
-no desktop app ([decision 0013](../KnowledgeBase/Decisions/0013-platform-support.md)). Every owner
+no desktop app ([decision 0013](../Assetarium%20KnowledgeBase/Decisions/0013-platform-support.md)). Every owner
 action except visual browsing runs from the [CLI](cli.md): sources, Process assets,
 settings, failures and collection exports, plus scans, Blender previews, keyword
 search, the STDIO MCP server and the test suite. Windows stays the fully verified

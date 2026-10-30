@@ -1,4 +1,4 @@
-"""Real WebView2 check of the loading language (KnowledgeBase/Architecture/Desktop App/Desktop app design.md → Loading states).
+"""Real WebView2 check of the loading language (Assetarium KnowledgeBase/Architecture/Desktop App/Desktop app design.md → Loading states).
 
 Holds chosen bridge calls in the page so every loading state can be observed and captured:
 ghost cards on the Collections tab, Home, a collection and Asset processing, ghost cover tiles

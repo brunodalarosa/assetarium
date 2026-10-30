@@ -78,7 +78,7 @@ read. Report notices lead to Asset processing. They are saved in
 
 **Asset processing** offers **Process assets** for each source that needs
 processing or publication (the rail item shows a dot). Missing or failed descriptions never count as pending work: descriptions are
-optional extra data ([decision 0008](../KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)). The pending state remains visible through processing, publication, cancellation
+optional extra data ([decision 0008](../Assetarium%20KnowledgeBase/Decisions/0008-optional-descriptions-and-notifications.md)). The pending state remains visible through processing, publication, cancellation
 and interruption while actionable work remains. A subsequent scan clears it
 when there is no unattempted work and current results have been published.
 Recorded failures appear in the importing failures report. Description failures,
@@ -128,7 +128,7 @@ audio. New candidate catalog databases use schema 2, allowing explicit parent an
 child records to share original paths. Old catalogs remain readable without a
 startup migration. Generic images, unsupported audio, file roles, relationships
 and adapter capabilities are documented in the
-[catalog contract](../KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#expansion-step-1-shared-asset-foundation).
+[catalog contract](../Assetarium%20KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#expansion-step-1-shared-asset-foundation).
 Expansion step 2 adds image enrollment as a per-source choice: tick **Include
 2D images** in *Settings → Asset sources* (stored as `import_types` in that
 source's `metadata-lal/source.json`). The source is rescanned; existing results
@@ -137,7 +137,7 @@ results. Model textures, previews, pack overview sheets, texture folders and
 atlas/tileset sheets stay out of the image assets with a visible inventory role.
 **Process assets** measures each image and writes its thumbnail, model input and
 image vector; **Generate descriptions** then works for images too. See the
-[catalog contract](../KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#static-2d-images-expansion-step-2).
+[catalog contract](../Assetarium%20KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md#static-2d-images-expansion-step-2).
 
 
 ## Source import restrictions
@@ -217,7 +217,7 @@ The texture source need not contain models. Originals stay read-only; conflictin
 missing, changed or disabled providers remain visible faults. New registrations
 with the same convention use this feature automatically during normal scans.
 See [shared dependency behavior](dependency-path-overrides.md) and the binding
-[capability policy](../KnowledgeBase/Decisions/0009-general-capabilities.md).
+[capability policy](../Assetarium%20KnowledgeBase/Decisions/0009-general-capabilities.md).
 
 How sources are stored, identified and published internally is in the knowledge base:
-[Sources](../KnowledgeBase/Notebook/Sources%20and%20Catalog/Sources.md).
+[Sources](../Assetarium%20KnowledgeBase/Notebook/Sources%20and%20Catalog/Sources.md).

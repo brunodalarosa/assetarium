@@ -75,7 +75,7 @@ def _drop_stale_projections(config, retired):
 
 def write_receipt(config, kind, outcomes):
     receipt = {'schema_version': 1, 'kind': kind, 'utc': datetime.now(timezone.utc).isoformat(),
-               'policy': 'KnowledgeBase/Decisions/0006-retention.md', 'outcomes': outcomes,
+               'policy': 'Assetarium KnowledgeBase/Decisions/0006-retention.md', 'outcomes': outcomes,
                'bytes': sum(o.get('bytes', 0) for o in outcomes if o),
                'faults': [f for o in outcomes if o for f in o.get('faults', [])]}
     path = config.project_root / 'data/maintenance' / f'{kind}-{datetime.now(timezone.utc):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}.json'

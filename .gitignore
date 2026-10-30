@@ -47,6 +47,7 @@ Desktop.ini
 /.claude/settings.local.json
 /CLAUDE.local.md
 /AGENTS.local.md
+/MACHINE.local.md
 /.mcp.json
 
 # Keys, certificates, and package-registry credentials.
@@ -66,8 +67,10 @@ npm-debug.log*
 *.blend1
 *.blend2
 
-# Per-user Obsidian state for the knowledge base vault (its shared settings stay tracked).
-/KnowledgeBase/.obsidian/workspace*.json
-/KnowledgeBase/.obsidian/cache
-/KnowledgeBase/.obsidian/appearance.json
-/KnowledgeBase/.trash/
+# Per-user Obsidian state and installed plugin code for the knowledge base vault (its shared
+# settings stay tracked, including community-plugins.json, the list of plugins to install).
+/Assetarium KnowledgeBase/.obsidian/workspace*.json
+/Assetarium KnowledgeBase/.obsidian/cache
+/Assetarium KnowledgeBase/.obsidian/appearance.json
+/Assetarium KnowledgeBase/.obsidian/plugins/
+/Assetarium KnowledgeBase/.trash/

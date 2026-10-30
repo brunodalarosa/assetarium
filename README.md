@@ -204,12 +204,12 @@ never change or delete your asset files. Details: [MCP tools](docs/mcp/README.md
 ## Documentation
 
 - [Desktop app guide](docs/gui/README.md) · [3D viewer](docs/gui/3d-preview.md)
-- [Asset sources and processing](docs/asset-sources.md) · [Library updates](KnowledgeBase/Architecture/Processing/Library%20updates.md)
+- [Asset sources and processing](docs/asset-sources.md) · [Library updates](Assetarium%20KnowledgeBase/Architecture/Processing/Library%20updates.md)
 - [Command line](docs/cli.md) · [Linux](docs/linux.md)
 - [Description engines](docs/description-engines.md) · [Model storage](docs/model-storage.md)
 - [MCP server](docs/mcp/README.md)
-- [Storage use](KnowledgeBase/Notebook/Platform%20and%20Storage/Storage%20discipline.md)
-- [Current status and roadmap](KnowledgeBase/Status.md)
+- [Storage use](Assetarium%20KnowledgeBase/Notebook/Platform%20and%20Storage/Storage%20discipline.md)
+- [Current status and roadmap](Assetarium%20KnowledgeBase/Status.md)
 
 ## Contributing
 
@@ -219,7 +219,7 @@ what you expected, what happened, the asset format and your operating system. Pl
 small test files instead of uploading paid asset packs.
 
 Before changing code, read [AGENTS.md](AGENTS.md) and the
-[design decisions](KnowledgeBase/Decisions/Decisions.md): they describe how the project protects
+[design decisions](Assetarium%20KnowledgeBase/Decisions/Decisions.md): they describe how the project protects
 original files, handles faults and manages disk space. Run the tests with:
 
 ```powershell

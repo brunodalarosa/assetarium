@@ -2,8 +2,9 @@
 tags: [roadmap]
 id: ASSETRM-0001
 type: bug
-status: open
+status: done
 created: 2026-10-29
+resolved: 2026-10-29
 ---
 # ASSETRM-0001
 
@@ -56,3 +57,13 @@ strategy before editing anything.** Do not decide these alone. Questions to star
 - Is the stale `KnowledgeBase/` path fixed here or tracked as its own task?
 
 This goes through the usual scope-and-plan checkpoint in `AGENTS.md` before implementation.
+
+## Resolution
+
+Machine details moved to the ignored `MACHINE.local.md`, which agents create by probing the
+machine when it is missing and read before machine-dependent decisions (`AGENTS.md` → Local
+machine). `CLAUDE.md` keeps only generic GPU, Blender and Linux guidance pointing at
+`config.example.toml`, `docs/linux.md` and `docs/model-storage.md`. Live `KnowledgeBase/` paths now
+say `Assetarium KnowledgeBase/`; the frozen journal and the hashed `docs/caption-contract.md` keep
+the old path. Measurements in Decision 0018, Decision 0022, `Embedding contract.md` and `Status.md`
+stay as records of what was tested.

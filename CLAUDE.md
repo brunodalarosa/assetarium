@@ -71,8 +71,8 @@ scripts\asset-desktop.pyw`; startup never installs or runs models).
 
 ## Code map and knowledge base
 
-The module map lives in `KnowledgeBase/Notebook/Codebase.md`; each area hub
-(`KnowledgeBase/Notebook/<Area>/<Area>.md`) lists its systems, rules and gotchas. Read the
+The module map lives in `Assetarium KnowledgeBase/Notebook/Codebase.md`; each area hub
+(`Assetarium KnowledgeBase/Notebook/<Area>/<Area>.md`) lists its systems, rules and gotchas. Read the
 hub and the notes for the systems a task touches first (see Knowledge base in AGENTS.md).
 Path-scoped rules in `.claude/rules/` name the notes to read for the files you open.
 
@@ -111,16 +111,19 @@ Recent commits (`git log`) follow this shape; mirror it:
   embedding worker may pre-load its libraries only; decision 0005).
 - Processing never starts automatically; scans never run models. Changing format
   settings never deletes results or retries faults.
-- Shared models live in the directory set as `[storage].models` in `config.local.toml` (not owned by this project).
-  Blender: `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`.
+- This file and `AGENTS.md` describe no particular computer. This machine's hardware, tool
+  paths and Linux check setup live in the ignored `MACHINE.local.md` (AGENTS.md → Local machine).
+- Shared models live in the directory set as `[storage].models` in `config.local.toml` (not owned
+  by this project; `docs/model-storage.md`). Blender comes from `[tools].blender` or discovery
+  (`local-assets doctor` lists the candidates).
 - Local overrides go in ignored `config.local.toml` (copy `config.example.toml`).
-  The tracked example is neutral (project `models/`, Blender discovered); the owner's
-  machine paths live in their `config.local.toml`. Scripts use `load_project_config`.
-- Hardware: RTX 5070 (~12 GB VRAM) in the original setup; the current owner machine is a
-  Ryzen 9 9950X3D with a Radeon RX 6800 (HIP; no CUDA). One GPU job at a time via `gpu_queue`.
-- Linux check environment: WSL2 `Ubuntu-24.04`, clone in `~/lal` (ext4), Blender in
-  `~/blender-5.2.2-linux-x64/`. Run Linux suites with `LAL_REQUIRE_BLENDER=1` and
-  report the `Real-Blender tests:` line; a skipped Blender fixture is unverified.
+  The tracked example is neutral (project `models/`, Blender discovered); your machine paths
+  live in your `config.local.toml`. Scripts use `load_project_config`.
+- GPU work runs on CUDA (NVIDIA) or HIP (AMD), or not at all where neither is supported
+  (search embeds on CPU, decision 0018). One GPU job at a time via `gpu_queue`.
+- Linux checks (`docs/linux.md`): use a clone on a Linux filesystem (under WSL2, not `/mnt/…`)
+  and a Linux Blender. Run Linux suites with `LAL_REQUIRE_BLENDER=1` and report the
+  `Real-Blender tests:` line; a skipped Blender fixture is unverified.
 - Do not edit `blender_worker.py` / `render_math.py` / repair workers for portability:
   their hashes are inspection fingerprints (editing re-queues every inspection). A worker edit
   that keeps CPU renders identical can keep them only through `incremental.EQUIVALENT_WORKERS`,
@@ -133,9 +136,9 @@ Recent commits (`git log`) follow this shape; mirror it:
 
 ## Source-of-truth docs
 
-`KnowledgeBase/Decisions/` (binding owner decisions, read first) ·
-`KnowledgeBase/Status.md` (current status and open work) · `KnowledgeBase/Home.md`
-(vault conventions and the list of user guides in `docs/`) · `KnowledgeBase/Notebook/`
-(area hubs and system notes) · `KnowledgeBase/Architecture/` (contracts, library updates,
+`Assetarium KnowledgeBase/Decisions/` (binding owner decisions, read first) ·
+`Assetarium KnowledgeBase/Status.md` (current status and open work) · `Assetarium KnowledgeBase/Home.md`
+(vault conventions and the list of user guides in `docs/`) · `Assetarium KnowledgeBase/Notebook/`
+(area hubs and system notes) · `Assetarium KnowledgeBase/Architecture/` (contracts, library updates,
 caption severity, the expansion roadmap) · `docs/caption-contract.md` (stays in `docs/`;
 a check script hashes its path) · `docs/history/` (frozen October 2026 journal).
