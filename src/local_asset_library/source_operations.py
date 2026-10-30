@@ -106,7 +106,8 @@ def operation_lease(config, scoped, token):
         acquired.__exit__(None,None,None)
 
 
-def start(config, operation, key=None):
+def start(config, operation, key=None, asset_ids=None, queue_item=None):
+    """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope."""
     if operation not in {"scan", "process", "describe", "render-test"}:
         raise ConfigError("Unknown asset source operation")
     if operation == "render-test" and (key or not (blender := with_saved_blender(config).blender) or not blender.exists()):
@@ -127,7 +128,7 @@ def start(config, operation, key=None):
         from .settings import descriptions_enabled
         if not descriptions_enabled(config):
             raise ConfigError(DESCRIPTIONS_OFF)
-    if operation == 'describe' and not (source_status(config, get_source(config, key)).get('descriptions') or {}).get('missing'):
+    if operation == 'describe' and asset_ids is None and not (source_status(config, get_source(config, key)).get('descriptions') or {}).get('missing'):
         raise ConfigError('Every asset that can be described already has a description or a recorded failure')
     if operation == 'scan' and not key and not any(s['enabled'] for s in registry(config)['sources']):
         return {'status': 'idle', 'reason': None}  # Nothing to scan (a fresh install); no worker is started.
@@ -140,7 +141,8 @@ def start(config, operation, key=None):
                     if operation == "render-test" else "This operation is already running"}
         token = uuid.uuid4().hex
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
-              operation=operation, key=key, reason=None, current_asset=None)
+              operation=operation, key=key, reason=None, current_asset=None,
+              asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item)
         command = [str(python), str(config.project_root / "scripts/source-operation.py"), operation, "--token", token]
         if key:
             command.extend(["--source", key])
@@ -458,10 +460,13 @@ def worker_stage(config, source, stage, token):
     operation = operation_status(scoped).get("operation", "process")
     # Description runs only describe assets whose renders are ready, so unfinished
     # imports never gain recorded description faults.
-    only = None
+    # A queue item's scope, resolved when it started (decision 0023); None is the whole folder.
+    scope = operation_status(scoped).get("asset_ids")
+    only = set(scope) if scope is not None else None
     if stage == "caption":
         from .sources import description_state
-        only = {r["asset_id"] for r in read_records(working(scoped)) if description_state(r) == "missing"}
+        missing = {r["asset_id"] for r in read_records(working(scoped)) if description_state(r) == "missing"}
+        only = missing if only is None else missing & only
     def on_progress(identifier, completed, total):
         state(scoped, status="cancelling" if cancelled(scoped, token) else "processing",
               phase=(finishing(stage) if cancelled(scoped, token) else STAGE_LABELS[stage]),

@@ -65,10 +65,10 @@ js, check, capture = ui.js, ui.check, ui.capture
 
 SYNTHETIC_SOURCES = {'status': 'ready', 'revision': 'synthetic', 'scan': {}, 'sources': [
     {'key': 'village', 'name': 'Village kit', 'path': 'D:/Assets/Village kit', 'enabled': True, 'scanned': True,
-     'needs_processing': True, 'pending': 12, 'format_counts': {'gltf': 64, 'fbx': 12}, 'import_types': ['model_3d'],
+     'needs_processing': True, 'pending': 12, 'format_counts': {'gltf': 64, 'fbx': 12}, 
      'descriptions': {'complete': 20, 'missing': 24, 'failed': 0}, 'operation': {}},
     {'key': 'props', 'name': 'Dungeon props', 'path': 'D:/Assets/Dungeon props', 'enabled': True, 'scanned': True,
-     'needs_processing': False, 'failed': 3, 'format_counts': {'obj': 31}, 'import_types': ['model_3d', 'image'],
+     'needs_processing': False, 'failed': 3, 'format_counts': {'obj': 31}, 
      'descriptions': {'complete': 28, 'missing': 0, 'failed': 3},
      'operation': {'operation': 'describe', 'status': 'faulty', 'reason': 'Not enough GPU memory.'}}],
     'notifications': [
@@ -161,9 +161,8 @@ def verify():
             panelClosed:!$('notifications-panel')}})()""")
         capture('13-run-report.png')
         js("lal.setState({runReport:null})")
-        check('processing_page', """(async()=>{await until(()=>$('import-failures-summary').textContent.includes('2 assets'));
-          return {process:!!document.querySelector('[data-action=process][data-source=village]'),describe:!!document.querySelector('[data-action=describe][data-source=village]'),
-            describeBlocked:document.querySelector('[data-action=describe][data-source=props]').disabled,attentionDot:$('nav-processing').getAttribute('aria-label').includes('attention')}})()""")
+        check('processing_page', """(async()=>{await until(()=>$('running')&&$('up-next-section')&&$('blocked')&&$('failures')&&$('recent'));
+          return {sections:true,attentionDot:$('nav-processing').getAttribute('aria-label').includes('attention')}})()""")
         capture('14-asset-processing.png')
 
         check('history', """(async()=>{lal.goBack();await until(()=>$('library-view'));const back=!!document.querySelector('#grid .card');
@@ -177,9 +176,9 @@ def verify():
         check('settings_general', """(async()=>{lal.navigate({page:'settings',tab:'general'});await until(()=>$('settings-view')&&lal.state.general.values);await frame();
           return {appearance:$('appearance-light').getAttribute('aria-checked')==='true',budget:!!$('storage-budget').value,formats:!!$('processing-format-fbx')}})()""")
         capture('15-settings-general.png')
-        js("$('asset-sources-tab').click()")
-        js("until(()=>document.querySelectorAll('.source-row').length===2)")
-        capture('16-settings-asset-sources.png')
+        js("lal.navigate({page:'sources'})")
+        js("until(()=>$('sources-view')&&lal.state.sourcesView.tree)")
+        capture('16-asset-sources.png')
 
         # Smallest supported desktop window: inspection floats over the results instead of squeezing them.
         window.resize(700, 520)

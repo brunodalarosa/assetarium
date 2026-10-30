@@ -56,7 +56,7 @@ def peer_requested(config):
 
 @contextmanager
 def lease(config, owner, timeout=15, resource='gpu'):
-    if resource not in {'gpu', 'operations', 'sources', 'notifications', 'collections', 'setup', 'setup_agent'}:
+    if resource not in {'gpu', 'operations', 'sources', 'notifications', 'collections', 'setup', 'setup_agent', 'queue'}:
         raise ConfigError('Unknown lease resource')
     path = config.output_path("data", "library/" + resource + ".lock")
     path.parent.mkdir(parents=True, exist_ok=True)

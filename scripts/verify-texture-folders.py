@@ -74,7 +74,7 @@ window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 ui = Harness(window, OUT, report)
-ROW = "document.querySelector('.source-row:has([data-source=pack])')"
+ROW = "document.querySelector('#folder-panel')"  # The library folder's panel on the Asset sources tab (decision 0023).
 PANEL = ROW + ".querySelector('.texture-choice')"
 
 
@@ -85,12 +85,13 @@ def wait(expression, timeout=60):
 def verify():
     try:
         ui.wait_ready(extra="lal.state.sources.length===3")
-        ui.js("$('nav-processing').click()")
-        wait("document.querySelector('[data-source=pack] .source-texture-suggestion')")
-        assert ui.js("document.querySelector('[data-source=pack] .source-texture-suggestion').textContent.includes('4 models can’t find their textures')")
-        report['checks'].append('Asset processing points to the texture choice for the 4 models')
-        ui.js("document.querySelector('[data-source=pack] .source-texture-suggestion button').click()")
+        ui.js("$('nav-sources').click()")
+        wait("lal.state.sourcesView.tree&&$('folder-tree')")
+        wait("lal.state.sourcesView.tree.attention")
+        report['checks'].append('The Asset sources rail item shows that a texture folder waits for an answer')
+        ui.js("lal.inspectFolder('pack','')")
         wait(f"{ROW}&&{PANEL}&&{PANEL}.querySelectorAll('[role=radio]').length===2")
+        assert ui.js(f"{PANEL}.textContent.includes('4 models can’t find their textures')")
         assert ui.js(f"[...{PANEL}.querySelectorAll('[role=radio]')].map(r=>r.dataset.value).join('|')") == 'Tex/PBR|Tex/URP'
         assert ui.js(f"{PANEL}.querySelector('.texture-total').textContent.startsWith('3 fixed · 1 stays failed')")
         ui.js(f"{ROW}.scrollIntoView()")
@@ -114,7 +115,7 @@ def verify():
         window.resize(680, 900)
         wait('innerWidth<761')
         ui.js(f"{ROW}.scrollIntoView()")
-        assert ui.js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
+        wait("$('sources-view').scrollWidth<=$('sources-view').clientWidth+1", 10)  # Once the resize has settled.
         ui.capture('03-narrow.png')
         report['checks'].append('Narrow layout has no horizontal overflow')
         assert not bridge._gateway.model_requested

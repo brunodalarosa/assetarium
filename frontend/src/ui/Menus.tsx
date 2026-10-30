@@ -1,4 +1,7 @@
-import { Check, ChevronRight, FolderOpen, FolderPlus, FolderSearch, ListX, Plus, RotateCcw, ScanSearch, Search, Trash2, X } from "lucide-react";
+import {
+  Ban, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, ExternalLink, FileText, FolderMinus, FolderOpen, FolderPlus, FolderSearch, Image as ImageIcon,
+  ListX, Merge, Package, Pencil, Plus, RefreshCw, RotateCcw, ScanSearch, Search, ToggleLeft, Trash2, Undo2, Wrench, X,
+} from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -12,7 +15,8 @@ import { plural } from "../app/format";
 import {
   addToCollection, assetMenuSource, closeConfirm, closeCreateCollection, closeMenu, collectionsFor, confirmDeleteCollection,
   createCollection, exportCollection, type GridId, type MenuRequest, openCollection, openCreateCollection, pushToast, removeFromCollection, revealAsset, selectAsset,
-  startSelection, useApp,
+  startSelection, useApp, pathAction, folderAction, makePreviews, makeDescriptions, showInPack, sourceAction, confirmRemoveSource, expandAll,
+  inspectFolder, navigate, copyText, recheckFailures,
 } from "../app/store";
 import { Skeleton } from "./Loading";
 import { Button, IconButton, Spinner } from "./primitives";
@@ -232,6 +236,12 @@ function AssetMenuItems({ request }: { request: MenuRequest }) {
       <ContextMenuItem textValue="Show in Explorer" onSelect={() => void revealAsset(grid, item.asset_id)}>
         <FolderSearch className={ICON} aria-hidden />Show in Explorer
       </ContextMenuItem>
+      {grid === "library" && (
+        <ContextMenuItem textValue="Show in pack" onSelect={() => void showInPack(item.asset_id)}>
+          <Package className={ICON} aria-hidden />Show in pack
+        </ContextMenuItem>
+      )}
+      {grid === "source" && <SourceAssetItems item={item} />}
       {grid === "collection" && (
         <>
           <ContextMenuSeparator />
@@ -242,6 +252,115 @@ function AssetMenuItems({ request }: { request: MenuRequest }) {
       )}
       {flyout && menu.open && trigger.current && <CollectionFlyout anchor={trigger.current} grid={grid} item={item} onBack={back} onEnter={() => clearTimeout(hover.current)} />}
     </div>
+  );
+}
+
+/** Asset sources tab: what can resolve this asset's state, and the file actions. Never Make previews on a ready, blocked or missing asset. */
+function SourceAssetItems({ item }: { item: Json }) {
+  const picked = useApp((s) => s.sourcesView.picked);
+  const descriptions = useApp((s) => s.general.values?.descriptions_enabled ?? true);
+  const many = picked.length > 1 && picked.includes(item.asset_id);
+  const ids = many ? picked : [item.asset_id];
+  const key = item.path?.split("/")[0], relative = item.path?.split("/").slice(1).join("/");
+  const folder = item.folder ?? "";
+  return (
+    <>
+      {item.path && (
+        <>
+          <ContextMenuItem textValue="Open with default app" onSelect={() => void pathAction("open", key, relative)}><ExternalLink className={ICON} aria-hidden />Open with default app</ContextMenuItem>
+          <ContextMenuItem textValue="Copy path" onSelect={() => void pathAction("copy", key, relative)}><Copy className={ICON} aria-hidden />Copy path</ContextMenuItem>
+        </>
+      )}
+      {(item.state === "no_previews" || many) && (
+        <ContextMenuItem textValue="Make previews" onSelect={() => void makePreviews({ key, asset_ids: ids }, ids.length)}><ImageIcon className={ICON} aria-hidden />Make previews{many ? ` (${ids.length})` : ""}</ContextMenuItem>
+      )}
+      {descriptions && (item.overlays?.description === "missing" || many) && (
+        <ContextMenuItem textValue="Generate descriptions" onSelect={() => void makeDescriptions({ key, asset_ids: ids }, ids.length)}><FileText className={ICON} aria-hidden />Generate descriptions{many ? ` (${ids.length})` : ""}</ContextMenuItem>
+      )}
+      {item.state === "blocked" && (
+        <ContextMenuItem textValue="Fix" onSelect={() => navigate({ page: "processing" })}><Wrench className={ICON} aria-hidden />Fix…</ContextMenuItem>
+      )}
+      {item.state === "failed" && (
+        <>
+          <ContextMenuItem textValue="Copy error" onSelect={() => void copyText(`${item.name}: ${item.reason || "Recorded failure"}`, "The recorded error is on the clipboard.")}><Copy className={ICON} aria-hidden />Copy error</ContextMenuItem>
+          <ContextMenuItem textValue="Recheck" onSelect={() => void recheckFailures({ key })}><RefreshCw className={ICON} aria-hidden />Recheck…</ContextMenuItem>
+        </>
+      )}
+      {folder && (
+        <ContextMenuItem textValue="Exclude containing folder" onSelect={() => void folderAction("exclude", key, folder)}><FolderMinus className={ICON} aria-hidden />Exclude containing folder</ContextMenuItem>
+      )}
+    </>
+  );
+}
+
+/** Tree rows and other files: folder, pack, library folder, excluded folder or a non-asset file. */
+function FolderMenuItems({ request }: { request: MenuRequest }) {
+  const item = request.item;
+  const descriptions = useApp((s) => s.general.values?.descriptions_enabled ?? true);
+  if (request.kind === "file") {
+    return (
+      <>
+        <ContextMenuLabel className="max-w-64 truncate normal-case tracking-normal">{item.name}</ContextMenuLabel>
+        <ContextMenuItem textValue="Open" onSelect={() => void pathAction("open", item.key, item.relative)}><ExternalLink className={ICON} aria-hidden />Open</ContextMenuItem>
+        <ContextMenuItem textValue="Show in Explorer" onSelect={() => void pathAction("reveal", item.key, item.relative)}><FolderSearch className={ICON} aria-hidden />Show in Explorer</ContextMenuItem>
+        <ContextMenuItem textValue="Copy path" onSelect={() => void pathAction("copy", item.key, item.relative)}><Copy className={ICON} aria-hidden />Copy path</ContextMenuItem>
+      </>
+    );
+  }
+  const { key, path, kind } = item;
+  const pending = item.node?.pending || 0;
+  const reveal = <ContextMenuItem textValue="Show in Explorer" onSelect={() => void pathAction("reveal", key, path)}><FolderSearch className={ICON} aria-hidden />Show in Explorer</ContextMenuItem>;
+  const work = (
+    <>
+      {pending > 0 && <ContextMenuItem textValue="Make previews" onSelect={() => void makePreviews({ key, path }, pending)}><ImageIcon className={ICON} aria-hidden />Make previews ({pending.toLocaleString()})</ContextMenuItem>}
+      {descriptions && item.node?.assets > 0 && <ContextMenuItem textValue="Generate descriptions" onSelect={() => void makeDescriptions({ key, path })}><FileText className={ICON} aria-hidden />Generate descriptions</ContextMenuItem>}
+    </>
+  );
+  return (
+    <>
+      <ContextMenuLabel className="max-w-64 truncate normal-case tracking-normal">{item.name}</ContextMenuLabel>
+      {kind === "excluded" && (
+        <>
+          <ContextMenuItem textValue="Include again" onSelect={() => void folderAction("include", key, path)}><Undo2 className={ICON} aria-hidden />Include again</ContextMenuItem>
+          {reveal}
+        </>
+      )}
+      {kind === "library" && (
+        <>
+          {work}
+          <ContextMenuItem textValue="Rescan" onSelect={() => void sourceAction("scan", key)}><RefreshCw className={ICON} aria-hidden />Rescan</ContextMenuItem>
+          <ContextMenuItem textValue="Enable or disable" onSelect={() => void sourceAction("enabled", key, null, !item.folder?.enabled)}><ToggleLeft className={ICON} aria-hidden />{item.folder?.enabled ? "Disable in search" : "Enable in search"}</ContextMenuItem>
+          {reveal}
+          <ContextMenuItem textValue="Copy path" onSelect={() => void pathAction("copy", key, "")}><Copy className={ICON} aria-hidden />Copy path</ContextMenuItem>
+          <ContextMenuItem textValue="Expand all" onSelect={() => expandAll(key, true)}><ChevronsUpDown className={ICON} aria-hidden />Expand all</ContextMenuItem>
+          <ContextMenuItem textValue="Collapse all" onSelect={() => expandAll(key, false)}><ChevronsDownUp className={ICON} aria-hidden />Collapse all</ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem tone="destructive" textValue="Remove" onSelect={() => confirmRemoveSource(item.folder)}><Trash2 className="size-4 shrink-0" aria-hidden />Remove…</ContextMenuItem>
+        </>
+      )}
+      {kind === "pack" && (
+        <>
+          {work}
+          <ContextMenuItem textValue="Rename" onSelect={() => inspectFolder(key, path)}><Pencil className={ICON} aria-hidden />Rename…</ContextMenuItem>
+          {path !== "" && <ContextMenuItem textValue="Merge into parent pack" onSelect={() => void folderAction("merge", key, path)}><Merge className={ICON} aria-hidden />Merge into parent pack</ContextMenuItem>}
+          {item.folder?.missing > 0 && <ContextMenuItem textValue="Forget missing" onSelect={() => void folderAction("forget_missing", key, path)}><Ban className={ICON} aria-hidden />Forget missing</ContextMenuItem>}
+          {reveal}
+        </>
+      )}
+      {(kind === "folder" || kind === "bundle") && (
+        <>
+          {work}
+          <ContextMenuItem textValue="Make this a pack" onSelect={() => void folderAction("make_pack", key, path)}><Package className={ICON} aria-hidden />Make this a pack</ContextMenuItem>
+          <ContextMenuItem textValue="Merge into parent pack" onSelect={() => void folderAction("merge", key, path)}><Merge className={ICON} aria-hidden />Merge into parent pack</ContextMenuItem>
+          <ContextMenuItem textValue="Treat images here as textures" onSelect={() => void folderAction("image_kind", key, path, "texture")}><ImageIcon className={ICON} aria-hidden />Treat images here as textures</ContextMenuItem>
+          <ContextMenuItem textValue="Treat images here as 2D assets" onSelect={() => void folderAction("image_kind", key, path, "image")}><ImageIcon className={ICON} aria-hidden />Treat images here as 2D assets</ContextMenuItem>
+          <ContextMenuItem textValue="Exclude folder" onSelect={() => void folderAction("exclude", key, path)}><FolderMinus className={ICON} aria-hidden />Exclude folder</ContextMenuItem>
+          {reveal}
+          <ContextMenuItem textValue="Copy path" onSelect={() => void pathAction("copy", key, path)}><Copy className={ICON} aria-hidden />Copy path</ContextMenuItem>
+          <ContextMenuItem textValue="Expand all" onSelect={() => expandAll(key, true)}><ChevronsUpDown className={ICON} aria-hidden />Expand all</ContextMenuItem>
+        </>
+      )}
+    </>
   );
 }
 
@@ -366,10 +485,11 @@ export function AppMenus() {
       onOpenChange={(open) => !open && closeMenu()}
     >
       <MenuShield />
-      <ContextMenuContent ariaLabel={{ asset: "Asset actions", collection: "Collection actions", export: "Export collection" }[shown?.kind ?? "asset"]} className="w-64">
+      <ContextMenuContent ariaLabel={{ asset: "Asset actions", collection: "Collection actions", export: "Export collection", folder: "Folder actions", file: "File actions" }[shown?.kind ?? "asset"]} className="w-64">
         {shown?.kind === "asset" && <AssetMenuItems request={shown} />}
         {shown?.kind === "collection" && <CollectionMenuItems request={shown} />}
         {shown?.kind === "export" && <ExportMenuItems request={shown} />}
+        {(shown?.kind === "folder" || shown?.kind === "file") && <FolderMenuItems request={shown} />}
       </ContextMenuContent>
     </ContextMenu>
   );

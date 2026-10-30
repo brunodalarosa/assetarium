@@ -6,16 +6,18 @@ import { useSyncExternalStore } from "react";
 import { type AssetApi, type Bridge, type Json, libraryApi, sourceApi } from "./api";
 import { describeActive, notificationContent, notificationKey, operationActive, plural, type Tone } from "./format";
 
-export type Page = "home" | "library" | "collections" | "collection" | "processing" | "settings" | "source";
-export type SettingsTab = "general" | "asset-sources";
+export type Page = "home" | "library" | "collections" | "collection" | "processing" | "settings" | "sources";
+export type SettingsTab = "general";
 export interface Route {
   page: Page;
   tab?: SettingsTab;
   key?: string;
+  /** Asset sources: the folder (inside library folder `key`) shown in the grid. */
+  path?: string;
   /** Asset processing: the source a notification pointed at. */
   focus?: string;
 }
-/** A card grid with its own selection and inspection: Home, a source browser or an open collection. */
+/** A card grid with its own selection and inspection: Home, the Asset sources tab or an open collection. */
 export type GridId = "library" | "source" | "collection";
 export type InspectorTab = "overview" | "sources" | "evidence";
 
@@ -115,7 +117,7 @@ export interface CollectionView {
 }
 export interface MenuRequest {
   id: number;
-  kind: "asset" | "collection" | "export";
+  kind: "asset" | "collection" | "export" | "folder" | "file";
   x: number;
   y: number;
   grid?: GridId;
@@ -132,6 +134,27 @@ export interface ConfirmRequest {
   run?: () => Promise<unknown>;
   /** Deletions are "danger" (the default); other confirmations are "neutral". */
   tone?: "danger" | "neutral";
+}
+/** The Asset sources tab (decision 0023): the tree, the shown folder and its filters. */
+export interface SourcesView {
+  tree: Json | null;
+  loading: boolean;
+  error: string | null;
+  key: string | null;
+  path: string;
+  expanded: Record<string, boolean>;
+  types: string[];
+  states: string[];
+  sort: "name" | "added" | "pending" | "assets";
+  showFiles: boolean;
+  list: boolean;
+  /** What inspection shows: the selected asset, or the selected folder, pack or library folder. */
+  panel: "asset" | "folder";
+  files: Json[];
+  counts: Json | null;
+  /** Ctrl- or Shift-clicked assets for queue actions, Add to collection and Exclude. */
+  picked: string[];
+  pickAnchor: string | null;
 }
 export interface CreateRequest {
   assetIds: string[];
@@ -214,6 +237,9 @@ export interface AppState {
   create: CreateRequest | null;
   knownTags: Json[];
   inspector: { open: boolean; width: number; tab: InspectorTab };
+  sourcesView: SourcesView;
+  /** The processing queue (decision 0023); null until first loaded. */
+  queue: Json | null;
   sources: Json[];
   /** False until the first sources answer (or fault), so "no sources" is never shown early. */
   sourcesLoaded: boolean;
@@ -250,6 +276,10 @@ const emptyGrid = (id: GridId): Grid => ({
 function emptyCollectionView(): CollectionView {
   return { id: null, name: "", description: "", updatedAt: "", count: 0, unavailable: 0, loading: false, error: null, query: "", mode: "combined", phase: "all", busy: false, search: null, members: {} };
 }
+function emptySourcesView(): SourcesView {
+  return { tree: null, loading: false, error: null, key: null, path: "", expanded: {}, types: [], states: [], sort: "name",
+    showFiles: true, list: false, panel: "asset", files: [], counts: null, picked: [], pickAnchor: null };
+}
 const emptyBlender = (): BlenderState => ({ report: null, path: "", check: null, checking: false, confirmRerender: false, editing: false, saving: false, message: "" });
 function emptySetup(): SetupState {
   return {
@@ -274,6 +304,8 @@ let state: AppState = {
   collections: { items: [], total: 0, loading: false, loaded: false, error: null, query: "" },
   selection: { active: false, ids: [], anchor: null }, menu: null, confirm: null, create: null, knownTags: [],
   inspector: { open: false, width: boot.inspector_width, tab: "overview" },
+  sourcesView: emptySourcesView(),
+  queue: null,
   sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
@@ -315,7 +347,7 @@ const api = () => {
 export const route = () => state.history[state.historyIndex];
 export const activeGridId = (s: AppState = state): GridId => {
   const page = s.history[s.historyIndex].page;
-  return page === "source" ? "source" : page === "collection" ? "collection" : "library";
+  return page === "sources" ? "source" : page === "collection" ? "collection" : "library";
 };
 /** Collection members open through the library, or through their source when the library does not hold them. */
 export function gridApi(id: GridId, assetId: string | null = null): AssetApi {
@@ -327,11 +359,12 @@ export function gridApi(id: GridId, assetId: string | null = null): AssetApi {
   return id === "source" && state.source.key ? sourceApi(api(), state.source.key) : libraryApi(api());
 }
 /** Stale checks compare one publication; collection members span several, so they skip it. */
-export const gridVersion = (s: AppState, id: GridId): string | null => (id === "collection" ? null : (s[id].version ?? s.context?.generation ?? null));
+// The Asset sources grid reads a folder's working data, which has no published version to compare.
+export const gridVersion = (s: AppState, id: GridId): string | null => (id === "collection" || id === "source" ? null : (s[id].version ?? s.context?.generation ?? null));
 
 /* ------------------------------- navigation ------------------------------ */
 
-const sameRoute = (a: Route, b: Route) => a.page === b.page && a.tab === b.tab && a.key === b.key;
+const sameRoute = (a: Route, b: Route) => a.page === b.page && a.tab === b.tab && a.key === b.key && (a.path ?? "") === (b.path ?? "");
 export function navigate(next: Route) {
   const current = route();
   if (sameRoute(current, next)) {
@@ -359,7 +392,7 @@ export function goForward() {
 function enterRoute(next: Route, previous: Route) {
   if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadRenderSettings(), loadSources(), loadSetupState().catch(() => undefined), loadBlenderInstallation()]);
   if (next.page === "processing") void Promise.all([loadSources(), loadImportFailures()]);
-  if (next.page === "source" && next.key && (state.source.key !== next.key || previous.page !== "source")) void openSourceBrowser(next.key);
+  if (next.page === "sources") void enterSources(next, previous);
   if (next.page === "collections") void loadCollections();
   if (state.selection.active) cancelSelection();
   if (next.page === "collection" && next.key) {
@@ -369,7 +402,7 @@ function enterRoute(next: Route, previous: Route) {
   // Returning to a grid re-resolves its selection so a paused 3D preview remounts.
   const id = activeGridId();
   const selected = state[id].selected;
-  if (selected && state.inspector.open && (next.page !== "source" || state.source.key === next.key))
+  if (selected && state.inspector.open && next.page !== "sources")
     void selectAsset(id, selected, state[id].detail?.format ?? null, state[id].detail?.view ?? "three_quarter", false);
 }
 
@@ -555,7 +588,7 @@ async function drainThumbs() {
     if (generation !== state[id].generation) continue;
     if (result.status === "stale") {
       if (id === "library") patchSearch({ status: "Library version changed; refresh the published view." });
-      else patchGrid("source", { error: "Saved source contents changed. Return to asset sources and reopen this source.", finished: true });
+      else patchGrid("source", { error: "This folder changed while it was shown; it is loaded again.", finished: true });
       continue;
     }
     const payload = result.payload || {};
@@ -579,6 +612,7 @@ async function drainThumbs() {
 let detailGeneration = { library: 0, source: 0, collection: 0 };
 export async function selectAsset(id: GridId, assetId: string, format: string | null = null, view = "three_quarter", moveFocus = true) {
   window.LALPreview?.dispose();
+  if (id === "source" && state.sourcesView.panel !== "asset") setState((s) => ({ sourcesView: { ...s.sourcesView, panel: "asset" } }));
   const generation = ++detailGeneration[id];
   setState((s) => ({ inspector: { ...s.inspector, open: true } }));
   const missing = id === "collection" ? state.collection.items.find((item) => item.asset_id === assetId && item.availability === "unavailable") : null;
@@ -763,38 +797,255 @@ export async function chooseSourceDirectory() {
   return result.status === "selected" ? (result.directory as string) : null;
 }
 
-/* ----------------------------- source browser ---------------------------- */
+/* ---------------------------- asset sources tab -------------------------- */
 
-let sourceGeneration = 0;
-export async function openSourceBrowser(key: string) {
-  ++detailGeneration.source;
-  const generation = ++sourceGeneration;
-  setState({ source: { ...emptyGrid("source"), key, generation } });
-  await browseSource(generation);
-}
-export async function browseSource(generation = state.source.generation) {
-  const c = state.source;
-  if (!c.key || c.loading || c.finished || generation !== c.generation) return;
-  patchGrid("source", { loading: true, status: c.items.length ? `Loading more assets · ${c.items.length} shown…` : "Loading saved source contents…" });
+const patchSources = (patch: Partial<SourcesView> | ((current: SourcesView) => Partial<SourcesView>)) =>
+  setState((s) => ({ sourcesView: { ...s.sourcesView, ...(typeof patch === "function" ? patch(s.sourcesView) : patch) } }));
+let treeGeneration = 0;
+/** Library folders → bundles → packs → folders, with counts and what needs the owner (read from saved data). */
+export async function loadLibraryTree() {
+  if (!state.api) return;
+  const generation = ++treeGeneration;
+  patchSources({ loading: true });
   try {
-    const result = await api().source_browse(c.key, c.items.length, 40);
+    const tree = await api().library_tree();
+    if (generation !== treeGeneration) return;
+    if (tree.status === "faulty") throw Error(tree.reason);
+    patchSources({ tree, error: null });
+  } catch (error) {
+    if (generation === treeGeneration) patchSources({ error: (error as Error).message });
+  } finally {
+    if (generation === treeGeneration) patchSources({ loading: false });
+  }
+}
+async function enterSources(next: Route, previous: Route) {
+  if (!state.sourcesView.tree) await loadLibraryTree();
+  else void loadLibraryTree();
+  const folders: Json[] = state.sourcesView.tree?.folders || [];
+  const key = next.key ?? state.sourcesView.key ?? folders[0]?.key ?? null;
+  if (!key) return;
+  const path = next.key ? next.path ?? "" : state.sourcesView.path;
+  if (key !== state.sourcesView.key || path !== state.sourcesView.path || previous.page !== "sources" || !state.source.items.length) await showFolder(key, path, next.focus);
+  else if (next.focus) void selectAsset("source", next.focus, null, "three_quarter", true);
+}
+/** Open the Asset sources tab at a folder (and an asset in it). */
+export function openSources(key?: string, path = "", assetId?: string) {
+  navigate({ page: "sources", key, path, focus: assetId });
+}
+/** Show in pack: a search result opens the Asset sources tab with its folder expanded and the asset selected. */
+export async function showInPack(assetId: string) {
+  try {
+    const found = await api().library_locate(assetId);
+    if (found.status === "faulty") throw Error(found.reason);
+    openSources(found.key, found.path, assetId);
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not in a library folder", body: (error as Error).message });
+  }
+}
+const ancestors = (key: string, path: string) => {
+  const parts = path ? path.split("/") : [];
+  return [key + ":", ...parts.map((_, i) => key + ":" + parts.slice(0, i + 1).join("/"))];
+};
+let folderGeneration = 0;
+export async function showFolder(key: string, path = "", focus?: string) {
+  ++detailGeneration.source;
+  const generation = ++folderGeneration;
+  const previous = state.sourcesView.key;
+  const changedFolder = key !== previous;
+  patchSources((v) => ({ key, path, panel: focus ? "asset" : v.panel, files: [], counts: null, picked: [], pickAnchor: null,
+    expanded: { ...v.expanded, ...Object.fromEntries(ancestors(key, path).slice(0, -1).map((id) => [id, true])) } }));
+  setState({ source: { ...emptyGrid("source"), key, generation } });
+  // "+N new" counts from your last visit: leaving a library folder marks what you saw there as seen.
+  if (changedFolder && previous) void api().library_visit(previous).catch(() => undefined);
+  await loadFolderItems(generation);
+  if (focus && generation === folderGeneration) void selectAsset("source", focus, null, "three_quarter", true);
+}
+export async function loadFolderItems(generation = state.source.generation) {
+  const c = state.source, view = state.sourcesView;
+  if (!c.key || c.loading || c.finished || generation !== c.generation) return;
+  patchGrid("source", { loading: true, status: c.items.length ? `Loading more · ${c.items.length} shown…` : "Loading this folder…" });
+  try {
+    const offset = c.items.length + view.files.length;
+    const result = await api().library_items(c.key, view.path, offset, 80, { types: view.types, states: view.states }, view.showFiles);
     if (generation !== state.source.generation) return;
     if (result.status === "faulty") throw Error(result.reason);
-    if (state.source.version && state.source.version !== result.generation) throw Error("Saved source contents changed. Return to asset sources and reopen this source.");
-    const append = state.source.items.length > 0;
-    patchGrid("source", (s) => ({ items: append ? s.items.concat(result.items) : result.items, version: result.generation, total: result.total_count }));
-    const total = result.total_count;
+    const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
+    patchGrid("source", (s) => ({ items: s.items.concat(assets), total: result.total }));
+    patchSources((v) => ({ files: v.files.concat(files), counts: result.counts }));
     patchGrid("source", (s) => ({
-      finished: s.items.length >= total,
-      status: `${total} ${total === 1 ? "saved asset" : "saved assets"}${result.source?.enabled ? "" : " · Disabled in library searches"}`,
-      emptyText: result.reason || "This source has no saved assets.",
+      finished: s.items.length + state.sourcesView.files.length >= result.total,
+      status: plural(result.assets, "asset", "assets") + (result.files ? ` · ${plural(result.files, "other file", "other files")}` : ""),
+      emptyText: view.types.length || view.states.length ? "Nothing here matches these filters." : "No assets in this folder.",
     }));
   } catch (error) {
     if (generation === state.source.generation)
-      patchGrid("source", (s) => ({ finished: true, error: (error as Error).message, status: s.items.length ? `${s.items.length} assets shown · could not load the rest` : "Source contents unavailable." }));
+      patchGrid("source", (s) => ({ finished: true, error: (error as Error).message, status: s.items.length ? `${s.items.length} shown · could not load the rest` : "This folder could not be read." }));
   } finally {
     if (generation === state.source.generation) patchGrid("source", { loading: false });
   }
+}
+/** Reload the shown folder in place after a scan or a finished item: states update, nothing jumps. */
+async function refreshFolder() {
+  const s = state.sourcesView;
+  if (!s.key || !state.api) return;
+  try {
+    const shown = Math.max(80, state.source.items.length + s.files.length);
+    const result = await api().library_items(s.key, s.path, 0, Math.min(200, shown), { types: s.types, states: s.states }, s.showFiles);
+    if (result.status === "faulty" || state.sourcesView.key !== s.key || state.sourcesView.path !== s.path) return;
+    const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
+    // Thumbnails of assets whose state changed are asked for again (a finished preview fades in).
+    const before: Record<string, string> = Object.fromEntries(state.source.items.map((item: Json) => [item.asset_id, item.state]));
+    for (const item of assets) if (before[item.asset_id] !== item.state) requested.delete(`source:${state.source.generation}:${item.asset_id}`);
+    patchGrid("source", (g) => ({ items: assets, total: result.total, finished: assets.length + files.length >= result.total,
+      thumbs: Object.fromEntries(Object.entries(g.thumbs).filter(([id]) => before[id] === assets.find((a: Json) => a.asset_id === id)?.state)) }));
+    patchSources({ files, counts: result.counts });
+  } catch {
+    /* The next change poll tries again. */
+  }
+}
+export function setSourcesFilter(patch: Partial<Pick<SourcesView, "types" | "states" | "sort" | "showFiles" | "list">>) {
+  patchSources(patch);
+  if (state.sourcesView.key && ("types" in patch || "states" in patch || "showFiles" in patch)) void showFolder(state.sourcesView.key, state.sourcesView.path);
+}
+export function toggleFolder(id: string, open?: boolean) {
+  patchSources((v) => ({ expanded: { ...v.expanded, [id]: open ?? !v.expanded[id] } }));
+}
+export function expandAll(key: string, open: boolean) {
+  const folder = (state.sourcesView.tree?.folders || []).find((f: Json) => f.key === key);
+  patchSources((v) => ({ expanded: { ...v.expanded, ...Object.fromEntries((folder?.nodes || []).map((n: Json) => [key + ":" + n.path, open])) } }));
+}
+/** Click a folder or pack: show it in the grid and its panel in inspection. */
+export function inspectFolder(key: string, path: string) {
+  patchSources((v) => ({ panel: "folder", expanded: { ...v.expanded, [key + ":" + path]: true } }));
+  setState((s) => ({ inspector: { ...s.inspector, open: true } }));
+  if (key !== state.sourcesView.key || path !== state.sourcesView.path) navigate({ page: "sources", key, path });
+}
+export function pickAsset(assetId: string, range: boolean) {
+  const items = state.source.items.map((item: Json) => item.asset_id);
+  patchSources((v) => {
+    if (range && v.pickAnchor) {
+      const [a, b] = [items.indexOf(v.pickAnchor), items.indexOf(assetId)].sort((x, y) => x - y);
+      return { picked: [...new Set([...v.picked, ...items.slice(a, b + 1)])] };
+    }
+    return { picked: v.picked.includes(assetId) ? v.picked.filter((id) => id !== assetId) : [...v.picked, assetId], pickAnchor: assetId };
+  });
+}
+export const clearPicked = () => patchSources({ picked: [], pickAnchor: null });
+/** Folder and pack answers (Make this a pack, Merge, image kinds, exclusions, Forget missing); most rescan. */
+export async function folderAction(action: string, key: string, path = "", value: Json = null) {
+  try {
+    const result = await api().folder_action(action, key, path, value);
+    if (result.status === "faulty") throw Error(result.reason);
+    const told: Record<string, string> = {
+      make_pack: "Saved as a pack; scanning again.", merge: "Merged into its parent pack; scanning again.", clear_pack: "Pack choice removed; scanning again.",
+      image_kind: "Saved; scanning again.", exclude: "Folder excluded; scanning again. Nothing on disk is deleted.", include: "Folder included again; scanning again.",
+      rename_pack: "Pack renamed.", forget_missing: `${plural(result.forgotten || 0, "missing asset", "missing assets")} forgotten.`,
+    };
+    pushToast({ tone: "info", title: told[action] || "Saved.", body: "" });
+    await loadSources();
+    await loadLibraryTree();
+    if (state.sourcesView.key) void showFolder(state.sourcesView.key, state.sourcesView.path);
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/** Show in Explorer, open with the default app, or copy the path of a library file or folder. */
+export async function pathAction(action: "reveal" | "open" | "copy", key: string, relative = "") {
+  try {
+    const result = await api().path_action(action, key, relative);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (action === "copy") pushToast({ tone: "info", title: "Path copied", body: "" });
+  } catch (error) {
+    pushToast({ tone: "fault", title: action === "reveal" ? "Could not show it in Explorer" : action === "open" ? "Could not open it" : "Could not copy the path", body: (error as Error).message });
+  }
+}
+/** Add a library folder; one inside a library folder is refused, with Show it. One around library folders replaces them. */
+export async function addLibraryFolder(directory: string) {
+  try {
+    const result = await api().source_action("add", null, directory, null);
+    if (result.status === "faulty") {
+      if (result.covered_by) {
+        const key = result.covered_by as string;
+        pushToast({ tone: "info", title: "Already covered", body: result.reason, actions: [{ label: "Show it", run: () => openSources(key, "") }] });
+        return result;
+      }
+      throw Error(result.reason);
+    }
+    const replaced: string[] = result.replaced || [];
+    pushToast({ tone: "success", title: "Library folder added", body: replaced.length
+      ? `It replaces ${replaced.join(", ")}; their assets keep their IDs and results. Scanning now; nothing is processed until you ask.`
+      : "Scanning now; nothing is processed until you ask." });
+    await loadSources();
+    await loadLibraryTree();
+    const added = (state.sourcesView.tree?.folders || []).find((f: Json) => f.path.toLowerCase() === directory.toLowerCase().replace(/[\\/]+$/, ""));
+    openSources(added?.key ?? state.sourcesView.key ?? undefined, "");
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Folder not added", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/** A pack's cover image, read from its own preview file (a small thumbnail), or null. */
+export async function libraryCover(key: string, relative: string): Promise<string | null> {
+  try {
+    const result = await api().library_cover(key, relative);
+    return result.status === "ready" ? (result.image as string) : null;
+  } catch {
+    return null;
+  }
+}
+/** Make previews for a folder, pack or picked assets: it starts at once or waits in line (decision 0023). */
+export async function makePreviews(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
+  return queueAction("previews", scope, count);
+}
+export async function makeDescriptions(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
+  return queueAction("descriptions", scope, count);
+}
+export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false): Promise<Json> {
+  try {
+    const result = await api().queue_add(action, scope, confirmed);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (result.status === "confirm") {
+      // Over 30 minutes, or the storage budget would be reached: ask first with the estimate.
+      askConfirm({ title: result.title, body: result.body, confirmLabel: result.confirm_label, tone: "neutral",
+        run: () => queueAction(action, scope, count, true) });
+      return result;
+    }
+    const undo = result.undo ? [{ label: "Undo", run: () => void api().queue_remove(result.item.id).then(loadQueue) }] : undefined;
+    pushToast({ tone: "info", title: result.title, body: result.body, actions: undo });
+    void loadQueue();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: action === "previews" ? "Previews not started" : "Descriptions not started", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/** The processing queue (Running, Up next, Blocked, Recorded failures, Recent). */
+export async function loadQueue() {
+  if (!state.api) return;
+  try {
+    const queue = await api().queue_state();
+    if (queue.status !== "faulty") setState({ queue });
+  } catch {
+    /* The Processing tab shows its own error on its next load. */
+  }
+}
+export async function queueControl(action: string, id: string | null = null, value: Json = null) {
+  try {
+    const result = await api().queue_control(action, id, value);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (result.queue) setState({ queue: result.queue });
+    else void loadQueue();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Queue not changed", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export function openFolderMenu(item: Json, x: number, y: number, returnFocus: HTMLElement | null = null, keyboard = false) {
+  setState({ menu: { id: ++menuId, kind: item.file ? "file" : "folder", x, y, item, returnFocus, keyboard } });
 }
 
 /* ------------------------- importing failures report --------------------- */
@@ -1128,7 +1379,7 @@ export async function skipSetup() {
 }
 export function finishSetup(next: "sources" | "close") {
   closeSetup();
-  if (next === "sources") navigate({ page: "settings", tab: "asset-sources" });
+  if (next === "sources") navigate({ page: "sources" });
 }
 
 /* ------------------------------- agent setup ------------------------------ */
@@ -1757,6 +2008,12 @@ async function watchChanges() {
       }
       // Running operations also report worker liveness, which is not a file change.
       if (sourcesChanged || state.sources.some((source) => operationActive(source.operation))) await loadSources();
+      // The tree and the shown folder follow scans and processing; the rail's folder dot follows the tree.
+      if (sourcesChanged) {
+        await loadLibraryTree();
+        const s = state.sourcesView;
+        if (route().page === "sources" && s.key && !state.source.loading) void refreshFolder();
+      }
       if (route().page === "settings" && (sourcesChanged || operationActive(state.render.values?.operation))) void loadRenderSettings();
     } finally {
       checking = false;
@@ -1775,6 +2032,7 @@ export async function start(bridge: Bridge) {
     patchGrid("library", { version: context.generation });
     renderCoverage(context);
     await loadSources();
+    void loadLibraryTree();
     void watchChanges();
     // Setup opens by itself only on a genuinely fresh install (setup_core.first_run).
     void loadSetupState().then((info) => info.auto_open && openSetup()).catch(() => undefined);

@@ -177,6 +177,10 @@ class DesktopService(AssetService):
     def _thumbnail(self, record):
         label=card_view(record)
         view=next((p for p in record['previews'] if p.get('view_label')==label),None)
+        if view is None and record.get('asset_type')=='image':
+            original=self._original_thumbnail(record)
+            if original:
+                return original
         key=view and (view.get('path'),view.get('source_path'),view.get('sha256'))
         if key and key in self.thumbnails:
             try:
@@ -191,6 +195,30 @@ class DesktopService(AssetService):
             while len(self.thumbnails)>THUMBNAIL_CACHE:
                 self.thumbnails.popitem(last=False)
         return preview,image
+
+    def _original_thumbnail(self, record):
+        """A 2D image is seen from its original file, before any processing (decision 0023). Read only, bounded."""
+        import base64
+        from .image_media import decode, image_format, png_bytes, thumbnail
+        source=next((f for f in record['files'] if f.get('availability')=='available' and image_format(f['path'])),None)
+        if source is None:
+            return None
+        key=('original',source['path'],source.get('sha256'))
+        if key in self.thumbnails:
+            self.thumbnails.move_to_end(key)
+            return self.thumbnails[key]
+        try:
+            path=self.config.source_file(source['path'])
+            if path.stat().st_size>64*1024*1024:
+                return None
+            image=thumbnail(decode(path,source['format'])[0])[0]
+        except Exception:  # Unsupported or damaged: the card shows its pending state; inspection records the fault.
+            return None
+        value=({'status':'original','view_label':'thumbnail','source_path':source['path']},base64.b64encode(png_bytes(image)).decode('ascii'))
+        self.thumbnails[key]=value
+        while len(self.thumbnails)>THUMBNAIL_CACHE:
+            self.thumbnails.popitem(last=False)
+        return value
 
     @pinned
     def asset(self, identifier, source_format=None, view='three_quarter', expected_version=None):

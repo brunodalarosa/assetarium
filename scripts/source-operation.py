@@ -45,3 +45,11 @@ else:
     except BaseException as exc:
         state(scoped, status='faulty', phase='Operation stopped', reason=str(exc))
         raise
+    finally:
+        if args.operation in {'process', 'describe'}:
+            # The next queued item starts when this one ends, with or without the app (decision 0023).
+            from local_asset_library.processing_queue import advance
+            try:
+                advance(config)
+            except Exception as exc:  # The queue shows the item's outcome; a start fault is recorded there.
+                print(f'Queue: the next item did not start: {exc}', flush=True)

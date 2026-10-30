@@ -319,6 +319,7 @@ def verify():
         sources.remove(config, removed_key)
         sources.aggregate(config)
         wait("lal.state.collection.items.some(i=>i.availability==='unavailable')", 20)
+        wait("[...document.querySelectorAll('#collection-grid .card')].some(c=>c.textContent.includes('Unavailable'))", 20)
         js("[...document.querySelectorAll('#collection-grid .card')].find(c=>c.textContent.includes('Unavailable')).click()")
         wait("$('unavailable-reason')?.textContent.includes('removed')&&$('collection-label')")
         capture('13-unavailable-member.png')
@@ -380,10 +381,10 @@ def verify():
         wait("!$('confirm-dialog').open&&document.querySelectorAll('.collection-card').length===2&&Boolean(toast('Deleted “Shop”'))")
         done('Collection menu offers Open and Delete; delete needs the red confirm button and Cancel keeps it')
 
-        # 14. Removing a source also asks first.
-        js("(async()=>{$('nav-settings').click();await until(()=>$('asset-sources-tab'));$('asset-sources-tab').click();return true})()")
-        wait("document.querySelectorAll('[data-action=remove]').length===1")
-        js("document.querySelector('[data-action=remove]').click()")
+        # 14. Removing a library folder also asks first (its panel on the Asset sources tab).
+        js("(async()=>{$('nav-sources').click();await until(()=>lal.state.sourcesView.tree);lal.inspectFolder(lal.state.sources[0].key,'');return true})()")
+        wait("$('folder-panel')&&document.querySelectorAll('#folder-panel [data-action=remove]').length===1")
+        js("document.querySelector('#folder-panel [data-action=remove]').click()")
         wait("$('confirm-dialog').open&&$('confirm-accept').textContent.includes('Remove source')")
         js("$('confirm-cancel').click()")
         wait("!$('confirm-dialog').open&&lal.state.sources.length===1")
@@ -399,7 +400,7 @@ def verify():
         wait("!menuOpen('Collection actions')")
         window.resize(700, 800)
         wait('innerWidth<761')
-        assert js("$('collections-view').scrollWidth<=$('collections-view').clientWidth+1")
+        wait("$('collections-view').scrollWidth<=$('collections-view').clientWidth+1", 10)  # Once the resize has settled.
         capture('18-collections-narrow.png')
         js("lal.setAppearance('system')")
         done('Dark theme and narrow window keep the Collections grid without horizontal overflow')

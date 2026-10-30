@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bell, House, LayoutGrid, PanelRight, Pencil, Settings, Workflow } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, Folder, House, LayoutGrid, PanelRight, Pencil, Settings, Workflow } from "lucide-react";
 import { motion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/beui/tooltip";
@@ -18,7 +18,7 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
 
 function RailItem({ page, label, icon, dot }: { page: Page; label: string; icon: ReactNode; dot?: boolean }) {
   const current = useApp((s) => s.history[s.historyIndex].page);
-  const active = current === page || (page === "settings" && current === "source") || (page === "collections" && current === "collection");
+  const active = current === page || (page === "collections" && current === "collection");
   return (
     <Tooltip content={label} side="right" delay={250}>
       <button
@@ -41,6 +41,8 @@ export function Rail() {
   const canBack = useApp((s) => s.historyIndex > 0);
   const canForward = useApp((s) => s.historyIndex < s.history.length - 1);
   const attention = useApp(processingAttention);
+  // The folder dot means the owner must act (offline, an answer to give, files missing, a migration); work has its own dot.
+  const owner = useApp((s) => Boolean(s.sourcesView.tree?.attention));
   return (
     <nav aria-label="Main" className="flex w-24 shrink-0 flex-col items-center bg-rail pt-4 pb-5">
       <div className="flex gap-1">
@@ -54,7 +56,8 @@ export function Rail() {
       <div className="mt-8 flex flex-col items-center gap-4">
         {NAV.map((item) => <RailItem key={item.page} {...item} dot={item.page === "processing" && attention} />)}
       </div>
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-col items-center gap-4">
+        <RailItem page="sources" label="Asset sources" icon={<Folder className="size-5" strokeWidth={1.75} />} dot={owner} />
         <RailItem page="settings" label="Settings" icon={<Settings className="size-5" strokeWidth={1.75} />} />
       </div>
     </nav>

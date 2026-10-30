@@ -11,6 +11,7 @@ import {
   pushToast, setCollectionItem, startSelection,
   setInspectorOpen, setInspectorTab, setInspectorWidth, useApp,
 } from "../app/store";
+import { FolderPanel } from "./FolderPanel";
 import { ImageViewer } from "./ImageViewer";
 import { InspectorGhost, Skeleton, useShownWhile } from "./Loading";
 import { Badge, Banner, Button, EvidenceBlock, IconButton, SelectField, Spinner } from "./primitives";
@@ -562,6 +563,8 @@ export function Inspector() {
   const open = useApp((s) => s.inspector.open);
   const width = useApp((s) => s.inspector.width);
   const grid = useApp((s) => activeGridId(s));
+  // On the Asset sources tab a folder, pack or library folder can be inspected too.
+  const folder = useApp((s) => s.history[s.historyIndex].page === "sources" && s.sourcesView.panel === "folder");
   const reduce = useReducedMotion();
   const [available, setAvailable] = useState(() => window.innerWidth);
   const [dragging, setDragging] = useState(false);
@@ -628,13 +631,13 @@ export function Inspector() {
           </div>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-surface">
             <div className="flex h-[76px] shrink-0 items-center justify-between pr-4 pl-6">
-              <span className="text-[14px] font-semibold text-foreground">Asset inspection</span>
+              <span className="text-[14px] font-semibold text-foreground">{folder ? "Folder" : "Asset inspection"}</span>
               <IconButton label="Hide asset inspection" onClick={() => setInspectorOpen(false)} className="close-detail size-9">
                 <X className="size-4" />
               </IconButton>
             </div>
             <div id="detail" className="detail-body flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain scroll-thin" aria-busy={false}>
-              <DetailBody grid={grid} />
+              {folder ? <FolderPanel /> : <DetailBody grid={grid} />}
             </div>
           </div>
         </motion.aside>

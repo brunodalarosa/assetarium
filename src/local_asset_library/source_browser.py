@@ -1,4 +1,8 @@
-"""Read-only source browsing through the existing desktop presentation services."""
+"""Read-only browsing of one library folder through the desktop presentation services.
+
+It reads the folder's working catalog when there is one, so the Asset sources tab shows assets without previews
+yet and results not published yet (decision 0023); search keeps reading the published library.
+"""
 from .config import ConfigError
 from .desktop_service import DesktopService
 from .interactive_preview import InteractivePreviewService
@@ -16,6 +20,9 @@ class SourceBrowser:
         # Resolve registration on every call: disabled is browsable, removed is not.
         source = get_source(self.config, key)
         scoped = bound(self.config, source)
+        from .incremental import working
+        if working(scoped).output_path('data', 'catalog.sqlite').is_file():
+            scoped = working(scoped)
         session = self.sessions.get(key)
         if session is None or session[0].config != scoped:
             service = DesktopService(scoped)

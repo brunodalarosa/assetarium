@@ -1,252 +1,225 @@
-import { FolderOpen, RotateCcw } from "lucide-react";
-import { type CSSProperties, useEffect, useRef } from "react";
+import { ArrowDown, ArrowUp, Copy, FolderOpen, Moon, Pause, Play, RotateCcw, X } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { type ReactNode, useEffect } from "react";
+import { Switch } from "@/components/beui/switch";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
-import {
-  describeActive, DESCRIBE_RESULTS, descriptionBlocked, descriptionSummary, operationActive, plural, sourceMessage,
-} from "../app/format";
-import { generateDescriptions, navigate, recheckFailures, refreshContext, setState, sourceAction, useApp } from "../app/store";
-import { Skeleton, SkeletonLines } from "../ui/Loading";
-import { Badge, type BadgeTone, Banner, Button, Disclosure, Progress } from "../ui/primitives";
+import { operationActive, plural } from "../app/format";
+import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, sourceAction, useApp } from "../app/store";
+import { Skeleton } from "../ui/Loading";
+import { Badge, Banner, Button, Disclosure, Progress } from "../ui/primitives";
 
-function sourceState(source: Json): [string, BadgeTone] {
-  const operation = source.operation || {};
-  if (operationActive(operation)) return [operation.operation === "describe" ? "Describing" : operation.status === "cancelling" ? "Cancelling" : "In progress", "info"];
-  if (source.scan_fault) return ["Scan fault", "fault"];
-  if (!source.enabled) return ["Disabled", "neutral"];
-  if (source.processing_paused) return ["Paused", "neutral"];
-  if (!source.scanned) return ["Waiting for scan", "neutral"];
-  if (source.needs_processing) return ["Needs processing", "warning"];
-  if (source.failed) return ["Done · failures recorded", "warning"];
-  return ["Up to date", "success"];
-}
+const ACTION = { previews: "Make previews", descriptions: "Generate descriptions" } as Record<string, string>;
+const OUTCOME: Record<string, [string, "success" | "warning" | "fault" | "neutral"]> = {
+  complete: ["Done", "success"], complete_with_faults: ["Done · failures recorded", "warning"], cancelled: ["Cancelled", "neutral"],
+  faulty: ["Stopped", "fault"], interrupted: ["Interrupted", "warning"], nothing_to_do: ["Nothing to do", "neutral"],
+};
 
-function OperationProgress({ source, operation, label }: { source: Json; operation: Json; label: string }) {
-  const value = Math.round((operation.progress || 0) * 100);
-  const phase = `${operation.phase || operation.status || "Waiting"}${operation.total ? " · " + operation.completed + " / " + operation.total : ""}`;
+function Section({ id, title, count, children, hint }: { id: string; title: string; count?: number; children: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="grid gap-2">
-      <Progress value={value} label={`${label} for ${source.name}`} valueText={`${value}% — ${phase}`} />
-      <p className="source-progress-label text-[12px] text-muted-foreground">{operation.reason || phase}</p>
-    </div>
-  );
-}
-
-function SourceCard({ source, focused }: { source: Json; focused: boolean }) {
-  const ref = useRef<HTMLElement>(null);
-  const report = useApp((s) => s.notifications.find((item) => item.kind === "descriptions_report" && item.source_key === source.key));
-  useEffect(() => {
-    // Scroll only the page's own scroller; scrollIntoView would also shift the fixed app shell.
-    const card = ref.current, scroller = document.getElementById("processing-view");
-    if (!focused || !card || !scroller) return;
-    const top = card.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-    scroller.scrollTo({ top: Math.max(0, top - (scroller.clientHeight - card.offsetHeight) / 2), behavior: "smooth" });
-    card.focus({ preventScroll: true });
-  }, [focused]);
-  const operation = source.operation || {};
-  const describing = describeActive(source);
-  const importing = operationActive(operation) && !describing;
-  const finished = !operationActive(operation) && operation.operation !== "describe" && ["cancelled", "complete_with_faults"].includes(operation.status);
-  const [state, tone] = sourceState(source);
-  const blocked = descriptionBlocked(source);
-  const needsWork = (source.needs_processing || source.scan_fault) && !operationActive(operation);
-  return (
-    <article
-      ref={ref}
-      tabIndex={-1}
-      data-source={source.key}
-      aria-labelledby={`processing-${source.key}`}
-      className={cn("source-warning grid gap-5 rounded-[22px] border bg-surface p-6 outline-none transition-shadow", focused ? "border-primary ring-2 ring-primary/30" : "border-border")}
-    >
-      <header className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h3 id={`processing-${source.key}`} className="text-[16px] font-semibold text-foreground">{source.name}</h3>
-          <p className="source-path mt-1 truncate text-[12px] text-muted-foreground" title={source.path}>{source.path}</p>
-        </div>
-        <Badge tone={tone} className="h-7 px-2.5">{state}</Badge>
-      </header>
-      <div className="grid gap-3">
-        <h4 className="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">Import</h4>
-        <p className="text-[13.5px] leading-relaxed text-foreground">{sourceMessage(source)}</p>
-        {(source.export_suggestions || []).length > 0 && (
-          <p className="source-export-suggestions flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted-foreground">
-            {plural(source.export_suggestions.length, "folder set looks", "folder sets look")} like another export of the same models. Answer before processing to avoid duplicate assets.
-            <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}>Review in Asset sources</button>
-          </p>
-        )}
-        {source.texture_suggestion && (
-          <p className="source-texture-suggestion flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted-foreground">
-            {plural(source.texture_suggestion.assets, "model can’t", "models can’t")} find {source.texture_suggestion.assets === 1 ? "its" : "their"} textures; choosing a texture folder can fix them.
-            <button type="button" className="font-medium text-primary hover:underline" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}>Choose in Asset sources</button>
-          </p>
-        )}
-        {(importing || finished) && <OperationProgress source={source} operation={operation} label="Processing and publishing progress" />}
-        <div className="source-actions flex flex-wrap items-center gap-2">
-          {needsWork && (
-            <Button
-              data-source={source.key}
-              data-action="process"
-              disabled={!source.enabled || source.processing_paused}
-              title={source.processing_paused ? "Select processing formats in Settings → General" : source.enabled ? undefined : "Enable this source in Settings before processing"}
-              onClick={() => void sourceAction("process", source.key)}
-            >
-              Process assets
-            </Button>
-          )}
-          {source.failed > 0 && !operationActive(operation) && (
-            <Button variant="secondary" data-source={source.key} data-action="recheck"
-              title="Check recorded failures again; you confirm before anything is retried"
-              onClick={() => void recheckFailures(source)}>
-              <RotateCcw className="size-4" aria-hidden />Recheck failures
-            </Button>
-          )}
-          {importing && (
-            <Button variant="secondary" data-source={source.key} data-action="cancel" disabled={operation.status === "cancelling"} onClick={() => void sourceAction("cancel", source.key)}>
-              {operation.status === "cancelling" ? "Cancelling…" : "Cancel"}
-            </Button>
-          )}
-          {needsWork && !source.enabled && <p className="text-[12px] text-muted-foreground">Enable this source in Settings → Asset sources to process it.</p>}
-          {needsWork && source.processing_paused && <p className="text-[12px] text-muted-foreground">Processing is paused. Select formats in Settings → General.</p>}
-        </div>
+    <section aria-labelledby={id + "-title"} id={id} className="grid gap-3 rounded-[22px] border border-border bg-surface p-6">
+      <div className="flex items-baseline gap-2">
+        <h2 id={id + "-title"} className="text-[16px] font-semibold">{title}</h2>
+        {count !== undefined && <span className="text-[12.5px] text-muted-foreground tabular-nums">{count.toLocaleString()}</span>}
       </div>
-      <div className="source-descriptions grid gap-3 border-t border-border pt-5">
-        <h4 className="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">Descriptions <span className="font-normal normal-case tracking-normal">· optional</span></h4>
-        <p className="source-descriptions-summary text-[13.5px] text-foreground tabular-nums"><strong className="sr">Descriptions </strong>{descriptionSummary(source)}</p>
-        {describing ? (
-          <>
-            <OperationProgress source={source} operation={operation} label="Description progress" />
-            <div>
-              <Button variant="secondary" data-source={source.key} data-action="cancel-describe" disabled={operation.status === "cancelling"} onClick={() => void sourceAction("cancel", source.key)}>
-                {operation.status === "cancelling" ? "Cancelling…" : "Cancel"}
-              </Button>
-            </div>
-          </>
-        ) : source.descriptions_enabled === false ? (
-          <div className="grid gap-2">
-            <p className="source-descriptions-off text-[12.5px] leading-relaxed text-muted-foreground">Descriptions are turned off. Existing descriptions stay stored and searchable.</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" data-source={source.key} data-action="description-settings" onClick={() => navigate({ page: "settings", tab: "general" })}>Open Settings → General</Button>
-              {report && <Button variant="quiet" onClick={() => setState({ runReport: report })}>View last run report</Button>}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant={blocked ? "secondary" : "primary"} data-source={source.key} data-action="describe" disabled={Boolean(blocked)} aria-describedby={`describe-help-${source.key}`} onClick={() => void generateDescriptions(source.key)}>
-              Generate descriptions
-            </Button>
-            {report && (
-              <Button variant="quiet" onClick={() => setState({ runReport: report })}>View last run report</Button>
-            )}
-          </div>
-        )}
-        {!describing && source.descriptions_enabled !== false && <p id={`describe-help-${source.key}`} className="hint text-[12px] leading-relaxed text-muted-foreground">{blocked || "Runs in the background with the engine chosen in Settings → General. Assets stay searchable by name and image meanwhile."}</p>}
-        {!describing && operation.operation === "describe" && DESCRIBE_RESULTS[operation.status] && (
-          <p className={cn("text-[12px] leading-relaxed", operation.reason ? "source-describe-reason text-fault" : "text-muted-foreground")}>{DESCRIBE_RESULTS[operation.status]}{operation.reason ? " " + operation.reason : ""}</p>
-        )}
-      </div>
-    </article>
-  );
-}
-
-/** A source card's ghost while the first sources answer is on its way. */
-function SourceCardGhost({ index }: { index: number }) {
-  const wave = index * 120;
-  return (
-    <div aria-hidden className="ghost-enter grid gap-5 rounded-[22px] border border-border bg-surface p-6" style={{ "--enter": `${index * 60}ms` } as CSSProperties}>
-      <span className="flex items-start gap-3">
-        <span className="grid flex-1 gap-2">
-          <Skeleton wave={wave} className="h-4 w-[34%]" />
-          <Skeleton wave={wave + 40} className="h-3 w-[52%]" />
-        </span>
-        <Skeleton wave={wave + 80} className="h-7 w-24 rounded-md" />
-      </span>
-      <SkeletonLines lines={2} wave={wave + 120} />
-      <Skeleton wave={wave + 200} className="h-10 w-36 rounded-full" />
-    </div>
-  );
-}
-
-function FailuresReport() {
-  const failures = useApp((s) => s.failures);
-  return (
-    <section aria-labelledby="import-failures-title" className="grid gap-3 rounded-[22px] border border-border bg-surface p-6">
-      <div className="flex items-center gap-3">
-        <h2 id="import-failures-title" tabIndex={-1} className="flex-1 text-[16px] font-semibold outline-none">Importing failures report</h2>
-      </div>
-      <p id="import-failures-summary" role="status" aria-live="polite" className="text-[13px] text-muted-foreground">
-        {!failures.loaded ? <><span className="sr">Loading recorded failures…</span><Skeleton className="ghost-enter h-3.5 w-64" /></> : failures.error ? "Could not load the failures report." : `${plural(failures.assets, "asset", "assets")} with recorded failures · ${plural(failures.paths.length, "path", "paths")}`}
-      </p>
-      {(failures.error || failures.unavailable.length > 0) && (
-        <Banner><span id="import-failures-error">{failures.error || failures.unavailable.map((item: Json) => `Could not read saved failures for ${item.source}: ${item.reason}`).join("\n")}</span></Banner>
-      )}
-      {failures.paths.length > 0 ? (
-        <Disclosure title={`Show ${plural(failures.paths.length, "path", "paths")}`}>
-          <ul id="import-failures-list" aria-label="Asset paths with recorded importing failures" tabIndex={0} className="max-h-[50vh] divide-y divide-border overflow-y-auto rounded-xl bg-surface-2 font-mono text-[11.5px] scroll-thin">
-            {failures.paths.map((path) => <li key={path} className="px-4 py-2.5 break-all select-text">{path}</li>)}
-          </ul>
-        </Disclosure>
-      ) : (
-        failures.loaded && !failures.error && <p id="import-failures-empty" className="text-[13px] text-muted-foreground">No importing failures recorded.</p>
-      )}
-      <p className="text-[11.5px] leading-relaxed text-muted-foreground">Failures are recorded evidence and are not retried automatically. Other assets from the same source stay usable.</p>
+      {hint && <p className="text-[12px] leading-relaxed text-muted-foreground">{hint}</p>}
+      {children}
     </section>
   );
 }
 
-export function Processing({ focus }: { focus?: string }) {
+function since(utc?: string) {
+  if (!utc) return "";
+  const seconds = Math.max(0, (Date.now() - Date.parse(utc)) / 1000);
+  return seconds < 90 ? `${Math.round(seconds)} s` : seconds < 5400 ? `${Math.round(seconds / 60)} min` : `${(seconds / 3600).toFixed(1)} h`;
+}
+
+function Running() {
+  const queue = useApp((s) => s.queue);
   const sources = useApp((s) => s.sources);
+  const item = queue?.running;
+  const scans = sources.filter((s: Json) => operationActive(s.operation) && s.operation?.token !== item?.token);
+  if (!item && !scans.length) return <p id="nothing-running" className="text-[13px] text-muted-foreground">Nothing is running. Make previews or Generate descriptions on the Asset sources tab; they start here.</p>;
+  const operation = item?.operation || {};
+  const value = Math.round((operation.progress || 0) * 100);
+  const phase = `${operation.phase || "Starting"}${operation.total ? " · " + operation.completed + " / " + operation.total : ""}`;
+  return (
+    <div className="grid gap-4">
+      {item && (
+        <div id="running-item" className="grid gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="mr-auto text-[13.5px] font-medium">{ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</p>
+            <span className="text-[12px] text-muted-foreground">{since(item.started_utc)}</span>
+            <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} onClick={() => void queueControl("remove", item.id)}>
+              <X className="size-3.5" aria-hidden />{item.status === "cancelling" ? "Stopping…" : "Cancel"}
+            </Button>
+          </div>
+          <Progress value={value} label={ACTION[item.action] + " for " + item.label} valueText={`${value}% — ${phase}`} />
+          <p className="text-[12px] text-muted-foreground">{operation.reason || phase}</p>
+          {(item.log || []).length > 0 && (
+            <Disclosure title="Live log">
+              <ul id="running-log" className="grid max-h-64 gap-0.5 overflow-y-auto rounded-xl bg-surface-2 p-2 font-mono text-[11.5px] scroll-thin">
+                {item.log.map((line: Json, index: number) => (
+                  <li key={index} className={cn("flex items-start gap-2 rounded px-1.5 py-1", line.level === "error" ? "text-fault" : line.level === "warning" ? "text-warning" : "text-muted-foreground")}>
+                    <span className="min-w-0 flex-1 break-all select-text">{line.text}</span>
+                    {line.level !== "info" && (
+                      <button type="button" aria-label="Copy this line" className="shrink-0 rounded p-0.5 hover:bg-surface" onClick={() => void copyText(line.text, "The log line is on the clipboard.")}><Copy className="size-3.5" /></button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
+        </div>
+      )}
+      {scans.map((s: Json) => (
+        <div key={s.key} className="grid gap-1.5">
+          <p className="text-[13px]">{s.operation.operation === "scan" ? "Scanning" : "Working on"} {s.name}</p>
+          <Progress value={Math.round((s.operation.progress || 0) * 100)} label={"Scanning " + s.name} valueText={s.operation.phase || ""} />
+          <div className="flex items-center gap-2">
+            <p className="mr-auto text-[12px] text-muted-foreground">{s.operation.phase}</p>
+            <Button variant="quiet" className="h-7 px-2" onClick={() => void sourceAction("cancel", s.key)}>Cancel</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function UpNext() {
+  const queue = useApp((s) => s.queue);
+  const reduce = useReducedMotion();
+  const items: Json[] = queue?.up_next || [];
+  const overnight = queue?.overnight || { enabled: false, start: "22:00", end: "07:00" };
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-4">
+        <Switch checked={overnight.enabled} onCheckedChange={(enabled) => void queueControl("overnight", null, { enabled })}
+          label={`Hold descriptions for overnight (${overnight.start}–${overnight.end})`} ariaLabel="Hold descriptions for overnight" />
+        {queue?.paused ? (
+          <Button id="resume-queue" className="h-8 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />Resume</Button>
+        ) : items.length > 0 && (
+          <Button variant="quiet" className="h-8 px-3" onClick={() => void queueControl("pause")}><Pause className="size-3.5" aria-hidden />Pause</Button>
+        )}
+      </div>
+      {queue?.paused && <Banner tone="info"><span id="queue-paused">Paused. Work left over from the last session waits here and never starts by itself.</span></Banner>}
+      {!items.length ? <p className="text-[13px] text-muted-foreground">Nothing waiting. Previews always run before descriptions.</p> : (
+        <ol id="up-next" className="grid gap-1.5">
+          <AnimatePresence initial={false}>
+            {items.map((item, index) => (
+              <motion.li key={item.id} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[13px]" data-action={item.action}>
+                <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}</span>
+                {item.held && <Badge tone="neutral" className="gap-1"><Moon className="size-3" aria-hidden />Tonight</Badge>}
+                {item.estimate?.seconds && <span className="text-[11.5px] text-muted-foreground tabular-nums">~{Math.round(item.estimate.seconds[1] / 60)} min</span>}
+                <button type="button" aria-label="Move up" disabled={index === 0} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, Math.max(0, index - 1))}><ArrowUp className="size-3.5" /></button>
+                <button type="button" aria-label="Move down" disabled={index === items.length - 1} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, index + 1)}><ArrowDown className="size-3.5" /></button>
+                <button type="button" aria-label={"Remove " + item.label} className="rounded p-1 hover:bg-surface" onClick={() => void queueControl("remove", item.id)}><X className="size-3.5" /></button>
+              </motion.li>
+            ))}
+          </AnimatePresence>
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function Blocked() {
+  const blocked: Json[] = useApp((s) => s.queue?.blocked) || [];
+  if (!blocked.length) return <p className="text-[13px] text-muted-foreground">Nothing is blocked.</p>;
+  return (
+    <ul id="blocked-groups" className="grid gap-2">
+      {blocked.map((b) => (
+        <li key={b.reason} className="grid gap-1 rounded-xl bg-warning-bg px-4 py-3 text-[13px] text-warning">
+          <span className="font-medium">{b.reason}{b.assets ? ` · fixing it unblocks ${plural(b.assets, "asset", "assets")}` : ""}</span>
+          <span className="flex flex-wrap items-center gap-2 text-[12.5px]">
+            <span className="min-w-0 break-words select-text">{b.fix}</span>
+            <Button variant="quiet" className="h-7 px-2" onClick={() => void copyText(b.fix, "The fix is on the clipboard.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
+            {b.reason.startsWith("Blender") && <Button variant="quiet" className="h-7 px-2" onClick={() => navigate({ page: "settings" })}>Open Settings</Button>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Failures() {
+  const groups: Json[] = useApp((s) => s.queue?.failures) || [];
+  if (!groups.length) return <p id="failures-empty" className="text-[13px] text-muted-foreground">No recorded failures.</p>;
+  return (
+    <ul id="failure-groups" className="grid gap-2">
+      {groups.map((g) => (
+        <li key={g.key + g.stage + g.reason} className="grid gap-2 rounded-xl bg-surface-2 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 text-[13px]">
+            <Badge tone="fault">{g.stage}</Badge>
+            <span className="mr-auto min-w-0 break-words">{g.reason}</span>
+            <span className="text-[12px] text-muted-foreground">{plural(g.assets.length, "asset", "assets")} · {g.folder}</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="quiet" className="h-7 px-2" onClick={() => void copyText(`${g.stage}: ${g.reason}\n` + g.assets.map((a: Json) => a.path || a.name).join("\n"), "The failure and its files are on the clipboard.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
+            <Button variant="quiet" className="h-7 px-2" onClick={() => void recheckFailures({ key: g.key })}><RotateCcw className="size-3.5" aria-hidden />Recheck…</Button>
+            <Button variant="quiet" className="h-7 px-2" onClick={() => openSources(g.key, "", g.assets[0]?.asset_id)}><FolderOpen className="size-3.5" aria-hidden />Show in Asset sources</Button>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Recent() {
+  const recent: Json[] = useApp((s) => s.queue?.recent) || [];
+  if (!recent.length) return <p className="text-[13px] text-muted-foreground">Finished work appears here.</p>;
+  return (
+    <ul id="recent-items" className="grid gap-1.5">
+      {recent.map((item) => {
+        const [label, tone] = OUTCOME[item.status] || [item.status, "neutral"];
+        const seconds = item.started_utc && item.finished_utc ? (Date.parse(item.finished_utc) - Date.parse(item.started_utc)) / 1000 : null;
+        return (
+          <li key={item.id + item.finished_utc} className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-[13px] hover:bg-surface-2">
+            <Badge tone={tone}>{label}</Badge>
+            <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</span>
+            {seconds !== null && <span className="text-[11.5px] text-muted-foreground tabular-nums">{seconds < 90 ? Math.round(seconds) + " s" : Math.round(seconds / 60) + " min"}</span>}
+            {item.reason && <span className="w-full text-[12px] break-words text-muted-foreground">{item.reason}</span>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function Processing({ focus: _focus }: { focus?: string }) {
+  const queue = useApp((s) => s.queue);
   const coverage = useApp((s) => s.coverage);
   const context = useApp((s) => s.context);
-  const message = useApp((s) => s.sourcesMessage);
-  const sourcesError = useApp((s) => s.sourcesError);
-  const loaded = useApp((s) => s.sourcesLoaded);
-  const count = (value: number) => (loaded ? value : <Skeleton className="my-1.5 h-6 w-10" />);
-  const running = sources.filter((source: Json) => operationActive(source.operation)).length;
-  const attention = sources.filter((source: Json) => source.needs_processing || source.scan_fault).length;
-  const ordered = [...sources].sort((a: Json, b: Json) => Number(operationActive(b.operation) || b.needs_processing || !!b.scan_fault) - Number(operationActive(a.operation) || a.needs_processing || !!a.scan_fault));
+  useEffect(() => {
+    void loadQueue();
+    const timer = setInterval(() => void loadQueue(), 2500);
+    return () => clearInterval(timer);
+  }, []);
+  const failures = (queue?.failures || []).reduce((n: number, g: Json) => n + g.assets.length, 0);
   return (
     <div id="processing-view" className="h-full overflow-y-auto overscroll-contain px-8 pb-12 scroll-thin">
       <div className="mx-auto grid max-w-[1120px] gap-6">
-        <div>
-          <h1 className="text-[26px] font-semibold text-foreground">Asset processing</h1>
-          <p className="mt-2 max-w-[640px] text-[13.5px] leading-relaxed text-muted-foreground">What still needs work, what is running, and what has been recorded. Processing only starts when you ask; scans never run models.</p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr_1.5fr]">
-          <div className="grid content-start gap-1 rounded-[22px] border border-border bg-surface p-5">
-            <span className="text-[12px] text-muted-foreground">Needs attention</span>
-            <span className="text-[24px] font-semibold tabular-nums">{count(attention)}</span>
-            <span className="text-[12px] text-muted-foreground">{attention === 1 ? "source to process or check" : "sources to process or check"}</span>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="mr-auto">
+            <h1 className="text-[26px] font-semibold text-foreground">Asset processing</h1>
+            <p className="mt-2 max-w-[640px] text-[13.5px] leading-relaxed text-muted-foreground">What is running, what waits, what can’t run yet and what has been recorded. Nothing starts until you ask; scans never run models.</p>
           </div>
-          <div className="grid content-start gap-1 rounded-[22px] border border-border bg-surface p-5">
-            <span className="text-[12px] text-muted-foreground">In progress</span>
-            <span className="text-[24px] font-semibold tabular-nums">{count(running)}</span>
-            <span className="text-[12px] text-muted-foreground">{running === 1 ? "operation running" : "operations running"}</span>
-          </div>
-          <div className="grid content-start gap-2 rounded-[22px] border border-border bg-surface p-5">
-            <span className="text-[12px] text-muted-foreground">Published library</span>
-            <p id="coverage" className="text-[13px] leading-snug">{coverage || <><span className="sr">Loading…</span><Skeleton className="my-1 h-3.5 w-[80%]" /></>}</p>
-            {context?.versions && <p id="version" className="font-mono text-[11px] text-subtle" title={JSON.stringify(context.versions, null, 2)}>Catalog {String(context.versions.catalog).slice(0, 10)} · index {String(context.versions.index).slice(0, 10)}</p>}
-            <div className="library-operations"><Button variant="secondary" className="h-8 px-3 text-[12px] whitespace-nowrap" onClick={() => void refreshContext(true)}><RotateCcw className="size-3.5" aria-hidden />Refresh published view</Button></div>
+          <div className="grid gap-1 text-right">
+            <p id="coverage" className="text-[12.5px] text-muted-foreground">{coverage || <Skeleton className="h-3.5 w-48" />}</p>
+            {context?.versions && <p id="version" className="font-mono text-[11px] text-subtle">Catalog {String(context.versions.catalog).slice(0, 10)} · index {String(context.versions.index).slice(0, 10)}</p>}
+            <Button variant="quiet" className="h-7 justify-self-end px-2 text-[12px]" onClick={() => void refreshContext(true)}><RotateCcw className="size-3.5" aria-hidden />Refresh published view</Button>
           </div>
         </div>
-        {message && <Banner tone="info" role="status"><span id="sources-message">{message}</span></Banner>}
-        {sourcesError && (
-        <Banner tone="fault"><span id="sources-error">Asset sources could not be loaded: {sourcesError}. Your sources, their files and their results are kept.</span></Banner>
+        {!queue ? <Skeleton className="h-40 w-full rounded-[22px]" /> : (
+          <>
+            <Section id="running" title="Running"><Running /></Section>
+            <Section id="up-next-section" title="Up next" count={(queue.up_next || []).length}><UpNext /></Section>
+            <Section id="blocked" title="Blocked" hint="Work whose next step can’t run on this computer yet. It is never offered as something to process; each fix says what it unblocks."><Blocked /></Section>
+            <Section id="failures" title="Recorded failures" count={failures} hint="Recorded evidence, kept apart from pending work and never retried automatically. Other assets in the same folder stay usable."><Failures /></Section>
+            <Section id="recent" title="Recent"><Recent /></Section>
+          </>
         )}
-        <section aria-labelledby="processing-sources-title" className="grid gap-4">
-          <h2 id="processing-sources-title" className="text-[16px] font-semibold">Sources</h2>
-          {!loaded ? (
-            <div id="source-warnings-loading" className="grid gap-4"><span className="sr" role="status">Loading sources…</span>{[0, 1].map((index) => <SourceCardGhost key={index} index={index} />)}</div>
-          ) : sources.length ? (
-            <div id="source-warnings" className="grid gap-4">{ordered.map((source: Json) => <SourceCard key={source.key} source={source} focused={focus === source.key} />)}</div>
-          ) : sourcesError ? null : (
-            <div className="grid justify-items-start gap-3 rounded-[22px] border border-dashed border-border-strong p-6">
-              <p className="text-[13.5px] text-muted-foreground">No asset sources yet. Add a folder of assets to start importing.</p>
-              <Button variant="secondary" onClick={() => navigate({ page: "settings", tab: "asset-sources" })}><FolderOpen className="size-4" aria-hidden />Add an asset source</Button>
-            </div>
-          )}
-        </section>
-        <FailuresReport />
       </div>
     </div>
   );

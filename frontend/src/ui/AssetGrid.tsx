@@ -1,11 +1,63 @@
-import { Check } from "lucide-react";
+import { Ban, Box, Check, CircleAlert, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, Sparkles, TriangleAlert, Unlink } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { type CSSProperties, type KeyboardEvent, useEffect, useRef } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
+import { Tooltip } from "@/components/beui/tooltip";
 import { cardMeta, hasDescription, packName } from "../app/format";
-import { type GridId, openAssetMenu, requestThumb, selectAsset, type Thumb, toggleSelected, useApp } from "../app/store";
+import { type GridId, openAssetMenu, pathAction, pickAsset, requestThumb, selectAsset, type Thumb, toggleSelected, useApp } from "../app/store";
+
+/** A library pack is an object on the Asset sources tab ({name}); elsewhere a folder key. */
+const packLabel = (item: Json) => (item.pack && typeof item.pack === "object" ? item.pack.name : packName(item.pack));
+
+/** Work states (decision 0023), each with a shape and a label so color is never the only signal. */
+const STATE: Record<string, { icon: typeof Clock; label: string }> = {
+  no_previews: { icon: Clock, label: "No previews yet" }, queued: { icon: Clock, label: "Queued" }, running: { icon: Loader, label: "Making previews" },
+  blocked: { icon: Ban, label: "Blocked" }, failed: { icon: CircleAlert, label: "Recorded failure" }, missing: { icon: Unlink, label: "Missing" },
+  excluded: { icon: FileX, label: "Excluded" },
+};
+const DESCRIPTION: Record<string, { icon: typeof FileText; label: string }> = {
+  complete: { icon: FileText, label: "Described" }, failed: { icon: FileX, label: "Description failed" }, missing: { icon: FileQuestion, label: "No description yet" },
+};
+
+/** The icon strip over a card's preview: its state and overlays, with tooltips. */
+function StateStrip({ item }: { item: Json }) {
+  const icons: { icon: typeof Clock; label: string; tone?: string; spin?: boolean }[] = [];
+  const state = STATE[item.state];
+  if (state && item.state !== "ready") icons.push({ ...state, label: item.reason ? `${state.label}: ${item.reason}` : state.label,
+    tone: item.state === "failed" ? "text-fault" : item.state === "blocked" ? "text-warning" : undefined, spin: item.state === "running" });
+  const overlays = item.overlays || {};
+  if (overlays.warning) icons.push({ icon: TriangleAlert, label: "Description warning", tone: "text-warning" });
+  if (overlays.description && DESCRIPTION[overlays.description]) icons.push(DESCRIPTION[overlays.description]);
+  if (overlays.collections) icons.push({ icon: Layers, label: `In ${overlays.collections} ${overlays.collections === 1 ? "collection" : "collections"}` });
+  if (item.new) icons.push({ icon: Sparkles, label: "New since your last visit", tone: "text-primary" });
+  if (!icons.length) return null;
+  return (
+    <span className="state-strip absolute top-3 right-3 z-10 flex gap-1" data-state={item.state}>
+      {icons.map(({ icon: Icon, label, tone, spin }) => (
+        <Tooltip key={label} content={label} delay={250}>
+          <span role="img" aria-label={label} className={cn("grid size-6 place-items-center rounded-full bg-surface/90 shadow-sm backdrop-blur", tone)}>
+            <Icon className={cn("size-3.5", spin && "animate-spin")} strokeWidth={2} />
+          </span>
+        </Tooltip>
+      ))}
+    </span>
+  );
+}
+
+/** "No previews yet" is a designed state: the format glyph, the name and a quiet label, never a broken image. */
+function NoPreview({ item }: { item: Json }) {
+  const Icon = item.kind === "image" || item.kind === "material_texture" ? ImageIcon : Box;
+  const label = item.state === "blocked" ? "Waiting for a fix" : item.state === "missing" ? "File not found" : item.state === "failed" ? "No usable preview"
+    : item.reason === "Search data pending" ? "Search data pending" : "No previews yet";
+  return (
+    <span className="no-preview flex flex-col items-center gap-2 text-muted-foreground">
+      <Icon className="size-9 opacity-50" strokeWidth={1.25} aria-hidden />
+      <span className="text-[11.5px]">{(item.formats || []).map((f: string) => f.toUpperCase()).join(" · ")}{item.formats?.length ? " · " : ""}{label}</span>
+    </span>
+  );
+}
 import { AssetCardGhost, Skeleton, useShownWhile } from "./Loading";
 import { Badge } from "./primitives";
 
@@ -23,7 +75,8 @@ function badges(item: Json, thumb?: Thumb) {
 function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; selected: boolean; index: number }) {
   const thumb = useApp((s) => s[grid].thumbs[item.asset_id]);
   const choosing = useApp((s) => grid === "collection" && s.selection.active);
-  const ticked = useApp((s) => choosing && s.selection.ids.includes(item.asset_id));
+  const picked = useApp((s) => grid === "source" && s.sourcesView.picked.includes(item.asset_id));
+  const ticked = useApp((s) => (choosing && s.selection.ids.includes(item.asset_id)) || picked);
   const ref = useRef<HTMLButtonElement>(null);
   const reduce = useReducedMotion();
   useEffect(() => {
@@ -40,7 +93,7 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
   }, [grid, item, thumb]);
   const list = badges(item, thumb);
   const latest = { ...item, ...(thumb?.presentation || {}) };
-  const label = `${item.name}, ${packName(item.pack)}${item.source_faulty ? ", source fault" : ""}${latest.caption_status === "warning" ? ", caption warning" : ""}`;
+  const label = `${item.name}, ${packLabel(item)}${item.source_faulty ? ", source fault" : ""}${latest.caption_status === "warning" ? ", caption warning" : ""}`;
   const describedBy = thumb?.reason ? `${grid}-preview-state-${item.asset_id}` : undefined;
   const meta = cardMeta(item, thumb?.card);
   const menu = (x: number, y: number, keyboard = false) => openAssetMenu(grid, item, x, y, ref.current, keyboard);
@@ -54,7 +107,13 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
       aria-describedby={describedBy}
       aria-haspopup="menu"
       title={thumb?.presentation?.faults?.length ? "Recorded faults available in detail" : undefined}
-      onClick={(event) => (choosing ? toggleSelected(item.asset_id, event.shiftKey) : void selectAsset(grid, item.asset_id, null, "three_quarter", true))}
+      onClick={(event) => {
+        if (choosing) return toggleSelected(item.asset_id, event.shiftKey);
+        // Ctrl- or Shift-click picks several assets on the Asset sources tab, for queue actions and collections.
+        if (grid === "source" && (event.ctrlKey || event.metaKey || event.shiftKey)) return pickAsset(item.asset_id, event.shiftKey);
+        void selectAsset(grid, item.asset_id, null, "three_quarter", true);
+      }}
+      onDoubleClick={() => grid === "source" && item.path && void pathAction("reveal", item.path.split("/")[0], item.path.split("/").slice(1).join("/"))}
       onContextMenu={(event) => {
         event.preventDefault();
         menu(event.clientX, event.clientY);
@@ -70,7 +129,7 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
       style={{ "--enter": `${Math.min(index % 40, 11) * 35}ms` } as CSSProperties}
       className={cn(
         "card ghost-enter group relative flex min-w-0 flex-col overflow-hidden rounded-[18px] border bg-surface p-2 text-left transition-[border-color,box-shadow] outline-none",
-        (choosing ? ticked : selected) ? "border-primary ring-1 ring-primary" : "border-border hover:border-border-strong hover:shadow-[0_6px_20px_rgb(0_0_0/0.06)]",
+        (choosing || picked ? ticked : selected) ? "border-primary ring-1 ring-primary" : "border-border hover:border-border-strong hover:shadow-[0_6px_20px_rgb(0_0_0/0.06)]",
         "focus-visible:ring-2 focus-visible:ring-ring/50",
       )}
     >
@@ -79,7 +138,9 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
           {ticked && <Check className="size-3.5" strokeWidth={3} />}
         </span>
       )}
-      <div className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb")}>
+      {grid === "source" && <StateStrip item={item} />}
+      <div className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb",
+        grid === "source" && item.state === "missing" && "opacity-60")}>
         {thumb?.image ? (
           <img
             src={"data:image/png;base64," + thumb.image}
@@ -87,6 +148,8 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
             className={cn("reveal-img size-full object-contain", item.asset_type === "image" && "p-2", thumb.pixelArt && "pixelated")}
             draggable={false}
           />
+        ) : thumb && grid === "source" && item.state ? (
+          <NoPreview item={item} />
         ) : thumb ? (
           <span className="placeholder px-3 text-center text-[12px] leading-snug text-muted-foreground" title={thumb.reason} aria-label={thumb.placeholder ? `${thumb.placeholder}: ${thumb.reason}` : undefined}>
             {thumb.placeholder}
@@ -101,7 +164,7 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
         {item.label && <span className="card-label w-fit max-w-full truncate rounded-md bg-accent-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-accent-soft-foreground">{item.label}</span>}
         <span className="card-name truncate text-[14px] font-medium text-foreground">{item.name}</span>
         {/* Collection members come from several sources; their saved source name says which. */}
-        <span className="pack truncate text-[12px] text-muted-foreground">{grid === "collection" && item.source_name ? item.source_name : packName(item.pack)}</span>
+        <span className="pack truncate text-[12px] text-muted-foreground">{grid === "collection" && item.source_name ? item.source_name : packLabel(item)}</span>
         {meta && <span className="truncate text-[11px] text-muted-foreground">{meta}</span>}
         {list.length > 0 && (
           <span className="badges mt-1 flex flex-wrap gap-1">

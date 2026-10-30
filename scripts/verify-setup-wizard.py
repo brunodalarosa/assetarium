@@ -199,8 +199,8 @@ def fresh():
         assert not (FIXTURE / 'config.local.toml').exists()
     report['checks']['save_writes_settings_setup_record_and_blender'] = True
     shoot('07-saved')
-    ui.js("(async()=>{$('setup-go-sources').click();await until(()=>!$('setup-wizard')&&$('asset-sources-panel')&&!$('asset-sources-panel').hidden);return true})()")
-    ui.check('next_step_opens_asset_sources', "$('nav-settings').closest('[inert]')===null")
+    ui.js("(async()=>{$('setup-go-sources').click();await until(()=>!$('setup-wizard')&&$('sources-view'));return true})()")
+    ui.check('next_step_opens_asset_sources', "$('nav-sources').closest('[inert]')===null&&$('nav-sources').getAttribute('aria-current')==='page'")
     if found:  # The app was launched without a saved Blender; no restart is needed for the speed test.
         ui.js("(async()=>{lal.navigate({page:'settings',tab:'general'});await until(()=>$('blender-status')&&$('render-test-start')"
               "&&lal.state.render.values&&lal.state.render.values.blender);await frame();return true})()")
@@ -268,15 +268,15 @@ def existing():
         wait("lal.state.blender.report&&lal.state.blender.report.configured===%s" % json.dumps(found[0]))
         ui.check('settings_card_follows_the_wizard_save', "!lal.state.blender.editing&&lal.state.blender.path===%s" % json.dumps(found[0]))
     ui.js("(async()=>{$('setup-close').click();await until(()=>!$('setup-wizard'));$('nav-processing').click();"
-          "await until(()=>document.querySelector('.source-descriptions-off'));await frame();return true})()")
-    ui.check('descriptions_off_removes_generate_descriptions', """(async()=>({noButton:!document.querySelector('[data-action=describe]'),
-      link:!!document.querySelector('[data-action=description-settings]'), backend:bridge_refuses}))()""".replace(
-        'bridge_refuses', 'true'))
+          "await until(()=>$('processing-view')&&lal.state.queue);await frame();return true})()")
     one = ui.js("lal.state.sources[0].key")
+    # Descriptions off (decision 0008): nothing offers Generate descriptions, and the queue refuses it with the reason.
+    queued = ui.js(f"lal.state.api.queue_add('descriptions',{{key:{json.dumps(one)}}},false)")
+    assert queued['status'] == 'faulty' and 'turned off' in queued['reason'], queued
+    ui.check('descriptions_off_removes_generate_descriptions', "!document.querySelector('[data-action=describe]')")
     refused = bridge.source_action('describe', one)
     assert refused['status'] == 'faulty' and 'turned off' in refused['reason'], refused
     report['checks']['backend_refuses_describe_when_off'] = True
-    ui.js("(async()=>{document.querySelector('.source-descriptions-off').scrollIntoView({block:'center'});await frame();return true})()")
     shoot('13-processing-descriptions-off')
 
 

@@ -63,8 +63,10 @@ def test_unprocessed_source_has_clear_read_only_state(managed):
     assert 'Scan and process' in result['reason']
     assert not sources.bound(config, one).output_path('data', 'catalog.sqlite').exists()
     sources.scan_source(config, one)
+    # Once scanned, the Asset sources tab shows the folder's assets before any processing (decision 0023).
     result = contents.call('browse', one['key'], 0, 40)
-    assert not result['available'] and 'Process this source' in result['reason']
+    assert result['available'] and result['total_count'] == 3
+    assert all(item['processing']['inspection'] == 'pending' for item in result['items'])
 
 
 def test_other_source_removed_source_and_stale_versions_cannot_be_inspected(managed):
@@ -131,15 +133,15 @@ def test_faulty_saved_assets_remain_visible_with_inspection_evidence(managed):
     _, _, contents = browser(config)
     record = sources.read_records(sources.bound(config, one))[0]
     config.source_file(record['files'][0]['path']).unlink()
-    # Discovery excludes the missing file from searches but preserves its saved evidence.
+    # Discovery makes the vanished asset Missing (decision 0023): kept with its last record until forgotten.
     sources.scan_source(config, one)
     page = contents.call('browse', one['key'], 0, 40)
-    item = next(item for item in page['items'] if item['asset_id'] == record['asset_id'])
-    assert item['source_faulty'] and item['availability'] == 'faulty'
-    detail = contents.call('asset', one['key'], record['asset_id'])
-    assert detail['payload']['status'] == 'faulty'
-    assert detail['payload']['presentation']['name'] == record['display_name']
-    assert not detail['image']
+    assert record['asset_id'] not in {item['asset_id'] for item in page['items']}
+    from local_asset_library.library_view import folder_items
+    missing = next(i for i in folder_items(config, one['key'])['items'] if i.get('asset_id') == record['asset_id'])
+    assert missing['state'] == 'missing' and missing['reason'].startswith('Not found since')
+    published = sources.read_records(sources.bound(config, one))
+    assert record['asset_id'] in {r['asset_id'] for r in published}  # Its published evidence is untouched.
 
 
 def test_reveal_locates_the_original_through_the_source_boundary(managed, monkeypatch):

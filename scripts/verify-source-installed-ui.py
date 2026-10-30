@@ -47,23 +47,22 @@ def verify():
         report['library']['attention']=js(attention)
         capture('library.png')
         js("$('nav-processing').click()")
-        wait(f"document.querySelectorAll('#processing-view [data-action=process]').length==={warnings}&&$('import-failures-summary').textContent.includes('with recorded failures')")
-        js("[...document.querySelectorAll('#processing-view button')].find(b=>b.textContent.startsWith('Show ')).click()")
-        wait("document.querySelectorAll('#import-failures-list li').length>0")
-        assert js("[...$('import-failures-list').children].map(x=>x.textContent)")==expected['paths']
-        assert js("$('import-failures-list').scrollHeight>$('import-failures-list').clientHeight")
-        report['failures']={'assets':expected['assets'],'paths':len(expected['paths']),'scrollable':True,'pending_actions':warnings}
-        capture('import-failures.png')
-        js("(async()=>{$('nav-settings').click();await until(()=>$('asset-sources-tab'));$('asset-sources-tab').click();return true})()")
-        wait(f"document.querySelectorAll('.source-row').length==={len(registered)}")
-        assert js("[...document.querySelectorAll('.source-enabled [role=switch]')].map(x=>x.getAttribute('aria-checked')==='true')")==[s['enabled'] for s in registered]
+        # Recorded failures are their own section, grouped by stage and reason, apart from pending work (decision 0023).
+        wait("$('failure-groups')&&lal.state.queue")
+        shown=js("new Set(lal.state.queue.failures.flatMap(g=>g.assets.map(a=>a.asset_id))).size")
+        assert shown==expected['assets'], (shown, expected['assets'])
+        report['failures']={'assets':expected['assets'],'groups':js("lal.state.queue.failures.length"),'pending_actions':warnings}
+        capture('recorded-failures.png')
+        js("(async()=>{$('nav-sources').click();await until(()=>lal.state.sourcesView.tree);return true})()")
+        wait(f"document.querySelectorAll('#folder-tree [role=treeitem][aria-level=\"1\"]').length==={len(registered)}")
+        assert js("lal.state.sourcesView.tree.folders.map(f=>f.enabled)")==[s['enabled'] for s in registered]
         # Startup cost receipt: summary loads and their duration from the bridge audit.
         calls=[json.loads(line) for line in (bridge._gateway.audit_root/'desktop.jsonl').read_text(encoding='utf-8').splitlines()]
         report['startup_calls']={name:{'count':sum(c['operation']==name for c in calls),
             'seconds':round(sum(c['elapsed_seconds'] for c in calls if c['operation']==name),3)} for name in ('context','browse','thumbnail','_sources','_changes')}
         assert not js("[...document.querySelectorAll('button')].some(b=>['Scan','Status'].includes(b.textContent))")
-        assert js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
-        capture('settings.png')
+        assert js("$('sources-view').scrollWidth<=$('sources-view').clientWidth+1")
+        capture('asset-sources.png')
         report.update(status='passed',startup_scan='complete',model_loaded=False)
     except BaseException as exc:
         import traceback;report.update(status='faulty',reason=str(exc),traceback=traceback.format_exc())

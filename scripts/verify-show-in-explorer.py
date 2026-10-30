@@ -107,20 +107,20 @@ def verify():
         assert not js("Boolean(toast('Could not show in Explorer'))")
         done('Home asset menu offers Show in Explorer; it selects the original file and closes the menu without a toast')
 
-        # 2. A source grid resolves through its own source.
+        # 2. The Asset sources grid resolves through its own library folder.
         key = one['key']
-        js(f"(async()=>{{lal.navigate({{page:'source',key:{json.dumps(key)}}});await until(()=>lal.state.source.items.length===3);return true}})()")
-        wait("document.querySelectorAll('#source-grid .thumb img').length===3")
-        js("rightClick(card('source-grid',0))")
+        js(f"(async()=>{{lal.openSources({json.dumps(key)},'');await until(()=>lal.state.source.items.length===3);return true}})()")
+        wait("document.querySelectorAll('#sources-grid .thumb img').length===3")
+        js("rightClick(card('sources-grid',0))")
         wait("menuOpen('Asset actions')&&Boolean(menuItem('Show in Explorer'))")
         js("menuItem('Show in Explorer').click()")
         wait("!menuOpen('Asset actions')")
         assert len(launches(2)) == 2 and Path(launched[1]).is_file() and Path(launched[1]).is_relative_to(Path(one['path'])), launched
-        done('Source browser menu shows the file from that source')
+        done('The Asset sources menu shows the file from that library folder')
 
         # 3. A missing original is a visible fault; nothing launches and nothing is retried.
         Path(launched[1]).unlink()
-        js("rightClick(card('source-grid',0))")
+        js("rightClick(card('sources-grid',0))")
         wait("menuOpen('Asset actions')")
         js("menuItem('Show in Explorer').click()")
         wait("Boolean(toast('Could not show in Explorer'))")

@@ -57,6 +57,12 @@ class DesktopBridge:
                 from .sources import aggregate
                 aggregate(self._config)
             self._service = DesktopService(self._config)
+            if self._config.sources_registry:
+                from .processing_queue import after_restart
+                try:
+                    after_restart(self._config)  # A leftover queue is paused; it never resumes by itself.
+                except (ConfigError, OSError, ValueError):
+                    pass  # The Asset processing tab reads the queue again and shows what it can.
             from .interactive_preview import InteractivePreviewService
             self._interactive_preview = InteractivePreviewService(self._service)
             from .source_browser import SourceBrowser
@@ -280,9 +286,6 @@ class DesktopBridge:
             except sources.Covered as exc:  # Inside a library folder: the app offers to show that folder.
                 return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.folder['key']}
             return {**self._start_source_operation('scan', source['key']), 'replaced': source['replaced']}
-        if action == 'images':
-            sources.set_import_types(self._config, key, enabled)
-            return self._start_source_operation('scan', key)
         if action == 'enabled':
             source = sources.set_enabled(self._config, key, enabled)
             if enabled:
@@ -298,6 +301,102 @@ class DesktopBridge:
         if action == 'cancel':
             return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
         raise ConfigError('Unknown asset source action')
+
+    # The Asset sources tab (decision 0023): library folders → bundles → packs → folders, read from saved data.
+    def library_tree(self):
+        from .library_view import tree
+        return self._wait(self._present(tree, self._config, guarded=False))
+
+    def library_items(self, key, path='', offset=0, page_size=60, filters=None, show_files=True):
+        from .library_view import folder_items
+        return self._wait(self._present(folder_items, self._config, key, path, offset, page_size, filters, show_files, guarded=False))
+
+    def library_locate(self, asset_id):
+        from .library_view import locate
+        return self._wait(self._present(locate, self._config, asset_id, guarded=False))
+
+    def library_cover(self, key, relative):
+        return self._wait(self._present(self._library_cover, key, relative, guarded=False))
+
+    def _library_cover(self, key, relative):
+        """A pack's cover: its own preview image, as a small thumbnail. Read only."""
+        import base64
+        from .config import _inside
+        from .image_media import decode, image_format, png_bytes, thumbnail
+        from .sources import bound, get_source
+        scoped = bound(self._config, get_source(self._config, key))
+        path = _inside(scoped.source_root, relative)
+        fmt = image_format(str(path))
+        if not fmt or not path.is_file() or path.stat().st_size > 64 * 1024 * 1024:
+            return {'status': 'faulty', 'reason': 'No cover image'}
+        return {'status': 'ready', 'image': base64.b64encode(png_bytes(thumbnail(decode(path, fmt)[0])[0])).decode('ascii')}
+
+    # The processing queue (decision 0023).
+    def queue_state(self):
+        from .processing_queue import state
+        return self._wait(self._present(state, self._config, guarded=False))
+
+    def queue_add(self, action, scope, confirmed=False):
+        from .processing_queue import add
+        return self._wait(self._present(add, self._config, action, scope, bool(confirmed), guarded=False))
+
+    def queue_remove(self, identifier):
+        from .processing_queue import control
+        return self._wait(self._present(control, self._config, 'remove', identifier, guarded=False))
+
+    def queue_control(self, action, identifier=None, value=None):
+        from .processing_queue import control
+        return self._wait(self._present(lambda: {'status': 'saved', 'queue': control(self._config, action, identifier, value)}, guarded=False))
+
+    def library_visit(self, key):
+        from .library_view import record_visit
+        return self._wait(self._present(record_visit, self._config, key, guarded=False))
+
+    def folder_action(self, action, key, path='', value=None):
+        return self._wait(self._present(self._folder_action, action, key, path, value, guarded=False))
+
+    def _folder_action(self, action, key, path, value):
+        from . import library_store, packs, sources
+        source = sources.get_source(self._config, key)
+        if action in {'make_pack', 'merge', 'clear_pack'}:
+            packs.answer(self._config, key, path, None if action == 'clear_pack' else action)
+        elif action == 'image_kind':
+            sources.answer_folder(self._config, key, path, 'image_kind', value)
+        elif action == 'rename_pack':
+            packs.rename(self._config, key, path, value or '')
+            return {'status': 'saved'}
+        elif action in {'exclude', 'include'}:
+            current = sources.excluded_folders(sources.bound(self._config, source))
+            chosen = current + [path] if action == 'exclude' else [p for p in current if p != path]
+            sources.set_excluded_folders(self._config, key, chosen)
+        elif action == 'forget_missing':
+            return {'status': 'saved', 'forgotten': library_store.forget_missing(self._config, source['id'], path or None)}
+        else:
+            raise ConfigError('Unknown folder action')
+        return self._start_source_operation('scan', key)
+
+    def path_action(self, action, key, relative=''):
+        """Show a library file or folder in Explorer, open it with its default app, or copy its path."""
+        return self._wait(self._present(self._path_action, action, key, relative, guarded=False))
+
+    def _path_action(self, action, key, relative):
+        from .config import _inside
+        from .sources import bound, get_source
+        scoped = bound(self._config, get_source(self._config, key))
+        target = _inside(scoped.source_root, relative) if relative else scoped.source_root
+        if not target.exists():
+            raise ConfigError('That file or folder is not there any more')
+        if action == 'reveal':
+            show_in_explorer(str(target))
+            return {'status': 'revealed'}
+        if action == 'open':
+            if os.name != 'nt':
+                raise ConfigError('Opening files is only available on Windows')
+            os.startfile(str(target))  # The owner's default app for that file; nothing here writes it.
+            return {'status': 'opened'}
+        if action == 'copy':
+            return self._clipboard(str(target))
+        raise ConfigError('Unknown path action')
 
     # Excluded folders and duplicate export folders (decision 0019): each change rescans the source.
     def source_exclusions(self, key, patterns):
