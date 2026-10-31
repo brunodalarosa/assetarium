@@ -86,3 +86,16 @@ def test_variants_point_search_and_detail_at_the_shared_description(managed, mon
     found = variant_groups.membership(config, record)
     assert found['shared'] and found['representative'] == {'asset_id': ids['Car_A'], 'name': 'Car_A'}
     assert [v['value'] for v in found['variants']] == ['A', 'B']
+
+
+def test_search_results_fold_a_group_at_its_best_ranked_member(managed, monkeypatch):
+    config, backend, one, _ = managed
+    monkeypatch.setattr(library_view, 'blockers', lambda config: {})
+    ready_source(config, backend, one)
+    scanned(config, one, 'Car_A', 'Car_B', 'Rock_01')
+    records = {r['display_name']: r for r in sources.read_records(working(sources.bound(config, one)))}
+    by_id = {r['asset_id']: r for r in records.values()}
+    ranked = [{'asset_id': records[n]['asset_id'], 'score': s} for n, s in (('Car_B', 0.9), ('Rock_01', 0.8), ('Car_A', 0.7))]
+    kept, folded = variant_groups.collapse(config, ranked, by_id.__getitem__)
+    assert folded == 1 and [k['asset_id'] for k in kept] == [records['Car_B']['asset_id'], records['Rock_01']['asset_id']]
+    assert kept[0]['variant'] == 'B' and [v['variant'] for v in kept[0]['variants']] == ['A', 'B'] and 'variants' not in kept[1]

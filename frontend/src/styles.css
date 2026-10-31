@@ -732,3 +732,11 @@
     display: block;
   }
 }
+
+/* An agent at work (decision 0024): a soft breathing dot, still under reduced motion. */
+@keyframes agent-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary) 55%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-primary) 0%, transparent); }
+}
+.agent-pulse { animation: agent-pulse 1.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .agent-pulse { animation: none; } }

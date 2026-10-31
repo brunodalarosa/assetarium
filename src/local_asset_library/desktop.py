@@ -230,18 +230,10 @@ class DesktopBridge:
         from .setup_core import skip_setup
         return self._wait(self._present(skip_setup, self._config, guarded=False))
 
-    # Agent setup (decision 0016): only these user-driven calls open a session or decide a proposal.
+    # Agent setup (decisions 0016, 0024): only the user decides a proposal; there is no session to open.
     def agent_setup_state(self):
         from .setup_agent import app_state
         return self._wait(self._present(app_state, self._config, guarded=False))
-
-    def open_agent_setup(self):
-        from .setup_agent import open_session
-        return self._wait(self._present(open_session, self._config, 'app', guarded=False))
-
-    def end_agent_setup(self):
-        from .setup_agent import end_session
-        return self._wait(self._present(end_session, self._config, guarded=False))
 
     def decide_setup_proposal(self, proposal_id, decision, confirm_rerender=False):
         from .setup_agent import decide
@@ -430,6 +422,25 @@ class DesktopBridge:
             raise ConfigError('Unknown pack profile action')
         if result['rescan']:
             result['operation'] = self._start_source_operation('scan', key)
+        return result
+
+    # Agent activity and proposals (decision 0024): the feed from the MCP call logs; the owner decides proposals.
+    def agent_activity(self, since=None):
+        return self._wait(self._present(self._agent_activity, since, guarded=False, shared=True))
+
+    def _agent_activity(self, since):
+        from .agent_activity import recent
+        from .pack_agent import proposals
+        return {**recent(self._config, since), 'proposals': proposals(self._config, 'pending')}
+
+    def agent_proposal(self, proposal_id, decision):
+        return self._wait(self._present(self._agent_proposal, proposal_id, decision, guarded=False))
+
+    def _agent_proposal(self, proposal_id, decision):
+        from .pack_agent import decide
+        result = decide(self._config, proposal_id, decision)
+        if result.get('rescan'):
+            result['operation'] = self._start_source_operation('scan', result['library_folder'])
         return result
 
     def _save_profile(self, key, pack):
@@ -637,7 +648,9 @@ class DesktopBridge:
         organized = [stamp(collections_path(config)), stamp(tags_path(config))]
         from .setup_agent import connection_token, store_path
         # Connection records carry liveness, so a client that died flips the token without touching a file.
-        agent = [stamp(store_path(config)), stamp(config.project_root / 'data/library/setup.json'), connection_token(config.project_root)]
+        from .agent_activity import token as activity_token
+        agent = [stamp(store_path(config)), stamp(config.project_root / 'data/library/setup.json'), connection_token(config.project_root),
+                 activity_token(config)]
         return {'status': 'ready', 'library': digest(library)[:16], 'sources': digest(sources)[:16],
                 'collections': digest(organized)[:16], 'agent': digest(agent)[:16],
                 'worker': self._gateway.worker_phase if hasattr(self, '_gateway') else 'not_started'}

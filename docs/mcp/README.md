@@ -154,22 +154,23 @@ them; `register-mcp.py` refuses to overwrite an existing entry.
 ## Agent setup
 
 An agent can set Assetarium up for the computer it runs on
-([decision 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)); the procedure is the user-invoked skill
+([decisions 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md) and
+[0024](../../Assetarium%20KnowledgeBase/Decisions/0024-pack-profiles-and-variant-groups.md)); the procedure is the user-invoked skill
 [`skills/assetarium-setup`](../../skills/assetarium-setup/SKILL.md) and the server prompt
 `set_up_assetarium`. The tools wrap `setup_core`, the same rules as the app's wizard.
 
-| Tool | Input | Session | Does |
+| Tool | Input | Tier | Does |
 | --- | --- | --- | --- |
-| `get_setup_status` | `{}` | not needed | OS, GPU/VRAM, free disk, Blender candidates, engine and search readiness, settings and who set them, proposals, `missing`, `next_actions` (exact commands), recommendations. Read only |
-| `validate_blender` | `path` (≤1,024) | needed | Checks a file named `blender.exe`/`blender` (version, headless start with scripts disabled, glTF/FBX/OBJ importers). Nothing else is ever run |
-| `apply_setup` | any of `storage_budget_gib`, `processing_formats`, `caption_batch_size`, `descriptions_enabled`, `description_engine`, `description_server {url, model}`, `engine_hint` | needed | Validated like the wizard, recorded as set by the agent; a local server must be on this computer, and the response includes its model list |
-| `propose_setup` | `blender_path` (≤1,024) | needed | Stores a pending proposal for a path `validate_blender` passed; the user applies or rejects it |
-| `finish_setup` | `{}` | needed | Marks setup completed by the agent; refused while a proposal is pending |
+| `get_setup_status` | `{}` | read | OS, GPU/VRAM, free disk, Blender candidates, engine and search readiness, settings and who set them, proposals, `missing`, `next_actions` (exact commands), recommendations. Read only |
+| `validate_blender` | `path` (≤1,024) | run | Checks a file named `blender.exe`/`blender` (version, headless start with scripts disabled, glTF/FBX/OBJ importers). Nothing else is ever run |
+| `apply_setup` | any of `storage_budget_gib`, `processing_formats`, `caption_batch_size`, `descriptions_enabled`, `description_engine`, `description_server {url, model}`, `engine_hint` | apply and undo | Validated like the wizard, recorded as set by the agent; a local server must be on this computer, and the response includes its model list |
+| `propose_setup` | `blender_path` (≤1,024) | propose | Stores a pending proposal for a path `validate_blender` passed; the user applies or rejects it |
+| `finish_setup` | `{}` | apply and undo | Marks setup completed by the agent; refused while a proposal is pending |
 
-- **Session.** Writes need a setup session the user opens: **Set up with my agent** on the
-  Welcome page, **Settings → General → Run setup with my agent**, or on Linux
-  `local-assets setup agent` in an interactive terminal. It lasts 60 minutes and can be ended.
-  Without one, writes return `{"status": "refused", "reason": …}` with `isError: true`.
+- **Tiers, no session.** Since decision 0024 there is no setup session: what a tool may do depends
+  on its tier. *Read* tools always answer; *apply and undo* values are recorded as set by the agent
+  and raise one notice per day that the user can act on; *propose* waits for the user's Apply;
+  *run* only ever starts a file named `blender.exe`/`blender`.
 - **Proposals.** The Blender path is applied only by the user's **Apply** (app, or
   `local-assets setup agent proposals`), after a fresh check in that process; a changed file
   is refused. `get_setup_status` shows `pending`, `applied`, `rejected`, `superseded` or `failed`.
@@ -193,6 +194,28 @@ generates the same text for the computer it runs on. **Existing Codex registrati
 check can take up to two minutes. `codex-setup.toml` and `opencode-setup.json` are earlier
 recorded snippets and are not rewritten. Verification: `scripts/verify-agent-setup-mcp.py
 --run-name NAME` drives the real STDIO server through the whole flow on an isolated project.
+
+## Pack structure
+
+Agents fix how a scan reads a pack (decision 0024): which folders are packs, which names are variants
+of one asset, which folders are engine copies, how images are meant. Every response is capped at about
+8,000 characters (≈2,000 tokens) so small local models can work page by page.
+
+| Tool | Input | Tier | Does |
+| --- | --- | --- | --- |
+| `list_packs` | `library_folder`?, `status`?, `cursor`?, `limit`? (≤50) | read | Packs, those that need a structure first, with their reasons |
+| `get_pack_outline` | `library_folder`, `path`?, `cursor`?, `limit`? (≤60) | read | One folder level: subfolders with file and asset counts and pack evidence, and its files as patterns (`Car_11_{B,G,R}.obj (3)`, `Rock_{01..20}.fbx (20)`) |
+| `get_profile` | `library_folder`, `pack` | read | The pack's rules, signals, version, any waiting proposal and the rule vocabulary |
+| `propose_profile` | `library_folder`, `pack`, `rules` (≤500), `note`? | propose (instant rules: apply and undo) | The pack's whole rule list. Variant and pack rules apply at once (the user can undo); exclusions, engine copies, image kinds, export groups and the texture folder wait for the user's Apply and rescan. Returns the effect |
+| `finish_structure` | `library_folder`, `pack` | apply and undo | Marks the pack's current signals reviewed; new signals show again |
+| `say` | `message` (≤300) | apply and undo | One line in the user's Agent activity |
+
+Rules are a closed vocabulary (`pack`, `pack_name`, `image_kind`, `variant_axis`, `separate_descriptions`,
+`exclude`, `engine_copy`, `export_group`, `texture_folder`) with paths inside the pack; there are no patterns.
+Search returns each variant group once (`variant`, `variants`), and `get_asset` lists an asset's variants and
+`description_shared_from` when it shares its group's description. Every call appears in the app's Agent
+activity, built from the server's call log. Existing Codex registrations must add the six tool names to
+`enabled_tools`.
 
 ## Privacy
 

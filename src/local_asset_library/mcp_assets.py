@@ -75,7 +75,7 @@ SCHEMAS = {
     "tag_assets": {"type": "object", "required": ["asset_ids"], "additionalProperties": False, "properties": {
         "asset_ids": ASSET_IDS, "add": {**TAG_LIST, "description": "Owner tags to add (shared app-wide, not per collection)."},
         "remove": {**TAG_LIST, "description": "Owner tags to remove."}}},
-    # Setup (decision 0016): writes need a setup session the user opened in the app; Blender is only proposed.
+    # Setup (decisions 0016, 0024): writes are recorded as the agent's and noticed; Blender is only proposed.
     "get_setup_status": {"type": "object", "additionalProperties": False, "properties": {}},
     "validate_blender": {"type": "object", "required": ["path"], "additionalProperties": False, "properties": {
         "path": {"type": "string", "maxLength": 1024, "description": "Absolute path of a file named blender.exe (Windows) or blender; nothing else is run."}}},
@@ -96,7 +96,9 @@ SCHEMAS = {
     "propose_setup": {"type": "object", "required": ["blender_path"], "additionalProperties": False, "properties": {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},
     "finish_setup": {"type": "object", "additionalProperties": False, "properties": {}}}
-WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup"}
+from .pack_agent import SCHEMAS as PACK_SCHEMAS, TOOLS as PACK_TOOLS, WRITE as PACK_WRITE  # noqa: E402
+SCHEMAS.update(PACK_SCHEMAS)  # Pack structure tools (decision 0024): paged outlines, profiles, proposals.
+WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup", *PACK_WRITE}
 SETUP_TOOLS = {"get_setup_status", "validate_blender", "apply_setup", "propose_setup", "finish_setup"}
 COLLECTION_MEANING = ("A collection is a named, owner-organized bundle of asset IDs, not an asset. Members keep their files "
                       "where they are; labels and notes belong to the collection. Use get_asset on a member for its files.")
@@ -153,6 +155,10 @@ def validate(name, arguments):
             if type(value) is not list or len(value) > prop["maxItems"]:
                 raise ConfigError("Invalid list: " + key)
             for item in value:
+                if prop["items"]["type"] == "object":  # Pack rules: the owning module validates their fields.
+                    if type(item) is not dict or len(encoded(item)) > 2000:
+                        raise ConfigError("Invalid list item: " + key)
+                    continue
                 check_string(key, item, prop["items"])
         if kind == "string":
             # Notes may hold line breaks; other strings stay single-line.
@@ -371,6 +377,8 @@ class AssetService:
             raise
         # Replace internal path with an ID reference, never pretend that it is a viewed image.
         response["query"] = args.get("query", "") if mode != "reference" else args["reference_asset_id"]
+        from .variant_groups import collapse
+        response["results"], response["variants_folded"] = collapse(self.config, response["results"], self.record)
         faults = list(evidence["excluded"])
         for item in response["results"]:
             record = self.record(item["asset_id"])
@@ -414,13 +422,26 @@ class AssetService:
                                   for item in c['items'] if item['asset_id'] == record['asset_id']][:20]
         from .publication import generation
         payload['generation'] = generation(self.config)
+        from .variant_groups import membership
+        group = membership(self.config, record)
+        shared = None
+        if group:  # One of several variants (decision 0024): every member, and whose description it shares.
+            payload['variant'] = group['value']
+            payload['variants'] = [{'asset_id': v['asset_id'], 'name': v['name'], 'variant': v['value']} for v in group['variants']]
+            if group['shared'] and record.get('description') is None and group['representative']['asset_id'] != record['asset_id']:
+                try:
+                    shared = self.record(group['representative']['asset_id']).get('description')
+                except (KeyError, ValueError, OSError):
+                    shared = None
+                if shared is not None:
+                    payload['description_shared_from'] = group['representative']['asset_id']
         if args.get("include_metadata", False):
             technical = record.get("technical") or {}
             keys = ("inspected_path", "inspected_sha256", "inspected_format") + (
                 IMAGE_FACTS if record.get('asset_type') == 'image' else ("evaluated_instance_totals", "unit_settings"))
             payload["metadata"] = {"formats": sorted({f["format"] for f in record["files"]}),
                 "technical": {k: technical.get(k) for k in keys},
-                "description": record.get("description"), "suggested_uses": record.get("suggested_uses"),
+                "description": record.get("description") or shared, "suggested_uses": record.get("suggested_uses"),
                 "processing": record["processing"], "license_evidence": relevant_license_evidence(record),
                 'stage_faults':record.get('stage_faults',{}), 'inspection_run':record.get('inspection_run'),
                 "caption_quality": caption_quality(self.config, record),

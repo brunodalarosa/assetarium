@@ -1,11 +1,11 @@
-"""Real WebView2 check of agent setup (decision 0016) with a real STDIO MCP client, on an isolated fresh project.
+"""Real WebView2 check of agent setup (decisions 0016, 0024) with a real STDIO MCP client, on an isolated fresh project.
 
-The app shows both setup paths; Set up with my agent opens the session and the panel waits; a
+The app shows both setup paths; Set up with my agent shows the panel (no session to open) and it waits; a
 scripted client launches the fixture's own scripts/asset-mcp.py (code copied, mcp environment
 linked; the owner's library is never touched) and the panel flips to connected; values the agent
 applies appear live with "Set by agent"; the Blender proposal card rejects and applies (a fresh
-check in the app); finish leads to the review, where a change is saved as the user's; ending
-access refuses the next write; the manual path still opens. Light and dark screenshots.
+check in the app); finish leads to the review, where a change is saved as the user's; the
+panel reopens; the manual path still opens. Light and dark screenshots.
 Writes data/gui/<run-name>/report.json.
 """
 import argparse
@@ -117,12 +117,12 @@ def verify():
         ui.wait_ready()
         wait("$('setup-wizard')&&$('setup-paths')&&lal.state.setup.env")
         ui.check('welcome_offers_two_equal_paths', """(async()=>({agent:!!$('setup-agent-start'), manual:!!$('setup-manual'),
-          equal:$('setup-paths').children.length===2, noSession:!lal.state.setup.agent.session.open}))()""")
+          equal:$('setup-paths').children.length===2}))()""")
         shoot('00-welcome-paths')
         ui.js("$('setup-agent-start').click()")
-        wait("$('agent-panel')&&$('agent-panel').dataset.session==='open'&&$('agent-connection')")
-        ui.check('session_opened_by_the_click_and_panel_waits', """(async()=>({waiting:$('agent-connection').dataset.state==='waiting',
-          minutes:$('agent-session').textContent.includes('59 minutes')||$('agent-session').textContent.includes('60 minutes'),
+        wait("$('agent-panel')&&$('agent-connection')")
+        ui.check('panel_opens_without_a_session_and_waits', """(async()=>({waiting:$('agent-connection').dataset.state==='waiting',
+          access:$('agent-access').textContent.includes('whenever it is connected'),
           honest:!/server is running/i.test(document.body.innerText), privacy:$('agent-privacy').textContent.includes('cloud'),
           tabs:$('agent-snippet-tabs').querySelectorAll('[role=tab]').length===4,
           allowlist:$('agent-snippet').textContent.includes('enabled_tools')&&$('agent-snippet').textContent.includes('finish_setup'),
@@ -186,14 +186,10 @@ def verify():
         assert settings['storage_budget_bytes'] == 45 * 1024**3 and settings['processing_formats'] == ['gltf']
         assert record['values']['storage_budget_gib']['set_by'] == 'user' and record['values']['processing_formats']['set_by'] == 'agent', record
         report['checks']['review_saves_only_the_users_change_as_theirs'] = True
-        ui.js("(async()=>{lal.closeSetup();await lal.openSetup();await until(()=>$('agent-panel'));return true})()")
-        ui.check('open_session_reopens_the_panel', "$('agent-panel').dataset.session==='open'")
-        ui.js("$('agent-end').click()")
-        wait("$('agent-panel').dataset.session==='closed'&&$('agent-reopen')")
-        refused, error = agent.call('apply_setup', {'storage_budget_gib': 60})
-        assert error and refused['status'] == 'refused', refused
-        report['checks']['ending_access_refuses_the_next_write'] = True
-        shoot('06-access-ended')
+        ui.js("(async()=>{lal.closeSetup();await lal.openSetup();await until(()=>$('setup-agent-start'));$('setup-agent-start').click();"
+              "await until(()=>$('agent-panel'));return true})()")
+        ui.check('the_panel_reopens', "!!$('agent-panel')&&!!$('agent-access')")
+        shoot('06-panel-reopened')
         assert agent.close() == 0
         agent = None
         wait("$('agent-connection').dataset.state==='waiting'", 15)

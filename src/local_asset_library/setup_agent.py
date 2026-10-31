@@ -1,12 +1,12 @@
-"""Agent-assisted setup through MCP (decision 0016); wraps setup_core, which keeps every setup rule.
+"""Agent-assisted setup through MCP (decisions 0016, 0024); wraps setup_core, which keeps every setup rule.
 
-Agents write only while a setup session is open, and only a user gesture opens one: the app's
-button or an interactive terminal. The Blender path, the one executable setup saves, is only
-ever proposed by an agent and applied by the user, after a fresh check in the applying process.
+There is no session gate: a connected agent may apply the low-risk values (recorded as set by the agent, with a
+notice the user can act on) at any time. The Blender path, the one executable setup saves, is only ever proposed
+by an agent and applied by the user, after a fresh check in the applying process.
 Connection records let the app tell that a client-launched STDIO server is alive; there is no
 listener. Status reveals only what setup needs: no user names, environment or directory listings.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -18,9 +18,7 @@ from .publication import atomic_json, read_json
 from .settings import SETTING_KEYS
 
 SERVER_NAME = 'local_asset_library'
-SESSION_MINUTES = 60
 PROPOSAL_STATES = ('pending', 'applied', 'rejected', 'superseded', 'failed')
-OPENED_FROM = ('app', 'cli')
 APPLY_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
               'description_engine', 'description_server', 'search_device', 'engine_hint')
 LABELS = {'storage_budget_gib': 'storage budget', 'processing_formats': 'formats', 'caption_batch_size': 'batch size',
@@ -34,8 +32,7 @@ SETUP_PROMPT = ('Set up Assetarium (Local Asset Library) for this computer with 
                 'command, propose the Blender executable for me to approve in the app, and do not add sources, '
                 'process assets or generate descriptions.')
 PROCEDURE = (
-    'Assetarium setup procedure. 1. Call get_setup_status. If write tools refuse with no session, ask the user to click '
-    '"Set up with my agent" in Assetarium (on Linux: run `local-assets setup agent` in a terminal). '
+    'Assetarium setup procedure. 1. Call get_setup_status. '
     '2. Ask the user which game engine they target and whether they want AI descriptions (optional). '
     '3. Work out a setup that runs on this computer: descriptions use the built-in engine on NVIDIA GPUs with BF16, '
     'otherwise a vision model in an OpenAI-compatible server on this computer (llama.cpp, Ollama, LM Studio) through '
@@ -62,9 +59,9 @@ def store_path(config):
 
 
 def load(config):
-    """Session and proposals. A damaged file is reported, kept, and treated as no session."""
+    """Proposals. A damaged file is reported and kept; no proposal can be saved until it is fixed."""
     path = store_path(config)
-    empty = {'schema_version': 1, 'session': None, 'proposals': []}
+    empty = {'schema_version': 1, 'proposals': []}
     if not path.exists():
         return empty, None
     try:
@@ -88,55 +85,27 @@ def _change(config, update):
         return value, result
 
 
-# --------------------------------- session ---------------------------------
+# ---------------------------- agent changes ---------------------------------
 
-def open_session(config, opened_from='app', now=None):
-    """Only the app's button and an interactive terminal call this; no MCP tool can."""
-    if opened_from not in OPENED_FROM:
-        raise ConfigError('Unknown setup session origin')
-    now = now or clock()
-    session = {'id': uuid.uuid4().hex[:16], 'opened_utc': stamp(now), 'opened_from': opened_from,
-               'expires_utc': stamp(now + timedelta(minutes=SESSION_MINUTES))}
-    _change(config, lambda value: value.update(session=session))
-    return session_state(config, now)
+def notice_id(now=None):
+    """Agent setup changes of one day share one notice (decision 0016, as updated by decision 0024)."""
+    return 'agent-' + (now or clock()).strftime('%Y%m%d')
 
 
-def end_session(config):
-    _change(config, lambda value: value.update(session=None))
-    return session_state(config)
-
-
-def session_state(config, now=None):
-    value, fault = load(config)
-    session = value.get('session')
-    now = now or clock()
-    try:
-        expires = datetime.fromisoformat(session['expires_utc']) if isinstance(session, dict) else None
-    except (KeyError, TypeError, ValueError):
-        expires = None
-    live = expires is not None and now < expires
-    return {'open': live, 'id': session['id'] if live else None, 'opened_from': session.get('opened_from') if live else None,
-            'expires_utc': session['expires_utc'] if live else None,
-            'minutes_left': max(0, int((expires - now).total_seconds() // 60)) if live else 0, 'fault': fault}
-
-
-def require_session(config, now=None):
-    state = session_state(config, now)
-    if not state['open']:
-        raise SetupRefused('No setup session is open. Ask the user to click “Set up with my agent” in Assetarium '
-                           '(on Linux: run `local-assets setup agent` in a terminal). Read-only get_setup_status stays available.')
-    return state
+def agent_change(config, now=None):
+    """No session gate (decision 0024): every tool is available; what it may do is decided by its tier."""
+    return {'id': notice_id(now)}
 
 
 class SetupRefused(ConfigError):
-    """A write refused by the session gate or the proposal rule; never a fault of the request's values."""
+    """A write refused by the proposal rule; never a fault of the request's values."""
 
 
 # -------------------------------- notices ---------------------------------
 
-def _notice_change(config, session, keys, values):
+def _notice_change(config, change, keys, values):
     from .notifications import notify_setup_change
-    notify_setup_change(config, session['id'], [{'key': key, 'label': LABELS[key], 'value': values.get(key)} for key in keys])
+    notify_setup_change(config, change['id'], [{'key': key, 'label': LABELS[key], 'value': values.get(key)} for key in keys])
 
 
 # ---------------------------------- writes ---------------------------------
@@ -145,7 +114,7 @@ def apply_setup(config, args, now=None):
     """Low-risk values, validated by the same functions as the wizard and recorded as set by the agent."""
     from .settings import general_settings, save_general_settings
     from . import setup_core
-    session = require_session(config, now)
+    change = agent_change(config, now)
     if not set(args) & set(APPLY_KEYS):
         raise ConfigError('Give at least one value to apply')
     hint = args.get('engine_hint')
@@ -170,7 +139,7 @@ def apply_setup(config, args, now=None):
             changed.append('engine_hint')
     values = {key: saved.get(key, hint) for key in changed}
     if changed:
-        _notice_change(config, session, changed, values)
+        _notice_change(config, change, changed, values)
     result = {'status': 'applied' if changed else 'unchanged', 'changed': changed,
               'settings': {key: saved[key] for key in SETTING_KEYS}, 'set_by': 'agent'}
     if saved['description_engine'] == 'local-server' and saved['descriptions_enabled']:
@@ -180,16 +149,15 @@ def apply_setup(config, args, now=None):
 
 
 def validate_blender(config, path, now=None):
-    """setup_core's check, behind the session: it runs the candidate, and only a file named blender(.exe)."""
+    """setup_core's check: it runs the candidate, and only a file named blender(.exe)."""
     from . import setup_core
-    require_session(config, now)
     return setup_core.check_blender(config, path)
 
 
 def propose_blender(config, path, now=None):
     """Store a pending proposal for a path this process checked; the user applies or rejects it in the app."""
     from . import setup_core
-    session = require_session(config, now)
+    change = agent_change(config, now)
     checked = setup_core._cached(path) if isinstance(path, str) and path.strip() else None
     if (checked or {}).get('status') not in {'passed', 'warning'}:
         raise SetupRefused('Run validate_blender on this exact path first; only a passing Blender can be proposed')
@@ -199,7 +167,7 @@ def propose_blender(config, path, now=None):
     info = Path(resolved).stat()
     proposal = {'id': uuid.uuid4().hex[:16], 'key': 'blender', 'path': path, 'resolved': resolved, 'version': checked['version'],
                 'check': checked['status'], 'identity': [info.st_size, info.st_mtime_ns],
-                'rerender': setup_core.processed_models(config), 'state': 'pending', 'session_id': session['id'],
+                'rerender': setup_core.processed_models(config), 'state': 'pending', 'notice_id': change['id'],
                 'proposed_utc': stamp(now or clock()), 'decided_utc': None, 'reason': None}
     superseded = []
     def update(value):
@@ -263,7 +231,7 @@ def decide(config, proposal_id, decision, confirm_rerender=False):
 def finish_setup(config, now=None):
     from . import setup_core
     from .settings import general_settings
-    session = require_session(config, now)
+    change = agent_change(config, now)
     value, _ = load(config)
     if any(item['state'] == 'pending' for item in value['proposals']):
         raise SetupRefused('A proposal is still waiting for the user; ask them to Apply or Reject it in Assetarium first')
@@ -271,7 +239,7 @@ def finish_setup(config, now=None):
     record = setup_core._change(config, lambda record: record.update(state='completed', completed_utc=setup_core.utc(), by='agent',
                                                                      wizard_version=setup_core.WIZARD_VERSION))
     from .notifications import notify_setup_change
-    notify_setup_change(config, session['id'], [], finished=True)
+    notify_setup_change(config, change['id'], [], finished=True)
     return {'status': 'completed', 'record': {k: record.get(k) for k in ('state', 'completed_utc', 'by', 'wizard_version')},
             'next': 'Tell the user setup is finished; they can review and change every value in Assetarium. Adding asset '
                     'sources and processing are separate tasks the user starts.'}
@@ -320,17 +288,12 @@ def status(config, now=None):
                     actions.append({'for': item['id'], 'command': item['command'], 'cwd': 'the Assetarium folder',
                                     'run_by': 'the user, or you with their permission'})
     pending = [public(item) for item in value['proposals'] if item['state'] == 'pending']
-    session = session_state(config, now)
-    if not session['open']:
-        actions.insert(0, {'for': 'session', 'do': 'Ask the user to click “Set up with my agent” in Assetarium '
-                           '(Linux: `local-assets setup agent`) before applying anything'})
     if pending:
         actions.insert(0, {'for': 'proposal', 'do': 'Ask the user to Apply or Reject your proposal in Assetarium'})
     gpu = env['gpu']
     payload = {
         'status': 'ready', 'mode': 'normal',
         'setup': {'state': record.get('state', 'not_run'), 'by': record.get('by'), 'completed_utc': record.get('completed_utc')},
-        'session': {k: session[k] for k in ('open', 'expires_utc', 'minutes_left')},
         'os': {'name': env['os']['name'], 'system': env['os']['system']},
         'gpu': {'status': gpu['status'], 'nvidia': [{'name': d['name'], 'vram_gib': d['vram_gib'], 'compute_capability': d['compute_capability']}
                                                     for d in gpu['nvidia']], 'other': gpu['other'], **({'reason': gpu['reason']} if gpu.get('reason') else {})},
@@ -498,7 +461,7 @@ def app_state(config, now=None):
     from . import setup_core
     value, fault = load(config)
     state = setup_core.setup_state(config)
-    return {'status': 'ready', 'session': session_state(config, now), 'connections': connections(config.project_root),
+    return {'status': 'ready', 'connections': connections(config.project_root),
             'proposals': [public(item) for item in value['proposals'][-10:]], 'record': state['record'], 'set_by': state['set_by'],
             'settings': state['settings'], 'blender': state['blender'], 'snippets': snippets(config.project_root),
             'prompt': SETUP_PROMPT, 'privacy': PRIVACY, 'fault': fault}

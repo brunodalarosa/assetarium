@@ -81,7 +81,9 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
   useEffect(() => {
     if (chosen && variants.some((v) => v.asset_id === chosen)) setShown(chosen);
   }, [chosen, variants]);
-  const item = variants.find((v) => v.asset_id === (peek ?? shown)) || card;
+  // Search results list variants by name only; they inherit the card's other fields.
+  const found = variants.find((v) => v.asset_id === (peek ?? shown));
+  const item = found ? { ...card, ...found, variants: undefined } : card;
   const selected = !!chosen && (chosen === card.asset_id || variants.some((v) => v.asset_id === chosen));
   const thumb = useApp((s) => s[grid].thumbs[item.asset_id]);
   const choosing = useApp((s) => grid === "collection" && s.selection.active);

@@ -1,4 +1,4 @@
-"""Agent setup through MCP (decision 0016): session gate, proposals, degraded mode, connection records, notices, bounds."""
+"""Agent setup through MCP (decisions 0016, 0024): no session gate, proposals, degraded mode, connection records, notices, bounds."""
 import asyncio
 from datetime import datetime, timedelta, timezone
 import json
@@ -73,24 +73,18 @@ def test_setup_tools_are_declared_described_and_annotated():
             validate(name, args)
 
 
-def test_every_write_is_refused_without_a_session_and_after_expiry(project, blender):
-    for name, args in (('apply_setup', {'storage_budget_gib': 20}), ('validate_blender', {'path': blender}),
-                       ('propose_setup', {'blender_path': blender}), ('finish_setup', {})):
-        payload, error, _ = call(project, name, args)
-        assert error and payload['status'] == 'refused' and 'Set up with my agent' in payload['reason']
-    assert not settings_path(project).exists() and not setup_core.setup_path(project).exists()
-    setup_agent.open_session(project, 'app')
+def test_writes_need_no_session_and_one_notice_collects_a_day(project, blender):
+    # Decision 0024 replaced the session gate with tiers: applying is recorded and noticed, Blender is only proposed.
     assert call(project, 'apply_setup', {'storage_budget_gib': 20})[0]['status'] == 'applied'
-    CLOCK[0] = START + timedelta(minutes=setup_agent.SESSION_MINUTES)
-    payload, error, _ = call(project, 'apply_setup', {'storage_budget_gib': 30})
-    assert error and payload['status'] == 'refused' and general_settings(project)['storage_budget_gib'] == 20
-    assert not call(project, 'get_setup_status')[1]  # Read-only status stays available.
-    with pytest.raises(ConfigError):
-        setup_agent.open_session(project, 'mcp')
+    CLOCK[0] = START + timedelta(hours=1)
+    assert call(project, 'apply_setup', {'storage_budget_gib': 30})[0]['status'] == 'applied'
+    notices = [item for item in notifications.load(project)['items'] if item['kind'] == 'setup_changed']
+    assert len(notices) == 1 and general_settings(project)['storage_budget_gib'] == 30
+    assert call(project, 'validate_blender', {'path': blender})[0]['status'] == 'passed'
+    assert not hasattr(setup_agent, 'open_session') and 'session' not in setup_agent.status(project)
 
 
 def test_apply_validates_like_the_wizard_and_records_the_agent(project, monkeypatch):
-    setup_agent.open_session(project, 'app')
     for bad in ({'storage_budget_gib': 0}, {'description_engine': 'local-server', 'description_server': {'url': 'http://example.com/v1', 'model': 'm'}}, {}):
         payload, error, _ = call(project, 'apply_setup', bad)
         assert error and payload['status'] == 'faulty'
@@ -108,7 +102,6 @@ def test_apply_validates_like_the_wizard_and_records_the_agent(project, monkeypa
 
 
 def test_proposal_is_pending_until_the_user_applies_or_rejects_it(project, blender, monkeypatch):
-    setup_agent.open_session(project, 'app')
     payload, error, _ = call(project, 'propose_setup', {'blender_path': blender})
     assert error and 'validate_blender' in payload['reason']  # Only a path checked in this process.
     assert call(project, 'validate_blender', {'path': blender})[0]['status'] == 'passed'
@@ -137,7 +130,6 @@ def test_proposal_is_pending_until_the_user_applies_or_rejects_it(project, blend
 
 
 def test_a_file_changed_after_the_agents_check_is_not_applied(project, blender):
-    setup_agent.open_session(project, 'app')
     call(project, 'validate_blender', {'path': blender})
     proposal = call(project, 'propose_setup', {'blender_path': blender})[0]['proposal']
     Path(blender).write_bytes(b'swapped for something else')
@@ -148,7 +140,6 @@ def test_a_file_changed_after_the_agents_check_is_not_applied(project, blender):
 
 def test_unconfirmed_rerender_keeps_the_proposal_pending(project, blender, monkeypatch):
     monkeypatch.setattr(setup_core, 'processed_models', lambda config: 7)
-    setup_agent.open_session(project, 'app')
     call(project, 'validate_blender', {'path': blender})
     proposal = call(project, 'propose_setup', {'blender_path': blender})[0]['proposal']
     assert proposal['rerender'] == 7
@@ -159,7 +150,6 @@ def test_unconfirmed_rerender_keeps_the_proposal_pending(project, blender, monke
 
 def test_validate_blender_never_runs_other_programs(project, monkeypatch):
     monkeypatch.setattr(setup_core, '_probe', lambda *a: pytest.fail('nothing may run'))
-    setup_agent.open_session(project, 'app')
     other = project.project_root / ('cmd.exe' if os.name == 'nt' else 'sh')
     other.write_bytes(b'x')
     folder = project.project_root / 'dir' / NAME
@@ -229,7 +219,7 @@ def test_status_reveals_only_what_setup_needs_and_stays_bounded(project, monkeyp
     raw = json.dumps(status, ensure_ascii=False)
     assert 'do-not-leak' not in raw and str(project.project_root) not in raw and json.dumps(str(project.project_root))[1:-1] not in raw
     assert {'os', 'gpu', 'disk', 'blender', 'settings', 'set_by', 'proposals', 'missing', 'next_actions', 'privacy'} <= set(status)
-    assert status['next_actions'][0]['for'] == 'session' and not status['session']['open']
+    assert all(action['for'] != 'session' for action in status['next_actions'])
     assert set(status['disk']) == {'free_gib', 'total_gib'}
     payload, error, _ = call(project, 'get_setup_status')
     assert not error and payload['serialized_characters'] <= DETAIL_CAP
@@ -252,19 +242,19 @@ def test_snippets_list_every_tool_for_allowlisting_clients(project):
     assert 'claude mcp add' in snippets['claude-code']['text']
 
 
-def test_cli_agent_session_needs_an_interactive_terminal(project, monkeypatch):
+def test_cli_shows_how_to_connect_and_proposals_need_an_interactive_terminal(project, monkeypatch, capsys):
     from local_asset_library import owner_commands
     monkeypatch.setattr(sys.stdin, 'isatty', lambda: False)
-    args = owner_commands.parser().parse_args(['setup', 'agent'])
+    assert owner_commands.setup_command(owner_commands.parser().parse_args(['setup', 'agent']), project)['prompt'] == setup_agent.SETUP_PROMPT
+    assert 'claude mcp add' in capsys.readouterr().out
     with pytest.raises(ConfigError, match='interactive terminal'):
-        owner_commands.setup_command(args, project)
-    assert not setup_agent.session_state(project)['open']
+        owner_commands.setup_command(owner_commands.parser().parse_args(['setup', 'agent', 'proposals']), project)
 
 
-def test_damaged_agent_record_is_kept_and_counts_as_no_session(project):
+def test_damaged_agent_record_is_kept_and_blocks_proposals(project):
     setup_agent.store_path(project).parent.mkdir(parents=True, exist_ok=True)
     setup_agent.store_path(project).write_text('{damaged', encoding='utf-8')
-    assert not setup_agent.session_state(project)['open'] and 'kept for review' in setup_agent.session_state(project)['fault']
+    assert 'kept for review' in setup_agent.load(project)[1] and 'kept for review' in setup_agent.app_state(project)['fault']
     with pytest.raises(ConfigError, match='kept for review'):
-        setup_agent.open_session(project, 'app')
+        setup_agent._change(project, lambda value: None)
     assert setup_agent.store_path(project).read_text(encoding='utf-8') == '{damaged'

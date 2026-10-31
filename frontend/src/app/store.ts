@@ -249,6 +249,8 @@ export interface AppState {
   sourcesError: string | null;
   notifications: Json[];
   notificationsOpen: boolean;
+  /** What agents do (decision 0024): the live feed, who is connected and proposals waiting for the owner. */
+  agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[] };
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
@@ -307,6 +309,7 @@ let state: AppState = {
   sourcesView: emptySourcesView(),
   queue: null,
   sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
+  agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [] },
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
@@ -1256,8 +1259,8 @@ export async function openSetup() {
       error: info.settings_fault || info.record_fault || null,
     });
     requestAnimationFrame(() => document.getElementById("setup-step-title")?.focus());
-    // A session the user opened earlier is still running: show its panel instead of the choice.
-    void loadAgentSetup().then((agent) => agent?.session?.open && patchSetup({ agentMode: true }));
+    // A proposal from the user's agent is waiting: show the agent panel instead of the choice.
+    void loadAgentSetup().then((agent) => (agent?.proposals || []).some((p: Json) => p.state === "pending") && patchSetup({ agentMode: true }));
     const [env, storage] = await Promise.all([api().setup_environment(), api().setup_storage_use(false)]);
     patchSetup({ env: env.status === "faulty" ? null : env, storage, error: env.status === "faulty" ? env.reason : state.setup.error });
     // A first run suggests where search runs from the GPU found; a saved or agent-set choice is never replaced.
@@ -1438,8 +1441,8 @@ export function finishSetup(next: "sources" | "close") {
 }
 
 /* ------------------------------- agent setup ------------------------------ */
-// Decision 0016: the backend gates agent writes behind a session only these clicks open,
-// and applies a proposed Blender only on the user's Apply. This presents its state.
+// Decisions 0016 and 0024: agents may apply setup values at any time (labeled and noticed);
+// a proposed Blender applies only on the user's Apply. This presents its state.
 
 export async function loadAgentSetup() {
   const agent = await api().agent_setup_state();
@@ -1447,19 +1450,11 @@ export async function loadAgentSetup() {
   patchSetup({ agent });
   return agent;
 }
-/** The user's gesture: opens a 60-minute session in which agents may apply setup values. */
+/** Show how to connect an agent; there is no session to open (decision 0024). */
 export async function startAgentSetup() {
-  patchSetup({ agentMode: true, agentBusy: "open", error: null });
-  const result = await api().open_agent_setup();
-  patchSetup({ agentBusy: null, ...(result.status === "faulty" ? { error: result.reason } : {}) });
+  patchSetup({ agentMode: true, error: null });
   await loadAgentSetup();
   requestAnimationFrame(() => document.getElementById("agent-setup-title")?.focus());
-}
-export async function endAgentSetup() {
-  patchSetup({ agentBusy: "end" });
-  const result = await api().end_agent_setup();
-  patchSetup({ agentBusy: null, ...(result.status === "faulty" ? { error: result.reason } : {}) });
-  await loadAgentSetup();
 }
 export function leaveAgentSetup() {
   patchSetup({ agentMode: false });
@@ -1544,7 +1539,7 @@ export async function saveNotification(action: string, identifier: string | null
 }
 export function setNotificationsOpen(open: boolean) {
   if (open === state.notificationsOpen) return;
-  setState(open ? { notificationsOpen: true, toasts: [] } : { notificationsOpen: false });
+  setState(open ? { notificationsOpen: true, toasts: [], agent: { ...state.agent, open: false } } : { notificationsOpen: false });
   // Closing the panel marks what was shown as read.
   if (!open && state.notifications.some((item) => !item.read)) void saveNotification("read_all");
 }
@@ -2016,6 +2011,51 @@ export async function exportCollection(id: string, kind: "json" | "png" | "md" |
 /* --------------------------------- toasts -------------------------------- */
 
 let toastId = 0;
+/* ----------------------------- agent activity ----------------------------- */
+// Decision 0024: every agent call becomes a line here; rules that need no scan apply at once with Undo,
+// the others wait as proposals for the owner's Apply.
+
+let agentLoading = false;
+export async function loadAgentActivity() {
+  if (agentLoading || !state.api) return;
+  agentLoading = true;
+  try {
+    const result = await api().agent_activity(state.agent.lastUtc);
+    if (result.status === "faulty") return;
+    const known = new Set(state.agent.entries.map((e: Json) => e.utc + e.run));
+    const fresh: Json[] = result.entries.filter((e: Json) => !known.has(e.utc + e.run));
+    if (state.agent.loaded && !state.agent.open) {  // The open drawer already shows these lines.
+      for (const entry of fresh.filter((e) => e.kind === "change" && e.proposal_id))
+        pushToast({ tone: "info", title: "Your agent changed a pack", body: entry.text, actions: [{ label: "Undo", run: () => void decideAgentProposal(entry.proposal_id, "undo") }] });
+      for (const entry of fresh.filter((e) => e.kind === "waiting" && e.proposal_id))
+        pushToast({ tone: "info", title: "Your agent proposes a change", body: entry.text, actions: [{ label: "Review", run: () => setAgentOpen(true) }] });
+    }
+    setState((s) => ({ agent: { ...s.agent, loaded: true, entries: [...s.agent.entries, ...fresh].slice(-200), connected: result.connected,
+      working: result.working, lastUtc: result.last_utc || s.agent.lastUtc, proposals: result.proposals } }));
+  } finally {
+    agentLoading = false;
+  }
+}
+export function setAgentOpen(open: boolean) {
+  setState((s) => ({ agent: { ...s.agent, open }, ...(open ? { notificationsOpen: false } : {}) }));
+  if (open) void loadAgentActivity();
+}
+/** Apply or reject a waiting proposal, or undo one that was applied. */
+export async function decideAgentProposal(id: string, decision: "apply" | "reject" | "undo") {
+  try {
+    const result = await api().agent_proposal(id, decision);
+    if (result.status === "faulty") throw Error(result.reason);
+    pushToast({ tone: "info", title: decision === "apply" ? `Applied as version ${result.version}.` : decision === "undo" ? "Undone." : "Proposal rejected.",
+      body: result.rescan ? "Scanning again; nothing is rendered or described." : "" });
+    await loadAgentActivity();
+    await loadLibraryTree();
+    if (state.sourcesView.key) void refreshFolder();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
 export function pushToast(toast: Omit<Toast, "id">) {
   const id = ++toastId;
   setState((s) => ({ toasts: [...s.toasts, { ...toast, id }].slice(-3) }));
@@ -2039,6 +2079,7 @@ async function watchChanges() {
     Object.assign(tokens, { library: first.library, sources: first.sources, collections: first.collections, agent: first.agent });
     setState({ worker: first.worker });
   }
+  void loadAgentActivity();
   // One cheap stat-only poll; library and source data reload only when their token changes.
   setInterval(async () => {
     if (checking) return;
@@ -2055,6 +2096,7 @@ async function watchChanges() {
       Object.assign(tokens, { library: next.library, sources: next.sources, collections: next.collections, agent: next.agent });
       // Agent setup steps, proposals and connections appear live while the panel is open.
       if (agentChanged && state.setup.open && state.setup.agentMode) void loadAgentSetup();
+      if (agentChanged || state.agent.working || state.agent.open) void loadAgentActivity();
       if (libraryChanged) await refreshContext();
       // Agent edits (and this window's own saves) reach the collection views here.
       if (collectionsChanged || (libraryChanged && route().page === "collection")) {

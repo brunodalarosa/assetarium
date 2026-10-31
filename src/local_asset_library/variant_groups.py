@@ -125,6 +125,29 @@ def membership(config, record):
             'variants': [{'asset_id': m[0], 'name': m[1], 'value': m[2]} for m in members]}
 
 
+def collapse(config, results, record_of):
+    """Ranked results with each variant group once, at its best-ranked member, listing every variant (decision 0024).
+
+    Returns ``(results, folded)``; a member keeps ``variant`` (its value) and ``variants`` (``asset_id``, ``name``, ``variant``).
+    """
+    kept, seen, folded = [], set(), 0
+    for item in results:
+        try:
+            group = membership(config, record_of(item['asset_id']))
+        except (KeyError, ValueError, OSError):
+            group = None
+        if group is None:
+            kept.append(item)
+            continue
+        if group['group'] in seen:
+            folded += 1
+            continue
+        seen.add(group['group'])
+        kept.append({**item, 'variant': group['value'],
+                     'variants': [{'asset_id': v['asset_id'], 'name': v['name'], 'variant': v['value']} for v in group['variants']]})
+    return kept, folded
+
+
 def assign(rows, rules=None):
     """Group keys for ``rows`` of ``(asset_id, folder, name, kind)``; returns ``({asset_id: (key, value, first)}, oversized)``.
 

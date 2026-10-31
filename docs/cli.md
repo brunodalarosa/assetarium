@@ -147,14 +147,13 @@ setup blender set PATH [--confirm-rerender]   # check, then save to config.local
 setup skip                             # record that setup was skipped
 setup agent                            # let your AI agent set up Assetarium for 60 minutes (interactive)
 setup agent proposals                  # apply or reject the agent's Blender proposal (interactive)
-setup agent end                        # end the agent's setup access
 ```
 
 `setup agent` is the terminal version of the app's **Set up with my agent**
-([decision 0016](../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)): it opens the setup session agents need for
-any setup change and prints the client configuration and the prompt to give them. Opening a
-session and deciding proposals need an interactive terminal and have no flag, so an agent
-running commands cannot grant itself access.
+([decisions 0016, 0024](../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)): it prints the client
+configuration and the prompt to give your agent; a connected agent can apply setup values at any time
+(each one labeled and noticed). Deciding its Blender proposal (`setup agent proposals`) needs an
+interactive terminal and has no flag, so an agent running commands cannot approve itself.
 
 `setup blender set` writes nothing when the path is already what Assetarium uses. A
 changed Blender marks finished 3D inspections as pending again (the path is part of
@@ -182,5 +181,5 @@ Replacing an existing export file asks the same way.
 
 Agents use the STDIO MCP server for search, asset detail, collections and tags
 ([MCP setup](mcp/README.md)). The owner commands above are not MCP tools: sources and
-processing stay owner actions. Setup is available to agents only inside a session you open
-(`setup agent`), and the Blender path only as a proposal you approve.
+processing stay owner actions. Agents can apply setup values and pack rules that need no scan
+(labeled, noticed, undoable); the Blender path and pack rules that rescan are proposals you approve.

@@ -11,6 +11,7 @@ import { Settings } from "./pages/Settings";
 import { Inspector } from "./ui/Inspector";
 import { AppMenus, ConfirmDialog, CreateCollectionDialog } from "./ui/Menus";
 import { NotificationsPanel, RunReport, Toasts } from "./ui/Notifications";
+import { AgentActivityPanel } from "./ui/AgentActivity";
 import { SetupWizard } from "./ui/SetupWizard";
 import { Rail, TopBar } from "./ui/Shell";
 
@@ -106,6 +107,7 @@ export function App() {
         </div>
       </div>
       <NotificationsPanel />
+      <AgentActivityPanel />
       <SetupWizard />
       <Toasts />
       <RunReport />

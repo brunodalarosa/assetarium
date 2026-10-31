@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { plural } from "../app/format";
 import { goBack, goForward, navigate, type Page, processingAttention, setInspectorOpen, setNotificationsOpen, updateCollection, useApp } from "../app/store";
 import { ActivityIndicator } from "./Activity";
+import { AgentButton } from "./AgentActivity";
 import { Skeleton } from "./Loading";
 import { IconButton } from "./primitives";
 
@@ -143,6 +144,7 @@ export function TopBar() {
       <TopTitle />
       <div className="flex items-center gap-3">
         <ActivityIndicator />
+        <AgentButton />
         <IconButton
           id="open-notifications"
           label={label}

@@ -26,8 +26,6 @@ export interface Bridge {
   skip_setup(): Promise<Json>;
   choose_blender_executable(): Promise<Json>;
   agent_setup_state(): Promise<Json>;
-  open_agent_setup(): Promise<Json>;
-  end_agent_setup(): Promise<Json>;
   decide_setup_proposal(proposalId: string, decision: "apply" | "reject", confirmRerender: boolean): Promise<Json>;
   interface_settings(): Promise<Json>;
   save_interface_settings(appearance: string | null, inspectorWidth: number | null): Promise<Json>;

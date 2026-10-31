@@ -108,9 +108,10 @@ def parser():
     setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
-    agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium (interactive terminal only)')
-    agent.add_argument('agent_action', nargs='?', choices=['open', 'proposals', 'end'], default='open',
-                       help='open a 60-minute setup session (default), apply or reject Blender proposals, or end the session')
+    agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium: how to connect it, and its proposals')
+    agent.add_argument('agent_action', nargs='?', choices=['show', 'proposals'], default='show',
+                       help='show how to connect your agent and what to ask it (default), or apply or reject its Blender proposals '
+                            '(interactive terminal only)')
     blender = setup.add_parser('blender', help='Check or save the Blender executable').add_subparsers(dest='blender_action', required=True)
     blender.add_parser('check').add_argument('path')
     save = blender.add_parser('set', help='Check, then save to config.local.toml')
@@ -717,21 +718,16 @@ def wizard(args, config):
 
 
 def agent_command(args, config):
-    """Opening a session and deciding proposals are user gestures: interactive terminal only, no flag (decision 0016)."""
+    """How to connect an agent; deciding its proposals is a user gesture: interactive terminal only, no flag (decision 0016)."""
     from . import setup_agent
-    if not (sys.stdin.isatty() and sys.stdout.isatty()):
-        raise ConfigError('Agent setup is opened and approved by you in an interactive terminal (or in the app); run it yourself')
-    if args.agent_action == 'end':
-        result = setup_agent.end_session(config)
-        say(args, 'Agent setup access ended. Agents can still read the setup status.')
-        return result
-    if args.agent_action == 'open':
-        result = setup_agent.open_session(config, 'cli')
-        say(args, f"Agent setup access is open for {result['minutes_left']} minutes. Add Assetarium to your agent:")
+    if args.agent_action == 'show':
+        say(args, 'Add Assetarium to your agent (it can set Assetarium up whenever it is connected):')
         for snippet in setup_agent.snippets(config.project_root):
             say(args, f"\n{snippet['label']} — {snippet['where']}\n{snippet['text']}")
         say(args, '\nThen ask it:\n' + setup_agent.SETUP_PROMPT + '\n\nApprove its Blender proposal with: setup agent proposals')
-        return result
+        return {'status': 'ready', 'prompt': setup_agent.SETUP_PROMPT}
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise ConfigError('Agent proposals are approved by you in an interactive terminal (or in the app); run it yourself')
     value, fault = setup_agent.load(config)
     if fault:
         raise ConfigError(fault)

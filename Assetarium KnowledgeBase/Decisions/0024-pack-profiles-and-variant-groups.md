@@ -34,6 +34,15 @@ draft the structure and raise signals, and an agent (or the owner) corrects it a
   `shared`; Generate descriptions skips them); search vectors embed it with the variant's own value; the
   inspector labels it as shared. **Generate separate descriptions for each variant** is a per-group switch
   (`separate_descriptions`).
+- **Agents: tiers instead of a session** (replaces the setup session of
+  [decision 0016](0016-agent-setup.md)). Read tools always answer; apply-and-undo tools act at once, recorded
+  as the agent's and undoable; propose tools wait for the owner; run is Blender's check only. Pack tools
+  (`list_packs`, `get_pack_outline`, `get_profile`, `propose_profile`, `finish_structure`, `say`) page through
+  folders in bounded responses. A proposal whose rules need no scan applies at once with Undo; any other waits
+  in the app's **Agent activity** drawer, one per pack (a newer one replaces it).
+- **Agent activity** is app-wide: every MCP call becomes a sentence (from the server's call log), with the
+  connected client, proposals waiting and Undo; toasts tell an owner who is elsewhere in the app.
+- Search returns each variant group once; `get_asset` lists the variants and the shared description.
 - An asset whose folder becomes excluded is `excluded`, not Missing; including the folder again brings it
   back with its ID.
 

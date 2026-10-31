@@ -190,7 +190,8 @@ def test_every_tool_is_described_and_only_collection_writes_are_writable():
     from local_asset_library.mcp_assets import SCHEMAS, WRITE_TOOLS
     from local_asset_library.mcp_server import DESCRIPTIONS, INSTRUCTIONS
     # Besides collections, only the session-gated setup writes (decision 0016) may change anything.
-    assert set(DESCRIPTIONS) == set(SCHEMAS) and WRITE_TOOLS == {'edit_collection', 'tag_assets', 'apply_setup', 'propose_setup', 'finish_setup'}
+    assert set(DESCRIPTIONS) == set(SCHEMAS) and WRITE_TOOLS == {'edit_collection', 'tag_assets', 'apply_setup', 'propose_setup', 'finish_setup',
+                                                                    'propose_profile', 'finish_structure', 'say'}
     assert 'delete' not in SCHEMAS['edit_collection']['properties']['action']['enum']
     assert 'not assets' in INSTRUCTIONS and 'read-only' in INSTRUCTIONS
 

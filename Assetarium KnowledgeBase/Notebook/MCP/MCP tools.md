@@ -16,10 +16,16 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
 - Read tools: `search_assets`, `get_asset`, `list_collections`, `get_collection`, `get_setup_status`.
   Owner-data writes: `edit_collection`, `tag_assets` (annotated destructive, since they can remove).
   Setup writes: `validate_blender`, `apply_setup`, `propose_setup`, `finish_setup` (non-destructive,
-  session-gated, see [Agent setup sessions](Agent%20setup%20sessions.md)). One prompt: `set_up_assetarium`.
+  see [Agent setup sessions](Agent%20setup%20sessions.md)). Pack structure (decision 0024): `list_packs`,
+  `get_pack_outline`, `get_profile` (read), `propose_profile`, `finish_structure`, `say` (`pack_agent.py`,
+  dispatched by `Gateway.call` with the client's name; see [Pack profiles](../Sources%20and%20Catalog/Pack%20profiles.md)).
+  One prompt: `set_up_assetarium`.
 - Semantic queries go to one private embedding worker (`scripts/asset-worker.py`, started on the
   first semantic query; only the desktop pre-starts its own). The worker returns query vectors only;
   verification, scoring and fusion stay in the server process (decision 0005).
+- The app's Agent activity reads the same `calls.jsonl` every server writes (`agent_activity.py`), so
+  the call log is a user-facing contract: keep `tool`, `arguments`, `response` and `utc` in each line.
+- Search folds each variant group to its best-ranked member (`variant_groups.collapse`).
 - Responses are bounded: the search character cap scales with the limit, detail is capped at
   16,000 characters and 64 dependencies, previews at 512 × 512 px and 512 KiB.
 

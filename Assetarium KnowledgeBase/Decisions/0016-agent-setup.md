@@ -68,3 +68,8 @@ never add sources, scan, process, generate descriptions, install, download or de
 protects against tool calls, not against an agent the user gave unrestricted shell access (such
 an agent could edit `config.local.toml` itself); say so rather than claiming more. Allowlisting
 clients need the new tool names in `enabled_tools`.
+
+> **Since [decision 0024](0024-pack-profiles-and-variant-groups.md) (October 31, 2026):** the setup session is
+> gone. Tools are gated by tier: read (always), apply and undo (recorded as the agent's, one notice per day),
+> propose (the user applies; the Blender path stays a proposal) and run (`validate_blender`, Blender only). The
+> owner chose more agent proactivity, with every agent action visible in the app's Agent activity.

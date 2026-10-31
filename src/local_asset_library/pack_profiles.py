@@ -447,16 +447,18 @@ def effect(config, key, pack, rules):
     packs_before, packs_after = found(before), found(rules)
     changed = _lanes(before, rules)
     lines = []
+    many = lambda n, one, more: f'{n:,} {one if n == 1 else more}'
     if cards_before != cards_after:
-        lines.append(f'{len(rows):,} assets → {cards_after:,} cards, {groups_after:,} with variants (now {cards_before:,} cards)')
+        lines.append(f"{many(len(rows), 'asset', 'assets')} → {many(cards_after, 'card', 'cards')}, {groups_after:,} with variants "
+                     f"(now {many(cards_before, 'card', 'cards')})")
     if packs_before != packs_after:
-        lines.append(f'{len(packs_before):,} → {len(packs_after):,} packs here')
+        lines.append(f"{len(packs_before):,} → {many(len(packs_after), 'pack', 'packs')} here")
     if skipped:
-        lines.append(f'{skipped:,} files skipped by excluded folders (nothing is deleted)')
+        lines.append(f"{many(skipped, 'file', 'files')} skipped by excluded folders (nothing is deleted)")
     if restored:
-        lines.append(f'{restored:,} files included again')
+        lines.append(f"{many(restored, 'file', 'files')} included again")
     if reclassified:
-        lines.append(f'{reclassified:,} images may change kind')
+        lines.append(f"{many(reclassified, 'image', 'images')} may change kind")
     if changed & {'export_group', 'texture_folder'}:
         lines.append('Export groups or the texture folder change on the next scan')
     return {'status': 'ready', 'pack': pack, 'assets': len(rows), 'cards': {'before': cards_before, 'after': cards_after},

@@ -15,7 +15,10 @@ All notable changes to Assetarium are listed here. The project follows
 - **Pack profiles**: a pack's Structure section says whether it needs a structure and why, lists the rules that
   steer it, keeps every version (Restore) and exports a profile file; `local-assets packs signals|profile|apply|
   revert|export` do the same from a terminal.
-
+- **Agent activity** (the agent button in the top bar): what connected agents read, change and propose,
+  live, with Undo for changes and Apply / Reject for proposals that rescan. Agents get pack structure tools
+  (`list_packs`, `get_pack_outline`, `get_profile`, `propose_profile`, `finish_structure`, `say`) that page
+  through folders in small responses; search shows each variant group once.
 - **Asset sources** tab (the folder icon above Settings): browse by place through library folders,
   bundles, packs and folders, with coverage, "+N new", a card state for every asset (no previews
   yet, queued, ready, blocked with its fix, recorded failure, missing), a pack header with its
@@ -82,6 +85,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- Agents no longer need a setup session: a connected agent may apply setup values at any time (each one
+  labeled *Set by agent* and noticed); the Blender path is still only a proposal you apply
+  (`local-assets setup agent` now just shows how to connect; decision 0024).
 - Nothing is written into asset folders any more: previews, descriptions and search data live in
   one library store (`data/library-store/`, or `[storage].library` in `config.local.toml`), which
   counts against the storage budget. Run `scripts/migrate-library.py` once to move existing

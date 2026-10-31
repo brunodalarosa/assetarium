@@ -1,21 +1,11 @@
 import { Bot, Check, CircleAlert, Copy, PlugZap, Wrench } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { formatLabel, plural } from "../app/format";
-import { copyText, decideProposal, endAgentSetup, leaveAgentSetup, reviewAgentSetup, startAgentSetup, useApp } from "../app/store";
+import { copyText, decideProposal, leaveAgentSetup, reviewAgentSetup, startAgentSetup, useApp } from "../app/store";
 import { Badge, Banner, Button, Card, Spinner } from "./primitives";
-
-/** Re-renders on an interval so the session countdown stays current without polling the backend. */
-function useNow(ms: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(timer);
-  }, [ms]);
-  return now;
-}
 
 export function SetByBadge({ entry }: { entry: Json | undefined }) {
   if (!entry) return null;
@@ -38,7 +28,7 @@ function PathCard({ icon, title, body, action }: { icon: ReactNode; title: strin
   );
 }
 
-/** Two equal ways to set up; choosing the agent opens the session (the user gesture the backend requires). */
+/** Two equal ways to set up; a connected agent may set things up at any time (decision 0024), so nothing opens here. */
 export function SetupPaths() {
   const busy = useApp((s) => s.setup.agentBusy);
   return (
@@ -161,24 +151,16 @@ function Values({ agent }: { agent: Json }) {
 
 export function AgentPanel() {
   const agent = useApp((s) => s.setup.agent);
-  const busy = useApp((s) => s.setup.agentBusy);
-  const now = useNow(15000);
   if (!agent) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Opening agent setup…</p>;
-  const expires = agent.session.expires_utc ? Date.parse(agent.session.expires_utc) : 0;
-  const open = agent.session.open && expires > now;
-  const minutes = Math.max(0, Math.floor((expires - now) / 60000));
   const pending = (agent.proposals || []).filter((item: Json) => item.state === "pending");
   const finished = agent.record?.state === "completed" && agent.record?.by === "agent";
   const anySet = Object.values(agent.set_by || {}).some((entry: Json) => entry.set_by === "agent");
   return (
-    <div id="agent-panel" className="grid gap-5" data-session={open ? "open" : "closed"}>
+    <div id="agent-panel" className="grid gap-5">
       <h2 id="agent-setup-title" tabIndex={-1} className="sr">Set up with your AI agent</h2>
-      <div id="agent-session" role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[12.5px]">
-        {open ? <span><span className="font-medium">Agent setup access is open</span> · {minutes < 1 ? "less than a minute" : plural(minutes, "minute", "minutes")} left</span>
-          : <span><span className="font-medium">Agent setup access has ended.</span> Your agent can still read the setup status but can’t change anything.</span>}
-        {open ? <Button variant="quiet" id="agent-end" className="h-8 px-3 text-[12px]" disabled={busy === "end"} onClick={() => void endAgentSetup()}>End access</Button>
-          : <Button variant="secondary" id="agent-reopen" className="h-8 px-3 text-[12px]" disabled={busy === "open"} onClick={() => void startAgentSetup()}>Open for 60 minutes</Button>}
-      </div>
+      <p id="agent-access" role="status" className="rounded-xl bg-surface-2 px-4 py-2.5 text-[12.5px] leading-relaxed">
+        <span className="font-medium">Your agent can set Assetarium up whenever it is connected.</span> Every change it makes is labeled “Set by agent” and raises a notice you can review; it only proposes which Blender to run.
+      </p>
       {pending.map((proposal: Json) => <ProposalCard key={proposal.id} proposal={proposal} />)}
       {finished && (
         <Banner tone="info" role="status" className="flex flex-wrap items-center justify-between gap-3">

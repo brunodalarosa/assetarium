@@ -199,11 +199,10 @@ own result (a failed Blender write keeps the other settings) and **Go to Asset
 sources** leads to the next step. Verification: `scripts/verify-setup-wizard.py
 --run-name <unique-name>`.
 
-**Setup with an AI agent** ([decision 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)). *Welcome*
+**Setup with an AI agent** ([decisions 0016, 0024](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)). *Welcome*
 offers two equal cards, **Set up with my agent** and **Set it up yourself** (the manual
-steps above). The agent card opens a 60-minute setup session — the only way an agent's setup
-tools may change anything — and shows the agent panel: the session line with minutes left
-and **End access** (or **Open for 60 minutes** once ended); **1 · Add Assetarium to your
+steps above). The agent card shows the agent panel (there is no session to open: a connected agent may set
+things up at any time, and every change it makes is labeled and noticed); **1 · Add Assetarium to your
 agent** with Codex / Claude Code / OpenCode / Other snippets generated for this computer's
 folders and **Copy**; **2 · Ask it to set up Assetarium** with **Copy setup prompt**; a
 live connection line ("Waiting for an agent to connect…" or "<client> is connected", from

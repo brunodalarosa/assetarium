@@ -17,6 +17,8 @@ The library root is the Assetarium (Local Asset Library) folder that the server'
 4. Select a source format that fits the project's existing import workflow. Request that format with `get_asset(source_format=...)` if it differs from the returned source. When `source_variants` lists several files of that format (for example `FBX` and `Unity FBX` folders), pick the one meant for the project's engine with `source_variant`. Never recommend a variant marked `usable: false`; report its reason instead. Review the selected source, known dependencies, measured metadata, license evidence, source faults, and completeness limitations before recommending it.
 5. Explain the selection, alternatives when helpful, and remaining uncertainty. An asset selection is a handoff to the project's implementation workflow; it does not establish artistic approval or successful engine integration.
 
+A result with `variants` is one of several assets that differ only in a color, material, letter or level of detail (`Car_11_R`, `Car_11_G`…); search lists each such group once, at its best match. Pick the variant the task needs by its `asset_id`. A variant may carry `description_shared_from`: its description was written for another variant of the group, so colors or materials in it can be that variant's; check the preview.
+
 Search and detail calls may display namespaced names such as `mcp__local_asset_library__search_assets` and `mcp__local_asset_library__get_asset`.
 
 ## Search controls

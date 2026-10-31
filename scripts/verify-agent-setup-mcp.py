@@ -1,10 +1,10 @@
-"""Real STDIO check of agent setup (decision 0016) on an isolated empty project. Not evidence of agent use.
+"""Real STDIO check of agent setup (decisions 0016, 0024) on an isolated empty project. Not evidence of agent use.
 
 Copies this checkout's code into scratch/agent-setup-mcp/<run-name>/project and links the
 prepared mcp environment (nothing is installed; the owner's library and configuration are never
 touched). A scripted MCP client launches scripts/asset-mcp.py exactly as clients do and walks:
-a broken configuration (setup-only server), then the full flow on a valid empty project — refused
-writes without a session, the user's session, apply_setup, validate_blender (real Blender when
+a broken configuration (setup-only server), then the full flow on a valid empty project — no
+session gate (decision 0024), apply_setup, validate_blender (real Blender when
 one is found; a non-Blender file is refused), propose → reject → propose → apply (the user's
 decisions call the backend in this process, as the app's buttons do), finish_setup, connection
 records and notices. Report: data/mcp/agent-setup/<run-name>/report.json
@@ -145,13 +145,10 @@ try:
           and 'get_setup_status' in prompt['messages'][0]['content']['text'])
     check('connection record names the client', [(r['mode'], (r['client'] or {}).get('name')) for r in records()] == [('normal', 'agent-setup-check')], records())
     status, error, size = client.call('get_setup_status')
-    check('status before a session', not error and not status['session']['open'] and status['next_actions'][0]['for'] == 'session'
-          and size <= status['character_cap'], {k: status.get(k) for k in ('session', 'setup')})
+    check('status has no session and stays bounded', not error and 'session' not in status
+          and size <= status['character_cap'], {k: status.get(k) for k in ('setup',)})
     text = json.dumps(status, ensure_ascii=False)
     check('status does not reveal the project path', str(project) not in text and json.dumps(str(project))[1:-1] not in text)
-    refused, error, _ = client.call('apply_setup', {'storage_budget_gib': 20})
-    check('write refused without a session', error and refused['status'] == 'refused', refused)
-    setup_agent.open_session(config, 'app')  # The user's click on "Set up with my agent".
     applied, error, _ = client.call('apply_setup', {'storage_budget_gib': 25, 'processing_formats': ['gltf'], 'engine_hint': 'godot',
                                                     'caption_batch_size': 4})
     check('apply_setup applies and records the agent', not error and applied['status'] == 'applied'
@@ -191,9 +188,6 @@ try:
     check('setup recorded as completed by the agent', setup_core.load_record(config)[0]['by'] == 'agent')
     notice = next((i for i in notifications.load(config)['items'] if i['kind'] == 'setup_changed'), None)
     check('one notice lists the agent changes', notice and {c['key'] for c in notice['changes']} >= {'storage_budget_gib', 'processing_formats'}, notice)
-    setup_agent.end_session(config)
-    refused, error, _ = client.call('apply_setup', {'storage_budget_gib': 30})
-    check('write refused after the user ends the session', error and refused['status'] == 'refused')
     run = next(p for p in (project / 'data/mcp/runs').iterdir() if (p / 'calls.jsonl').exists()
                and 'finish_setup' in (p / 'calls.jsonl').read_text(encoding='utf-8'))
     calls = [json.loads(line)['tool'] for line in (run / 'calls.jsonl').read_text(encoding='utf-8').splitlines()]
