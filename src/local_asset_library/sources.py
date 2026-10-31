@@ -702,7 +702,8 @@ def scan_source(config, source):
     if snapshot(rows) != snapshot(walk_source(scoped)):
         raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
     # Identity by recognition: kept IDs for known places, moves and edits; new IDs only at first sight.
-    fresh, recognized = library_store.recognize(config, source, fresh, previous)
+    skipped = [r["path"].split("/", 1)[1] for r in rows if r.get("status") == "excluded_folder"]
+    fresh, recognized = library_store.recognize(config, source, fresh, previous, skipped)
     # Isolate file failures to their assets; other assets in the source continue.
     rejected = [r for r in rows if r.get("status") == "rejected"]
     merged, changed = [], set()
@@ -720,7 +721,8 @@ def scan_source(config, source):
         if prior:
             same = prior["files"] == record["files"] and [d for d in prior["dependencies"] if not d.get("inspection_version")] == record["dependencies"]
             kept = deepcopy(prior)
-            for key in ("files", "availability", "variants", "dependency_inspection", "pack_id", "source_relative_identity"):
+            kept.pop("variants", None)  # Pair lists of 0.1.0; variant groups live in folder views now.
+            for key in ("files", "availability", "dependency_inspection", "pack_id", "source_relative_identity"):
                 kept[key] = record[key]
             from .dependency_overrides import synchronize_recipe
             synchronize_recipe(kept, record)

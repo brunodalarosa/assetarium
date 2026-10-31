@@ -1,6 +1,6 @@
-import { Ban, Box, Check, CircleAlert, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, Sparkles, TriangleAlert, Unlink } from "lucide-react";
+import { Ban, Box, Check, CircleAlert, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, Sparkles, SwatchBook, TriangleAlert, Unlink } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { type CSSProperties, type KeyboardEvent, useEffect, useRef } from "react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
@@ -19,6 +19,7 @@ const STATE: Record<string, { icon: typeof Clock; label: string }> = {
 };
 const DESCRIPTION: Record<string, { icon: typeof FileText; label: string }> = {
   complete: { icon: FileText, label: "Described" }, failed: { icon: FileX, label: "Description failed" }, missing: { icon: FileQuestion, label: "No description yet" },
+  shared: { icon: FileText, label: "Shares its variant group’s description" },
 };
 
 /** The icon strip over a card's preview: its state and overlays, with tooltips. */
@@ -72,13 +73,25 @@ function badges(item: Json, thumb?: Thumb) {
   return list;
 }
 
-function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; selected: boolean; index: number }) {
+function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId; item: Json; selected: string | null; index: number }) {
+  // A variant group is one card (decision 0024): chips pick the variant shown; hovering a chip previews it.
+  const variants: Json[] = card.variants || [];
+  const [shown, setShown] = useState<string>(card.asset_id);
+  const [peek, setPeek] = useState<string | null>(null);
+  useEffect(() => {
+    if (chosen && variants.some((v) => v.asset_id === chosen)) setShown(chosen);
+  }, [chosen, variants]);
+  const item = variants.find((v) => v.asset_id === (peek ?? shown)) || card;
+  const selected = !!chosen && (chosen === card.asset_id || variants.some((v) => v.asset_id === chosen));
   const thumb = useApp((s) => s[grid].thumbs[item.asset_id]);
   const choosing = useApp((s) => grid === "collection" && s.selection.active);
   const picked = useApp((s) => grid === "source" && s.sourcesView.picked.includes(item.asset_id));
   const ticked = useApp((s) => (choosing && s.selection.ids.includes(item.asset_id)) || picked);
   const ref = useRef<HTMLButtonElement>(null);
   const reduce = useReducedMotion();
+  useEffect(() => {
+    if (variants.length && !thumb) requestThumb(grid, item);
+  }, [grid, item, thumb, variants.length]);
   useEffect(() => {
     const element = ref.current;
     if (!element || thumb) return;
@@ -97,13 +110,20 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
   const describedBy = thumb?.reason ? `${grid}-preview-state-${item.asset_id}` : undefined;
   const meta = cardMeta(item, thumb?.card);
   const menu = (x: number, y: number, keyboard = false) => openAssetMenu(grid, item, x, y, ref.current, keyboard);
+  const pick = (id: string) => {
+    setShown(id);
+    setPeek(null);
+    if (selected) void selectAsset(grid, id, null, "three_quarter", false);
+  };
   return (
+    <div className="card-wrap relative min-w-0">
     <motion.button
       ref={ref}
       type="button"
       data-id={item.asset_id}
       aria-pressed={choosing ? ticked : selected}
-      aria-label={(choosing ? (ticked ? "Selected: " : "Not selected: ") : "") + label + (item.label ? `, labeled ${item.label}` : "")}
+      aria-label={(choosing ? (ticked ? "Selected: " : "Not selected: ") : "") + label + (item.label ? `, labeled ${item.label}` : "")
+        + (variants.length ? `, ${variants.length} variants, showing ${item.variant}` : "")}
       aria-describedby={describedBy}
       aria-haspopup="menu"
       title={thumb?.presentation?.faults?.length ? "Recorded faults available in detail" : undefined}
@@ -139,6 +159,13 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
         </span>
       )}
       {grid === "source" && <StateStrip item={item} />}
+      {variants.length > 0 && (
+        <Tooltip content={`${variants.length} variants`} delay={250}>
+          <span className="variant-badge absolute top-3 left-3 z-10 inline-flex h-6 items-center gap-1 rounded-full bg-surface/90 px-2 text-[11px] font-medium text-foreground shadow-sm backdrop-blur">
+            <SwatchBook className="size-3.5" strokeWidth={2} aria-hidden />{variants.length}
+          </span>
+        </Tooltip>
+      )}
       <div className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb",
         grid === "source" && item.state === "missing" && "opacity-60")}>
         {thumb?.image ? (
@@ -175,9 +202,24 @@ function AssetCard({ grid, item, selected, index }: { grid: GridId; item: Json; 
             ))}
           </span>
         )}
+        {variants.length > 0 && <span aria-hidden className="h-8" />}
       </div>
       {thumb?.reason && <span id={describedBy} className="sr">{thumb.reason}</span>}
     </motion.button>
+    {variants.length > 0 && (
+      <span className="variant-chips absolute bottom-3 left-5 right-5 flex gap-1 overflow-hidden" role="radiogroup" aria-label={`Variants of ${card.name}`}
+        onMouseLeave={() => setPeek(null)}>
+        {variants.map((v) => (
+          <button key={v.asset_id} type="button" role="radio" aria-checked={v.asset_id === shown} title={v.name} tabIndex={v.asset_id === shown ? 0 : -1}
+            onMouseEnter={() => setPeek(v.asset_id)} onFocus={() => setPeek(v.asset_id)} onBlur={() => setPeek(null)} onClick={() => pick(v.asset_id)}
+            className={cn("h-6 min-w-7 shrink-0 rounded-full border px-2 text-[11px] transition-colors",
+              v.asset_id === shown ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground")}>
+            {v.variant}
+          </button>
+        ))}
+      </span>
+    )}
+    </div>
   );
 }
 
@@ -222,7 +264,7 @@ export function AssetGrid({ grid, id, pending, append }: { grid: GridId; id: str
       onKeyDown={onKeyDown}
       className={cn("grid grid-cols-[repeat(auto-fill,minmax(min(100%,232px),1fr))] content-start gap-5 outline-none", shown && items.length > 0 && !append && "refreshing")}
     >
-      {items.map((item, index) => <AssetCard key={item.asset_id} grid={grid} item={item} index={index} selected={item.asset_id === selected} />)}
+      {items.map((item, index) => <AssetCard key={item.asset_id} grid={grid} item={item} index={index} selected={selected} />)}
       {Array.from({ length: ghosts }, (_, index) => <AssetCardGhost key={"ghost-" + index} index={index} />)}
     </div>
   );

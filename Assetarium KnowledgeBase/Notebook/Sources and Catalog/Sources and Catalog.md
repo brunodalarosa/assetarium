@@ -13,6 +13,8 @@ assets, and how each source's results combine into one read-only catalog. Up: [N
 - [Sources](Sources.md): library folders, the library store, recognition, scans, exclusions and duplicate export folders.
   Packs (`packs.py`), image kinds (`image_kinds.py`) and the Asset sources tab's data (`library_view.py`) are
   described there too.
+- [Pack profiles](Pack%20profiles.md): a pack's answers as versioned rules, effect, signals, variant groups and shared
+  variant descriptions (`pack_profiles.py`, `variant_groups.py`).
 - [Publication](Publication.md) *(gap)*: per-source publications, the combined catalog and index, pinned immutable generations (`publication.py`, `membership.py`).
 - [Logical assets](Logical%20assets.md) *(gap)*: grouping files into one asset, alternate files and variants (`catalog.py`, `asset_structure.py`).
 
@@ -24,4 +26,5 @@ assets, and how each source's results combine into one read-only catalog. Up: [N
   detection), [0004](../../Decisions/0004-stat-identity-hash-reuse.md) (hash reuse),
   [0019](../../Decisions/0019-source-folders-and-export-variants.md) (excluded folders, export
   variants), [0020](../../Decisions/0020-alternate-file-faults-and-recheck.md) (alternate file
-  faults, recheck), [0021](../../Decisions/0021-texture-folder-choice.md) (texture folder choice).
+  faults, recheck), [0021](../../Decisions/0021-texture-folder-choice.md) (texture folder choice),
+  [0024](../../Decisions/0024-pack-profiles-and-variant-groups.md) (pack profiles, variant groups).

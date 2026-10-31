@@ -6,9 +6,13 @@ when its catalog, embedding index or processing formats change. A build streams 
 thread, one per catalog at a time and at most two at once, so memory does not grow with the library. Readers wait
 briefly for a build and otherwise use the last view (counts may lag processing by seconds); without any view yet they
 get ``Reading`` instead of blocking the window. Nothing in a library folder is read or written.
+
+Variant groups (``variant_groups``) are assigned here, one folder at a time, from names and the folder's
+``variant_axis`` answers; a variant that shares its group's description shows the description state ``shared``.
 """
 from contextlib import closing
 import hashlib
+from itertools import groupby
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -19,10 +23,11 @@ import uuid
 
 from .config import ConfigError
 
-VERSION = 1
+VERSION = 2
+VIEW_ANSWERS = ('variant_axis', 'separate_descriptions')  # Answers a view applies; they are part of its stamp.
 WAIT = 1.5
 # Heavy record fields no view column needs; SQLite drops them before Python parses a row.
-HEAVY = ('variants', 'technical', 'dependencies', 'texture_repair', 'texture_repair_history', 'dependency_inspection',
+HEAVY = ('technical', 'dependencies', 'texture_repair', 'texture_repair_history', 'dependency_inspection',
          'provenance', 'grouping', 'license_evidence', 'effective_caption', 'inspection_run', 'description')
 _lock = threading.Lock()
 _jobs = {}
@@ -57,7 +62,15 @@ def stamp(current):
     from .settings import processing_formats
     catalog = current.output_path('data', 'catalog.sqlite')
     index = current.output_path('data', 'embeddings/index.sqlite')
-    return digest([VERSION, _stat(catalog), _stat(index), sorted(processing_formats(current))])[:16]
+    return digest([VERSION, _stat(catalog), _stat(index), sorted(processing_formats(current)), view_answers(current)])[:16]
+
+
+def view_answers(current):
+    """This folder's answers that change its view, as sorted ``[kind, path, value]`` lists."""
+    from .library_store import answers
+    if current.metadata_root is None:
+        return []
+    return sorted([a['kind'], a['path'], a['value']] for kind in VIEW_ANSWERS for a in answers(current, current.metadata_root.name, kind))
 
 
 def _open(path):
@@ -136,14 +149,39 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE assets (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT NOT NULL, folder_key TEXT NOT NULL,
     name_key TEXT NOT NULL, kind TEXT NOT NULL, asset_type TEXT, path TEXT, formats TEXT NOT NULL, groups TEXT NOT NULL,
     has_preview INTEGER NOT NULL, failed TEXT, failed_stages TEXT, pending_next TEXT, outcome TEXT NOT NULL,
-    eligible INTEGER NOT NULL, description TEXT NOT NULL, warning INTEGER NOT NULL, inspection TEXT, digest TEXT NOT NULL);
+    eligible INTEGER NOT NULL, description TEXT NOT NULL, warning INTEGER NOT NULL, inspection TEXT, digest TEXT NOT NULL,
+    group_key TEXT, variant TEXT, representative INTEGER NOT NULL DEFAULT 1, card TEXT, kind_basis TEXT);
 CREATE INDEX assets_order ON assets (folder_key, name_key, asset_id);
+CREATE INDEX assets_card ON assets (card);
 CREATE TABLE folders (path TEXT PRIMARY KEY);
 CREATE TABLE inventory (path TEXT PRIMARY KEY);
 CREATE TABLE files (path TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT NOT NULL, folder_key TEXT NOT NULL,
     name_key TEXT NOT NULL, role TEXT, excluded INTEGER NOT NULL);
 CREATE INDEX files_order ON files (folder_key, name_key, path);
 """
+
+
+_INSERT = ('INSERT INTO assets (asset_id, name, folder, folder_key, name_key, kind, asset_type, path, formats, groups, has_preview, '
+           'failed, failed_stages, pending_next, outcome, eligible, description, warning, inspection, digest, kind_basis) VALUES (' + ','.join('?' * 21) + ')')
+
+
+def group(db, saved):
+    """Assign variant groups folder by folder; returns the oversized sets. ``saved`` comes from ``view_answers``."""
+    from .variant_groups import assign
+    rules = {path: value for kind, path, value in saved if kind == 'variant_axis'}
+    separate = {path for kind, path, value in saved if kind == 'separate_descriptions' and value}
+    oversized, updates = [], []
+    rows = db.execute('SELECT asset_id, folder, name, kind FROM assets ORDER BY folder, asset_id')
+    for _, chunk in groupby(rows, key=lambda r: r[1]):
+        found, big = assign(list(chunk), rules)
+        oversized += big
+        updates += [(key, value, int(first), asset_id) for asset_id, (key, value, first) in found.items()]
+    db.executemany('UPDATE assets SET group_key=?, variant=?, representative=? WHERE asset_id=?', updates)
+    db.execute('UPDATE assets SET card = COALESCE(group_key, asset_id)')
+    # A variant shares its group's description unless the owner asked for separate ones; its own finished one stays.
+    db.execute("UPDATE assets SET description='shared' WHERE representative=0 AND description IN ('missing', 'unavailable') "
+               "AND group_key NOT IN (SELECT value FROM json_each(?))", (json.dumps(sorted(separate)),))
+    return oversized
 
 
 def build(current, target):
@@ -183,12 +221,14 @@ def build(current, target):
                               following if outcome['state'] == 'pending' else None, outcome['state'],
                               int(processing_eligible(record, formats)), description_state(record),
                               int(any(f.get('severity') == 'warning' for f in review if isinstance(f, dict))),
-                              record['processing'].get('inspection'), hashlib.sha256(row[1].encode()).hexdigest()))
+                              record['processing'].get('inspection'), hashlib.sha256(row[1].encode()).hexdigest(),
+                              ((record.get('type_metadata') or {}).get('image_kind') or {}).get('basis')))
                 db.executemany('INSERT OR IGNORE INTO temp.owned VALUES (?)', [(f['path'],) for f in files])
                 if len(batch) >= 500:
-                    db.executemany('INSERT INTO assets VALUES (' + ','.join('?' * 20) + ')', batch)
+                    db.executemany(_INSERT, batch)
                     batch = []
-            db.executemany('INSERT INTO assets VALUES (' + ','.join('?' * 20) + ')', batch)
+            db.executemany(_INSERT, batch)
+            oversized = group(db, view_answers(current))
             prefix, parents, batch = key + '/', set(), []
             for path, role, payload in source.execute('SELECT path, role, record FROM inventory'):
                 row = json.loads(payload)
@@ -205,7 +245,8 @@ def build(current, target):
                               file_name.casefold(), row.get('role', role), int(row.get('status') == 'excluded_directory_link')))
             db.executemany('INSERT OR IGNORE INTO files VALUES (?,?,?,?,?,?,?)', batch)
             db.executemany('INSERT INTO folders VALUES (?)', [(p,) for p in sorted(parents)])
-            db.executemany('INSERT INTO meta VALUES (?,?)', [('version', str(VERSION)), ('catalog', str(catalog))])
+            db.executemany('INSERT INTO meta VALUES (?,?)', [('version', str(VERSION)), ('catalog', str(catalog)),
+                                                             ('oversized', json.dumps(oversized[:200])), ('oversized_count', str(len(oversized)))])
             db.commit()
         os.replace(temporary, target)
     except PermissionError:
@@ -274,7 +315,7 @@ def summary(current, published, formats):
         counts = dict.fromkeys(PROCESSING_FORMATS, 0)
         counts.update(db.execute('SELECT j.value, COUNT(*) FROM assets, json_each(assets.groups) j GROUP BY j.value').fetchall())
         total, failed, skipped = db.execute('SELECT COUNT(*), COUNT(failed), COALESCE(SUM(eligible = 0), 0) FROM assets').fetchone()
-        descriptions = dict.fromkeys(('complete', 'missing', 'failed', 'unavailable'), 0)
+        descriptions = dict.fromkeys(('complete', 'missing', 'failed', 'unavailable', 'shared'), 0)
         descriptions.update(db.execute('SELECT description, COUNT(*) FROM assets WHERE eligible GROUP BY description').fetchall())
         pending = [r[0] for r in db.execute(f"SELECT asset_id FROM assets a WHERE eligible AND (outcome = 'pending' {changed}) ORDER BY asset_id")]
     from .sources import summary_result

@@ -48,6 +48,11 @@ as the old name of `library …`.
 | `packs merge KEY FOLDER` | Merge into parent pack (rescans) |
 | `packs split KEY FOLDER` | Make this a pack (rescans) |
 | `packs reset KEY FOLDER` | Forget a merge or split; detection decides again (rescans) |
+| `packs signals KEY` | Which packs need a structure, and why (decision 0024) |
+| `packs profile KEY PACK` | A pack's profile rules and its versions (`""` is the library folder itself) |
+| `packs export KEY PACK --output FILE` | Write a pack profile file outside the library folder |
+| `packs apply KEY PACK [FILE] [--rules JSON] [--yes]` | Show a profile's effect, then make it the pack's profile (asks first; a file must match 80% of the pack's names) |
+| `packs revert KEY PACK VERSION` | Restore an earlier profile version as a new version |
 
 ## Processing
 

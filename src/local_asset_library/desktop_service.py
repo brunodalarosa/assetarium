@@ -258,11 +258,20 @@ class DesktopService(AssetService):
         except (OSError, ValueError) as exc:
             effective, owner = None, {'caption_review': 'faulty'}
             self._record_fault(identifier, 'owner_correction', exc)
+        from .variant_groups import membership
+        group = membership(self.config, record)
+        shared_from = None
+        if group and group['shared'] and effective is None and group['representative']['asset_id'] != identifier:
+            try:  # A variant shows its group's description, labeled as shared (decision 0024).
+                effective = observations(self.config, self.record(group['representative']['asset_id']))
+                shared_from = group['representative']['name'] if effective else None
+            except (OSError, ValueError, KeyError):
+                effective = None
         technical = record.get('technical') or {}
         payload['presentation'] = {'name': record['display_name'], 'pack': record['pack_id'],
             'formats': sorted({f['format'] for f in record['files']}),
             'views': [v for v in VIEWS if any(p.get('view_label') == v for p in record['previews'])],
-            'observations': effective,
+            'observations': effective, 'description_shared_from': shared_from, 'variant_group': group,
             'suggested_uses': owner.get('suggested_uses') if owner.get('suggested_uses') is not None else record.get('suggested_uses'),
             'owner_review': owner.get('caption_review', 'pending'),
             'owner_artistic_approval': owner.get('artistic_suitability', 'pending'),

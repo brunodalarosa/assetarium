@@ -8,6 +8,14 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Variant groups**: assets whose names differ only in a last letter, color, material or LOD (`Car_11_R`,
+  `Car_11_G`, `Car_11_B`) are one card with a variant badge and chips; hovering a chip previews it. Numbered
+  series stay separate. Variants share one description unless you turn on **Generate separate descriptions for
+  each variant** in the inspector (decision 0024).
+- **Pack profiles**: a pack's Structure section says whether it needs a structure and why, lists the rules that
+  steer it, keeps every version (Restore) and exports a profile file; `local-assets packs signals|profile|apply|
+  revert|export` do the same from a terminal.
+
 - **Asset sources** tab (the folder icon above Settings): browse by place through library folders,
   bundles, packs and folders, with coverage, "+N new", a card state for every asset (no previews
   yet, queued, ready, blocked with its fix, recorded failure, missing), a pack header with its

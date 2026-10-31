@@ -330,7 +330,8 @@ def refresh(config, dry_run=False):
         if previous:
             same = previous["files"] == record["files"] and [d for d in previous["dependencies"] if not d.get("inspection_version")] == record["dependencies"]
             kept = deepcopy(previous)
-            for key in ("files", "availability", "display_name", "license_evidence", "grouping", "variants", "dependency_inspection"):
+            kept.pop("variants", None)  # Pair lists of 0.1.0; variant groups live in folder views now.
+            for key in ("files", "availability", "display_name", "license_evidence", "grouping", "dependency_inspection"):
                 kept[key] = record[key]
             from .dependency_overrides import synchronize_recipe
             synchronize_recipe(kept, record)

@@ -178,8 +178,15 @@ def tree(config):
             'attention': bool(migration.get('needed') or any(f['attention'] for f in folders))}
 
 
+ITEM = 'asset_id, name, kind, state, reason, folder, formats, has_preview, path, description, warning'
+
+
 def folder_items(config, key, path='', offset=0, page_size=60, filters=None, show_files=True):
-    """A folder's (or pack's) assets with state and overlays, then its other files, faded; paged in SQL from its view."""
+    """A folder's (or pack's) asset cards with state and overlays, then its other files, faded; paged in SQL from its view.
+
+    Variants of one group are one card (its representative, or the first member a filter keeps) with ``variants``
+    listing every member; ``assets`` counts assets, ``cards`` and ``total`` count what pages through.
+    """
     from .asset_collections import load
     from .folder_view import Reading, connect, inside_sql, state_sql
     from .library_store import missing_list
@@ -205,7 +212,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     counts = dict.fromkeys(STATES, 0)
     if current is None:
         counts['missing'] = len(missing)
-        return {'status': 'ready', 'key': key, 'path': path, 'items': missing[offset:offset + page_size], 'total': len(missing),
+        return {'status': 'ready', 'key': key, 'path': path, 'items': missing[offset:offset + page_size], 'total': len(missing), 'cards': len(missing),
                 'assets': len(missing), 'files': 0, 'counts': counts, 'offset': offset, 'page_size': page_size}
     try:
         view = connect(current)
@@ -223,38 +230,57 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
         params += state_params + sorted(wanted) + ([json.dumps(new)] if 'new' in wanted else [])
     with closing(view):
         counts.update(view.execute(f'SELECT {state}, COUNT(*) FROM assets WHERE {where} GROUP BY 1', state_params + params).fetchall())
-        listed = sum(counts.values())
+        listed = view.execute(f'SELECT COUNT(DISTINCT card) FROM assets WHERE {where}', params).fetchone()[0]
+        assets = sum(counts.values()) + len(missing)
         counts['missing'] += len(missing)
-        assets = listed + len(missing)
+        cards = listed + len(missing)
         files_where, files_params = inside_sql(path)
         files = view.execute(f'SELECT COUNT(*) FROM files WHERE {files_where}', files_params).fetchone()[0] if show_files else 0
-        rows = view.execute(f'SELECT asset_id, name, kind, {state}, {reason}, folder, formats, has_preview, path, description, warning '
-                            f'FROM assets WHERE {where} ORDER BY folder_key, name_key, asset_id LIMIT ? OFFSET ?',
+        # One row per card: its representative when the filters keep it, otherwise the first member they keep.
+        rows = view.execute(f'SELECT {ITEM}, group_key FROM (SELECT {ITEM}, group_key, folder_key, '
+                            'ROW_NUMBER() OVER (PARTITION BY card ORDER BY representative DESC, name_key, asset_id) AS position, '
+                            'MIN(name_key) OVER (PARTITION BY card) AS card_name, card '
+                            f'FROM (SELECT *, {state} AS state, {reason} AS reason FROM assets WHERE {where})) '
+                            'WHERE position = 1 ORDER BY folder_key, card_name, card LIMIT ? OFFSET ?',
                             state_params + reason_params + params + [page_size, offset]).fetchall() if offset < listed else []
+        members = {}
+        grouped = sorted({row[-1] for row in rows if row[-1]})
+        if grouped:  # Every member of the shown groups (at most variant_groups.CAP each), unfiltered: the picker shows them all.
+            for row in view.execute(f'SELECT {ITEM}, group_key, variant, representative FROM (SELECT *, {state} AS state, {reason} AS reason '
+                                    'FROM assets WHERE group_key IN (SELECT value FROM json_each(?))) ORDER BY group_key, representative DESC, name_key',
+                                    state_params + reason_params + [json.dumps(grouped)]):
+                members.setdefault(row[-3], []).append(row)
         detected = structure(config, source, view)
         descriptions, names, new = descriptions_enabled(config), names_of(config, source), set(new)
         collections = {}
         for collection in load(config).get('collections', []):
             for item in collection.get('items', []):
                 collections[item['asset_id']] = collections.get(item['asset_id'], 0) + 1
-        page = []
-        for asset_id, name, kind, item_state, item_reason, folder, formats, preview, first, description, warning in rows:
+        def item(row):
+            asset_id, name, kind, item_state, item_reason, folder, formats, preview, first, description, warning = row[:11]
             found = {'warning': True} if warning else {}  # Review notes are not shown as warnings.
             if descriptions:
                 found['description'] = description
             if collections.get(asset_id):
                 found['collections'] = collections[asset_id]
-            page.append({'asset_id': asset_id, 'name': name, 'kind': kind, 'state': item_state, 'reason': item_reason,
-                         'folder': folder, 'pack': pack_of(config, source, {'files': [{'path': first}]}, detected, names) if first else None,
-                         'formats': json.loads(formats), 'has_preview': bool(preview), 'path': first, 'overlays': found,
-                         'new': asset_id in new})
+            return {'asset_id': asset_id, 'name': name, 'kind': kind, 'state': item_state, 'reason': item_reason,
+                    'folder': folder, 'pack': pack_of(config, source, {'files': [{'path': first}]}, detected, names) if first else None,
+                    'formats': json.loads(formats), 'has_preview': bool(preview), 'path': first, 'overlays': found,
+                    'new': asset_id in new}
+        page = []
+        for row in rows:
+            card = item(row)
+            if row[-1] in members:
+                card['group'] = row[-1]
+                card['variants'] = [dict(item(m), variant=m[-2], representative=bool(m[-1])) for m in members[row[-1]]]
+            page.append(card)
         start = max(0, offset - listed)
         page += missing[start:start + page_size - len(page)]
         if files and len(page) < page_size:
             page += [{'file': True, 'path': p, 'name': n, 'folder': f, 'role': r, 'excluded': bool(x)} for p, n, f, r, x in view.execute(
                 f'SELECT path, name, folder, role, excluded FROM files WHERE {files_where} ORDER BY folder_key, name_key, path LIMIT ? OFFSET ?',
-                files_params + [page_size - len(page), max(0, offset - assets)])]
-    return {'status': 'ready', 'key': key, 'path': path, 'items': page, 'total': assets + files,
+                files_params + [page_size - len(page), max(0, offset - cards)])]
+    return {'status': 'ready', 'key': key, 'path': path, 'items': page, 'total': cards + files, 'cards': cards,
             'assets': assets, 'files': files, 'counts': counts, 'offset': offset, 'page_size': page_size}
 
 

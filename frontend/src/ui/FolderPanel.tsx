@@ -1,10 +1,10 @@
-import { Boxes, Copy, Folder, FolderSearch, HardDrive, Package, RefreshCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Boxes, Copy, Download, Folder, FolderSearch, HardDrive, History, Package, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
 import type { Json } from "../app/api";
 import { nearMissText, operationActive, plural } from "../app/format";
-import { confirmRemoveSource, folderAction, pathAction, sourceAction, sourceFolders, useApp } from "../app/store";
+import { confirmRemoveSource, folderAction, loadPackProfile, packProfileAction, pathAction, sourceAction, sourceFolders, useApp } from "../app/store";
 import { Badge, Banner, Button, RadioCards, TextField } from "./primitives";
 
 const where = (anchor: string) => (anchor ? `In ${anchor}` : "At the top of this library folder");
@@ -144,6 +144,80 @@ export function SourceFolders({ source, busy }: { source: Json; busy: boolean })
 }
 
 
+/** One profile rule as a sentence (decision 0024); paths are inside the pack. */
+export function ruleText(rule: Json): string {
+  const at = (folder: string) => (folder ? `“${folder}”` : "the pack");
+  switch (rule.kind) {
+    case "pack": return `${at(rule.folder)} ${rule.value === "merge" ? "is merged into its parent pack" : "is a pack of its own"}`;
+    case "pack_name": return `Named “${rule.value}”`;
+    case "image_kind": return `Images in ${at(rule.folder)} are ${rule.value === "texture" ? "textures" : "2D assets"}`;
+    case "variant_axis": return rule.values.length ? `Variants in ${at(rule.folder)}: names ending in ${rule.values.join(", ")}` : `No variants in ${at(rule.folder)}`;
+    case "separate_descriptions": return `Each variant of “${rule.group}” has its own description`;
+    case "exclude": return `${at(rule.folder)} is excluded`;
+    case "engine_copy": return `${at(rule.folder)} is an engine copy of ${at(rule.of)}, excluded`;
+    case "export_group": return `${rule.folders.join(", ")} in ${at(rule.anchor)}: ${rule.decision === "group" ? "grouped as one asset each" : "kept separate"}`;
+    case "texture_folder": return `Missing textures come from ${rule.folder ? at(rule.folder) : "single copies"}${rule.folder && rule.single_copies ? " and single copies" : ""}`;
+    default: return rule.kind;
+  }
+}
+const ORIGIN: Record<string, string> = { owner: "You", agent: "Agent", import: "Imported file", earlier: "Before the first profile", revert: "Restored", heuristics: "Detection" };
+const STATUS: Record<string, { label: string; tone: "neutral" | "warning" | "fault" }> = {
+  fine: { label: "Looks fine", tone: "neutral" }, suggestions: { label: "Has suggestions", tone: "neutral" }, needs_structure: { label: "Needs a structure", tone: "warning" },
+};
+
+/** A pack's profile: how detection reads it, the rules that steer it and every version (decision 0024). */
+function PackProfile({ folderKey, path, busy }: { folderKey: string; path: string; busy: boolean }) {
+  const [profile, setProfile] = useState<Json | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const load = () => loadPackProfile(folderKey, path).then((value) => { setProfile(value); setError(null); }, (e: Error) => setError(e.message));
+  useEffect(() => {
+    setProfile(null);
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folderKey, path]);
+  const act = async (action: "revert" | "review" | "export", value: Json = null) => {
+    await packProfileAction(action, folderKey, path, value);
+    void load();
+  };
+  if (error) return <Banner tone="warning"><span>Pack profile unavailable: {error}</span></Banner>;
+  if (!profile) return <p className="text-[12.5px] text-muted-foreground">Reading this pack’s profile…</p>;
+  const signals = profile.signals, status = STATUS[signals?.status || "fine"], rules: Json[] = profile.rules || [], history: Json[] = profile.history || [];
+  return (
+    <section id="pack-profile" className="grid gap-2.5" data-status={signals?.status || "fine"}>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="mr-auto text-[13px] font-medium">Structure</h3>
+        <Badge tone={status.tone}>{status.label}</Badge>
+      </div>
+      {signals && [...signals.needs, ...signals.suggestions].length > 0 && (
+        <ul className="grid gap-1 text-[12.5px] leading-relaxed text-muted-foreground">
+          {[...signals.needs, ...signals.suggestions].map((line: string) => <li key={line}>· {line}</li>)}
+        </ul>
+      )}
+      {signals && !signals.reviewed && signals.status !== "fine" && (
+        <Button variant="quiet" className="h-8 w-fit px-3" data-action="review-structure" disabled={busy} onClick={() => void act("review", signals.evidence)}>It’s right as it is</Button>
+      )}
+      <p className="text-[12.5px] text-muted-foreground">{rules.length ? plural(rules.length, "rule steers", "rules steer") + " this pack:" : "No rules: detection and the defaults decide this pack."}</p>
+      {rules.length > 0 && <ul className="profile-rules grid gap-1 text-[12.5px]">{rules.map((rule, i) => <li key={i} title={rule.note}>{ruleText(rule)}</li>)}</ul>}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" className="h-8 px-3" data-action="export-profile" onClick={() => void act("export")}><Download className="size-4" aria-hidden />Export profile</Button>
+        {history.length > 0 && <Button variant="quiet" className="h-8 px-3" aria-expanded={open} onClick={() => setOpen(!open)}><History className="size-4" aria-hidden />{plural(history.length, "version", "versions")}</Button>}
+      </div>
+      {open && (
+        <ol className="profile-history grid gap-1.5 border-l border-border pl-3">
+          {history.map((item: Json, index: number) => (
+            <li key={item.version} className="flex flex-wrap items-center gap-x-2 text-[12px]">
+              <span className="font-medium tabular-nums">v{item.version}</span>
+              <span className="text-muted-foreground">{ORIGIN[item.origin.by] || item.origin.by}{item.origin.agent ? ` (${item.origin.agent})` : ""} · {new Date(item.utc).toLocaleString()} · {plural(item.rules, "rule", "rules")}</span>
+              {index > 0 && <button type="button" className="text-primary hover:underline disabled:opacity-50" disabled={busy} onClick={() => void act("revert", item.version)}>Restore</button>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 const KIND_LABEL: Record<string, string> = { library: "Library folder", bundle: "Bundle", pack: "Pack", folder: "Folder" };
 const KIND_ICON = { library: HardDrive, bundle: Boxes, pack: Package, folder: Folder } as const;
 
@@ -201,6 +275,7 @@ export function FolderPanel() {
           {license && <Badge tone="neutral" className="w-fit">License file</Badge>}
         </section>
       )}
+      {kind === "pack" && <PackProfile folderKey={folder.key} path={view.path} busy={busy} />}
       <section className="grid gap-2">
         <h3 className="text-[13px] font-medium">Organize</h3>
         <div className="flex flex-wrap gap-2">

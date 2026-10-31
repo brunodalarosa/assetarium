@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS recognition(sequence INTEGER PRIMARY KEY, utc TEXT, a
   folder_id TEXT, locator TEXT, evidence TEXT);
 CREATE TABLE IF NOT EXISTS answers(folder_id TEXT, path TEXT, kind TEXT, value TEXT, utc TEXT,
   PRIMARY KEY(folder_id, path, kind));
+CREATE TABLE IF NOT EXISTS profiles(folder_id TEXT, pack TEXT, version INTEGER, rules TEXT, origin TEXT, utc TEXT,
+  PRIMARY KEY(folder_id, pack, version));
 """
 
 
@@ -104,14 +106,17 @@ def _remap(records, mapping):
     return json.loads(text)
 
 
-def recognize(config, folder, fresh, previous=()):
+def recognize(config, folder, fresh, previous=(), excluded=()):
     """Give each freshly scanned record its kept ID; record moves, duplicates, edits and vanished assets.
 
     ``fresh`` carries formula IDs from the scan. Returns (records with kept IDs, summary). ``previous`` holds
-    this folder's last records, kept as snapshots of assets that went Missing.
+    this folder's last records, kept as snapshots of assets that went Missing. An asset that vanished because its
+    folder is now excluded (``excluded``: folder paths the scan skipped) is ``excluded``, not Missing: it is not listed,
+    and including the folder again brings it back with its ID.
     """
     stamp = now()
-    summary = {'new': 0, 'moved': 0, 'duplicate': 0, 'edited': 0, 'missing': 0, 'returned': 0}
+    summary = {'new': 0, 'moved': 0, 'duplicate': 0, 'edited': 0, 'missing': 0, 'returned': 0, 'excluded': 0}
+    skipped = lambda locator: any(locator.removeprefix('image:').startswith(f + '/') for f in excluded)
     with closing(connect(config)) as db, db:
         known = {r[1]: r for r in db.execute(
             "SELECT asset_id, locator, content, state FROM assets WHERE folder_id=?", (folder['id'],))}
@@ -132,7 +137,7 @@ def recognize(config, folder, fresh, previous=()):
                 if row[2] != content:
                     summary['edited'] += 1
                     history.append((identifier, 'edited', locator, {'before': row[2], 'after': content}))
-                elif row[3] == 'missing':
+                elif row[3] in {'missing', 'excluded'}:
                     summary['returned'] += 1
                     history.append((identifier, 'returned', locator, {'content': content}))
             elif candidates := [i for i in by_content.get(content, []) if i not in kept]:
@@ -164,11 +169,11 @@ def recognize(config, folder, fresh, previous=()):
         for identifier, row in vanished.items():
             if identifier in kept:
                 continue
-            summary['missing'] += 1
-            history.append((identifier, 'missing', row[1], {'content': row[2]}))
+            state = 'excluded' if skipped(row[1]) else 'missing'
+            summary[state] += 1
+            history.append((identifier, state, row[1], {'content': row[2]}))
             snapshot = snapshots.get(identifier)
-            db.execute("UPDATE assets SET state='missing', record=? WHERE asset_id=?",
-                       (encoded(snapshot) if snapshot else None, identifier))
+            db.execute('UPDATE assets SET state=?, record=? WHERE asset_id=?', (state, encoded(snapshot) if snapshot else None, identifier))
         db.executemany('INSERT INTO recognition(utc, asset_id, kind, folder_id, locator, evidence) VALUES (?,?,?,?,?,?)',
                        [(stamp, i, kind, folder['id'], locator, encoded(evidence)) for i, kind, locator, evidence in history])
         if history:
@@ -265,4 +270,19 @@ def save_answer(config, folder_id, path, kind, value):
             db.execute('DELETE FROM answers WHERE folder_id=? AND path=? AND kind=?', (folder_id, path, kind))
         else:
             db.execute('INSERT OR REPLACE INTO answers VALUES (?,?,?,?,?)', (folder_id, path, kind, encoded(value), now()))
+        touch(db)
+
+
+def replace_answers(config, folder_id, kinds, inside, rows):
+    """Replace this folder's answers of ``kinds`` at or below path ``inside`` ('' is everything) with ``rows``.
+
+    ``rows`` are ``(path, kind, value)``; one transaction, so a pack profile never applies half.
+    """
+    prefix = inside.rstrip('/') + '/'
+    with closing(connect(config)) as db, db:
+        for kind in kinds:
+            db.execute('DELETE FROM answers WHERE folder_id=? AND kind=? AND (?=\'\' OR path=? OR substr(path, 1, ?)=?)',
+                       (folder_id, kind, inside, inside, len(prefix), prefix))
+        db.executemany('INSERT OR REPLACE INTO answers VALUES (?,?,?,?,?)',
+                       [(folder_id, path, kind, encoded(value), now()) for path, kind, value in rows])
         touch(db)

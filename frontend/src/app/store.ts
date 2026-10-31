@@ -980,6 +980,32 @@ export async function folderAction(action: string, key: string, path = "", value
     return { status: "faulty", reason: (error as Error).message };
   }
 }
+/** A pack's profile (decision 0024): its rules, versions and structure signals. */
+export async function loadPackProfile(key: string, pack: string) {
+  const result = await api().pack_profile(key, pack);
+  if (result.status === "faulty") throw Error(result.reason);
+  return result;
+}
+/** Apply, revert, review, export or measure a pack profile; a change that rescans says so. */
+export async function packProfileAction(action: "apply" | "revert" | "review" | "export" | "effect" | "separate_descriptions", key: string, pack: string, value: Json = null) {
+  try {
+    const result = await api().pack_profile_action(action, key, pack, value);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (action === "effect" || result.status === "cancelled") return result;
+    const told: Record<string, string> = {
+      apply: result.status === "unchanged" ? "Nothing changed." : `Saved as version ${result.version}.`,
+      revert: `Restored as version ${result.version}.`, review: "Marked as reviewed.", export: "Profile saved.",
+      separate_descriptions: value?.separate ? "Each variant gets its own description." : "Variants share one description.",
+    };
+    pushToast({ tone: "info", title: told[action], body: result.rescan ? "Scanning again; nothing is rendered or described." : action === "export" ? result.path : "" });
+    await loadLibraryTree();
+    if (state.sourcesView.key) void refreshFolder();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
 /** Show in Explorer, open with the default app, or copy the path of a library file or folder. */
 export async function pathAction(action: "reveal" | "open" | "copy", key: string, relative = "") {
   try {

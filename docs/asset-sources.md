@@ -59,6 +59,37 @@ An asset's ID is assigned once, when it is first seen, and kept by recognizing i
 - A file that **vanished** becomes **Missing**: shown faded with when it was last seen, with its results and
   collection entries kept until you choose **Forget missing** on its library folder or pack.
 
+## Variants
+
+Assets in one folder whose names differ only in a last letter, color, material or level of detail
+(`Car_11_R`, `Car_11_G`, `Car_11_B`; `Tree_LOD0`, `Tree_LOD1`) are one card with a variant badge in its
+corner and a chip per variant; hover a chip to preview it, click it to show it. Each variant is still its own
+asset with its own previews, and a collection holds the variant you picked. Numbered series (`Rock_01` to
+`Rock_20`) stay separate cards. Sets of more than 24 stay separate and the pack says it needs a structure.
+
+A variant group shares one description, written for its first variant: **Generate descriptions** skips the
+others, and search finds each variant with that description and its own value. The inspector says when a
+description is shared. Turn on **Generate separate descriptions for each variant** there when the variants
+differ in more than color or material.
+
+## Pack structure and profiles
+
+A pack's panel has a **Structure** section:
+
+- **Looks fine**, **Has suggestions** or **Needs a structure**, with the reasons: name sets too big for one
+  card, the same names in several folders, many images with no evidence of what they are, models that can't find
+  their textures, unanswered duplicate export folders. **It's right as it is** quiets these reasons until they change.
+- The **rules** that steer the pack, as sentences: its pack boundaries and name, how images are treated, excluded
+  folders and engine copies, export groups, the texture folder, variant rules. Together they are the pack's
+  **profile**. Your answers on folders and export cards are part of it.
+- Every change is a **version**; **Restore** brings back an earlier one as a new version.
+- **Export profile** saves the rules to a file outside the library folder, with a fingerprint of the pack's file
+  names, so the same pack elsewhere can use them (`local-assets packs apply KEY PACK FILE` applies a file that
+  matches at least 80% of the names, after showing its effect).
+
+Nothing is written into the pack. Rules about variants and pack boundaries apply at once; rules a scan applies
+(images, exclusions, export groups, textures) scan the library folder again. Nothing is rendered or described.
+
 ## States on the cards
 
 Each card has one state and a few overlays, shown as labeled icons (never color alone):
@@ -71,7 +102,7 @@ Each card has one state and a few overlays, shown as labeled icons (never color 
 | Ready | Previews and search data done | — |
 | Blocked | Its next step can't run on this computer (Blender not set up, the search runtime not installed) | **Fix…** shows what to install; it is never offered as something to process |
 | Recorded failure | A fault with its evidence | **Copy error**, **Recheck…** (decision 0020) |
-| Missing | The file is gone | **Forget missing** |
+| Missing | The file is gone (an excluded folder's assets are not Missing; including it again brings them back) | **Forget missing** |
 
 Overlays: a description warning (review notes are not shown as warnings), the description state when
 descriptions are on, how many collections hold it, and **new** since your last visit to that library folder.

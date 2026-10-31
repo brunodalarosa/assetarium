@@ -55,3 +55,7 @@ variant is chosen from an asset's own files only.
 > **Since [decision 0023](0023-central-asset-library.md) (October 30, 2026):** the per-source generated folder named
 > here is replaced by the central library store; the rules of this decision are unchanged and now apply to
 > library folders, packs and folders.
+
+> **Since [decision 0024](0024-pack-profiles-and-variant-groups.md) (October 31, 2026):** excluded folders and export
+> answers inside a pack are rules of its pack profile and versioned with it. "Folder variants" here (files of one
+> asset per export folder) are unrelated to variant groups (separate assets whose names differ in a last token).

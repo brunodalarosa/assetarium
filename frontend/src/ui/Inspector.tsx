@@ -1,13 +1,14 @@
-import { Box, Copy, GripVertical, X } from "lucide-react";
+import { Box, Copy, GripVertical, SwatchBook, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Switch } from "@/components/beui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/beui/tabs";
 import { SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { display, packName, plural, VIEWS } from "../app/format";
 import {
-  activeGridId, assetTags, type GridId, gridApi, gridVersion, copyText, getState, type InspectorTab, saveAssetTags, selectAsset,
+  activeGridId, assetTags, type GridId, gridApi, gridVersion, copyText, getState, type InspectorTab, packProfileAction, saveAssetTags, selectAsset,
   pushToast, setCollectionItem, startSelection,
   setInspectorOpen, setInspectorTab, setInspectorWidth, useApp,
 } from "../app/store";
@@ -105,7 +106,9 @@ function Observations({ info, processed = true, image = false }: { info: Json; p
       {info.observations ? (
         <>
           <Text>{info.observations.description || display(info.observations)}</Text>
-          <Hint>Generated description · owner review {info.owner_review || "pending"}. Interpretations, separate from measured facts.</Hint>
+          {info.description_shared_from
+            ? <Hint>Shared from {info.description_shared_from}: one description serves this variant group, so colors or materials may describe another variant.</Hint>
+            : <Hint>Generated description · owner review {info.owner_review || "pending"}. Interpretations, separate from measured facts.</Hint>}
         </>
       ) : (
         <Text className="text-muted-foreground">
@@ -497,6 +500,40 @@ function UnavailableDetail({ entry }: { entry: Json }) {
   );
 }
 
+/** A variant group (decision 0024): pick a variant, and choose whether its variants share one description. */
+function Variants({ grid, group, assetId }: { grid: GridId; group: Json; assetId: string }) {
+  const [busy, setBusy] = useState(false);
+  const toggle = async () => {
+    setBusy(true);
+    await packProfileAction("separate_descriptions", group.key, "", { group: group.group, separate: !group.separate });
+    setBusy(false);
+    void selectAsset(grid, assetId, null, "three_quarter", false);
+  };
+  return (
+    <div className="variant-group grid gap-2.5 rounded-2xl border border-border bg-surface-2/60 p-3.5">
+      <div className="flex items-center gap-2 text-[12.5px] font-medium text-foreground">
+        <SwatchBook className="size-4 text-muted-foreground" aria-hidden />{plural(group.variants.length, "variant", "variants")}
+      </div>
+      <div className="variant-chips flex flex-wrap gap-1.5" role="radiogroup" aria-label="Variants">
+        {group.variants.map((v: Json) => (
+          <button key={v.asset_id} type="button" role="radio" aria-checked={v.asset_id === assetId} title={v.name}
+            onClick={() => v.asset_id !== assetId && void selectAsset(grid, v.asset_id, null, "three_quarter", false)}
+            className={cn("h-7 min-w-8 rounded-full border px-2.5 text-[12px] transition-colors",
+              v.asset_id === assetId ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground")}>
+            {v.value}
+          </button>
+        ))}
+      </div>
+      {grid === "source" && (
+        <div id="separate-descriptions" className="grid gap-1">
+          <Switch checked={!!group.separate} disabled={busy} onCheckedChange={() => void toggle()} label="Generate separate descriptions for each variant" ariaLabel="Generate separate descriptions for each variant" />
+          <Hint>{group.separate ? "Each variant is described on its own by Generate descriptions." : `Off: one description, from ${group.representative.name}, serves them all.`}</Hint>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DetailBody({ grid }: { grid: GridId }) {
   const detail = useApp((s) => s[grid].detail);
   const tab = useApp((s) => s.inspector.tab);
@@ -537,6 +574,7 @@ function DetailBody({ grid }: { grid: GridId }) {
         </div>
         {p.status === "faulty" && <Banner className="state-banner mt-1">{p.reason}</Banner>}
       </div>
+      {info.variant_group && <Variants grid={grid} group={info.variant_group} assetId={detail.assetId} />}
       {grid === "collection" && <CollectionEntry assetId={detail.assetId} />}
       <Tabs value={tab} onValueChange={(value) => setInspectorTab(value as InspectorTab)} variant="segment">
         <TabsList aria-label="Inspection sections" wrapperClassName="w-full" className="flex w-full rounded-full bg-surface-2 p-1 [--tabs-active-fg:var(--color-foreground)]">

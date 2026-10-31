@@ -20,12 +20,12 @@ def work_of(config, source):
 
 
 def inflate(config, source, copies, padding):
-    """Clone the folder's first record ``copies`` times with ``padding`` bytes of unused variants each."""
+    """Clone the folder's first record ``copies`` times with ``padding`` bytes of heavy, unviewed fields each."""
     catalog = work_of(config, source).output_path('data', 'catalog.sqlite')
     with closing(sqlite3.connect(catalog)) as db, db:
         row = db.execute('SELECT asset_id, source_id, pack_id, identity, name, availability, record FROM assets').fetchone()
         record = json.loads(row[6])
-        record['variants'] = [{'asset_id': 'x' * 40, 'evidence': 'y' * 60, 'relationship': 'filename_variant_candidate'}] * (padding // 120)
+        record['dependency_inspection'] = [{'path': 'x' * 40, 'issues': ['y' * 60], 'status': 'complete'}] * (padding // 120)
         first = db.execute('SELECT COUNT(*) FROM assets').fetchone()[0]
         for n in range(first, first + copies):
             clone = dict(record, asset_id=f'asset_clone{n:05d}', display_name=f'clone {n}')

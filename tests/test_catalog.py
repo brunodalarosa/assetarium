@@ -154,7 +154,7 @@ def test_preview_lookup_keeps_row_order_labels_and_exact_versus_directional_matc
         ("pack/Isometric/chair_NE.png", "Isometric")]
 
 
-def test_variants_previews_texture_and_missing_dependency(catalog_config):
+def test_previews_texture_and_missing_dependency(catalog_config):
     exports(catalog_config)
     put(catalog_config, "pack/Previews/chair.png")
     put(catalog_config, "pack/Isometric/chair_NE.png")
@@ -164,7 +164,8 @@ def test_variants_previews_texture_and_missing_dependency(catalog_config):
     by_name = {a["display_name"]: a for a in assets}
     assert len(by_name["chair"]["previews"]) == 2
     assert not by_name["chair-round"]["previews"]
-    assert by_name["chair-round"]["variants"][0]["asset_id"] == by_name["chair"]["asset_id"]
+    # Variant groups are derived in folder views (variant_groups.py); records carry no pair lists.
+    assert all("variants" not in a for a in assets)
     assert any(d["role"] == "texture" and d["status"] == "available" for d in by_name["chair"]["dependencies"])
     assert any(d["status"] == "missing" for d in by_name["chair-round"]["dependencies"])
     assert any(r["role"] == "pack_contact_sheet" for r in rows)

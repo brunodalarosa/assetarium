@@ -34,7 +34,8 @@ read it first. Up: [Notebook](Notebook.md).
   `notifications`.
 - **Sources and catalog:** `sources` (library folders, scans, the combined catalog), `library_store`
   (`library.sqlite`: folders, recognized assets, recognition history, owner answers), `packs`
-  (packs and bundles from folder structure), `image_kinds` (model texture, material texture or 2D
+  (packs and bundles from folder structure), `pack_profiles` (a pack's answers as versioned rules, effect,
+  signals), `variant_groups` (variant groups assigned in folder views), `image_kinds` (model texture, material texture or 2D
   image), `library_view` (the Asset sources tab's tree, states and folder contents), `folder_view`
   (the small per-catalog views those tabs read instead of whole records),
   `library_migration` (the one-time move into the store; the only code naming the old folder),

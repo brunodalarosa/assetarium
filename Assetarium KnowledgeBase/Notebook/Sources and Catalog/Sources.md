@@ -62,7 +62,9 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   costs ~2.6 GiB to load; that is what made the app use 14 GB (October 31, 2026).
 - **Packs** (`packs.detect`, cached by `packs.structure`) come from folder structure only and are never
   stored in records, so detecting them never makes assets pending. Owner answers (`pack`, `pack_name`,
-  `image_kind`, `visit`) live in `library.sqlite` `answers`.
+  `image_kind`, `variant_axis`, `separate_descriptions`, `engine_copy`, `structure_reviewed`, `visit`) live in
+  `library.sqlite` `answers`; a pack's answers form its [pack profile](Pack%20profiles.md).
+- Assets whose folder is excluded become `excluded` (not Missing) and return with their IDs when included again.
 - **Image kinds** (`image_kinds.classify`, called from `image_catalog.image_assets`): model references,
   then an owner answer, then the pack prior, model stems, material names, folder words and neighbours;
   decoded pixel hints (`pixel_evidence`, recorded by `image_inspection.run`) decide only an image with no
@@ -73,7 +75,7 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
 - A view may lag its catalog: readers wait `folder_view.WAIT` seconds for a rebuild, then use the last view,
   and a view that took a second or more to build is rebuilt at most every three build durations. Code that
   acts on the result (the queue resolving work, `locate`, `importing_failures`) uses `connect(fresh=True)`.
-- Missing assets keep their whole saved record (variants included) in `library.sqlite`; lists use
+- Missing assets keep their whole saved record in `library.sqlite`; lists use
   `library_store.missing_list` / `missing_count`, which never parse it.
 
 - The old-folder migration (`library_migration.apply`) computes old fingerprints and per-folder keys under

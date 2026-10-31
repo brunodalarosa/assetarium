@@ -70,7 +70,7 @@ def parse_record(identifier,pack,name,payload):
             'description':None,'caption_provenance':None,'owner_overlay':{},'license_evidence':[],
             'processing':{'inventory':'failed','inspection':'unknown','previews':'unknown','caption':'unknown','embeddings':'unknown'},
             'metadata_fault':fault,'stage_faults':{'inventory':fault},'inspection_run':{'source_faults':[fault]},
-            'provenance':{},'grouping':{},'variants':[]}
+            'provenance':{},'grouping':{}}
 
 
 def asset_id(pack, identity):
@@ -598,7 +598,7 @@ def build_inventory(config, suggestions=None, previous=()):
                      "files": [{"path": f["path"], "format": PurePosixPath(f["path"]).suffix[1:].lower(),
                                 "sha256": f["sha256"], "availability": f["status"]} for f in files],
                      "grouping": {"evidence": [grouping], "unresolved_ambiguities": [], "geometry_equivalence": "unverified"},
-                     "dependencies": [], "dependency_inspection": [], "previews": [], "variants": [],
+                     "dependencies": [], "dependency_inspection": [], "previews": [],
                      "technical": None, "description": None, "caption_provenance": None, "embeddings": [],
                      "owner_overlay": {}, "license_evidence": license_rows,
                      "processing": {"inventory": "complete", "inspection": "pending", "previews": "pending",
@@ -662,21 +662,6 @@ def build_inventory(config, suggestions=None, previous=()):
             ambiguities.append(case)
             for asset in matching:
                 asset["grouping"]["unresolved_ambiguities"].append(case)
-    # Variants are filename suggestions, not verified visual relationships, and never merged.
-    # Models by (pack, export anchor, name prefix), so each asset reads its own group instead of all assets.
-    variant_key = lambda a: (a["pack_id"], a["grouping"]["evidence"][0].get("anchor"), re.split(r"[-_]", a["display_name"])[0].casefold())
-    by_prefix = defaultdict(list)
-    for asset in assets:
-        if asset.get("asset_type") != "image":
-            by_prefix[variant_key(asset)].append(asset)
-    for asset in assets:
-        if asset.get("asset_type") == "image":
-            continue  # Filename prefixes are not image variant evidence; identical bytes are recorded instead.
-        parts = re.split(r"[-_]", asset["display_name"])
-        if len(parts) > 1:
-            related = [a for a in by_prefix[variant_key(asset)] if a["asset_id"] != asset["asset_id"]]
-            asset["variants"] = [{"asset_id": a["asset_id"], "relationship": "filename_variant_candidate",
-                                  "evidence": f"Shared filename prefix {parts[0]!r}; unreviewed"} for a in sorted(related, key=lambda a: a["asset_id"])]
     archives = []
     for row in rows:
         if row["role"] == "archive" and row["status"] == "available":

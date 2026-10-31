@@ -387,7 +387,71 @@ class DesktopBridge:
             return {'status': 'saved', 'forgotten': library_store.forget_missing(self._config, source['id'], path or None)}
         else:
             raise ConfigError('Unknown folder action')
+        from .pack_profiles import record_change
+        record_change(self._config, key, path, {'by': 'owner'})
         return self._start_source_operation('scan', key)
+
+    # Pack profiles (decision 0024): a pack's rules, versions, signals and effect; apply, revert, review, export.
+    def pack_profile(self, key, pack):
+        return self._wait(self._present(self._pack_profile, key, pack, guarded=False, shared=True))
+
+    def _pack_profile(self, key, pack):
+        from . import pack_profiles, sources
+        source = sources.get_source(self._config, key)
+        return {'status': 'ready', 'key': key, 'pack': pack, 'rules': pack_profiles.current(self._config, source, pack),
+                'history': pack_profiles.history(self._config, key, pack), 'signals': pack_profiles.signals(self._config, key).get(pack)}
+
+    def pack_profile_action(self, action, key, pack, value=None):
+        if action == 'export':
+            return self._save_profile(key, pack)
+        return self._wait(self._present(self._pack_profile_action, action, key, pack, value, guarded=False))
+
+    def _pack_profile_action(self, action, key, pack, value):
+        from . import pack_profiles, sources
+        if action == 'effect':
+            return pack_profiles.effect(self._config, key, pack, value)
+        if action == 'review':
+            return pack_profiles.review(self._config, key, pack, value)
+        if action == 'separate_descriptions':
+            # value: {group (library-folder relative), separate}; the pack holding the group is versioned.
+            source = sources.get_source(self._config, key)
+            owner = pack_profiles.pack_at(self._config, source, value['group'])
+            group = pack_profiles._relative(value['group'], owner)
+            rules = [r for r in pack_profiles.current(self._config, source, owner)
+                     if not (r['kind'] == 'separate_descriptions' and r['group'] == group)]
+            if value.get('separate'):
+                rules.append({'kind': 'separate_descriptions', 'group': group})
+            result = pack_profiles.apply(self._config, key, owner, rules, {'by': 'owner'})
+        elif action == 'apply':
+            result = pack_profiles.apply(self._config, key, pack, value, {'by': 'owner'})
+        elif action == 'revert':
+            result = pack_profiles.revert(self._config, key, pack, value)
+        else:
+            raise ConfigError('Unknown pack profile action')
+        if result['rescan']:
+            result['operation'] = self._start_source_operation('scan', key)
+        return result
+
+    def _save_profile(self, key, pack):
+        import webview
+        from .pack_profiles import export
+        try:
+            body = self._wait(self._present(export, self._config, key, pack, guarded=False))
+            if body.get('status') == 'faulty':
+                return body
+            name = ''.join(c if c.isalnum() or c in ' -_.' else '_' for c in body['pack']['name']).strip() or 'pack'
+            selected = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename=name + '.assetarium-profile.json',
+                                                       file_types=('Pack profile (*.json)',))
+            if not selected:
+                return {'status': 'cancelled'}
+            path = Path(selected[0] if isinstance(selected, (list, tuple)) else selected)
+            from .sources import get_source
+            if Path(get_source(self._config, key)['path']).resolve() in (path.resolve(), *path.resolve().parents):
+                return {'status': 'faulty', 'reason': 'Nothing is written into a library folder; choose a place outside it'}
+            path.write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding='utf-8')
+            return {'status': 'saved', 'path': str(path)}
+        except Exception as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
 
     def path_action(self, action, key, relative=''):
         """Show a library file or folder in Explorer, open it with its default app, or copy its path."""
@@ -448,6 +512,11 @@ class DesktopBridge:
         if not self._config.sources_registry:
             raise ConfigError('Configure asset sources before using source settings')
         getattr(sources, name)(self._config, key, *args)
+        if name in {'decide_export', 'forget_export'}:  # Export answers belong to the pack holding them (decision 0024).
+            from .pack_profiles import record_change
+            anchor = next((d['anchor'] for d in sources.export_decisions(sources.bound(self._config, sources.get_source(self._config, key)))
+                           if d['id'] == args[0]), '')
+            record_change(self._config, key, anchor, {'by': 'owner'})
         return self._start_source_operation('scan', key)
 
     def _start_source_operation(self, operation, key):

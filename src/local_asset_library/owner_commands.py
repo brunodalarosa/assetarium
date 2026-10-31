@@ -44,6 +44,22 @@ def parser():
         change = packs.add_parser(action, help=text)
         change.add_argument('key')
         change.add_argument('folder')
+    packs.add_parser('signals', help='Which packs need a structure, and why').add_argument('key')
+    for action, text in (('profile', "A pack's profile: its rules and versions"),
+                         ('export', 'Write a pack profile file (rules and a fingerprint of the file names)'),
+                         ('apply', 'Make a profile file (or --rules JSON) the pack profile, after showing its effect'),
+                         ('revert', 'Restore an earlier version of a pack profile (as a new version)')):
+        change = packs.add_parser(action, help=text)
+        change.add_argument('key')
+        change.add_argument('pack', help='The pack folder inside the library folder ("" for the library folder itself)')
+        if action == 'export':
+            change.add_argument('--output', required=True, help='The file to write (outside the library folder)')
+        if action == 'apply':
+            change.add_argument('file', nargs='?', help='A profile file from packs export')
+            change.add_argument('--rules', help='The rules as a JSON list instead of a file')
+            change.add_argument('--yes', action='store_true', help='Apply without asking after the effect is shown')
+        if action == 'revert':
+            change.add_argument('version', type=int)
     for name, text in (('previews', 'Make previews (inspection, previews, search data) for a folder, pack or assets'),
                        ('describe', 'Generate missing descriptions for a folder, pack or assets with the configured engine')):
         command = commands.add_parser(name, help=text + '; it starts at once or waits in the queue')
@@ -166,6 +182,8 @@ def packs_command(args, config):
         if not result['packs']:
             say(args, 'No packs yet; scan the library folder first.')
         return result
+    if args.action in {'signals', 'profile', 'export', 'apply', 'revert'}:
+        return profile_command(args, config, source)
     if args.action == 'rename':
         packs.rename(config, args.key, args.folder, args.name)
         say(args, f"Renamed {args.folder or 'the library folder'} to “{args.name}”." if args.name else 'Name reset.')
@@ -431,6 +449,65 @@ def sources_command(args, config):
         args.follow = False
         return run_operation(args, config, 'scan', args.key)
     raise ConfigError('Unknown library command')
+
+
+def profile_command(args, config, source):
+    """Pack profiles from the terminal (decision 0024): signals, rules and versions, export, apply, revert."""
+    from . import pack_profiles
+    if args.action == 'signals':
+        found = pack_profiles.signals(config, args.key)
+        for pack, value in sorted(found.items()):
+            say(args, f"{pack or '(the library folder)'}  {value['status'].replace('_', ' ')}"
+                      + ''.join(f"\n    {line}" for line in value['needs'] + value['suggestions']))
+        if not found:
+            say(args, 'No packs yet; scan the library folder first.')
+        return {'status': 'ready', 'packs': found}
+    if args.action == 'profile':
+        rules, versions = pack_profiles.current(config, source, args.pack), pack_profiles.history(config, args.key, args.pack)
+        for rule in rules:
+            say(args, '  ' + json.dumps(rule, ensure_ascii=False))
+        if not rules:
+            say(args, 'No rules: detection and the defaults decide this pack.')
+        for item in versions:
+            say(args, f"  v{item['version']}  {item['utc'][:19]}  {item['origin'].get('by')}  {item['rules']} rule(s)")
+        return {'status': 'ready', 'rules': rules, 'history': versions}
+    if args.action == 'export':
+        body = pack_profiles.export(config, args.key, args.pack)
+        target = Path(args.output).resolve()
+        if Path(source['path']).resolve() in (target, *target.parents):
+            raise ConfigError('Nothing is written into a library folder; choose a file outside it')
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding='utf-8')
+        say(args, f"Wrote {len(body['rules'])} rule(s) for {body['pack']['name']} to {target}.")
+        return {'status': 'saved', 'path': str(target)}
+    if args.action == 'revert':
+        rules = pack_profiles.version_rules(config, args.key, args.pack, args.version)
+    elif args.rules is not None:
+        rules = json.loads(args.rules)
+    elif args.file:
+        body = json.loads(Path(args.file).read_text(encoding='utf-8'))
+        rules = pack_profiles.read_file(body)
+        share = pack_profiles.match(config, args.key, args.pack, body)
+        say(args, f"This file's pack matches {round(share * 100)}% of this pack's file names.")
+        if share < pack_profiles.IMPORT_MATCH:
+            raise ConfigError(f'A profile file applies from a {round(pack_profiles.IMPORT_MATCH * 100)}% match; choose the pack it was made for')
+    else:
+        raise ConfigError('Give a profile file or --rules')
+    seen = pack_profiles.effect(config, args.key, args.pack, rules)
+    for line in seen['lines']:
+        say(args, '  ' + line)
+    if not args.json and not getattr(args, 'yes', False) and input('Apply? [y/N] ').strip().lower() != 'y':
+        say(args, 'Nothing changed.')
+        return {'status': 'cancelled', 'effect': seen}
+    origin = {'by': 'owner'} if args.action != 'apply' or not args.file else {'by': 'import', 'approved': 'owner'}
+    result = (pack_profiles.revert(config, args.key, args.pack, args.version) if args.action == 'revert'
+              else pack_profiles.apply(config, args.key, args.pack, rules, origin))
+    say(args, f"Saved as version {result['version']}." if result['status'] == 'saved' else 'Already this profile; nothing changed.')
+    if result['rescan']:
+        say(args, 'Scanning (no rendering or models).')
+        args.follow = False
+        return run_operation(args, config, 'scan', args.key)
+    return result
 
 
 def settings_command(args, config):

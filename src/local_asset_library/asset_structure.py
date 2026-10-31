@@ -98,7 +98,7 @@ def image_record(pack, identity, name, files, grouping, purpose, license_rows):
              'files': [{'path': f['path'], 'format': PurePosixPath(f['path']).suffix[1:].lower(), 'sha256': f['sha256'],
                         'availability': f['status']} for f in files],
              'grouping': {'evidence': [grouping], 'unresolved_ambiguities': []},
-             'dependencies': [], 'dependency_inspection': [], 'previews': [], 'variants': [],
+             'dependencies': [], 'dependency_inspection': [], 'previews': [],
              'technical': None, 'description': None, 'caption_provenance': None, 'embeddings': [],
              'owner_overlay': {}, 'license_evidence': license_rows, 'provenance': {'scanner': 'inventory-v1+images-v1'},
              'processing': {s: 'pending' for s in STAGES}, 'structure_version': STRUCTURE_VERSION,
@@ -125,7 +125,7 @@ def new_record(pack, path, format, sha256, kind):
     value = {'schema_version': 2, 'asset_id': asset_id(pack, identity), 'source_id': SOURCE_ID,
              'pack_id': pack, 'source_relative_identity': identity, 'display_name': relative.stem,
              'availability': 'available', 'files': [{'path': path, 'format': format, 'sha256': sha256, 'availability': 'available'}],
-             'dependencies': [], 'previews': [], 'variants': [], 'grouping': {}, 'license_evidence': [],
+             'dependencies': [], 'previews': [], 'grouping': {}, 'license_evidence': [],
              'technical': None, 'description': None, 'caption_provenance': None, 'embeddings': [],
              'owner_overlay': {}, 'provenance': {}, 'processing': {s: 'pending' for s in STAGES},
              'asset_type': kind, 'file_roles': {path: 'primary'}}
