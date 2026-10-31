@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import {
-  addLibraryFolder, chooseSourceDirectory, copyText, libraryCover, loadFolderItems, makePreviews, openFolderMenu, pathAction, type SourcesView, setSourcesFilter, useApp,
+  copyText, libraryCover, loadFolderItems, makePreviews, openFolderMenu, pathAction, type SourcesView, setSourcesFilter, startAddFolder, useApp,
 } from "../app/store";
 import { AssetGrid } from "../ui/AssetGrid";
 import { FolderTree } from "../ui/FolderTree";
@@ -31,10 +31,8 @@ function Header() {
   const [busy, setBusy] = useState(false);
   const toggle = (list: string[], value: string) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   const add = async () => {
-    const directory = await chooseSourceDirectory();
-    if (!directory) return;
     setBusy(true);
-    await addLibraryFolder(directory);
+    await startAddFolder();
     setBusy(false);
   };
   return (
@@ -172,7 +170,7 @@ function Empty() {
       </svg>
       <p className="text-[15px] font-medium">Point Assetarium at a folder of game assets</p>
       <p className="text-[12.5px] text-muted-foreground">Models and images are found and grouped into packs. Nothing is written into your folders, and nothing is processed until you ask.</p>
-      <Button disabled={busy} onClick={async () => { const d = await chooseSourceDirectory(); if (d) { setBusy(true); await addLibraryFolder(d); setBusy(false); } }}>
+      <Button disabled={busy} onClick={async () => { setBusy(true); await startAddFolder(); setBusy(false); }}>
         <FolderOpen className="size-4" aria-hidden />Add library folder
       </Button>
     </motion.div>

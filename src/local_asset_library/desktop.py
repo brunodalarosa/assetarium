@@ -443,6 +443,41 @@ class DesktopBridge:
             result['operation'] = self._start_source_operation('scan', result['library_folder'])
         return result
 
+    # Add library folder (decision 0024): a names-only quick look, then add, keep the names and scan.
+    def quick_look_start(self, directory):
+        from .quick_look import start
+        from .sources import Covered
+        try:
+            return start(self._config, directory)
+        except Covered as exc:
+            return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.source['key']}
+        except Exception as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
+
+    def quick_look_status(self, job_id):
+        from .quick_look import status
+        return self._wait(self._present(status, job_id, guarded=False))
+
+    def quick_look_add(self, job_id):
+        return self._wait(self._present(self._quick_look_add, job_id, guarded=False))
+
+    def _quick_look_add(self, job_id):
+        from . import sources
+        from .pack_agent import prompt
+        from .quick_look import _jobs, save
+        job = _jobs.get(job_id)
+        if job is None or not job['done'] or job['error']:
+            raise ConfigError('Choose the folder again; its quick look is gone')
+        added = sources.add(self._config, job['path'])
+        save(self._config, added, job_id)
+        sources.aggregate(self._config)
+        operation = self._start_source_operation('scan', added['key'])
+        return {'status': 'added', 'key': added['key'], 'name': added['name'], 'prompt': prompt(added), 'operation': operation}
+
+    def pack_signals(self, key):
+        from .pack_agent import counts
+        return self._wait(self._present(counts, self._config, key, guarded=False, shared=True))
+
     def _save_profile(self, key, pack):
         import webview
         from .pack_profiles import export

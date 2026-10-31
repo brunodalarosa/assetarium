@@ -1,7 +1,7 @@
 ---
 area: Sources and Catalog
 tags: [system]
-code: [pack_profiles.py, pack_profiles.validate, pack_profiles.current, pack_profiles.apply, pack_profiles.effect, pack_profiles.signals, pack_profiles.record_change, variant_groups.py, variant_groups.assign, variant_groups.shared_map, variant_groups.membership, folder_view.group, folder_view.view_answers, library_store.replace_answers, library_index.shared_input]
+code: [quick_look.py, quick_look.summarize, quick_look.save, pack_profiles.open_view, pack_agent.py, pack_profiles.py, pack_profiles.validate, pack_profiles.current, pack_profiles.apply, pack_profiles.effect, pack_profiles.signals, pack_profiles.record_change, variant_groups.py, variant_groups.assign, variant_groups.shared_map, variant_groups.membership, folder_view.group, folder_view.view_answers, library_store.replace_answers, library_index.shared_input]
 verified: 2026-10-31
 branch: feature/library-view
 ---
@@ -30,6 +30,10 @@ variant groups those rules steer. Start at `pack_profiles.apply` and `variant_gr
 - **Shared descriptions reach search and detail at read time**: `library_index` embeds a shared variant with
   `shared_input` (the representative's description plus " Variant: G"); `desktop_service` shows the
   representative's observations with `description_shared_from`. Records never carry group data.
+- **Before the first scan** (the Add library folder wizard): `quick_look` walks names only; `quick_look.save`
+  keeps them as `folders/<id>/library/quicklook.sqlite`, shaped like a folder view (`assets`, `inventory`, groups).
+  `pack_profiles.open_view` uses it until a real view exists, and `packs.structure` reads it when the view says
+  `snapshot`. Signals there cover names only (no textures, no export suggestions from the scan).
 
 ## Rules
 

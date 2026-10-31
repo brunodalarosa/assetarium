@@ -251,6 +251,8 @@ export interface AppState {
   notificationsOpen: boolean;
   /** What agents do (decision 0024): the live feed, who is connected and proposals waiting for the owner. */
   agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[] };
+  /** The Add library folder wizard (decision 0024). */
+  addFolder: AddFolder;
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
@@ -310,6 +312,7 @@ let state: AppState = {
   queue: null,
   sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [] },
+  addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false },
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
@@ -1044,6 +1047,84 @@ export async function addLibraryFolder(directory: string) {
     pushToast({ tone: "fault", title: "Folder not added", body: (error as Error).message });
     return { status: "faulty", reason: (error as Error).message };
   }
+}
+/* --------------------------- add library folder ---------------------------- */
+// Decision 0024: a names-only quick look first (seconds), then the owner chooses who finishes the structure.
+
+export type AddFolder = { open: boolean; step: "look" | "found" | "agent" | "done"; job: string | null; look: Json | null; key: string | null;
+  name: string; prompt: string; copiedAt: number | null; signals: Json | null; error: string | null; busy: boolean };
+const closedAddFolder = (): AddFolder => ({ open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false });
+export const patchAddFolder = (patch: Partial<AddFolder>) => setState((s) => ({ addFolder: { ...s.addFolder, ...patch } }));
+let lookTimer: ReturnType<typeof setTimeout> | undefined;
+/** Choose a folder and start the quick look; the wizard shows the tree as it is read. */
+export async function startAddFolder() {
+  const directory = await chooseSourceDirectory();
+  if (!directory) return;
+  const result = await api().quick_look_start(directory);
+  if (result.status === "faulty") {
+    if (result.covered_by) {
+      pushToast({ tone: "info", title: "Already covered", body: result.reason, actions: [{ label: "Show it", run: () => openSources(result.covered_by, "") }] });
+      return;
+    }
+    pushToast({ tone: "fault", title: "Folder not added", body: result.reason });
+    return;
+  }
+  setState({ addFolder: { ...closedAddFolder(), open: true, job: result.job, name: result.name } });
+  void pollQuickLook();
+}
+async function pollQuickLook() {
+  clearTimeout(lookTimer);
+  const job = state.addFolder.job;
+  if (!job || !state.addFolder.open) return;
+  const look = await api().quick_look_status(job);
+  if (job !== state.addFolder.job) return;
+  if (look.status === "faulty") return patchAddFolder({ error: look.reason, look });
+  patchAddFolder({ look, ...(look.status === "done" && state.addFolder.step === "look" ? { step: "found" } : {}) });
+  if (look.status !== "done") lookTimer = setTimeout(() => void pollQuickLook(), 350);
+}
+/** Add the folder (it starts scanning) and go on: the agent takes over, the owner reviews, or it waits. */
+export async function finishAddFolder(choice: "agent" | "myself" | "later") {
+  patchAddFolder({ busy: true, error: null });
+  const result = await api().quick_look_add(state.addFolder.job);
+  if (result.status === "faulty") return patchAddFolder({ busy: false, error: result.reason });
+  patchAddFolder({ busy: false, key: result.key, prompt: result.prompt });
+  await loadSources();
+  await loadLibraryTree();
+  if (choice === "agent") {
+    patchAddFolder({ step: "agent" });
+    void pollFolderSignals();
+    return;
+  }
+  closeAddFolder();
+  openSources(result.key, "");
+  if (choice === "myself") pushToast({ tone: "info", title: "Library folder added", body: "Packs that need a structure say why in their panel. Scanning now; nothing is processed until you ask." });
+}
+let signalsTimer: ReturnType<typeof setTimeout> | undefined;
+async function pollFolderSignals() {
+  clearTimeout(signalsTimer);
+  const { key, open, step } = state.addFolder;
+  if (!key || !open || step !== "agent") return;
+  const signals = await api().pack_signals(key);
+  if (signals.status !== "faulty") {
+    patchAddFolder({ signals });
+    if (signals.total && !signals.needs_structure && !signals.waiting) patchAddFolder({ step: "done" });
+  }
+  signalsTimer = setTimeout(() => void pollFolderSignals(), 3000);
+}
+export function copyAgentPrompt() {
+  patchAddFolder({ copiedAt: Date.now() });
+  void copyText(state.addFolder.prompt, "Prompt copied. Paste it into your agent.");
+}
+export function closeAddFolder() {
+  clearTimeout(lookTimer);
+  clearTimeout(signalsTimer);
+  setState({ addFolder: closedAddFolder() });
+}
+/** Keep working elsewhere: the agent button in the top bar keeps the work visible. */
+export function minimizeAddFolder() {
+  const key = state.addFolder.key;
+  closeAddFolder();
+  if (key) pushToast({ tone: "info", title: "Your agent keeps working", body: "Follow it with the agent button in the top bar.", actions: [{ label: "Open", run: () => setAgentOpen(true) }] });
 }
 /** A pack's cover image, read from its own preview file (a small thumbnail), or null. */
 export async function libraryCover(key: string, relative: string): Promise<string | null> {
@@ -2024,7 +2105,8 @@ export async function loadAgentActivity() {
     if (result.status === "faulty") return;
     const known = new Set(state.agent.entries.map((e: Json) => e.utc + e.run));
     const fresh: Json[] = result.entries.filter((e: Json) => !known.has(e.utc + e.run));
-    if (state.agent.loaded && !state.agent.open) {  // The open drawer already shows these lines.
+    // The open drawer, or the wizard's take-over, already shows these lines.
+    if (state.agent.loaded && !state.agent.open && !(state.addFolder.open && state.addFolder.step === "agent")) {
       for (const entry of fresh.filter((e) => e.kind === "change" && e.proposal_id))
         pushToast({ tone: "info", title: "Your agent changed a pack", body: entry.text, actions: [{ label: "Undo", run: () => void decideAgentProposal(entry.proposal_id, "undo") }] });
       for (const entry of fresh.filter((e) => e.kind === "waiting" && e.proposal_id))

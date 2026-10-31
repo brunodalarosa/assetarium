@@ -342,14 +342,9 @@ def fingerprint(config, source, pack):
     The names (pack-relative, lowercase) let a copy with a few files more or fewer match partially (``match``).
     """
     import hashlib
-    from .folder_view import connect
-    from .library_view import _current
-    work = _current(config, source)
-    if work is None:
-        raise ConfigError('Scan this library folder first')
     hashed, names = hashlib.sha256(), []
-    with closing(connect(work)) as view:
-        for name in _names(view, pack):
+    with closing(open_view(config, source)) as opened:
+        for name in _names(opened, pack):
             hashed.update(name.encode() + b'\n')
             names.append(name)
     return {'sha256': hashed.hexdigest(), 'files': len(names), 'names': names}
@@ -387,6 +382,23 @@ def match(config, key, pack, body):
     return round(len(wanted & here) / max(len(wanted), len(here)), 3)
 
 
+def open_view(config, source):
+    """The folder view, or before the first scan the quick look's names snapshot (``quick_look.save``)."""
+    from .folder_view import _open, connect
+    from .library_view import _current
+    from .quick_look import snapshot_path
+    from .sources import bound
+    work = _current(config, source)
+    if work is not None:
+        return connect(work)
+    path = snapshot_path(bound(config, source))
+    if not path.exists():
+        raise ConfigError('This library folder has not been read yet')
+    snapshot = _open(path)
+    snapshot.snapshot = True
+    return snapshot
+
+
 def _inside(column, pack):
     from .folder_view import inside_sql
     return inside_sql(pack, column)
@@ -399,23 +411,20 @@ def effect(config, key, pack, rules):
     short sentences for the effect card. Nothing is saved.
     """
     from itertools import groupby
-    from .folder_view import connect, view_answers
+    from .folder_view import view_answers
     from .library_store import answers
-    from .library_view import _current
     from .packs import detect
-    from .sources import get_source
+    from .sources import bound, get_source
     from .variant_groups import assign
     source = get_source(config, key)
     pack = _folder(pack, 'pack')
     rules = validate(rules)
     before = current(config, source, pack)
-    work = _current(config, source)
-    if work is None:
-        raise ConfigError('Scan this library folder first')
-    outside = {path: value for kind, path, value in view_answers(work) if kind == 'variant_axis' and _relative(path, pack) is None}
+    outside = {path: value for kind, path, value in view_answers(bound(config, source))
+               if kind == 'variant_axis' and _relative(path, pack) is None}
     axes = lambda chosen: {**outside, **{_absolute(r['folder'], pack): r['values'] for r in chosen if r['kind'] == 'variant_axis'}}
     where, params = _inside('folder', pack)
-    with closing(connect(work)) as view:
+    with closing(open_view(config, source)) as view:
         rows = view.execute(f'SELECT asset_id, folder, name, kind FROM assets WHERE {where} ORDER BY folder, asset_id', params).fetchall()
 
         def cards(chosen):
@@ -484,16 +493,15 @@ def signals(config, key):
     only by default, models failing on missing textures. Suggestions: unanswered duplicate export folders. A pack whose
     owner or agent marked these same signals reviewed (``review``) is ``fine``.
     """
-    from .folder_view import connect
     from .library_store import answers
-    from .library_view import _current
     from .packs import structure
     from .sources import get_source, source_status
     source = get_source(config, key)
-    work = _current(config, source)
-    if work is None:
+    try:
+        opened = open_view(config, source)
+    except ConfigError:
         return {}
-    with closing(connect(work)) as view:
+    with closing(opened) as view:
         detected = structure(config, source, view)
         found = {path: _blank() for path in detected['packs']}
         entry = lambda folder: found.setdefault(detected['pack_of'].get(folder, ''), _blank())

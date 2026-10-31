@@ -105,6 +105,12 @@ def structure(config, source, view=None):
     from .library_store import answers
     from .sources import bound
     work = working(bound(config, source))
+    if getattr(view, 'snapshot', False):  # Before the first scan: the quick look's names (quick_look.save).
+        from .library_store import answers
+        prefix = source['key'] + '/'
+        paths = [r[0] for r in view.execute('SELECT path FROM inventory ORDER BY path')]
+        assets = sorted(r[0][len(prefix):] for r in view.execute('SELECT path FROM assets'))
+        return detect(paths, assets, [{'path': a['path'], 'value': a['value']} for a in answers(config, source['id'], 'pack')])
     if not work.output_path('data', 'catalog.sqlite').exists():
         return {'packs': {}, 'bundles': [], 'pack_of': {}}
     saved = json.dumps(sorted(({'path': a['path'], 'value': a['value']} for a in answers(config, source['id'], 'pack')),

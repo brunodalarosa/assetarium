@@ -24,6 +24,25 @@ that holds all your packs); Assetarium finds the structure inside it:
   survive rescans, and **Rename** gives a pack a display name. Packs have no tags and are never added to
   collections.
 
+**Add library folder** opens a short wizard (decision 0024):
+
+1. **Quick look.** Assetarium reads folder and file names only (no file contents, nothing written) and shows
+   the tree filling in, with a pack badge on folders that carry a license, readme or preview.
+2. **What we found.** How many packs look fine, have suggestions or need a structure, and why; **How did we
+   decide?** explains it with this folder's own examples (a pack found by its license, `Car_11_{B,G,R}` made
+   one card with 3 variants, a numbered series kept separate, two folders that look like exports of the same
+   models).
+3. **Who finishes.** **Let my agent finish** adds the folder and shows a prompt to paste into your AI agent,
+   whether it is connected, what it reads and changes here, its proposals with **Apply** / **Reject**, and how
+   many packs have a structure. If it goes quiet for two minutes, the wizard says so and offers to copy the
+   prompt again or take over. **Minimize** keeps it working; follow it with the agent button in the top bar.
+   **Review myself** opens the folder (each pack's Structure section says what needs a look); **Later** just
+   adds it.
+
+Every choice adds the folder and scans it. Your agent can start before the scan finishes: until then it reads
+the names the quick look found. When every pack has a structure, the wizard offers **Make previews**; nothing
+is rendered or described before you ask.
+
 Adding a folder **inside** a library folder is refused as already covered, with **Show it**. Adding a folder
 **around** library folders replaces them: their assets keep their IDs, results, collection entries and
 your reviews. **Remove…** stops watching a folder; its results stay in the store, and adding the same

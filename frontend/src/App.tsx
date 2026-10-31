@@ -12,6 +12,7 @@ import { Inspector } from "./ui/Inspector";
 import { AppMenus, ConfirmDialog, CreateCollectionDialog } from "./ui/Menus";
 import { NotificationsPanel, RunReport, Toasts } from "./ui/Notifications";
 import { AgentActivityPanel } from "./ui/AgentActivity";
+import { AddFolderWizard } from "./ui/AddFolderWizard";
 import { SetupWizard } from "./ui/SetupWizard";
 import { Rail, TopBar } from "./ui/Shell";
 
@@ -108,6 +109,7 @@ export function App() {
       </div>
       <NotificationsPanel />
       <AgentActivityPanel />
+      <AddFolderWizard />
       <SetupWizard />
       <Toasts />
       <RunReport />
