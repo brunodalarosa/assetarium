@@ -518,6 +518,13 @@ def signals(config, key):
         for name, folder in view.execute('SELECT name_key, folder FROM assets WHERE name_key IN '
                                          '(SELECT name_key FROM assets GROUP BY name_key HAVING COUNT(DISTINCT folder) > 1)'):
             names.setdefault((detected['pack_of'].get(folder, ''), name), set()).add(folder)
+        for path, pack in detected['packs'].items():
+            # A pack only because its name carries a version, inside a folder with its own pack evidence (a license, a
+            # readme): most likely that pack's version folder.
+            if path and pack['markers'] and all(m['kind'] == 'versioned_name' for m in pack['markers']):
+                outer = next((a for a in _ancestors(path) if _marked(view, a)), None)
+                if outer is not None:
+                    found.setdefault(path, _blank())['version_of'] = outer
     for (pack, name), folders in names.items():
         if len(folders) > 1:
             value = found.setdefault(pack, _blank())
@@ -539,6 +546,8 @@ def signals(config, key):
             needs.append(f"{value['clashes']} names repeat in several folders (for example {', '.join(value['clash_examples'])})")
         if value['images'] >= DEFAULT_MIN and value['default_images'] / value['images'] > DEFAULT_SHARE:
             needs.append(f"{value['default_images']} of {value['images']} images have no evidence of what they are")
+        if value.get('version_of') is not None:
+            needs.append(f"looks like a version folder of “{value['version_of'] or 'the library folder'}”, not a pack of its own")
         if value['texture_failures']:
             needs.append(f"{value['texture_failures']} models can’t find their textures")
         suggestions = [f"{value['export_suggestions']} duplicate export folder suggestions"] if value['export_suggestions'] else []
@@ -548,6 +557,20 @@ def signals(config, key):
         result[pack] = {'pack': pack, 'status': status, 'needs': needs, 'suggestions': suggestions, 'evidence': evidence,
                         'reviewed': reviewed.get(pack) == evidence and bool(needs or suggestions)}
     return result
+
+
+def _ancestors(path):
+    parts = PurePosixPath(path).parts
+    return ['/'.join(parts[:depth]) for depth in range(len(parts) - 1, 0, -1)]
+
+
+def _marked(view, folder):
+    """Whether a folder's own files carry pack markers other than a versioned name."""
+    from .packs import markers
+    prefix = folder + '/'
+    names = [r[0][len(prefix):] for r in view.execute("SELECT path FROM inventory WHERE substr(path, 1, ?) = ? AND instr(substr(path, ?), '/') = 0",
+                                                       (len(prefix), prefix, len(prefix) + 1))]
+    return any(m['kind'] != 'versioned_name' for m in markers(folder, names))
 
 
 def review(config, key, pack, evidence):

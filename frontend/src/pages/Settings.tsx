@@ -19,6 +19,7 @@ import { SkeletonLines } from "../ui/Loading";
 import { ReadinessList } from "../ui/Readiness";
 import { BlenderChecks, BlenderPicker } from "../ui/BlenderPicker";
 import { Badge, Banner, Button, Card, SelectField, Spinner, TextField } from "../ui/primitives";
+import { ModelCheckCard } from "../ui/ModelCheck";
 
 const FORMATS: [string, string][] = [["fbx", "FBX"], ["gltf", "glTF / GLB"], ["obj", "OBJ"]];
 const APPEARANCES = [
@@ -66,7 +67,7 @@ function AppearancePicker() {
 function SetupCard() {
   const info = useApp((s) => s.setup.info);
   return (
-    <Card id="setup-card" title="Setup" help="Walks through Blender, formats, storage and descriptions again with your current values filled in, or lets your AI agent do it. Nothing is saved until you (or your agent, within the access you open) save it.">
+    <Card id="setup-card" title="Setup" help="Walks through Blender, formats, storage and descriptions again with your current values filled in, or lets your AI agent do it. Nothing is saved until you save it; what your agent sets is labeled and raises a notice.">
       <div className="grid gap-1 text-[13px]">
         <p id="setup-record">{setupRecordText(info?.record)}</p>
       </div>
@@ -290,6 +291,7 @@ function General() {
         <AppearancePicker />
       </Card>
       <SetupCard />
+      <ModelCheckCard />
       <BlenderInstallation />
       <form id="general-settings-form" onSubmit={submit} className="grid gap-5">
         <Card title="Storage budget" help={BUDGET_HELP}>

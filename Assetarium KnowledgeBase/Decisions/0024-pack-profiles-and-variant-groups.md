@@ -47,6 +47,11 @@ draft the structure and raise signals, and an agent (or the owner) corrects it a
   prompt, the connection, the agent's lines and proposals for this folder, progress, a hint after two quiet
   minutes), *Review myself* or *Later*. The quick look's names are kept as a snapshot so agents can work before
   the first scan (hashing) ends. The wizard offers Make previews at the end and never starts it.
+- **Check my model** (CLI `model-check`, Settings → General, an optional setup wizard step): a local model on a
+  loopback OpenAI-compatible server works through synthetic pack trees (`model_check_trees.py`; quick 8, full
+  27) with the same prompt and pack tools, the owner's part simulated by applying its proposals; scored by
+  outcome (packs, cards, excluded folders, image kinds, settled signals). Disposable project under `scratch/`,
+  report and transcripts under `data/evidence/model-check/`.
 - Search returns each variant group once; `get_asset` lists the variants and the shared description.
 - An asset whose folder becomes excluded is `excluded`, not Missing; including the folder again brings it
   back with its ID.

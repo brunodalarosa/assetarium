@@ -214,7 +214,13 @@ Rules are a closed vocabulary (`pack`, `pack_name`, `image_kind`, `variant_axis`
 `exclude`, `engine_copy`, `export_group`, `texture_folder`) with paths inside the pack; there are no patterns.
 Search returns each variant group once (`variant`, `variants`), and `get_asset` lists an asset's variants and
 `description_shared_from` when it shares its group's description. Every call appears in the app's Agent
-activity, built from the server's call log. Existing Codex registrations must add the six tool names to
+activity, built from the server's call log.
+
+**Check my model** (Settings → General, a setup step, or `local-assets model-check --model NAME`) tells you
+whether a local model is good enough for this: it gives the model the same prompt and the six pack tools on
+made-up packs (engine copies, version folders, big name sets, material folders, texture and sprite folders,
+packs that are fine as they are) and scores the outcome, not the rules it wrote. The conversation is trimmed
+to fit a 4,096-token context. Reports and transcripts are saved under `data/evidence/model-check/`. Existing Codex registrations must add the six tool names to
 `enabled_tools`.
 
 ## Privacy

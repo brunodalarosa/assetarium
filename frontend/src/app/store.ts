@@ -161,7 +161,7 @@ export interface CreateRequest {
   sourceKey: string | null;
   name?: string;
 }
-export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "review"] as const;
+export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "model", "review"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 /** What the wizard will save; nothing is written until Save (or Skip setup, which saves nothing). */
 export interface SetupDraft {
@@ -253,6 +253,8 @@ export interface AppState {
   agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[] };
   /** The Add library folder wizard (decision 0024). */
   addFolder: AddFolder;
+  /** Check my model: a running check's progress and the last report (decision 0024). */
+  modelCheck: Json | null;
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
@@ -313,6 +315,7 @@ let state: AppState = {
   sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [] },
   addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false },
+  modelCheck: null,
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
@@ -1453,6 +1456,29 @@ export async function measureSetupStorage() {
   patchSetup({ measuring: true });
   const storage = await api().setup_storage_use(true);
   patchSetup({ measuring: false, storage: storage.status === "faulty" ? { status: "faulty", reason: storage.reason } : storage });
+}
+/* ------------------------------ check my model ----------------------------- */
+// Decision 0024: a local model works through synthetic packs with the pack tools; scored by outcome.
+
+let modelCheckTimer: ReturnType<typeof setTimeout> | undefined;
+export async function loadModelCheck() {
+  clearTimeout(modelCheckTimer);
+  const result = await api().model_check_state();
+  if (result.status === "faulty") return;
+  setState({ modelCheck: result });
+  if (result.running) modelCheckTimer = setTimeout(() => void loadModelCheck(), 2000);
+}
+export async function startModelCheck(url: string, model: string, full = false) {
+  const result = await api().model_check_start(url, model, full);
+  if (result.status === "faulty") {
+    pushToast({ tone: "fault", title: "Check not started", body: result.reason });
+    return;
+  }
+  void loadModelCheck();
+}
+export async function cancelModelCheck() {
+  await api().model_check_cancel();
+  void loadModelCheck();
 }
 /** List a local model server's models (never generates text); shared by setup and Settings → General. */
 export async function checkServer(url: string, model: string): Promise<Json> {

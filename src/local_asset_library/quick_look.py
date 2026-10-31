@@ -172,10 +172,17 @@ def snapshot_path(current):
 
 
 def save(config, source, job_id):
-    """Keep a finished quick look as the folder's names snapshot, until its first folder view exists."""
-    from .catalog import IMAGES, MODELS, asset_id
+    """Keep a finished quick look as the folder's names snapshot, until its first folder view exists.
+
+    Excluded folders are left out and images are classified by name (``image_kinds.classify`` without model
+    references), with the folder's image-kind answers, so saving again after an answer shows its effect.
+    """
+    from .catalog import IMAGES, MODELS, asset_id, excluded_folder
     from .folder_view import SCHEMA, group, view_answers
-    from .sources import bound
+    from .image_kinds import classify
+    from .library_store import answers
+    from .packs import detect
+    from .sources import bound, excluded_folders
     job = _jobs.get(job_id)
     if job is None or not job['done'] or job['paths'] is None or Path(job['path']) != Path(source['path']):
         return None
@@ -184,21 +191,37 @@ def save(config, source, job_id):
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix('.tmp')
     temporary.unlink(missing_ok=True)
+    excluded = excluded_folders(current)
+    paths = [p for p in job['paths'] if not any(excluded_folder('/'.join(PurePosixPath(p).parts[:i]), x)
+                                                 for i in range(1, len(PurePosixPath(p).parts)) for x in excluded)]
+    suffix = lambda p: PurePosixPath(p).suffix.casefold()
+    models = [p for p in paths if suffix(p) in MODELS]
+    saved = answers(config, source['id'])
+    images = [p for p in paths if suffix(p) in IMAGES or suffix(p) == '.svg']
+    detected = detect(paths, models + images, [{'path': a['path'], 'value': a['value']} for a in saved if a['kind'] == 'pack'])
+    with_models = {detected['pack_of'].get(_parent(p), '') for p in models}
+    stems, folders = {PurePosixPath(p).stem.casefold() for p in models}, {_parent(p) for p in models}
+    kinds = {a['path']: a['value'] for a in saved if a['kind'] == 'image_kind'}
     rows = []
-    for path in job['paths']:
-        suffix = PurePosixPath(path).suffix.casefold()
-        kind = 'model_3d' if suffix in MODELS else 'image' if suffix in IMAGES or suffix == '.svg' else None
+    for path in paths:
+        kind, basis = ('model_3d', None) if suffix(path) in MODELS else (None, None)
+        if suffix(path) in IMAGES or suffix(path) == '.svg':
+            folder = _parent(path)
+            answer = next((kinds[f] for f in [folder] + [str(a) for a in PurePosixPath(folder).parents][:-1] + [''] if f in kinds), None)
+            found = classify(source['key'] + '/' + path, {}, stems, {source['key'] + '/' + f for f in folders},
+                             detected['pack_of'].get(folder, '') in with_models, answer)
+            kind, basis = ('image' if found['value'] == 'image' else 'material_texture'), found['basis']
         if kind:
             folder, name = _parent(path), PurePosixPath(path).stem
             rows.append((asset_id(source['key'], path), name, folder, folder.casefold(), name.casefold(), kind, kind,
-                         source['key'] + '/' + path, json.dumps([suffix[1:]]), '[]', 0, None, None, 'inspection', 'pending', 1,
-                         'unavailable', 0, None, ''))
+                         source['key'] + '/' + path, json.dumps([suffix(path)[1:]]), '[]', 0, None, None, 'inspection', 'pending', 1,
+                         'unavailable', 0, None, '', basis))
     with closing(sqlite3.connect(temporary)) as db:
         db.executescript('PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF;' + SCHEMA)
         db.executemany('INSERT OR IGNORE INTO assets (asset_id, name, folder, folder_key, name_key, kind, asset_type, path, formats, '
                        'groups, has_preview, failed, failed_stages, pending_next, outcome, eligible, description, warning, '
-                       'inspection, digest) VALUES (' + ','.join('?' * 20) + ')', rows)
-        db.executemany('INSERT OR IGNORE INTO inventory VALUES (?)', [(p,) for p in job['paths']])
+                       'inspection, digest, kind_basis) VALUES (' + ','.join('?' * 21) + ')', rows)
+        db.executemany('INSERT OR IGNORE INTO inventory VALUES (?)', [(p,) for p in paths])
         oversized = group(db, view_answers(current))
         db.executemany('INSERT INTO meta VALUES (?,?)', [('version', 'quicklook'), ('snapshot', '1'),
                                                          ('oversized', json.dumps(oversized[:200]))])

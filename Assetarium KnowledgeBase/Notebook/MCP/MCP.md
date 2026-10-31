@@ -14,6 +14,7 @@ write tools (collections, tags) and session-gated setup tools. The ranking itsel
 - [MCP server](../../Architecture/MCP/MCP%20server.md) (Architecture): runtime, worker, registration,
   verification.
 - [MCP tools](MCP%20tools.md): the tool surface, caps and annotations, and what the server never accepts.
+- [Model check](Model%20check.md): "Check my model", a local model scored on synthetic packs through the pack tools.
 - [Agent setup sessions](Agent%20setup%20sessions.md): how an agent can configure an install, and only
   while the user allows it.
 

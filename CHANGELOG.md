@@ -23,6 +23,9 @@ All notable changes to Assetarium are listed here. The project follows
   says which packs look fine or need a structure and how it decided, then **Let my agent finish** (a prompt
   to paste, your agent's progress and proposals, live), **Review myself** or **Later**. Your agent can start
   before the first scan has finished.
+- **Check my model** (Settings → General, an optional setup step, `local-assets model-check`): runs a model on
+  a server on this computer through made-up packs with the pack tools and says how many it structures right
+  (quick: 8 packs, about 5 minutes; `--full`: 27).
 - **Asset sources** tab (the folder icon above Settings): browse by place through library folders,
   bundles, packs and folders, with coverage, "+N new", a card state for every asset (no previews
   yet, queued, ready, blocked with its fix, recorded failure, missing), a pack header with its

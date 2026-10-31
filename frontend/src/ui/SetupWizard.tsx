@@ -6,18 +6,19 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, plural, SEARCH_HELP } from "../app/format";
 import {
-  cancelBlenderCheck, checkBlender, chooseBlenderExecutable, finishSetup, goToSetupStep, measureSetupStorage,
+  cancelBlenderCheck, checkBlender, getState, chooseBlenderExecutable, finishSetup, goToSetupStep, measureSetupStorage,
   saveSetup, SETUP_STEPS, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
 } from "../app/store";
 import { AgentPanel, SetByBadge, SetupPaths } from "./AgentSetup";
 import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
+import { MODEL_CHECK_HELP, ModelCheck } from "./ModelCheck";
 import { ReadinessList } from "./Readiness";
 import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
 
 const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Batch size", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Batch size", model: "Your agent’s model", review: "Review and finish",
 };
 const FORMAT_NOTES: [string, string, string][] = [
   ["fbx", "FBX", "Rigs and animation; common in Unity and Unreal."],
@@ -250,6 +251,10 @@ function summary(step: SetupStep, draft: Json, info: Json): string {
       return (draft.engine === "local-server" ? `On · local model server ${draft.serverUrl} · model ${draft.serverModel || "not set"}` : `On · ${engine ? `${engine.label} — ${engine.name}` : draft.engine}`) + search;
     }
     case "batch": return setupStepNeeded("batch", draft) ? draft.batch : "Not used";
+    case "model": {
+      const last = getState().modelCheck?.last;
+      return last ? `${last.model}: ${last.passed}/${last.total} · ${last.verdict_text}` : "Not checked (optional)";
+    }
     default: return "";
   }
 }
@@ -302,13 +307,22 @@ function Review() {
   );
 }
 
+function ModelStep() {
+  return (
+    <div className="grid gap-5">
+      <Paragraph>{MODEL_CHECK_HELP} It saves nothing; skip it if you use a large cloud model, or run it later from Settings → General.</Paragraph>
+      <ModelCheck id="setup-model-check" />
+    </div>
+  );
+}
+
 const CONTENT: Record<SetupStep, () => ReactNode> = {
   welcome: Welcome, blender: BlenderStep, formats: FormatsStep, storage: StorageStep,
-  descriptions: DescriptionsStep, batch: BatchStep, review: Review,
+  descriptions: DescriptionsStep, batch: BatchStep, model: ModelStep, review: Review,
 };
 const TITLES: Record<SetupStep, string> = {
   welcome: "Set up Assetarium", blender: "Blender", formats: "Formats to process", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Description batch size", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Description batch size", model: "Check your agent’s model (optional)", review: "Review and finish",
 };
 
 export function SetupWizard() {

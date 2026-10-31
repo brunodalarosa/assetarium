@@ -478,6 +478,45 @@ class DesktopBridge:
         from .pack_agent import counts
         return self._wait(self._present(counts, self._config, key, guarded=False, shared=True))
 
+    # Check my model (decision 0024): a local model works through synthetic packs; one check at a time.
+    def model_check_state(self):
+        from .model_check import latest
+        job = getattr(self, '_model_check', None)
+        return {'status': 'ready', 'running': bool(job and not job['done']), 'job': job and {k: v for k, v in job.items() if k != 'thread'},
+                'last': latest(self._config)}
+
+    def model_check_start(self, url, model, full=False):
+        import threading
+        from .engine_server import checked_model, checked_url
+        from .model_check import run
+        job = getattr(self, '_model_check', None)
+        if job and not job['done']:
+            return {'status': 'faulty', 'reason': 'A check is already running'}
+        try:
+            url, model = checked_url(url), checked_model(model)
+        except ConfigError as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
+        job = self._model_check = {'done': False, 'cancel': False, 'index': 0, 'total': 0, 'tree': None, 'report': None, 'reason': None,
+                                   'model': model, 'url': url, 'full': bool(full)}
+
+        def work():
+            def progress(index, total, name):
+                job.update(index=index, total=total, tree=name)
+            try:
+                job['report'] = run(self._config, url, model, bool(full), progress=progress, cancelled=lambda: job['cancel'])
+            except Exception as exc:  # Shown in the card; the check never retries by itself.
+                job['reason'] = str(exc)
+            finally:
+                job['done'] = True
+        threading.Thread(target=work, name='model-check', daemon=True).start()
+        return {'status': 'started'}
+
+    def model_check_cancel(self):
+        job = getattr(self, '_model_check', None)
+        if job and not job['done']:
+            job['cancel'] = True
+        return {'status': 'cancelling' if job and not job['done'] else 'idle'}
+
     def _save_profile(self, key, pack):
         import webview
         from .pack_profiles import export

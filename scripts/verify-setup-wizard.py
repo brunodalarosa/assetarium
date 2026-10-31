@@ -42,7 +42,7 @@ report = {'status': 'running', 'phase': args.phase, 'checks': {}, 'screenshots':
 probes = []
 real_probe = setup_core._probe
 setup_core._probe = lambda *a: probes.append(a[0][0]) or real_probe(*a)  # Counts every program setup runs.
-STEPS = ['welcome', 'blender', 'formats', 'storage', 'descriptions', 'batch', 'review']
+STEPS = ['welcome', 'blender', 'formats', 'storage', 'descriptions', 'batch', 'model', 'review']
 BLENDER = setup_core.blender_report  # noqa: F841 (discovery is the app's own)
 
 if args.phase == 'fresh':
@@ -172,7 +172,9 @@ def fresh():
               "await until(()=>$('setup-server-result').classList.contains('text-fault'));return true})()")
         ui.check('other_computers_are_refused', "$('setup-server-result').textContent.includes('this computer')")
         ui.js(f"(async()=>{{type('setup-server-url',{json.dumps(url)});await frame();lal.setupNext();"
-              "await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
+              "await until(()=>$('setup-wizard').dataset.step==='model');await frame();return true})()")
+        ui.check('model_check_step_is_offered_and_skippable', "!!$('setup-model-check')&&!!$('setup-skip-step')")
+        ui.js("(async()=>{lal.setupNext(true);await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
         ui.check('batch_step_not_needed_for_a_server', """(async()=>({skippedOver:$('setup-wizard').dataset.step==='review',
           listed:document.querySelector('nav [data-step=batch]').textContent.includes('Not needed')}))()""")
         shoot('06-review-server')
@@ -182,7 +184,8 @@ def fresh():
       measured:document.body.innerText.includes('RTX 5070 (12 GiB)')}))()""")
     ui.js("(async()=>{$('setup-batch').querySelector('[data-value=\"4\"]').click();await frame();return true})()")
     shoot('05-batch')
-    ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
+    ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='model');lal.setupNext(true);"
+          "await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
     shoot('06-review')
     assert not (FIXTURE / 'data/library/settings.json').exists()  # Nothing is saved before Save.
     ui.js("$('setup-save').click()")

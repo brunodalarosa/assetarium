@@ -14,7 +14,7 @@ import time
 from .config import ConfigError, load_config, project_config_path
 
 COMMANDS = {'library', 'sources', 'packs', 'previews', 'queue', 'forget-missing', 'settings', 'rendering', 'process', 'describe',
-            'cancel', 'failures', 'recheck', 'collections', 'setup'}
+            'cancel', 'failures', 'recheck', 'collections', 'setup', 'model-check'}
 ENDED_OK = {'complete'}
 
 
@@ -60,6 +60,11 @@ def parser():
             change.add_argument('--yes', action='store_true', help='Apply without asking after the effect is shown')
         if action == 'revert':
             change.add_argument('version', type=int)
+    check = commands.add_parser('model-check', help='Check my model: can a local model structure packs through the pack tools?')
+    check.add_argument('--url', default='http://127.0.0.1:1234/v1', help='An OpenAI-compatible server on this computer')
+    check.add_argument('--model', required=True, help='The model name the server lists')
+    check.add_argument('--full', action='store_true', help='All 27 synthetic packs (slower) instead of the quick 8')
+    check.add_argument('--run-name', help='A new name for the report under data/evidence/model-check/')
     for name, text in (('previews', 'Make previews (inspection, previews, search data) for a folder, pack or assets'),
                        ('describe', 'Generate missing descriptions for a folder, pack or assets with the configured engine')):
         command = commands.add_parser(name, help=text + '; it starts at once or waits in the queue')
@@ -452,6 +457,19 @@ def sources_command(args, config):
     raise ConfigError('Unknown library command')
 
 
+def model_check_command(args, config):
+    """Check my model from the terminal (decision 0024); prints each pack as it runs and the verdict."""
+    from .model_check import run
+    report = run(config, args.url, args.model, args.full, run_name=args.run_name,
+                 progress=lambda index, total, name: say(args, f'[{index + 1}/{total}] {name}…'))
+    for tree in report['trees']:
+        failed = [c['check'] for c in tree['checks'] if not c['passed']]
+        say(args, f"  {'✓' if tree['passed'] else '✗'} {tree['name']} ({tree['calls']} calls, {tree['seconds']} s)"
+                  + (f" — missed: {', '.join(failed)}" if failed else '') + (f" — {tree['ended']}" if tree['ended'].startswith('server') else ''))
+    say(args, f"{report['model']}: {report['passed']}/{report['total']} · {report['verdict_text']}. Report: {report['report']}")
+    return report
+
+
 def profile_command(args, config, source):
     """Pack profiles from the terminal (decision 0024): signals, rules and versions, export, apply, revert."""
     from . import pack_profiles
@@ -839,6 +857,8 @@ def main(argv, config=None):
             result = sources_command(args, config)
         elif args.command == 'packs':
             result = packs_command(args, config)
+        elif args.command == 'model-check':
+            result = model_check_command(args, config)
         elif args.command in {'previews', 'describe'}:
             result = queue_command(args, config)
         elif args.command == 'queue':
