@@ -97,6 +97,19 @@ def test_a_folder_added_around_others_replaces_them_and_keeps_ids_overlays_and_c
     assert not any(p.is_dir() for p in Path(one['path']).iterdir())  # Still nothing written into the folders.
 
 
+def test_an_image_keeps_its_id_in_a_folder_added_around_it(managed):
+    """Image records carry the current schema; a kept ID no longer matches its pack-and-path formula and is valid."""
+    from PIL import Image
+    config, _, one, two = managed
+    (Path(one['path']) / 'Icons').mkdir()  # Away from the models, so it is a 2D asset, not a texture.
+    Image.new('RGB', (8, 8), 'blue').save(Path(one['path']) / 'Icons/icon.png')
+    sources.scan_source(config, one)
+    image = next(r for r in records(working(sources.bound(config, one))) if r.get('asset_type') == 'image')
+    parent = sources.add(config, str(Path(one['path']).parent))
+    assert sources.scan_source(config, parent)['assets'] == 7
+    assert image['asset_id'] in ids(config, parent).values()
+
+
 def test_removing_and_adding_a_folder_again_restores_its_identity(managed):
     config, _, one, _ = managed
     sources.scan_source(config, one)

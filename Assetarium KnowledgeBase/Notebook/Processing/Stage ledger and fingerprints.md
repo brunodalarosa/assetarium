@@ -15,7 +15,8 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
 
 - **Keys hold inputs, never locations (decision 0023).** The inspection key hashes the inspected file's
   content and format, each dependency's content with its path *relative to the inspected file*, the
-  texture-repair recipe without asset IDs, and the settings/code below; the caption key hashes view
+  texture-repair recipe without asset IDs (a shared-texture recipe through `dependency_resolution.portable`:
+  provider paths relative to the model, no folder IDs, so joining split folders keeps the key), and the settings/code below; the caption key hashes view
   contents, not view paths; the image key hashes content only. No asset ID, pack or source-prefixed
   path. One ledger (`library-store/ledger.sqlite`) serves every library folder.
 - `result_store` indexes finished results by (stage, key). New results go to
@@ -38,7 +39,8 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
 
 - **A fingerprint-definition change re-keys, never re-queues.** `library_migration.rekey` recomputes
   the old fingerprint (kept verbatim as `legacy_*` in `library_migration.py`), and only a row it still
-  matches gets the new key; stale rows keep theirs and stay pending. `scripts/check-rekey.py` proves it on
+  matches gets the new key; stale rows keep theirs and stay pending, but a stale *failed* row still gets its
+  `fault_content` translated, or the unchanged fault would look changed and be retried. `scripts/check-rekey.py` proves it on
   copies of the ledgers (receipt `data/evidence/rekey/rekey-proof-20261030.json`: nothing newly pending).
 
 - **Editing a fingerprinted file re-queues every finished result that depends on it.** That covers

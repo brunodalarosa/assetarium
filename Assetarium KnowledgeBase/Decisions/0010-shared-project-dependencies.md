@@ -30,6 +30,14 @@ renderer. The viewer and agent detail receive the same verified bindings. Origin
 asset bytes are never rewritten, and no shared model or original texture is copied
 into a cache. External consumers of originals must honor the returned bindings.
 
+**Amendment (owner-approved, October 30, 2026).** Split project fragments may also live side by side inside
+one library folder, as when old separate sources join a library folder added around them (decision 0023). When
+no other library folder has the path, the same path inside a sibling folder of the same library folder is
+tried: exactly one folder differs (the fragment's own folder and its sibling), at least a folder and the file
+name follow it, and the nearest such level with a match wins. The same single-hash, conflict and validation
+rules apply. The inspection key holds these bindings relative to the model and without folder IDs, so a joined
+fragment keeps its finished renders.
+
 The path-resolution component is independent of named packs. Additional format
 adapters can use its validation, but this decision does not claim processing
 support for unimplemented formats or other missing resource kinds.

@@ -2,8 +2,12 @@
 
 The legacy folder name lives here only; other code imports it to skip or refuse those folders.
 """
+from contextlib import contextmanager
 
 LEGACY_METADATA_DIR = "metadata-lal"
+# Files every old folder has under a shared result area that are not results: the Blender probe is rewritten at
+# the next discovery, so it is never copied (each folder's differs and would collide in the shared store).
+REGENERATED = {'inspection': {'blender-runtime.json'}}
 
 
 # Fingerprints as defined before decision 0023, which hashed source-prefixed paths. The migration recomputes
@@ -135,11 +139,17 @@ def rekey(work, db, store=None):
             except (OSError, ValueError, KeyError):
                 counts[stage + ':unreadable'] += 1
                 continue
+            # A recorded fault follows its content even when its fingerprint is stale: an unchanged fault is never retried.
+            translated = evidence.get('fault_content') == legacy_stage_content(work, record, stage)
+            if translated:
+                evidence['fault_content'] = stage_content(work, record, stage)
             if legacy != old:
+                if translated:
+                    with db:
+                        db.execute('UPDATE jobs SET evidence=? WHERE asset_id=? AND stage=?',
+                                   (encoded(evidence), record['asset_id'], stage))
                 counts[stage + ':stale'] += 1
                 continue
-            if evidence.get('fault_content') == legacy_stage_content(work, record, stage):
-                evidence['fault_content'] = stage_content(work, record, stage)
             with db:
                 db.execute('UPDATE jobs SET fingerprint=?, evidence=? WHERE asset_id=? AND stage=?',
                            (key, encoded(evidence), record['asset_id'], stage))
@@ -184,6 +194,29 @@ def legacy_bound(config, found):
     from pathlib import Path
     return replace(config, source_root=Path(found['path']), source_key=found['key'], metadata_root=Path(found['metadata']),
                    catalog_generation=None)
+
+
+@contextmanager
+def _old_world(config, folders):
+    """Library folders as the old registry listed them, while old fingerprints and per-folder keys are computed.
+
+    A joined folder is no longer a library folder, yet a model in it still borrows textures from another old
+    folder by its key; ``folders`` (a plan's) gives each old folder's current path.
+    """
+    from . import sources
+    paths = {f['id']: f['path'] for f in folders if f.get('id')}
+    old = {s['id']: s for s in _legacy_registry(config)}
+    old.update({f['id']: dict(f, registered=not f.get('detached')) for f in folders if f.get('id') and f['id'] not in old})
+    entries = [{'id': s['id'], 'key': s['key'], 'name': s.get('name') or s['key'], 'path': paths.get(s['id'], s['path']),
+                'enabled': s.get('enabled', True), 'registered': s['registered']} for s in old.values()]
+    view = {'schema_version': 1, 'revision': 'migration', 'sources': [e for e in entries if e['registered']],
+            'detached': [e for e in entries if not e['registered']]}
+    saved = sources.registry
+    sources.registry = lambda _config: view
+    try:
+        yield
+    finally:
+        sources.registry = saved
 
 
 def _legacy_registry(config):
@@ -378,14 +411,17 @@ def plan(config, library_folders=(), search=()):
     from .sources import now
     named = [Path(p).resolve() for p in library_folders]
     found = discover(config, [*named, *[Path(p) for p in search]])
-    done = imported(config)
+    done, verified = imported(config), migrated(config)
     ids = Counter(f.get('id') for f in found if not f.get('fault'))
     registry = {s['id']: s for s in _legacy_registry(config) if s.get('id')}
     folders, groups = [], {}
     for entry in found:
         item = {k: entry.get(k) for k in ('path', 'metadata', 'id', 'key', 'fault')}
-        if str(entry['metadata']).casefold() in done:
+        if str(entry['metadata']).casefold() in verified:
             item['status'] = 'already imported'
+        elif str(entry['metadata']).casefold() in done:
+            # Imported, but its check found work that looked new: applying checks it again (nothing is copied twice).
+            item.update(status='recheck', ledger=_ledger_counts(entry))
         elif entry.get('fault'):
             item['status'] = 'fault'
         elif ids[entry['id']] > 1:
@@ -417,8 +453,11 @@ def _stamp(utc):
     return utc.replace(':', '').replace('-', '').replace('.', '')[:22]
 
 
-def _copy_tree(source, target, link_results):
-    """Copy (never move) a tree; immutable result files are hard-linked when on the same volume. Refuses links."""
+def _copy_tree(source, target, link_results, skip=()):
+    """Copy (never move) a tree; immutable result files are hard-linked when on the same volume. Refuses links.
+
+    ``skip``: file names at the top of the tree that are never copied (see ``REGENERATED``).
+    """
     import os
     import shutil
     from pathlib import Path
@@ -430,6 +469,8 @@ def _copy_tree(source, target, link_results):
         relative = Path(directory).relative_to(source)
         (target / relative).mkdir(parents=True, exist_ok=True)
         for name in files:
+            if relative == Path('.') and name in skip:
+                continue
             origin, destination = Path(directory) / name, target / relative / name
             if origin.is_symlink():
                 raise ValueError(f'Links are not migrated: {origin}')
@@ -456,66 +497,112 @@ def _readonly_copy(path, target):
         src.backup(dst)
 
 
-def apply(config, value, confirm):
-    """Import every ``ready`` folder of a plan into the store, then verify. ``confirm(text)`` asks the owner."""
+def _measure(config, item, absorbed, entry):
+    """What a folder had before: pending work under the old fingerprints (on a copy of its old ledger), its IDs."""
+    import shutil
+    from .incremental import working
+    from .sources import read_records
+    legacy = legacy_bound(config, {k: item[k] for k in ('path', 'metadata', 'id', 'key')})
+    measured = absorbed / 'jobs-measured.sqlite'
+    shutil.copy2(absorbed / 'jobs.sqlite', measured)
+    entry['before'] = {stage: sorted(pending(working(legacy), stage, legacy=True, ledger_path=measured))
+                       for stage in ('inspection', 'caption')}
+    measured.unlink()
+    entry['published_ids'] = sorted(r['asset_id'] for r in read_records(legacy))
+    records = read_records(working(legacy)) or read_records(legacy)
+    entry['known_ids'] = sorted(r['asset_id'] for r in records)
+    return records
+
+
+def _rekeyed(config, item, absorbed, entry):
+    """The old ledger re-keyed (on a copy): its job rows and history, ready for the store's ledger."""
     import shutil
     import sqlite3
+    from contextlib import closing
+    from .incremental import working
+    legacy = legacy_bound(config, {k: item[k] for k in ('path', 'metadata', 'id', 'key')})
+    rekeyed = absorbed / 'jobs-rekeyed.sqlite'
+    shutil.copy2(absorbed / 'jobs.sqlite', rekeyed)
+    with closing(sqlite3.connect(rekeyed)) as db:
+        entry['rekeyed'] = rekey(working(legacy), db, config)
+        rows = db.execute('SELECT * FROM jobs').fetchall()
+        history = db.execute('SELECT asset_id, stage, fingerprint, status, evidence, updated FROM history ORDER BY sequence').fetchall()
+    rekeyed.unlink()
+    return rows, history
+
+
+def apply(config, value, confirm, say=lambda text: None):
+    """Import every ``ready`` folder of a plan into the store, check ``recheck`` ones again, then verify.
+
+    ``confirm(text)`` asks the owner; ``say(text)`` reports progress. A folder inside a library folder that already
+    exists joins it; folders named together with --library-folder join a new one.
+    """
+    import shutil
     from contextlib import closing
     from dataclasses import replace
     from pathlib import Path
     from . import library_store
     from .config import ConfigError
-    from .incremental import ledger, working
+    from .incremental import ledger
     from .publication import atomic_json, read_json
-    from .sources import now, read_records
+    from .sources import _registry_file, now, registry
     running = app_processes()
     if running:
         raise ConfigError('Close the Assetarium app and MCP servers first: ' + '; '.join(running)[:400])
-    done = imported(config)
+    done, verified = imported(config), migrated(config)
     ready = [f for f in value['folders'] if f['status'] == 'ready' and str(f['metadata']).casefold() not in done]
-    if not ready:
+    again = [f for f in value['folders'] if f['status'] == 'recheck' and str(f['metadata']).casefold() in done
+             and str(f['metadata']).casefold() not in verified]
+    if not ready and not again:
         raise ConfigError('Nothing to import: every folder is imported already, faulty or in conflict')
-    if not confirm(f"Import {len(ready)} old generated folder(s) into {config.library_store()}? "
+    if not confirm(f"Import {len(ready)} old generated folder(s) into {config.library_store()}"
+                   + (f" and check {len(again)} imported folder(s) again" if again else '') + "? "
                    "Nothing is moved; the old folders stay until you remove them with --remove-old."):
         raise ConfigError('Cancelled; nothing was changed')
     from .source_storage import receipt
+    say('Measuring project storage before the import')
     before = receipt(config, 'migration-before')['totals']
     store = config.library_store()
     store.mkdir(parents=True, exist_ok=True)
+    _registry_file.cache_clear()
+    active = registry(config)['sources']
+    # A library folder that already exists (added since, or by an earlier run) takes in the old folders inside it.
+    outer = {item['id']: next((s for s in active if Path(item['path']).is_relative_to(Path(s['path']))), None) for item in ready}
+    folder = lambda item: {'id': item['id'], 'key': item['key'], 'name': item.get('name') or item['key'],
+                           'path': item['path'], 'enabled': item.get('enabled', True)}
     results, groups = [], {}
-    # Every folder is registered first, so a texture one model borrows from another folder still resolves.
+    # Every folder is registered first; while keys are computed, textures borrowed across old folders resolve
+    # through the old registry (``_old_world``).
     with closing(library_store.connect(config)) as db, db:
         for item in ready:
-            library_store.save_folder(db, {'id': item['id'], 'key': item['key'], 'name': item.get('name') or item['key'],
-                                           'path': item['path'], 'enabled': item.get('enabled', True)},
-                                      state='removed' if item.get('detached') else 'active')
-    from .sources import _registry_file
+            container = outer[item['id']]
+            if container and container['id'] == item['id']:
+                continue
+            library_store.save_folder(db, folder(item), replaced_by=container['id'] if container else None,
+                                      state='replaced' if container else 'removed' if item.get('detached') else 'active')
     _registry_file.cache_clear()
-    for item in ready:
-        found = {k: item[k] for k in ('path', 'metadata', 'id', 'key')}
-        legacy = legacy_bound(config, found)
+    for number, item in enumerate(ready, 1):
+        say(f"[{number}/{len(ready)}] Importing {item['path']}")
+        container = outer[item['id']]
         entry = {**{k: item.get(k) for k in ('path', 'metadata', 'id', 'key', 'library_folder', 'relinked_from')}, 'status': 'imported'}
         try:
+            if container and Path(container['path']) == Path(item['path']):
+                raise ConfigError(f"{item['path']} is already the library folder {container['key']}; its old data is not imported")
             metadata = Path(item['metadata'])
             absorbed = store / 'absorbed' / item['id']
             absorbed.mkdir(parents=True, exist_ok=True)
             shutil.copy2(metadata / 'source.json', absorbed / 'source.json')
-            copy = absorbed / 'jobs.sqlite'  # The old ledger, kept as evidence; pending is measured on a copy of it.
-            _readonly_copy(metadata / 'library/jobs.sqlite', copy)
-            measured = absorbed / 'jobs-measured.sqlite'
-            shutil.copy2(copy, measured)
-            entry['before'] = {stage: sorted(pending(working(legacy), stage, legacy=True, ledger_path=measured))
-                               for stage in ('inspection', 'caption')}
-            measured.unlink()
-            entry['published_ids'] = sorted(r['asset_id'] for r in read_records(legacy))
-            records = read_records(working(legacy)) or read_records(legacy)
-            entry['known_ids'] = sorted(r['asset_id'] for r in records)
+            _readonly_copy(metadata / 'library/jobs.sqlite', absorbed / 'jobs.sqlite')  # The old ledger, kept as evidence.
+            say('  measuring pending work under the old fingerprints')
+            with _old_world(config, value['folders']):
+                records = _measure(config, item, absorbed, entry)
             # Results are shared by the whole store; working data and evidence go under the folder's own directory.
+            say('  copying results (hard links on the same drive)')
             partition = store / 'folders' / item['id']
             entry['copy'] = {}
             for area in ('inspection', 'captions'):
                 if (metadata / area).is_dir():
-                    entry['copy'][area] = _copy_tree(metadata / area, store / area, link_results=True)
+                    entry['copy'][area] = _copy_tree(metadata / area, store / area, link_results=True, skip=REGENERATED.get(area, ()))
             for child in metadata.iterdir():
                 if child.name in {'inspection', 'captions'}:
                     continue
@@ -532,36 +619,59 @@ def apply(config, value, confirm):
             if excluded:
                 settings['excluded_folders'] = excluded[:50]
             atomic_json(partition / 'source.json', settings)
-            # Re-key a copy of the old ledger, then merge it into the store's ledger.
-            rekeyed = absorbed / 'jobs-rekeyed.sqlite'
-            shutil.copy2(copy, rekeyed)
-            with closing(sqlite3.connect(rekeyed)) as db:
-                entry['rekeyed'] = rekey(working(legacy), db, config)
-                rows = db.execute('SELECT * FROM jobs').fetchall()
-                history = db.execute('SELECT asset_id, stage, fingerprint, status, evidence, updated FROM history ORDER BY sequence').fetchall()
-            rekeyed.unlink()
+            say(f"  re-keying finished results ({len(records)} assets)")
+            with _old_world(config, value['folders']):
+                rows, history = _rekeyed(config, item, absorbed, entry)
             with closing(ledger(replace(config, source_key=item['key']))) as db, db:
                 db.executemany('INSERT OR REPLACE INTO jobs VALUES (?,?,?,?,?,?)', rows)
                 db.executemany('INSERT INTO history(asset_id,stage,fingerprint,status,evidence,updated) VALUES (?,?,?,?,?,?)', history)
             # The folder and its assets, with their existing IDs.
-            source = {'id': item['id'], 'key': item['key'], 'name': item.get('name') or item['key'], 'path': item['path'],
-                      'enabled': item.get('enabled', True)}
             with closing(library_store.connect(config)) as db, db:
                 stamp = now()
                 db.executemany("INSERT OR IGNORE INTO assets VALUES (?,?,?,?,'present',?,?,NULL)",
                                [(r['asset_id'], item['id'], r['source_relative_identity'], library_store.content_of(r), stamp, stamp)
                                 for r in records])
-            groups.setdefault(item['library_folder'], []).append(source)
+                if container:  # Its assets now live one level down in that folder, with the same IDs.
+                    library_store.relocate(db, folder(item), container['id'], Path(item['path']).relative_to(container['path']).as_posix())
+            if container:
+                entry['joined'] = container['key']
+            else:
+                groups.setdefault(item['library_folder'], []).append(folder(item))
         except Exception as exc:  # A fault stops only its own folder, with evidence; the others continue.
             entry.update(status='faulty', fault=f'{type(exc).__name__}: {exc}')
-            with closing(library_store.connect(config)) as db, db:
-                db.execute('DELETE FROM folders WHERE id=?', (item['id'],))  # Not imported: a later run takes it.
+            say(f"  faulty: {entry['fault']}")
+            if not (container and container['id'] == item['id']):
+                with closing(library_store.connect(config)) as db, db:
+                    db.execute('DELETE FROM folders WHERE id=?', (item['id'],))  # Not imported: a later run takes it.
+        results.append(entry)
+    for number, item in enumerate(again, 1):
+        # Imported before: re-key the kept copy of its old ledger again (a later fix may key more of it), and update
+        # only the store's rows that nothing has touched since that import.
+        say(f"[check {number}/{len(again)}] Checking {item['path']} again")
+        entry = {**{k: item.get(k) for k in ('path', 'metadata', 'id', 'key')}, 'status': 'imported', 'rechecked': True}
+        try:
+            absorbed = store / 'absorbed' / item['id']
+            if not (absorbed / 'jobs.sqlite').is_file():
+                raise ConfigError('The kept copy of its old ledger is missing')
+            with _old_world(config, value['folders']):
+                say('  measuring pending work under the old fingerprints')
+                _measure(config, item, absorbed, entry)
+                say('  re-keying finished results')
+                rows, _ = _rekeyed(config, item, absorbed, entry)
+            with closing(ledger(replace(config, source_key=item['key']))) as db, db:
+                entry['updated_rows'] = sum(db.execute(
+                    'UPDATE jobs SET fingerprint=?, evidence=? WHERE asset_id=? AND stage=? AND status=? AND updated=?',
+                    (r[2], r[4], r[0], r[1], r[3], r[5])).rowcount for r in rows)
+        except Exception as exc:  # The earlier import stays as it was; only this check is faulty.
+            entry.update(status='faulty', fault=f'{type(exc).__name__}: {exc}')
+            say(f"  faulty: {entry['fault']}")
         results.append(entry)
     # A folder named with --library-folder takes in the old sources inside it; recognition keeps every ID.
     from . import sources as library
     for root, members in groups.items():
         if len(members) == 1 and Path(members[0]['path']) == Path(root):
             continue
+        say(f'Joining {len(members)} folder(s) into the library folder {root}')
         library._registry_file.cache_clear()
         for member in members:  # A detached old source inside it joins too.
             with closing(library_store.connect(config)) as db, db:
@@ -572,27 +682,44 @@ def apply(config, value, confirm):
             if entry.get('library_folder') == root and entry['status'] == 'imported':
                 entry['joined'] = added['key']
     return verify(config, {'schema_version': 1, 'utc': now(), 'plan_utc': value.get('utc'), 'folders': results,
-                           'storage_before': before})
+                           'storage_before': before}, say)
 
 
-def verify(config, value):
-    """Rescan (no models), check every published ID is present and nothing newly pending; save the receipt."""
+def verify(config, value, say=lambda text: None):
+    """Rescan the library folders (no models), check every published ID is present and nothing newly pending.
+
+    Only library folders in use are scanned and measured: a folder another one replaced has no assets of its own
+    any more. A scan fault leaves every imported folder unverified. Saves the receipt.
+    """
+    from contextlib import closing
     from .incremental import working
+    from .library_store import connect
     from .publication import atomic_json
     from .source_storage import receipt
     from .sources import _registry_file, bound, read_records, registry, scan_source
     _registry_file.cache_clear()
     present, faults, after = set(), {}, {'inspection': set(), 'caption': set()}
-    for source in registry(config)['sources'] + registry(config)['detached']:
+    with closing(connect(config)) as db:
+        replaced = {r[0] for r in db.execute("SELECT id FROM folders WHERE state='replaced'")}
+    active = registry(config)['sources']
+    for number, source in enumerate(active, 1):
         try:
-            if source in registry(config)['sources']:
-                scan_source(config, source)
+            say(f"Scanning {source['path']} ({number}/{len(active)}; no models run)")
+            scan_source(config, source)
             work = working(bound(config, source))
             present |= {r['asset_id'] for r in read_records(work)}
+            say('  checking for work that became pending')
             for stage in after:
                 after[stage] |= pending(work, stage)
         except Exception as exc:
             faults[source['key']] = f'{type(exc).__name__}: {exc}'
+            say(f"  scan fault: {faults[source['key']]}")
+    for source in registry(config)['detached']:
+        if source['id'] not in replaced:  # A removed folder's assets stay out of search but are still there.
+            try:
+                present |= {r['asset_id'] for r in read_records(working(bound(config, source)))}
+            except Exception as exc:
+                faults[source['key']] = f'{type(exc).__name__}: {exc}'
     for entry in value['folders']:
         if entry['status'] != 'imported':
             continue
@@ -602,8 +729,9 @@ def verify(config, value):
         entry['check'] = {'missing_published_ids': lost, 'newly_pending': newly,
                           'pending_before': {s: len(v) for s, v in before.items()},
                           'pending_after': {s: len(after[s] & known) for s in before}}
-        entry['status'] = 'verified' if not lost and not any(newly.values()) else 'unverified'
+        entry['status'] = 'verified' if not lost and not any(newly.values()) and not faults else 'unverified'
     value['scan_faults'] = faults
+    say('Measuring project storage after the import')
     value['storage_after'] = receipt(config, 'migration-after')['totals']
     path = config.project_root / f"data/library/migration/{_stamp(value['utc'])}.json"
     atomic_json(path, value)

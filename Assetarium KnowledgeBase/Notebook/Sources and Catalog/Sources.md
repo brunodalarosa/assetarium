@@ -62,6 +62,14 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
 
 ## Gotchas
 
+- The old-folder migration (`library_migration.apply`) computes old fingerprints and per-folder keys under
+  `_old_world`, a view of the old source registry: once folders are joined, a model's provider is no longer a
+  library folder, yet its old key still needs it. Its check (`verify`) measures only active folders; a
+  `replaced` folder has no assets of its own. A rerun joins faulty folders into an existing library folder and
+  re-checks `unverified` ones from `absorbed/<id>/jobs.sqlite`.
+- Kept IDs need not match the `asset_id(pack, locator)` formula; `asset_structure.validate_record` checks
+  only the format.
+
 - Recognition is by content, so moved-and-edited at once is a new asset plus a Missing one.
 - A moved asset keeps its previews and descriptions at once, but its search vectors hash source
   paths, so its search data is pending until the next Make previews (CPU only).

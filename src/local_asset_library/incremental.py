@@ -151,7 +151,8 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
     from .texture_repair import validate_recipe
     repair = validate_recipe(config, record)
     if repair:
-        content.append({'texture_repair': location_free(repair, base, prefix)})
+        from .dependency_resolution import portable
+        content.append({'texture_repair': location_free(portable(repair, base), base, prefix)})
     if content_only:
         return asset,source,reason,digest(content)
     code = config.project_root / "src/local_asset_library"

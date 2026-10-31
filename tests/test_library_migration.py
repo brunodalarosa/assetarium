@@ -170,3 +170,74 @@ def test_cleanup_is_refused_before_a_verified_import_and_asks_for_each_folder(ol
     # The store keeps working without the old folder.
     sources._registry_file.cache_clear()
     assert sources.scan_source(config, sources.get_source(config, 'one'))['assets'] == 3
+
+
+def _stale_failed_caption(config, source):
+    """A failed description whose fingerprint was already stale before the migration: kept failed, never retried."""
+    found = {'path': source['path'], 'metadata': str(Path(source['path']) / LEGACY_METADATA_DIR), 'id': source['id'], 'key': source['key']}
+    work = working(migration.legacy_bound(config, found))
+    record = records(work)[0]
+    with closing(sqlite3.connect(Path(found['metadata']) / 'library/jobs.sqlite')) as db:
+        evidence = {'error': 'synthetic', 'fault_content': migration.legacy_stage_content(work, record, 'caption')}
+        checkpoint(db, record['asset_id'], 'caption', 'an older caption fingerprint', 'failed', evidence)
+    return record['asset_id'], evidence
+
+
+def test_every_folders_blender_probe_and_a_stale_fault_import_without_new_work(old_install):
+    config, one, two, _ = old_install
+    for number, source in enumerate((one, two)):  # Each old folder recorded its own Blender discovery.
+        probe = Path(source['path']) / LEGACY_METADATA_DIR / 'inspection/blender-runtime.json'
+        probe.parent.mkdir(parents=True, exist_ok=True)
+        probe.write_text(json.dumps({'executable': f'blender-{number}'}))
+    failed, _ = _stale_failed_caption(config, one)
+    said = []
+    receipt, _ = migration.apply(config, migration.plan(config)[0], yes, said.append)
+    assert {f['key']: f['status'] for f in receipt['folders']} == {'one': 'verified', 'two': 'verified'}, receipt
+    assert not config.library_store().joinpath('inspection/blender-runtime.json').exists()
+    assert receipt['folders'][0]['rekeyed']['caption:stale'] == 1
+    with closing(ledger(sources.bound(config, one))) as db:
+        assert db.execute("SELECT status FROM jobs WHERE asset_id=? AND stage='caption'", (failed,)).fetchone() == ('failed',)
+    assert any('Importing' in text for text in said) and any('Scanning' in text for text in said)
+
+
+def test_a_rerun_imports_failed_folders_into_the_library_folder_that_now_holds_them(old_install):
+    config, one, two, published = old_install
+    parent = Path(one['path']).parent
+    old_ledger = Path(two['path']) / LEGACY_METADATA_DIR / 'library/jobs.sqlite'
+    kept = old_ledger.read_bytes()
+    old_ledger.write_bytes(b'not a database')
+    receipt, _ = migration.apply(config, migration.plan(config, [str(parent)])[0], yes)
+    assert {f['key']: f['status'] for f in receipt['folders']} == {'one': 'verified', 'two': 'faulty'}, receipt
+    old_ledger.write_bytes(kept)  # The fault is fixed; the second run takes only that folder.
+    plan, _ = migration.plan(config, [str(parent)])
+    assert {f['key']: f['status'] for f in plan['folders']} == {'one': 'already imported', 'two': 'ready'}
+    receipt, _ = migration.apply(config, plan, yes)
+    assert [(f['key'], f['status'], f['joined']) for f in receipt['folders']] == [('two', 'verified', parent.name)], receipt
+    sources._registry_file.cache_clear()
+    [folder] = sources.registry(config)['sources']
+    assert folder['path'] == str(parent)
+    assert published <= {r['asset_id'] for r in records(working(sources.bound(config, folder)))}
+
+
+def test_an_unverified_import_is_checked_again_and_fixed_in_place(old_install, monkeypatch):
+    config, one, two, _ = old_install
+    failed, evidence = _stale_failed_caption(config, one)
+    rekey = migration.rekey
+
+    def before_the_fix(work, db, store=None):  # A stale fault kept its old identity, so the check saw new work.
+        counts = rekey(work, db, store)
+        with db:
+            db.execute("UPDATE jobs SET evidence=? WHERE asset_id=? AND stage='caption'", (json.dumps(evidence), failed))
+        return counts
+    monkeypatch.setattr(migration, 'rekey', before_the_fix)
+    receipt, _ = migration.apply(config, migration.plan(config)[0], yes)
+    assert {f['key']: f['status'] for f in receipt['folders']} == {'one': 'unverified', 'two': 'verified'}
+    assert receipt['folders'][0]['check']['newly_pending']['caption'] == [failed]
+    monkeypatch.setattr(migration, 'rekey', rekey)
+    plan, _ = migration.plan(config)
+    assert {f['key']: f['status'] for f in plan['folders']} == {'one': 'recheck', 'two': 'already imported'}
+    receipt, _ = migration.apply(config, plan, yes)
+    [entry] = receipt['folders']
+    assert (entry['key'], entry['status'], entry['rechecked']) == ('one', 'verified', True), receipt
+    assert entry['updated_rows'] >= 1
+    assert migration.migrated(config).keys() >= {str(Path(one['path']) / LEGACY_METADATA_DIR).casefold()}

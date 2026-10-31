@@ -204,10 +204,9 @@ def validate_record(record):
             raise ConfigError('Sub-asset requires its parent and explicit selector')
     elif record.get('parent_asset_id') is not None:
         raise ConfigError('Parent linkage requires subasset-v1 identity')
-    else:
-        from .catalog import asset_id
-        if record['asset_id'] != asset_id(record['pack_id'], record['source_relative_identity']):
-            raise ConfigError('Asset identity does not match the preserved asset-v1 algorithm')
+    elif not re.fullmatch(ID_PATTERN, record['asset_id']):
+        # An ID is kept through moves and joined folders (decision 0023), so it need not match its formula any more.
+        raise ConfigError('Asset identity is not an asset-v1 ID')
 
 
 def validate_collection(records):

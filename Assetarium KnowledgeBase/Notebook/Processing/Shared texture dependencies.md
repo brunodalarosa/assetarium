@@ -23,6 +23,11 @@ User guide: [Shared texture dependencies](../../../docs/dependency-path-override
 - The desktop viewer and `get_asset` expose the same verified paths and bindings; external consumers
   must apply those bindings when importing the original file.
 
+- `SharedDependencies.candidates` probes the same path in every other enabled library folder; when none has
+  it, `siblings` probes sibling folders on the model's own path inside its library folder (nearest level first;
+  decision 0010 amendment). A sibling binding needs no worker grant (`worker_files` skips it): the worker reads
+  it as an ordinary source file, so `blender_shared_dependency_worker.py` stays unchanged.
+
 ## Rules
 
 - **Never guess by basename, never copy or move textures, never edit model bytes or material/alpha settings.**

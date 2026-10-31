@@ -90,7 +90,8 @@ the store once, with the app and MCP servers closed (base runtime; nothing rende
 ```
 
 The first run is a dry run that writes a plan to `data/library/migration/`; `--apply` asks for a typed `yes`,
-imports, verifies and writes a receipt; `--remove-old` deletes only verified old folders, asking for each.
+imports, verifies and writes a receipt, printing progress; run `--apply` again after a fault to import the
+folders that failed and check unverified ones again; `--remove-old` deletes only verified old folders, asking for each.
 See [Asset sources](asset-sources.md#moving-results-into-the-library-store).
 
 `process --stage inspection|caption|embeddings` is the existing stage-level

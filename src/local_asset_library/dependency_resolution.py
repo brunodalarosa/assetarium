@@ -25,17 +25,18 @@ def dependency_file(config, item):
     _relative(target)
     _relative(consumer)
     consumer_key = consumer.split('/', 1)[0]
+    sibling = target.split('/', 1)[0] == consumer_key
     if (original.split('/', 1)[0] != consumer_key or item.get('from', consumer) != consumer
             or config.source_key and config.source_key != consumer_key
-            or original.split('/', 1)[-1].casefold() != target.split('/', 1)[-1].casefold()
+            or not (sibling_path(original, target) if sibling else
+                    original.split('/', 1)[-1].casefold() == target.split('/', 1)[-1].casefold())
             or len(PurePosixPath(original).parts) < 3):
         raise ConfigError('Shared dependency does not match its recorded project layout')
     source = get_source(config, consumer_key)
     provider = get_source(config, target.split('/', 1)[0])
     if not provider['enabled']:
         raise ConfigError('The library folder that holds this texture is not included in search; include it on the Asset sources tab')
-    if (provider['id'] != evidence.get('provider_id') or provider['key'] == consumer_key
-            or item.get('sha256') != evidence.get('sha256')):
+    if provider['id'] != evidence.get('provider_id') or item.get('sha256') != evidence.get('sha256'):
         raise ConfigError('Shared dependency provider identity or hash changed')
     owner = bound(config, source)
     if file_hash(owner.source_file(consumer)) != evidence.get('consumer_sha256'):
@@ -52,6 +53,30 @@ def dependency_file(config, item):
     if not candidates or {entry['sha256'] for entry in candidates} != {item['sha256']}:
         raise ConfigError('Shared dependency candidates changed or conflict; scan its source again')
     return path
+
+
+def sibling_path(original, target):
+    """Whether ``target`` is ``original`` inside a sibling project folder of the same library folder: exactly one
+    folder differs, and at least a folder and the file name follow it (the cross-folder rule, one level down)."""
+    first, second = PurePosixPath(original).parts, PurePosixPath(target).parts
+    differ = [i for i, (a, b) in enumerate(zip(first, second)) if a.casefold() != b.casefold()]
+    return len(first) == len(second) and len(differ) == 1 and 1 <= differ[0] <= len(first) - 3
+
+
+def portable(recipe, base):
+    """A shared texture recipe as an input key sees it: provider paths relative to the model and no folder IDs, so
+    joining split projects under one library folder keeps the key (decision 0023: keyed by inputs, not places)."""
+    from .result_store import relative_to
+    if not recipe or recipe.get('kind') != 'shared_dependency_paths':
+        return recipe
+
+    def evidence(value):
+        return {**{k: v for k, v in value.items() if k != 'provider_id'},
+                'equivalent_candidates': [{'path': relative_to(base, c['path']), 'sha256': c['sha256']}
+                                          for c in value.get('equivalent_candidates', [])]}
+    return dict(recipe, bindings=[dict(b, path=relative_to(base, b['path']), **(
+        {'dependency_resolution': evidence(b['dependency_resolution'])} if b.get('dependency_resolution') else {}))
+        for b in recipe['bindings']])
 
 
 class SharedDependencies:
@@ -77,8 +102,41 @@ class SharedDependencies:
                     continue
                 path = scoped.source_file(target)  # Reject escaping links and metadata.
                 found.append({'path': target, 'sha256': file_hash(path), 'provider_id': source['id']})
-            self.matches[original] = sorted(found, key=lambda item: item['path'])
+            self.matches[original] = sorted(found or self.siblings(original), key=lambda item: item['path'])
         return self.matches[original]
+
+    def siblings(self, original):
+        """The same path in a sibling folder of the consumer's own library folder (split projects joined under one
+        folder, such as a pack's sub-packs sharing a core pack's textures); the nearest level with a match wins."""
+        from .sources import bound, registry
+        from .captions import file_hash
+        from .library_migration import LEGACY_METADATA_DIR
+        key, *parts = original.split('/')
+        source = next((s for s in registry(self.config)['sources'] if s['key'] == key and s['enabled']), None)
+        if source is None:
+            return []
+        scoped = bound(self.config, source)
+        for depth in range(len(parts) - 3, -1, -1):
+            parent, own, rest = parts[:depth], parts[depth], parts[depth + 1:]
+            try:
+                names = sorted(p.name for p in scoped.source_root.joinpath(*parent).iterdir()
+                               if p.name != own and p.name.casefold() != LEGACY_METADATA_DIR and p.is_dir()
+                               and not p.is_symlink() and not p.is_junction())
+            except OSError:
+                continue
+            found = []
+            for name in names:
+                relative = '/'.join([*parent, name, *rest])
+                if not (scoped.source_root / relative).is_file():
+                    continue
+                try:
+                    path = scoped.source_file(key + '/' + relative)  # Reject escaping links and metadata.
+                except ConfigError:
+                    continue
+                found.append({'path': key + '/' + relative, 'sha256': file_hash(path), 'provider_id': source['id']})
+            if found:
+                return found
+        return []
 
     def resolve(self, source, dependency, image_name=None):
         # Additional format adapters can consume the same resolver. Only the
@@ -136,7 +194,8 @@ def worker_files(config, recipe):
     from .sources import get_source
     files = []
     for binding in recipe['bindings']:
-        if not binding.get('dependency_resolution'):
+        # A sibling inside the model's own library folder needs no grant: the worker reads it like any source file.
+        if not binding.get('dependency_resolution') or binding['path'].split('/', 1)[0] == recipe['source_path'].split('/', 1)[0]:
             continue
         path = dependency_file(config, binding)
         provider = get_source(config, binding['path'].split('/', 1)[0])

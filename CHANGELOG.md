@@ -29,7 +29,10 @@ All notable changes to Assetarium are listed here. The project follows
   entries; copies share finished previews and descriptions instead of rendering again; vanished
   files are listed as Missing until you forget them (`local-assets forget-missing`).
 - `scripts/migrate-library.py` moves existing results into the library store once, with a dry run
-  first, without rendering or describing anything again.
+  first, without rendering or describing anything again. It prints its progress, and running it again
+  after a fault imports the folders that failed and checks unverified ones again.
+- Models that borrow textures from a sibling project folder keep them when those folders sit inside one
+  library folder, as when separately added folders are joined (decision 0010 amendment).
 - Agents get each asset's detected `pack_name` and `pack_path` from `search_assets` and `get_asset`.
 
 - **Settings → General → Blender installation** shows whether a Blender is saved (Saved, Not

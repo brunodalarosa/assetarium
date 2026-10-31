@@ -39,11 +39,12 @@ def asset(scoped):
 def test_split_texture_mapping_preserves_original_and_survives_rescan(managed):
     scoped, model, texture, manifest = split_pack(managed)
     before = model.read_bytes(), texture.read_bytes()
-    assert asset(scoped)['dependencies'][0]['status'] == 'missing'
+    # Sibling folders of one library folder resolve on their own (decision 0010 amendment); a mapping still wins.
+    assert asset(scoped)['dependencies'][0]['dependency_resolution']['original_status'] == 'missing'
     save_json(scoped.output_path('data', 'library/dependency-overrides.json'), manifest)
     mapped = asset(scoped)
     dep = mapped['dependencies'][0]
-    assert dep['status'] == 'available' and '/core/' in dep['path']
+    assert dep['status'] == 'available' and '/core/' in dep['path'] and 'dependency_resolution' not in dep
     assert dep['dependency_override']['original_status'] == 'missing'
     binding = mapped['texture_repair']['bindings'][0]
     assert binding['image'] == 'atlas' and binding['preserve_supplied_alpha'] is False

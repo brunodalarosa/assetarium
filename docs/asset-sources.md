@@ -177,8 +177,15 @@ folders proposed as exclusions so nothing new floods in. Review it, then add `--
   re-keyed by its inputs, so **nothing renders or is described again**; a result that was already out of date
   stays pending, as before.
 - Every asset keeps its ID. Old sources inside a `--library-folder` become part of it.
+- Models that borrowed textures from another old source keep them when both join one library folder (see
+  [Shared texture dependencies](dependency-path-overrides.md)).
 - It rescans without models and checks that every published asset is present and nothing newly pending, then
   writes `data/library/migration/<time>.json`. A fault stops only its own folder. A folder is imported once.
+- It prints what it is doing with the elapsed time. Importing is quick; the final rescan of each library folder
+  takes longest, since it reads every file of the folder (later scans reuse those hashes).
+- **Run `--apply` again after a fault.** The new plan lists the folders that failed as `ready` (they join the
+  library folder that now contains them) and folders whose check found unexpected work as `recheck`: their kept
+  copy of the old ledger is re-keyed again and only rows untouched since the import are updated.
 
 `--remove-old` then deletes the old generated folders whose import a receipt verified, asking for each one.
 

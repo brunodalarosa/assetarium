@@ -13,6 +13,11 @@ in one source can supply that exact missing path in a separately registered mode
 source. The source folder names do not matter. Texture-only sources work without
 model imports or prior processing. No unrelated disk directories are searched.
 
+The fragments can also sit side by side in **one library folder**, for example a pack's add-on folders next
+to its core folder: `Pack/Buildings/Town/Textures/map.png`, missing, is found as `Pack/Core/Town/Textures/map.png`.
+Only a sibling of a folder on the model's own path is tried, with the rest of the path identical. Joining
+separately added folders under one library folder keeps these textures and their finished previews.
+
 Healthy local files and explicit mappings win. Conflicting contents at the same
 relative path stay ambiguous faults; byte-identical duplicates retain all candidate
 evidence. Records retain the original reference/location, model hash, provider ID,
