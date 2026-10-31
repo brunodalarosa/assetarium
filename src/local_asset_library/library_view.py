@@ -6,7 +6,6 @@ plus overlays (warning, description, collections, new). Blocked work names its f
 processing action; recorded failures stay apart from pending work.
 """
 from contextlib import closing
-from functools import lru_cache
 import json
 from pathlib import Path, PurePosixPath
 
@@ -67,30 +66,52 @@ def state_of(record, blocked, vector_faults=None, queued=(), running=()):
     return 'ready', None
 
 
-def overlays(config, record, descriptions_on, collections):
-    from .sources import description_state
-    found = {}
-    review = (record.get('caption_provenance') or {}).get('findings') or []
-    if any(f.get('severity') == 'warning' for f in review if isinstance(f, dict)):
-        found['warning'] = True  # Review notes are not shown as warnings.
-    if descriptions_on:
-        found['description'] = description_state(record)
-    if collections.get(record['asset_id']):
-        found['collections'] = collections[record['asset_id']]
-    return found
-
-
 def _folder(record, key):
     path = record['files'][0]['path'] if record.get('files') else ''
     parent = PurePosixPath(path.removeprefix(key + '/')).parent.as_posix()
     return '' if parent == '.' else parent
 
 
-@lru_cache(maxsize=16)
-def _tree(stamp, key, records_json, inventory_json, structure_json, names_json, first_seen_json, visit, blocked_json):
-    records, inventory = json.loads(records_json), json.loads(inventory_json)
-    detected, names, first_seen = json.loads(structure_json), json.loads(names_json), json.loads(first_seen_json)
-    blocked = json.loads(blocked_json)
+def _current(config, source):
+    """The folder's working catalog when it has one, else its published one; None before a first scan."""
+    from .incremental import working
+    from .sources import bound
+    scoped = bound(config, source)
+    work = working(scoped)
+    current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
+    return current if current.output_path('data', 'catalog.sqlite').exists() else None
+
+
+def _new_ids(config, source):
+    """Assets first seen after the owner's last visit to this folder (none before a first visit)."""
+    from .library_store import answers, connect, database_path
+    visit = next((a['value'] for a in answers(config, source['id'], 'visit')), '')
+    if not visit or not database_path(config).exists():
+        return []
+    with closing(connect(config)) as db:
+        return [r[0] for r in db.execute('SELECT asset_id FROM assets WHERE folder_id=? AND first_seen > ?', (source['id'], visit))]
+
+
+def folder_tree(config, source, blocked=None):
+    """One library folder's nodes (folders only) with counts, coverage and +N new, from its view (never whole records)."""
+    from .folder_view import Reading, connect, state_sql
+    from .packs import names_of, structure
+    if not Path(source['path']).is_dir():
+        return {'offline': True, 'nodes': []}
+    current = _current(config, source)
+    if current is None:
+        return {'offline': False, 'nodes': [], 'scanned': False}
+    try:
+        view = connect(current)
+    except Reading:
+        return {'offline': False, 'scanned': True, 'reading': True, 'nodes': []}
+    state, params, _, _ = state_sql(blockers(config) if blocked is None else blocked)
+    with closing(view):
+        groups = view.execute(f'SELECT folder, {state}, has_preview, COUNT(*) FROM assets GROUP BY 1, 2, 3', params).fetchall()
+        fresh = view.execute('SELECT folder, COUNT(*) FROM assets WHERE asset_id IN (SELECT value FROM json_each(?)) GROUP BY 1',
+                             (json.dumps(_new_ids(config, source)),)).fetchall()
+        folders = [r[0] for r in view.execute('SELECT path FROM folders')]
+        detected = structure(config, source, view)
     nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0}}
 
     def node(path):
@@ -99,22 +120,23 @@ def _tree(stamp, key, records_json, inventory_json, structure_json, names_json, 
             parent = PurePosixPath(path).parent.as_posix()
             node('' if parent == '.' else parent)['children'].add(path)
         return nodes[path]
-    for row in inventory:  # Folders only; files are listed in the grid.
-        parent = PurePosixPath(row.removeprefix(key + '/')).parent.as_posix()
-        node('' if parent == '.' else parent)
-    for record in records:
-        folder = _folder(record, key)
-        state, _ = state_of(record, blocked)
-        chain = PurePosixPath(folder).parts if folder else ()
-        for depth in range(len(chain) + 1):
-            entry = node('/'.join(chain[:depth]))
-            entry['assets'] += 1
-            entry['previews'] += state in {'ready'} or (state != 'failed' and bool(record.get('previews')))
-            entry['pending'] += state == 'no_previews'
-            entry['blocked'] += state == 'blocked'
-            entry['failed'] += state == 'failed'
-            entry['new'] += bool(visit and first_seen.get(record['asset_id'], '') > visit)
-    packs, bundles = detected['packs'], set(detected['bundles'])
+
+    def chain(folder):
+        parts = PurePosixPath(folder).parts if folder else ()
+        return [node('/'.join(parts[:depth])) for depth in range(len(parts) + 1)]
+    for folder in folders:  # Folders only; files are listed in the grid.
+        node(folder)
+    for folder, state, preview, count in groups:
+        for entry in chain(folder):
+            entry['assets'] += count
+            entry['previews'] += count * (state == 'ready' or (state != 'failed' and bool(preview)))
+            entry['pending'] += count * (state == 'no_previews')
+            entry['blocked'] += count * (state == 'blocked')
+            entry['failed'] += count * (state == 'failed')
+    for folder, count in fresh:
+        for entry in chain(folder):
+            entry['new'] += count
+    packs, bundles, names = detected['packs'], set(detected['bundles']), names_of(config, source)
     result = []
     for path, entry in sorted(nodes.items()):
         pack = packs.get(path)
@@ -124,56 +146,19 @@ def _tree(stamp, key, records_json, inventory_json, structure_json, names_json, 
                        'coverage': round(entry['previews'] / entry['assets'], 3) if entry['assets'] else None,
                        'pack': {'id': pack['id'], 'cover': pack.get('cover'), 'basis': pack['basis'],
                                 'markers': pack['markers']} if pack else None})
-    return result
-
-
-def folder_tree(config, source):
-    """One library folder's nodes (folders only) with counts, coverage and +N new; cheap and cached."""
-    from .catalog import read_database
-    from .incremental import working
-    from .library_store import answers, connect, database_path
-    from .packs import names_of, structure
-    from .sources import bound, read_records
-    if not Path(source['path']).is_dir():
-        return {'offline': True, 'nodes': []}
-    scoped = bound(config, source)
-    work = working(scoped)
-    current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
-    path = current.output_path('data', 'catalog.sqlite')
-    if not path.exists():
-        return {'offline': False, 'nodes': [], 'scanned': False}
-    records = read_records(current)
-    with closing(read_database(current)) as db:
-        inventory = sorted(json.loads(r[0])['path'] for r in db.execute('SELECT record FROM inventory'))
-    with closing(connect(config)) as db:
-        first_seen = dict(db.execute("SELECT asset_id, first_seen FROM assets WHERE folder_id=?", (source['id'],)).fetchall()) \
-            if database_path(config).exists() else {}
-    visit = next((a['value'] for a in answers(config, source['id'], 'visit')), '')
-    detected = structure(config, source, records)
-    stat = path.stat()
-    blocked = blockers(config)
-    slim = [{k: r.get(k) for k in ('asset_id', 'files', 'processing', 'previews', 'technical', 'asset_type', 'type_metadata',
-                                   'stage_faults', 'description')} for r in records]
-    for item in slim:
-        item['files'] = item['files'][:1]
-        item['previews'] = bool(item['previews'])
-        item['technical'] = bool(item['technical'])
-        item['description'] = bool(item['description'])
-    nodes = _tree((str(path), stat.st_mtime_ns, stat.st_size), source['key'], json.dumps(slim), json.dumps(inventory),
-                  json.dumps(detected), json.dumps(names_of(config, source)), json.dumps(first_seen), visit, json.dumps(blocked))
-    return {'offline': False, 'scanned': True, 'nodes': nodes}
+    return {'offline': False, 'scanned': True, 'nodes': result}
 
 
 def tree(config):
     """Every library folder with its tree, what needs the owner, and the migration notice."""
     from .library_migration import needed
-    from .library_store import missing_assets
+    from .library_store import missing_count
     from .sources import registry, source_status
-    folders = []
+    folders, blocked = [], blockers(config)
     for source in registry(config)['sources']:
         try:
             status = source_status(config, source)
-            entry = folder_tree(config, source)
+            entry = folder_tree(config, source, blocked)
         except Exception as exc:  # One unreadable folder shows its fault; the others still list.
             status, entry = {'scan_fault': f'{type(exc).__name__}: {exc}'}, {'offline': not Path(source['path']).is_dir(), 'nodes': []}
         attention = [reason for reason, active in (
@@ -181,105 +166,110 @@ def tree(config):
             ('Duplicate export folders to answer', bool(status.get('export_suggestions'))),
             ('A texture folder to choose', bool((status.get('texture_suggestion') or {}).get('folders')) and not status.get('texture_folder')),
             ('Could not be read', bool(status.get('scan_fault')))) if active]
-        folders.append({**source, **entry, 'attention': attention, 'missing': len(missing_assets(config, source['id'])),
+        folders.append({**source, **entry, 'attention': attention, 'missing': missing_count(config, source['id']),
                         'excluded_folders': status.get('excluded_folders', []), 'exclusions': status.get('exclusions', []),
                         'export_suggestions': status.get('export_suggestions', []), 'export_decisions': status.get('export_decisions', []),
                         'texture_suggestion': status.get('texture_suggestion'), 'texture_folder': status.get('texture_folder'),
                         'scan_fault': status.get('scan_fault'), 'operation': status.get('operation'),
                         'scanned_utc': status.get('scanned_utc')})
     migration = needed(config)
-    return {'status': 'ready', 'folders': folders, 'migration': migration, 'blockers': list(blockers(config).values()),
+    return {'status': 'ready', 'folders': folders, 'migration': migration, 'blockers': list(blocked.values()),
             'types': [{'id': i, 'label': label} for i, label in TYPES],
             'attention': bool(migration.get('needed') or any(f['attention'] for f in folders))}
 
 
 def folder_items(config, key, path='', offset=0, page_size=60, filters=None, show_files=True):
-    """A folder's (or pack's) assets with state and overlays, then its other files, faded; paged."""
+    """A folder's (or pack's) assets with state and overlays, then its other files, faded; paged in SQL from its view."""
     from .asset_collections import load
-    from .catalog import read_database
-    from .incremental import working
-    from .library_store import missing_assets
-    from .packs import pack_of, structure
+    from .folder_view import Reading, connect, inside_sql, state_sql
+    from .library_store import missing_list
+    from .packs import names_of, pack_of, structure
     from .settings import descriptions_enabled
-    from .sources import bound, embedding_failures, get_source, read_records
+    from .sources import get_source
     if type(offset) is not int or offset < 0 or type(page_size) is not int or not 1 <= page_size <= 200:
         raise ConfigError('Invalid page')
     filters = filters or {}
     source = get_source(config, key)
-    scoped = bound(config, source)
-    work = working(scoped)
-    current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
-    records = read_records(current) if current.output_path('data', 'catalog.sqlite').exists() else []
+    current = _current(config, source)
     inside = lambda folder: not path or folder == path or folder.startswith(path.rstrip('/') + '/')
-    blocked, faults = blockers(config), embedding_failures(current)
-    detected = structure(config, source, records)
-    collections = {}
-    for collection in load(config).get('collections', []):
-        for item in collection.get('items', []):
-            collections[item['asset_id']] = collections.get(item['asset_id'], 0) + 1
-    descriptions = descriptions_enabled(config)
-    from .library_store import answers, connect, database_path
-    visit = next((a['value'] for a in answers(config, source['id'], 'visit')), '')
-    first_seen = {}
-    if visit and database_path(config).exists():
-        with closing(connect(config)) as db:
-            first_seen = dict(db.execute('SELECT asset_id, first_seen FROM assets WHERE folder_id=?', (source['id'],)).fetchall())
-    items = []
-    for record in sorted(records, key=lambda r: (_folder(r, key).casefold(), r['display_name'].casefold(), r['asset_id'])):
-        if not inside(_folder(record, key)):
-            continue
-        kind = kind_of(record)
-        if filters.get('types') and kind not in filters['types']:
-            continue
-        state, reason = state_of(record, blocked, faults)
-        items.append({'asset_id': record['asset_id'], 'name': record['display_name'], 'kind': kind, 'state': state,
-                      'reason': reason, 'folder': _folder(record, key), 'pack': pack_of(config, source, record, detected),
-                      'formats': sorted({f['format'] for f in record['files']}), 'has_preview': bool(record.get('previews')),
-                      'path': record['files'][0]['path'] if record['files'] else None,
-                      'overlays': overlays(config, record, descriptions, collections),
-                      'new': bool(visit and first_seen.get(record['asset_id'], '') > visit)})
-    for asset in missing_assets(config, source['id']):
+    wanted = set(filters.get('states') or ())
+    missing = []
+    for asset in missing_list(config, source['id']):
         saved = asset.get('record') or {}
         folder = _folder(saved, key) if saved.get('files') else PurePosixPath(asset['locator']).parent.as_posix().replace('.', '')
-        if inside(folder):
-            items.append({'asset_id': asset['asset_id'], 'name': saved.get('display_name') or PurePosixPath(asset['locator']).stem,
-                          'kind': kind_of(saved) if saved else 'model_3d', 'state': 'missing', 'folder': folder,
-                          'reason': 'Not found since ' + asset['last_seen'][:10], 'overlays': {}, 'formats': [], 'has_preview': False,
-                          'path': None, 'pack': None})
-    wanted = set(filters.get('states') or ())
+        if inside(folder) and (not wanted or 'missing' in wanted):
+            missing.append({'asset_id': asset['asset_id'], 'name': saved.get('display_name') or PurePosixPath(asset['locator']).stem,
+                            'kind': kind_of(saved) if saved else 'model_3d', 'state': 'missing', 'folder': folder,
+                            'reason': 'Not found since ' + asset['last_seen'][:10], 'overlays': {}, 'formats': [], 'has_preview': False,
+                            'path': None, 'pack': None})
+    counts = dict.fromkeys(STATES, 0)
+    if current is None:
+        counts['missing'] = len(missing)
+        return {'status': 'ready', 'key': key, 'path': path, 'items': missing[offset:offset + page_size], 'total': len(missing),
+                'assets': len(missing), 'files': 0, 'counts': counts, 'offset': offset, 'page_size': page_size}
+    try:
+        view = connect(current)
+    except Reading as exc:
+        return {'status': 'reading', 'reason': str(exc), 'key': key, 'path': path}
+    new = _new_ids(config, source)
+    state, state_params, reason, reason_params = state_sql(blockers(config))
+    where, params = inside_sql(path)
+    if filters.get('types'):
+        where += f" AND kind IN ({','.join('?' * len(filters['types']))})"
+        params += list(filters['types'])
     if wanted:
-        items = [i for i in items if i['state'] in wanted or ('new' in wanted and i.get('new'))]
-    files = []
-    if show_files:
-        owned = {f['path'] for r in records for f in r['files']}
-        with closing(read_database(current)) as db:
-            for (payload,) in db.execute('SELECT record FROM inventory'):
-                row = json.loads(payload)
-                folder = PurePosixPath(row['path'].removeprefix(key + '/')).parent.as_posix()
-                folder = '' if folder == '.' else folder
-                if row['path'] in owned or not inside(folder) or row.get('status') == 'excluded_folder':
-                    continue
-                files.append({'path': row['path'], 'name': PurePosixPath(row['path']).name, 'folder': folder,
-                              'role': row.get('role'), 'excluded': row.get('status') in {'excluded_folder', 'excluded_directory_link'}})
-        files.sort(key=lambda f: (f['folder'].casefold(), f['name'].casefold()))
-    everything = items + [{'file': True, **f} for f in files]
-    counts = {state: sum(i['state'] == state for i in items) for state in STATES}
-    return {'status': 'ready', 'key': key, 'path': path, 'items': everything[offset:offset + page_size], 'total': len(everything),
-            'assets': len(items), 'files': len(files), 'counts': counts, 'offset': offset, 'page_size': page_size}
+        where += f" AND ({state} IN ({','.join('?' * len(wanted))})" + (
+            ' OR asset_id IN (SELECT value FROM json_each(?)))' if 'new' in wanted else ')')
+        params += state_params + sorted(wanted) + ([json.dumps(new)] if 'new' in wanted else [])
+    with closing(view):
+        counts.update(view.execute(f'SELECT {state}, COUNT(*) FROM assets WHERE {where} GROUP BY 1', state_params + params).fetchall())
+        listed = sum(counts.values())
+        counts['missing'] += len(missing)
+        assets = listed + len(missing)
+        files_where, files_params = inside_sql(path)
+        files = view.execute(f'SELECT COUNT(*) FROM files WHERE {files_where}', files_params).fetchone()[0] if show_files else 0
+        rows = view.execute(f'SELECT asset_id, name, kind, {state}, {reason}, folder, formats, has_preview, path, description, warning '
+                            f'FROM assets WHERE {where} ORDER BY folder_key, name_key, asset_id LIMIT ? OFFSET ?',
+                            state_params + reason_params + params + [page_size, offset]).fetchall() if offset < listed else []
+        detected = structure(config, source, view)
+        descriptions, names, new = descriptions_enabled(config), names_of(config, source), set(new)
+        collections = {}
+        for collection in load(config).get('collections', []):
+            for item in collection.get('items', []):
+                collections[item['asset_id']] = collections.get(item['asset_id'], 0) + 1
+        page = []
+        for asset_id, name, kind, item_state, item_reason, folder, formats, preview, first, description, warning in rows:
+            found = {'warning': True} if warning else {}  # Review notes are not shown as warnings.
+            if descriptions:
+                found['description'] = description
+            if collections.get(asset_id):
+                found['collections'] = collections[asset_id]
+            page.append({'asset_id': asset_id, 'name': name, 'kind': kind, 'state': item_state, 'reason': item_reason,
+                         'folder': folder, 'pack': pack_of(config, source, {'files': [{'path': first}]}, detected, names) if first else None,
+                         'formats': json.loads(formats), 'has_preview': bool(preview), 'path': first, 'overlays': found,
+                         'new': asset_id in new})
+        start = max(0, offset - listed)
+        page += missing[start:start + page_size - len(page)]
+        if files and len(page) < page_size:
+            page += [{'file': True, 'path': p, 'name': n, 'folder': f, 'role': r, 'excluded': bool(x)} for p, n, f, r, x in view.execute(
+                f'SELECT path, name, folder, role, excluded FROM files WHERE {files_where} ORDER BY folder_key, name_key, path LIMIT ? OFFSET ?',
+                files_params + [page_size - len(page), max(0, offset - assets)])]
+    return {'status': 'ready', 'key': key, 'path': path, 'items': page, 'total': assets + files,
+            'assets': assets, 'files': files, 'counts': counts, 'offset': offset, 'page_size': page_size}
 
 
 def locate(config, asset_id):
     """Where an asset lives (its library folder and folder), for Show in pack."""
-    from .incremental import working
-    from .sources import bound, read_records, registry
+    from .folder_view import connect
+    from .sources import registry
     for source in registry(config)['sources']:
-        scoped = bound(config, source)
-        current = working(scoped) if working(scoped).output_path('data', 'catalog.sqlite').exists() else scoped
-        if not current.output_path('data', 'catalog.sqlite').exists():
+        current = _current(config, source)
+        if current is None:
             continue
-        record = next((r for r in read_records(current) if r['asset_id'] == asset_id), None)
-        if record:
-            return {'status': 'located', 'key': source['key'], 'path': _folder(record, source['key']), 'asset_id': asset_id}
+        with closing(connect(current, fresh=True)) as view:
+            row = view.execute('SELECT folder FROM assets WHERE asset_id=?', (asset_id,)).fetchone()
+        if row:
+            return {'status': 'located', 'key': source['key'], 'path': row[0], 'asset_id': asset_id}
     raise ConfigError('This asset is not in a library folder any more')
 
 

@@ -6,11 +6,11 @@ first folder under the library folder that contains assets is the pack. The owne
 "Merge into parent pack" answers are saved per folder and survive rescans. A pack is a light object: a name,
 a cover and license evidence; no tags and no collection membership.
 """
-from collections import defaultdict
-from functools import lru_cache
+from collections import OrderedDict, defaultdict
 import json
 from pathlib import PurePosixPath
 import re
+import threading
 
 from .catalog import digest
 
@@ -93,41 +93,52 @@ def detect(paths, asset_paths, answers=()):
     return {'packs': packs, 'bundles': bundles, 'pack_of': pack_of}
 
 
-@lru_cache(maxsize=32)
-def _cached(key, paths, asset_paths, answers):
-    return detect(paths, asset_paths, json.loads(answers))
+_detected = OrderedDict()
+_lock = threading.Lock()
 
 
-def structure(config, source, records=None):
-    """Packs of a scanned library folder, from its saved inventory (cheap; cached by the catalog's identity)."""
+def structure(config, source, view=None):
+    """Packs of a scanned library folder from its working catalog's view (``folder_view``), cached by view and answers."""
     from contextlib import closing
-    from .catalog import read_database
+    from .folder_view import connect
     from .incremental import working
     from .library_store import answers
-    from .sources import bound, read_records
+    from .sources import bound
     work = working(bound(config, source))
-    path = work.output_path('data', 'catalog.sqlite')
-    if not path.exists():
+    if not work.output_path('data', 'catalog.sqlite').exists():
         return {'packs': {}, 'bundles': [], 'pack_of': {}}
-    prefix = source['key'] + '/'
-    with closing(read_database(work)) as db:
-        paths = tuple(sorted(json.loads(r[0])['path'][len(prefix):] for r in db.execute('SELECT record FROM inventory')
-                             if json.loads(r[0]).get('path', '').startswith(prefix)))
-    records = read_records(work) if records is None else records
-    asset_paths = tuple(sorted(f['path'][len(prefix):] for r in records for f in r['files'][:1] if f['path'].startswith(prefix)))
     saved = json.dumps(sorted(({'path': a['path'], 'value': a['value']} for a in answers(config, source['id'], 'pack')),
                               key=lambda a: a['path']))
-    stat = path.stat()
-    return _cached((str(path), stat.st_mtime_ns, stat.st_size), paths, asset_paths, saved)
+    own = view is None or view.path.name.rsplit('-', 1)[0] != work.output_path('data', 'catalog.sqlite').parent.name
+    view = connect(work) if own else view
+    try:
+        key = (str(view.path), saved)
+        with _lock:
+            if key in _detected:
+                _detected.move_to_end(key)
+                return _detected[key]
+        prefix = source['key'] + '/'
+        paths = [r[0] for r in view.execute('SELECT path FROM inventory ORDER BY path')]
+        asset_paths = sorted(r[0][len(prefix):] for r in view.execute('SELECT path FROM assets WHERE substr(path, 1, ?) = ?',
+                                                                       (len(prefix), prefix)))
+        value = detect(paths, asset_paths, json.loads(saved))
+    finally:
+        if own:
+            view.close()
+    with _lock:
+        _detected[key] = value
+        while len(_detected) > 16:
+            _detected.popitem(last=False)
+    return value
 
 
-def pack_of(config, source, record, detected=None):
+def pack_of(config, source, record, detected=None, names=None):
     """The pack (path and display name) an asset belongs to."""
     detected = detected or structure(config, source)
     folder = PurePosixPath(record['files'][0]['path'].split('/', 1)[1]).parent.as_posix()
     path = detected['pack_of'].get('' if folder == '.' else folder, '')
     pack = detected['packs'].get(path) or {'path': path, 'name': PurePosixPath(path).name, 'id': 'pack_' + digest(path)[:16]}
-    names = names_of(config, source)
+    names = names_of(config, source) if names is None else names
     return {'id': pack['id'], 'path': path, 'name': names.get(path) or pack['name'] or source['name']}
 
 
@@ -160,7 +171,6 @@ def answer(config, key, folder, value):
         raise ConfigError('Choose Make this a pack or Merge into parent pack')
     source = get_source(config, key)
     save_answer(config, source['id'], validate_exclusion(folder) if folder else '', 'pack', value)
-    _cached.cache_clear()
     return source
 
 

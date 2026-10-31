@@ -2,7 +2,7 @@
 area: Desktop App
 tags: [system]
 code: [desktop.DesktopBridge, desktop.DesktopBridge._present, desktop.DesktopBridge._wait, desktop.create_window, desktop.page_html, desktop_service.DesktopService, frontend/src/app/api.ts, frontend/src/app/store.ts]
-verified: 2026-10-28
+verified: 2026-10-31
 branch: feature/library-view
 ---
 # Desktop bridge
@@ -15,13 +15,22 @@ method is callable from the page as `window.pywebview.api.<name>`. Types for the
 
 - pywebview runs bridge methods on its own threads. The bridge owns one asyncio loop on the
   `asset-gateway` thread; methods hand work to it (`_wait` → `run_coroutine_threadsafe`), and
-  presentation work runs through `_present` in a worker thread.
+  presentation work runs through `_present` in a worker thread of a pool of eight (`asset-present`).
+- `_present(..., shared=True)` marks a read-only call: identical calls in flight (same operation and
+  arguments) share one run. `_wait` gives up after 110 s but cannot stop the thread, so without sharing every
+  poll used to start one more copy of a slow read.
+- `desktop.main` ends with `os._exit` after `_close`: closing never waits for a read still running in the
+  pool (the loop drops its executor with `shutdown(wait=False, cancel_futures=True)`).
 - `create_window` / `page_html` inline the built `ui/build/app.css` and `app.js` plus
   `ui/interactive-preview.js` into `ui/index.html`, and apply the saved theme before first paint.
 - The launch `Config` is frozen for the window's life; anything saved later (for example Blender) is
   read through helpers such as `config.with_saved_blender`.
 
 ## Rules
+
+- **A read the window polls is bounded by its page, not the library**: read folder views or SQL columns
+  ([Sources](../Sources%20and%20Catalog/Sources.md) → Folder views), never whole catalogs, and pass
+  `shared=True`. A bigger library may mean a longer wait, never more memory.
 
 - **New features follow one shape**: backend logic in the owning module, exposed as a bridge method
   that returns a plain JSON-able dict with `status` / `reason` on faults, then UI in `frontend/src`.

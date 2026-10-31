@@ -1,6 +1,6 @@
 """Windows desktop shell. All UI resources are bundled; worker inference stays offline."""
 import asyncio
-from concurrent.futures import TimeoutError as FutureTimeout
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import json
 import logging
 import os
@@ -38,6 +38,7 @@ class DesktopBridge:
         self._closed = False
         self._owned_source_operations = set()
         self._pending_prints = {}
+        self._shared = {}
         self._thread = threading.Thread(target=self._run, name='asset-gateway', daemon=True)
         self._thread.start()
         if not self._ready.wait(10):
@@ -47,6 +48,9 @@ class DesktopBridge:
 
     def _run(self):
         asyncio.set_event_loop(self._loop)
+        # A bounded pool: a slow read can hold a few threads, never the machine (identical reads share one, see _present).
+        executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix='asset-present')
+        self._loop.set_default_executor(executor)
         try:
             log = self._config.output_path('logs', 'gui-worker.log')
             log.parent.mkdir(parents=True, exist_ok=True)
@@ -89,7 +93,8 @@ class DesktopBridge:
             task.cancel()
         if pending:
             self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        self._loop.run_until_complete(self._loop.shutdown_default_executor())
+        # A read still running in the pool is abandoned, not awaited: closing never waits on it (the process exits).
+        executor.shutdown(wait=False, cancel_futures=True)
         self._loop.close()
         self._diagnostics.close()
 
@@ -108,7 +113,15 @@ class DesktopBridge:
                 stream.write(encoded(payload) + '\n')
             return {'status': 'faulty', 'reason': payload['reason'], 'payload': payload}
 
-    async def _present(self, operation, *args, guarded=True):
+    async def _present(self, operation, *args, guarded=True, shared=False):
+        if shared:
+            # Identical read-only calls in flight share one run: polls and a timed-out caller's retry never stack up.
+            key = (operation, repr(args))
+            task = self._shared.get(key)
+            if task is None:
+                task = self._shared[key] = asyncio.ensure_future(self._present(operation, *args, guarded=guarded))
+                task.add_done_callback(lambda _: self._shared.pop(key, None))
+            return await asyncio.shield(task)
         started = time.perf_counter()
         # Source/detail work is independent of the serialized GPU search queue. The lock
         # protects DesktopService state only; settings, sources and change polls skip it.
@@ -134,7 +147,7 @@ class DesktopBridge:
         return self._wait(self._present(self._service.context))
 
     def sources(self):
-        return self._wait(self._present(self._sources, guarded=False))
+        return self._wait(self._present(self._sources, guarded=False, shared=True))
 
     def general_settings(self):
         from .settings import general_settings
@@ -254,7 +267,7 @@ class DesktopBridge:
 
     def importing_failures(self):
         from .sources import importing_failures
-        return self._wait(self._present(importing_failures, self._config, guarded=False))
+        return self._wait(self._present(importing_failures, self._config, guarded=False, shared=True))
 
     def _sources(self):
         from .sources import revision, source_statuses
@@ -305,15 +318,16 @@ class DesktopBridge:
     # The Asset sources tab (decision 0023): library folders → bundles → packs → folders, read from saved data.
     def library_tree(self):
         from .library_view import tree
-        return self._wait(self._present(tree, self._config, guarded=False))
+        return self._wait(self._present(tree, self._config, guarded=False, shared=True))
 
     def library_items(self, key, path='', offset=0, page_size=60, filters=None, show_files=True):
         from .library_view import folder_items
-        return self._wait(self._present(folder_items, self._config, key, path, offset, page_size, filters, show_files, guarded=False))
+        return self._wait(self._present(folder_items, self._config, key, path, offset, page_size, filters, show_files,
+                                        guarded=False, shared=True))
 
     def library_locate(self, asset_id):
         from .library_view import locate
-        return self._wait(self._present(locate, self._config, asset_id, guarded=False))
+        return self._wait(self._present(locate, self._config, asset_id, guarded=False, shared=True))
 
     def library_cover(self, key, relative):
         return self._wait(self._present(self._library_cover, key, relative, guarded=False))
@@ -334,7 +348,7 @@ class DesktopBridge:
     # The processing queue (decision 0023).
     def queue_state(self):
         from .processing_queue import state
-        return self._wait(self._present(state, self._config, guarded=False))
+        return self._wait(self._present(state, self._config, guarded=False, shared=True))
 
     def queue_add(self, action, scope, confirmed=False):
         from .processing_queue import add
@@ -518,7 +532,7 @@ class DesktopBridge:
         return self._wait(self._present(self._interactive_preview.release, ticket))
 
     def changes(self):
-        return self._wait(self._present(self._changes, guarded=False))
+        return self._wait(self._present(self._changes, guarded=False, shared=True))
 
     def _changes(self):
         """Cheap stat-only tokens; views fetch heavy data only when a token changes."""
@@ -883,6 +897,16 @@ def record_profile_outcome(bridge, profile):
 
 
 def main():
+    """Run the window; when it closes, end the process even if a read is still running in a worker thread."""
+    code = run()
+    logging.shutdown()
+    for stream in (sys.stdout, sys.stderr):
+        if stream:  # None under pythonw.
+            stream.flush()
+    os._exit(code)  # Closing already cancelled owned operations and stopped the worker; nothing else may keep it alive.
+
+
+def run():
     root = Path(__file__).resolve().parents[2]
     log_dir = root / 'logs'
     log_dir.mkdir(parents=True, exist_ok=True)

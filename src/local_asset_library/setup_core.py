@@ -233,13 +233,17 @@ def _same(a, b):
 
 def processed_models(config):
     """Finished 3D inspections that a Blender change would mark as pending again (fingerprint input)."""
+    from contextlib import closing
+    from .folder_view import connect
     from .incremental import working
-    from .sources import bound, read_records, registry
+    from .sources import bound, registry
     count = 0
     if config.sources_registry:
         for source in registry(config)['sources']:
-            count += sum(1 for record in read_records(working(bound(config, source)))
-                         if record['processing'].get('inspection') == 'complete' and record.get('asset_type') != 'image')
+            work = working(bound(config, source))
+            if work.output_path('data', 'catalog.sqlite').exists():
+                with closing(connect(work, fresh=True)) as view:
+                    count += view.execute("SELECT COUNT(*) FROM assets WHERE inspection = 'complete' AND asset_type IS NOT 'image'").fetchone()[0]
     return count
 
 

@@ -801,22 +801,39 @@ export async function chooseSourceDirectory() {
 
 const patchSources = (patch: Partial<SourcesView> | ((current: SourcesView) => Partial<SourcesView>)) =>
   setState((s) => ({ sourcesView: { ...s.sourcesView, ...(typeof patch === "function" ? patch(s.sourcesView) : patch) } }));
-let treeGeneration = 0;
-/** Library folders → bundles → packs → folders, with counts and what needs the owner (read from saved data). */
-export async function loadLibraryTree() {
-  if (!state.api) return;
-  const generation = ++treeGeneration;
-  patchSources({ loading: true });
-  try {
-    const tree = await api().library_tree();
-    if (generation !== treeGeneration) return;
-    if (tree.status === "faulty") throw Error(tree.reason);
-    patchSources({ tree, error: null });
-  } catch (error) {
-    if (generation === treeGeneration) patchSources({ error: (error as Error).message });
-  } finally {
-    if (generation === treeGeneration) patchSources({ loading: false });
+let treeLoading: Promise<void> | null = null;
+let treeAgain = false;
+let readingTimer: number | undefined;
+/** Library folders → bundles → packs → folders, with counts and what needs the owner (read from saved data).
+ *  One request at a time: a call while one runs asks for one more pass afterwards instead of a second request. */
+export function loadLibraryTree(): Promise<void> {
+  if (!state.api) return Promise.resolve();
+  if (treeLoading) {
+    treeAgain = true;
+    return treeLoading;
   }
+  treeLoading = (async () => {
+    patchSources({ loading: true });
+    try {
+      do {
+        treeAgain = false;
+        try {
+          const tree = await api().library_tree();
+          if (tree.status === "faulty") throw Error(tree.reason);
+          patchSources({ tree, error: null });
+          // A library folder read for the first time shows "Reading…"; look again shortly instead of waiting on it.
+          window.clearTimeout(readingTimer);
+          if ((tree.folders || []).some((f: Json) => f.reading)) readingTimer = window.setTimeout(() => void loadLibraryTree(), 2000);
+        } catch (error) {
+          patchSources({ error: (error as Error).message });
+        }
+      } while (treeAgain);
+    } finally {
+      patchSources({ loading: false });
+      treeLoading = null;
+    }
+  })();
+  return treeLoading;
 }
 async function enterSources(next: Route, previous: Route) {
   if (!state.sourcesView.tree) await loadLibraryTree();
@@ -869,6 +886,14 @@ export async function loadFolderItems(generation = state.source.generation) {
     const result = await api().library_items(c.key, view.path, offset, 80, { types: view.types, states: view.states }, view.showFiles);
     if (generation !== state.source.generation) return;
     if (result.status === "faulty") throw Error(result.reason);
+    if (result.status === "reading") {
+      // The folder's saved data is being read for the first time: keep the skeleton and ask again shortly.
+      patchGrid("source", { status: "Reading this library folder…" });
+      window.setTimeout(() => {
+        if (generation === state.source.generation) void loadFolderItems(generation);
+      }, 2000);
+      return;
+    }
     const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
     patchGrid("source", (s) => ({ items: s.items.concat(assets), total: result.total }));
     patchSources((v) => ({ files: v.files.concat(files), counts: result.counts }));
@@ -885,13 +910,15 @@ export async function loadFolderItems(generation = state.source.generation) {
   }
 }
 /** Reload the shown folder in place after a scan or a finished item: states update, nothing jumps. */
+let refreshing = false;
 async function refreshFolder() {
   const s = state.sourcesView;
-  if (!s.key || !state.api) return;
+  if (!s.key || !state.api || refreshing) return;
+  refreshing = true;
   try {
     const shown = Math.max(80, state.source.items.length + s.files.length);
     const result = await api().library_items(s.key, s.path, 0, Math.min(200, shown), { types: s.types, states: s.states }, s.showFiles);
-    if (result.status === "faulty" || state.sourcesView.key !== s.key || state.sourcesView.path !== s.path) return;
+    if (result.status !== "ready" || state.sourcesView.key !== s.key || state.sourcesView.path !== s.path) return;
     const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
     // Thumbnails of assets whose state changed are asked for again (a finished preview fades in).
     const before: Record<string, string> = Object.fromEntries(state.source.items.map((item: Json) => [item.asset_id, item.state]));
@@ -901,6 +928,8 @@ async function refreshFolder() {
     patchSources({ files, counts: result.counts });
   } catch {
     /* The next change poll tries again. */
+  } finally {
+    refreshing = false;
   }
 }
 export function setSourcesFilter(patch: Partial<Pick<SourcesView, "types" | "states" | "sort" | "showFiles" | "list">>) {

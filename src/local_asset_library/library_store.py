@@ -188,6 +188,27 @@ def missing_assets(config, folder_id=None, prefix=None):
     return [a for a in found if not prefix or a['locator'] == prefix or a['locator'].startswith(prefix.rstrip('/') + '/')]
 
 
+def missing_count(config, folder_id):
+    if not database_path(config).exists():
+        return 0
+    with closing(connect(config)) as db:
+        return db.execute("SELECT COUNT(*) FROM assets WHERE state='missing' AND folder_id=?", (folder_id,)).fetchone()[0]
+
+
+def missing_list(config, folder_id):
+    """Missing assets with the few saved fields a list shows; the saved records stay in the database."""
+    if not database_path(config).exists():
+        return []
+    with closing(connect(config)) as db:
+        rows = db.execute("SELECT asset_id, locator, last_seen, json_extract(record, '$.display_name'), "
+                          "json_extract(record, '$.files[0].path'), json_extract(record, '$.asset_type'), "
+                          "json_extract(record, '$.type_metadata.image_kind') FROM assets WHERE state='missing' AND folder_id=?",
+                          (folder_id,)).fetchall()
+    return [{'asset_id': r[0], 'locator': r[1], 'last_seen': r[2], 'record': {
+        'display_name': r[3], 'files': [{'path': r[4]}] if r[4] else [], 'asset_type': r[5],
+        'type_metadata': {'image_kind': json.loads(r[6])} if r[6] else {}} if r[3] or r[4] else None} for r in rows]
+
+
 def forget_missing(config, folder_id, prefix=None):
     """Forget Missing assets (all of a folder, or those under ``prefix``); the history keeps the evidence."""
     chosen = missing_assets(config, folder_id, prefix)

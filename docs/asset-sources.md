@@ -28,7 +28,9 @@ Adding a folder **inside** a library folder is refused as already covered, with 
 **around** library folders replaces them: their assets keep their IDs, results, collection entries and
 your reviews. **Remove…** stops watching a folder; its results stay in the store, and adding the same
 folder again restores everything. An unreachable folder (a removed drive) shows **Offline**; its results
-and collection entries are kept.
+and collection entries are kept. A large library folder opened for the first time after a scan shows
+**Reading…** for a few seconds while Assetarium prepares a small summary of it; counts can trail running
+processing by a few seconds.
 
 ## What is found
 

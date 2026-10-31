@@ -19,6 +19,11 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
   chose not to add one in October 2026). Seen: 2026-10-18, 2026-10-28, 2026-10-30
 - **The full test suite takes minutes and needs real Blender**: a skipped Blender fixture counts as
   unverified. Targeted runs (`tests/test_<area>.py`) are the everyday path. Seen: 2026-10-28
+- **`scripts/verify-loading-states.py` is stale**: it waits for `#source-warnings-loading`, which the
+  rebuilt Asset processing tab no longer has, so it fails before its later checks. Seen: 2026-10-31
+- **No process memory probe in the runtimes**: `.venv-mcp` has no `psutil`, so measuring peak memory
+  needed a `kernel32.K32GetProcessMemoryInfo` ctypes snippet (`PeakWorkingSetSize`). A small helper
+  in `scripts/gui_harness.py` would make memory checks repeatable. Seen: 2026-10-31
 
 ## Agent setup
 

@@ -7,6 +7,7 @@ operations, and each operation starts the next item when it ends, so the queue n
 overnight switch holds descriptions until the chosen window. A queue left over after a restart is paused and
 never resumes by itself. Blocked work is never queued: its prerequisite and fix are shown instead.
 """
+from contextlib import closing
 from datetime import datetime, time as clock, timezone
 import json
 from pathlib import PurePosixPath
@@ -74,41 +75,36 @@ def validate_scope(config, scope):
 
 
 def resolve(config, action, scope):
-    """The assets an item would process now, and those it cannot (blocked), from the saved working catalog."""
-    from .incremental import working
-    from .library_view import _folder, blockers, kind_of, state_of
-    from .settings import descriptions_enabled, processing_eligible, processing_formats
-    from .sources import bound, description_state, embedding_failures, get_source, read_records
+    """The assets an item would process now, and those it cannot (blocked), from the folder's up-to-date view."""
+    from .folder_view import connect, inside_sql, state_sql
+    from .library_view import _current, blockers
+    from .settings import descriptions_enabled
+    from .sources import get_source
     source = get_source(config, scope['key'])
-    scoped = bound(config, source)
-    work = working(scoped)
-    current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
-    if not current.output_path('data', 'catalog.sqlite').exists():
-        return {'ids': [], 'blocked': {}, 'kinds': {}, 'records': []}
-    records = read_records(current)
-    picked = set(scope.get('asset_ids') or ())
-    path = scope.get('path') or ''
-    inside = lambda r: (r['asset_id'] in picked) if picked else (not path or _folder(r, source['key']) == path
-                                                                  or _folder(r, source['key']).startswith(path + '/'))
-    blocked, faults, formats = blockers(config), embedding_failures(current), processing_formats(config)
-    ids, stopped, kinds, chosen = [], {}, {}, []
-    for record in records:
-        if not inside(record) or not processing_eligible(record, formats):
-            continue
-        if action == 'previews':
-            state, reason = state_of(record, blocked, faults)
-            if state == 'blocked':
-                stopped[reason] = stopped.get(reason, 0) + 1
+    current = _current(config, source)
+    blocked = blockers(config)
+    fixes = {b['reason']: b['fix'] for b in blocked.values()}
+    if current is None or (action != 'previews' and not descriptions_enabled(config)):
+        return {'ids': [], 'blocked': {}, 'kinds': {}, 'fixes': fixes}
+    picked = scope.get('asset_ids')
+    where, params = ('asset_id IN (SELECT value FROM json_each(?))', [json.dumps(picked)]) if picked else inside_sql(scope.get('path') or '')
+    state, state_params, reason, reason_params = state_sql(blocked)
+    ids, stopped, kinds = [], {}, {}
+    with closing(connect(current, fresh=True)) as view:
+        rows = view.execute(f'SELECT asset_id, kind, {state}, {reason}, description FROM assets WHERE eligible AND {where} '
+                            'ORDER BY asset_id', state_params + reason_params + params)
+        for asset_id, kind, item_state, item_reason, description in rows:
+            if action == 'previews':
+                if item_state == 'blocked':
+                    stopped[item_reason] = stopped.get(item_reason, 0) + 1
+                    continue
+                if item_state != 'no_previews':
+                    continue
+            elif description != 'missing':
                 continue
-            if state != 'no_previews':
-                continue
-        elif not descriptions_enabled(config) or description_state(record) != 'missing':
-            continue
-        ids.append(record['asset_id'])
-        chosen.append(record)
-        kinds[kind_of(record)] = kinds.get(kind_of(record), 0) + 1
-    return {'ids': ids, 'blocked': stopped, 'kinds': kinds, 'records': chosen,
-            'fixes': {b['reason']: b['fix'] for b in blocked.values()}}
+            ids.append(asset_id)
+            kinds[kind] = kinds.get(kind, 0) + 1
+    return {'ids': ids, 'blocked': stopped, 'kinds': kinds, 'fixes': fixes}
 
 
 def _batch_rate(config, stage):
@@ -372,23 +368,25 @@ def _log_lines(config, item):
 
 def failures(config):
     """Recorded failures by stage and reason, per library folder (never mixed with pending work)."""
-    from .incremental import working
-    from .sources import bound, read_records, registry, import_outcome
+    from .folder_view import Reading, connect
+    from .library_view import _current
+    from .sources import registry
     groups = {}
     for source in registry(config)['sources']:
-        scoped = bound(config, source)
-        current = working(scoped) if working(scoped).output_path('data', 'catalog.sqlite').exists() else scoped
-        if not current.output_path('data', 'catalog.sqlite').exists():
+        current = _current(config, source)
+        if current is None:
             continue
-        for record in read_records(current):
-            outcome = import_outcome(record)
-            for stage in outcome['failed_stages']:
-                fault = (record.get('stage_faults') or {}).get(stage) or (record.get('stage_faults') or {}).get('previews') or {}
-                reason = str(fault.get('error') or fault.get('reason') or 'Recorded failure')[:300]
+        try:
+            view = connect(current)
+        except Reading:
+            continue  # Listed once the folder's view is built; the Asset sources tab shows it is being read.
+        with closing(view):
+            rows = view.execute('SELECT asset_id, name, path, failed_stages FROM assets WHERE failed_stages IS NOT NULL ORDER BY asset_id').fetchall()
+        for asset_id, name, path, stages in rows:
+            for stage, reason in json.loads(stages).items():
                 key = (source['key'], stage, reason)
                 entry = groups.setdefault(key, {'key': source['key'], 'folder': source['name'], 'stage': stage, 'reason': reason, 'assets': []})
-                entry['assets'].append({'asset_id': record['asset_id'], 'name': record['display_name'],
-                                        'path': record['files'][0]['path'] if record['files'] else None})
+                entry['assets'].append({'asset_id': asset_id, 'name': name, 'path': path})
     return sorted(groups.values(), key=lambda g: (-len(g['assets']), g['folder'], g['stage']))
 
 
@@ -402,7 +400,7 @@ def blocked_groups(config):
     counts = {}
     for source in registry(config)['sources']:
         try:
-            nodes = folder_tree(config, source).get('nodes', [])
+            nodes = folder_tree(config, source, found).get('nodes', [])
         except Exception:  # A folder that cannot be read is shown on the Asset sources tab.
             continue
         root = next((n for n in nodes if n['path'] == ''), None)

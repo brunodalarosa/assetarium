@@ -105,6 +105,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Large libraries no longer take over the computer's memory. The Asset sources and Asset processing
+  tabs read a small per-folder summary instead of every saved record, so a 73,000-asset library
+  folder opens in about a second instead of timing out with 14 GB in use. A library folder read
+  for the first time shows "Reading…" for a few seconds, and the same request is never run twice
+  at once. Closing the window now always ends the app.
 - Descriptions are no longer rejected for wording alone. A sailing ship's "rigging" is its
   ropes, not a character rig, and phrases such as "designed for use in games" in the
   description are now kept with a review note instead of failing it. The 35 descriptions an

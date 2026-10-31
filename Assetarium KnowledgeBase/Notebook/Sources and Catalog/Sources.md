@@ -1,8 +1,8 @@
 ---
 area: Sources and Catalog
 tags: [system]
-code: [sources.registry, sources.add, sources.Covered, sources.scan_source, sources.aggregate, sources.generated_path, sources.bound, sources.importing_failures, library_store.py, library_store.recognize, result_store.py, result_store.reattach, source_operations.py, library_migration.py, catalog.walk_source, hash_cache.py, library_policy.DEFAULT_BUDGET, library_policy.LEGACY]
-verified: 2026-10-30
+code: [sources.registry, sources.add, sources.Covered, sources.scan_source, sources.aggregate, sources.generated_path, sources.bound, sources.importing_failures, folder_view.py, folder_view.connect, library_store.py, library_store.recognize, result_store.py, result_store.reattach, source_operations.py, library_migration.py, catalog.walk_source, hash_cache.py, library_policy.DEFAULT_BUDGET, library_policy.LEGACY]
+verified: 2026-10-31
 branch: feature/library-view
 ---
 # Sources
@@ -52,6 +52,14 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   original; only `library_migration.py` names it (`tests/test_metadata_name.py`).
 - **Processing never starts from a scan**; Make previews and Generate descriptions are always explicit actions.
 
+- **Folder views** (`folder_view.py`): the Asset sources tab, the processing queue (`resolve`, `failures`,
+  blocked counts), source status (`sources._format_status`), `importing_failures`, `locate` and
+  `setup_core.processed_models` read one small SQLite view per catalog generation
+  (`<store>/folders/<id>/library/views/<generation>-<stamp>.sqlite`), never whole records. The stamp covers
+  the catalog and embedding index stats and the processing formats. A build streams the catalog with
+  `json_remove` dropping heavy fields (`folder_view.HEAVY`), one per catalog, at most two at once.
+  **Never call `sources.read_records` from a window or MCP read path**: a 73k-asset catalog is 1.1 GB and
+  costs ~2.6 GiB to load; that is what made the app use 14 GB (October 31, 2026).
 - **Packs** (`packs.detect`, cached by `packs.structure`) come from folder structure only and are never
   stored in records, so detecting them never makes assets pending. Owner answers (`pack`, `pack_name`,
   `image_kind`, `visit`) live in `library.sqlite` `answers`.
@@ -61,6 +69,12 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   other evidence. Model textures become `model_dependency_image` inventory rows, not assets.
 
 ## Gotchas
+
+- A view may lag its catalog: readers wait `folder_view.WAIT` seconds for a rebuild, then use the last view,
+  and a view that took a second or more to build is rebuilt at most every three build durations. Code that
+  acts on the result (the queue resolving work, `locate`, `importing_failures`) uses `connect(fresh=True)`.
+- Missing assets keep their whole saved record (variants included) in `library.sqlite`; lists use
+  `library_store.missing_list` / `missing_count`, which never parse it.
 
 - The old-folder migration (`library_migration.apply`) computes old fingerprints and per-folder keys under
   `_old_world`, a view of the old source registry: once folders are joined, a model's provider is no longer a

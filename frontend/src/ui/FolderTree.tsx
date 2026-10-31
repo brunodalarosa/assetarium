@@ -1,4 +1,4 @@
-import { Boxes, ChevronRight, Folder, FolderX, HardDrive, Package } from "lucide-react";
+import { Boxes, ChevronRight, Folder, FolderX, HardDrive, LoaderCircle, Package } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { type KeyboardEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Tooltip } from "@/components/beui/tooltip";
@@ -50,7 +50,7 @@ function flatten(tree: Json, view: SourcesView): Row[] {
       for (const child of children) visit(child.path, depth + 1, id);
       for (const item of extra) rows.push({ id: folder.key + ":excluded:" + item.path, key: folder.key, path: item.path, depth: depth + 1, node: item, folder, open: false, parent: id, hasChildren: false });
     };
-    if (folder.offline || !folder.scanned) rows.push({ id: folder.key + ":", key: folder.key, path: "", depth: 0, node: { path: "", name: folder.name, kind: "library", children: [], assets: 0 }, folder, open: false, parent: null, hasChildren: false });
+    if (folder.offline || !folder.scanned || folder.reading) rows.push({ id: folder.key + ":", key: folder.key, path: "", depth: 0, node: { path: "", name: folder.name, kind: "library", children: [], assets: 0 }, folder, open: false, parent: null, hasChildren: false });
     else visit("", 0, null);
   }
   return rows;
@@ -70,8 +70,9 @@ function TreeRow({ row, selected, focused, onFocus }: { row: Row; selected: bool
   const Icon = ICONS[(row.node.kind as keyof typeof ICONS) || "folder"] || Folder;
   const offline = row.folder.offline && row.depth === 0;
   const excluded = row.node.kind === "excluded";
+  const reading = row.folder.reading && row.depth === 0;
   const reduce = useReducedMotion();
-  const label = `${row.node.name || row.folder.name}${offline ? ", offline" : ""}${excluded ? ", excluded" : ""}${row.node.assets ? ", " + plural(row.node.assets, "asset", "assets") : ""}${row.node.new ? `, ${row.node.new} new` : ""}`;
+  const label = `${row.node.name || row.folder.name}${offline ? ", offline" : ""}${reading ? ", reading" : ""}${excluded ? ", excluded" : ""}${row.node.assets ? ", " + plural(row.node.assets, "asset", "assets") : ""}${row.node.new ? `, ${row.node.new} new` : ""}`;
   const menu = (x: number, y: number, element: HTMLElement | null, keyboard = false) =>
     openFolderMenu({ key: row.key, path: row.path, kind: row.node.kind, name: row.node.name || row.folder.name, node: row.node, folder: row.folder }, x, y, element, keyboard);
   return (
@@ -118,6 +119,13 @@ function TreeRow({ row, selected, focused, onFocus }: { row: Row; selected: bool
       <Icon className={cn("size-4 shrink-0", row.node.kind === "pack" ? "text-primary" : "text-muted-foreground")} strokeWidth={1.75} aria-hidden />
       <span className="min-w-0 flex-1 truncate">{row.node.name || row.folder.name}</span>
       {offline && <span className="text-[11px] text-muted-foreground">Offline</span>}
+      {reading && (
+        <Tooltip content="Reading this library folder’s saved data; its folders appear in a moment" delay={200}>
+          <span className="reading flex items-center gap-1 text-[11px] text-muted-foreground">
+            <LoaderCircle className={cn("size-3", !reduce && "animate-spin")} aria-hidden />Reading…
+          </span>
+        </Tooltip>
+      )}
       {row.depth === 0 && !offline && row.folder.scan_fault && (
         <Tooltip content={row.folder.scan_fault} delay={200}><span className="unreadable text-[11px] text-fault">Can’t be read</span></Tooltip>
       )}
@@ -127,7 +135,7 @@ function TreeRow({ row, selected, focused, onFocus }: { row: Row; selected: bool
           <span className="new rounded-full bg-primary/12 px-1.5 text-[10.5px] font-semibold text-primary tabular-nums">+{row.node.new}</span>
         </Tooltip>
       )}
-      {!excluded && !offline && (
+      {!excluded && !offline && !reading && (
         <Tooltip content={row.node.assets ? `${Math.round((row.node.coverage ?? 0) * 100)}% have previews · ${plural(row.node.assets, "asset", "assets")}` : "No assets"} delay={300}>
           <span className="flex items-center"><Coverage node={row.node} /></span>
         </Tooltip>

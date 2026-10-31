@@ -35,7 +35,8 @@ read it first. Up: [Notebook](Notebook.md).
 - **Sources and catalog:** `sources` (library folders, scans, the combined catalog), `library_store`
   (`library.sqlite`: folders, recognized assets, recognition history, owner answers), `packs`
   (packs and bundles from folder structure), `image_kinds` (model texture, material texture or 2D
-  image), `library_view` (the Asset sources tab's tree, states and folder contents),
+  image), `library_view` (the Asset sources tab's tree, states and folder contents), `folder_view`
+  (the small per-catalog views those tabs read instead of whole records),
   `library_migration` (the one-time move into the store; the only code naming the old folder),
   `source_operations`, `source_storage`, `source_browser`, `catalog`, `catalog_migration`,
   `asset_structure`, `image_catalog`, `membership`, `recheck`, `texture_folders`. The October 14

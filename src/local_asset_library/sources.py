@@ -492,14 +492,18 @@ def importing_failures(config):
         try:
             work = replace(scoped, catalog_generation="work")
             current = work if work.output_path("data", "catalog.sqlite").exists() else scoped
-            records = read_records(current)
-            vector_faults = embedding_failures(current)
-            for record in records:
-                failed_vector = None if vector_faults is None else record["asset_id"] in vector_faults
-                if not import_outcome(record, failed_vector)["failed_stages"]:
-                    continue
-                assets += 1
-                for file in record["files"]:
+            if not current.output_path("data", "catalog.sqlite").exists():
+                continue
+            from .catalog import read_database
+            from .folder_view import connect
+            with closing(connect(current, fresh=True)) as view:
+                failed = [r[0] for r in view.execute("SELECT asset_id FROM assets WHERE failed IS NOT NULL")]
+            assets += len(failed)
+            with closing(read_database(current)) as db:
+                rows = db.execute("SELECT json_extract(record, '$.files') FROM assets WHERE asset_id IN (SELECT value FROM json_each(?))",
+                                  (json.dumps(failed),)).fetchall()
+            for (files,) in rows:
+                for file in json.loads(files):
                     relative = _relative(file["path"])
                     if relative.parts[0] != source["key"]:
                         raise ConfigError("Asset path does not belong to its source")
@@ -522,8 +526,11 @@ def source_status(config, source):
              current.output_path('data', 'embeddings/index.sqlite')]
     signature = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) if p.exists() else (str(p), None, None) for p in paths)
     if paths[0].exists():
+        from .folder_view import Reading
         try:
             status = dict(status, **_format_status(scoped, formats, signature))
+        except Reading:
+            status = dict(status, reading=True)  # The last saved counts stay until the folder's first view is built.
         except (sqlite3.Error, OSError, ValueError) as exc:
             # One unreadable database marks only this source; its files and results stay where they are.
             status = dict(status, scan_fault=f"This source's saved processing data could not be read ({exc}). "
@@ -590,25 +597,27 @@ def processing_summary(current, published, formats, vector_faults=None):
         old = published.get(identifier)
         if outcome['state'] == 'pending' or old is None or encoded(old) != encoded(record):
             pending.append(identifier)
+    return summary_result(counts, pending, len(failed), skipped, len(current), descriptions, formats)
+
+
+def summary_result(counts, pending, failed, skipped, total, descriptions, formats):
     reason = ('Processing paused: no formats selected' if not formats else
               'Assets need processing or publication' if pending else
               'Import finished with recorded failures' if failed else
-              'No assets match the selected processing formats' if current and skipped == len(current) else
+              'No assets match the selected processing formats' if total and skipped == total else
               'Selected formats are up to date and published')
     counts = {key: counts[key] for key in (*PROCESSING_FORMATS, *sorted(set(counts) - set(PROCESSING_FORMATS)))}
     return {'format_counts': counts, 'pending_ids': sorted(pending), 'pending': len(pending), 'reason': reason,
-            'needs_processing': bool(pending), 'failed': len(failed), 'skipped_formats': skipped,
-            'eligible_assets': len(current) - skipped, 'descriptions': descriptions}
+            'needs_processing': bool(pending), 'failed': failed, 'skipped_formats': skipped,
+            'eligible_assets': total - skipped, 'descriptions': descriptions}
 
 
-@lru_cache(maxsize=64)
 def _format_status(scoped, formats, signature):
-    # Polling settings uses saved inventory only. Cache by database identity and
-    # settings, without rescanning originals or rewriting source metadata.
+    # Polling reads the folder views only (``folder_view``): saved data, never the originals or whole records.
+    from .folder_view import summary
     work = replace(scoped, catalog_generation='work')
     current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
-    return processing_summary(read_records(current), {r['asset_id']: r for r in read_records(scoped)},
-                              formats, embedding_failures(current))
+    return summary(current, scoped, formats)
 
 
 def visible(config, records):

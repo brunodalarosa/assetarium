@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [processing_queue.py, processing_queue.add, processing_queue.advance, processing_queue.resolve, processing_queue.estimate, processing_queue.after_restart, source_operations.start, source_operations.worker_stage, scripts/source-operation.py, library_view.blockers]
+code: [processing_queue.py, processing_queue.add, processing_queue.advance, processing_queue.resolve, processing_queue.estimate, processing_queue.after_restart, processing_queue.failures, folder_view.connect, source_operations.start, source_operations.worker_stage, scripts/source-operation.py, library_view.blockers]
 verified: 2026-10-30
 branch: feature/library-view
 ---
@@ -18,7 +18,7 @@ Start at `processing_queue.add` and `processing_queue.advance`.
 - `advance` finishes a running item whose operation ended (its outcome goes to `recent`), then starts the
   first waiting item: previews before descriptions, otherwise the owner's order; descriptions wait while
   the overnight hold is on and the clock is outside the window. **The scope is resolved at start**
-  (`resolve`): assets whose state is `no_previews` (or whose description is `missing`), skipping blocked
+  (`resolve`, from the folder's up-to-date view, `folder_view.connect(fresh=True)`): assets whose state is `no_previews` (or whose description is `missing`), skipping blocked
   ones. It then calls `source_operations.start` with `asset_ids`, which the operation saves in its state;
   `worker_stage` limits inspection and captions to them (search vectors still cover the whole folder).
 - `scripts/source-operation.py` calls `advance` when a process or describe operation ends, so the queue
