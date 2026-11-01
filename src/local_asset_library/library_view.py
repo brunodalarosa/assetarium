@@ -18,7 +18,7 @@ TYPES = (('model_3d', '3D models'), ('image', 'Images'), ('material_texture', 'M
 def blockers(config):
     """Prerequisites a stage needs and lacks, each with its fix: Blender for 3D previews, the search runtime."""
     from .config import with_saved_blender
-    from .engines import runtime_ready, weights_ready, command, search_device, SEARCH_DEVICES
+    from .engines import runtime_ready, weights_command, weights_ready, command, search_device, SEARCH_DEVICES
     found = {}
     blender = with_saved_blender(config).blender
     if not blender or not Path(blender).exists():
@@ -32,6 +32,9 @@ def blockers(config):
     if not runtime['ready']:
         found['search'] = {'reason': 'The search runtime is not installed', 'stages': ['embeddings'], 'types': ['model_3d', 'image'],
                            'fix': 'Install it: ' + command(config, 'embedding', 'sync --locked --project ' + project)}
+    elif weights.get('state') == 'present':
+        found['search'] = {'reason': 'The search model is here but not verified yet', 'stages': ['embeddings'], 'types': ['model_3d', 'image'],
+                           'fix': 'Verify it (reads the files, downloads nothing): ' + weights_command(config, 'embedding', weights, project)}
     elif not weights['ready']:
         found['search'] = {'reason': 'The search model is not downloaded', 'stages': ['embeddings'], 'types': ['model_3d', 'image'],
                            'fix': weights.get('reason') or 'Download it with scripts/prepare_embedding_model.py'}

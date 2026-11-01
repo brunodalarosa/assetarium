@@ -4,9 +4,11 @@ The app shows both setup paths; Set up with my agent shows the panel (no session
 synthetic Claude Code entry for a deleted copy is named with its fix, and Check again confirms the repair; a
 scripted client launches the fixture's own scripts/asset-mcp.py (code copied, mcp environment
 linked; the owner's library is never touched) and the panel flips to connected; values the agent
-applies appear live with "Set by agent"; the Blender proposal card rejects and applies (a fresh
-check in the app); finish leads to the review, where a change is saved as the user's; the
-panel reopens; the manual path still opens. Light and dark screenshots.
+answers appear live with "Set by agent"; the Blender proposal card rejects and applies (a fresh
+check in the app); finishing switches the open panel to the agent's report (every value with its
+source), Undo brings a replaced value back, Looks good completes setup and leads to Asset sources;
+the report's Change opens a step whose save is the user's; the panel reopens; the manual path
+still opens. Light and dark screenshots.
 Writes data/gui/<run-name>/report.json.
 """
 import argparse
@@ -159,8 +161,11 @@ def verify():
         wait("$('agent-connection').dataset.state==='connected'&&$('agent-connection').textContent.includes(' is connected')", 30)
         ui.check('panel_flips_to_connected_with_the_client_name', "$('agent-connection').textContent.includes('agent-setup-check is connected')")
         shoot('02-agent-connected')
-        applied, error = agent.call('apply_setup', {'storage_budget_gib': 30, 'processing_formats': ['gltf'], 'engine_hint': 'godot'})
-        assert not error and applied['status'] == 'applied', applied
+        status, _ = agent.call('get_setup_status')
+        assert status['guide'] and [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'storage_gib'], status['ask_user']
+        report['checks']['status_carries_the_guide_and_only_the_users_questions'] = True
+        applied, error = agent.call('apply_setup', {'answers': {'engines': ['godot'], 'descriptions': False, 'storage_gib': 30}})
+        assert not error and applied['status'] == 'applied' and applied['settings']['processing_formats'] == ['gltf'], applied
         wait("$('agent-values').querySelector('[data-key=processing_formats] [data-set-by=agent]')", 15)
         ui.check('agent_values_appear_live_with_attribution', """(async()=>({formats:$('agent-values').querySelector('[data-key=processing_formats]').textContent.includes('glTF'),
           budget:$('agent-values').querySelector('[data-key=storage_budget_gib]').textContent.includes('30 GiB')}))()""")
@@ -194,15 +199,30 @@ def verify():
         else:
             report['unverified'].append('No Blender found: the proposal card ran only in pytest')
         finished, error = agent.call('finish_setup')
-        assert not error and finished['status'] == 'completed', finished
-        wait("$('agent-review')", 15)
-        shoot('04-agent-finished')
-        ui.js("$('agent-review').click()")
-        wait("$('setup-wizard').dataset.step==='review'&&$('setup-summary')")
-        ui.check('review_shows_who_set_each_value', "$('setup-summary').querySelectorAll('[data-set-by=agent]').length>=2")
-        shoot('05-review')
-        ui.js("(async()=>{lal.goToSetupStep(3);await until(()=>$('setup-budget'));type('setup-budget','45');await frame();"
-              "lal.goToSetupStep(7);await until(()=>$('setup-summary'));await frame();return true})()")  # 7: review, after the model step.
+        assert not error and finished['status'] == 'review', finished
+        # The open panel follows the agent: finishing shows its report, not the Welcome page.
+        wait("$('setup-report')&&$('setup-report').dataset.state==='review'", 15)
+        ui.check('finish_shows_the_agents_report', """(async()=>({title:$('setup-step-title').textContent.includes('Your agent set up Assetarium'),
+          rows:$('setup-report-rows').children.length>=5, agent:$('setup-report-rows').textContent.includes('Set by agent'),
+          checked:$('setup-report-rows').textContent.includes('Checked by agent'), next:$('setup-next').textContent.includes('asset folders'),
+          looksGood:!!$('setup-looks-good'), noSkip:!$('setup-skip-all'),
+          rail:[...document.querySelectorAll('nav[aria-label="Setup steps"] li')].filter(li=>li.querySelector('svg')).length>=5}))()""")
+        shoot('04-agent-report')
+        ui.js("(async()=>{document.querySelector('[data-row=storage] .report-undo').click();"
+              "await until(()=>!document.querySelector('[data-row=storage] .report-undo'));return true})()")
+        record = json.loads((FIXTURE / 'data/library/setup.json').read_text(encoding='utf-8'))
+        assert record['values']['storage_budget_gib']['set_by'] == 'user', record
+        ui.check('undo_brings_back_the_replaced_value', "$('setup-report-rows').querySelector('[data-row=storage]').textContent.includes('Set by you')")
+        ui.js("$('setup-looks-good').click()")
+        wait("!$('setup-wizard')&&lal.state.history[lal.state.historyIndex].page==='sources'", 15)
+        assert json.loads((FIXTURE / 'data/library/setup.json').read_text(encoding='utf-8'))['state'] == 'completed'
+        report['checks']['looks_good_completes_and_leads_to_asset_sources'] = True
+        ui.js("(async()=>{await lal.openSetup();await until(()=>$('setup-report'));return true})()")
+        ui.check('reopened_setup_shows_the_completed_report', """(async()=>({state:$('setup-report').dataset.state==='completed',
+          title:$('setup-step-title').textContent.includes('Setup complete'), close:!!$('setup-close-report')}))()""")
+        shoot('05-report-completed')
+        ui.js("(async()=>{document.querySelector('[aria-label=\"Change Storage budget\"]').click();await until(()=>$('setup-budget'));"
+              "type('setup-budget','45');await frame();lal.goToSetupStep(7);await until(()=>$('setup-summary'));await frame();return true})()")  # 7: review.
         ui.check('review_edit_is_marked_as_changed', "$('setup-summary').querySelector('[data-step=storage]').textContent.includes('Changed by you')")
         ui.js("$('setup-save').click()")
         wait("lal.state.setup.result&&$('setup-saved-title')", 60)
@@ -211,9 +231,9 @@ def verify():
         assert settings['storage_budget_bytes'] == 45 * 1024**3 and settings['processing_formats'] == ['gltf']
         assert record['values']['storage_budget_gib']['set_by'] == 'user' and record['values']['processing_formats']['set_by'] == 'agent', record
         report['checks']['review_saves_only_the_users_change_as_theirs'] = True
-        ui.js("(async()=>{lal.closeSetup();await lal.openSetup();await until(()=>$('setup-agent-start'));$('setup-agent-start').click();"
+        ui.js("(async()=>{lal.closeSetup();await lal.openSetup();await until(()=>$('setup-report-agent'));$('setup-report-agent').click();"
               "await until(()=>$('agent-panel'));return true})()")
-        ui.check('the_panel_reopens', "!!$('agent-panel')&&!!$('agent-access')")
+        ui.check('the_panel_reopens', "!!$('agent-panel')&&!!$('agent-access')&&!$('agent-copy-prompt')")
         shoot('06-panel-reopened')
         assert agent.close() == 0
         agent = None

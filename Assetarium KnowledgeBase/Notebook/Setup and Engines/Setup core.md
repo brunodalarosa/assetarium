@@ -20,6 +20,10 @@ value). The desktop wizard, `local-assets setup` and the agent tools only wrap i
   "not fresh".
 - Nothing is saved until the review step's **Save**; each part then reports its own result, so a
   failed Blender write keeps the other settings.
+- **States:** `not_run`, `skipped`, `review` (an agent finished; the user has not confirmed its report) and
+  `completed`. `engine_hint` is a list since several engines are accepted (older records hold one string).
+- **Weights** are `verified` (receipt matches), `present` (manifest sizes match, no receipt: verify locally,
+  never download), `changed` or `absent` (`engines.weights_ready`); `engines.weights_command` picks the command.
 - Blender lives in `config.local.toml` (`[tools].blender`); `config.local.toml` overrides
   `config.example.toml` (decision 0001). The tracked example stays neutral.
 

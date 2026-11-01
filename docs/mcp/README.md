@@ -161,11 +161,12 @@ An agent can set Assetarium up for the computer it runs on
 
 | Tool | Input | Tier | Does |
 | --- | --- | --- | --- |
-| `get_setup_status` | `{}` | read | OS, GPU/VRAM, free disk, Blender candidates, engine and search readiness, settings and who set them, proposals, `missing`, `next_actions` (exact commands), recommendations. Read only |
-| `validate_blender` | `path` (≤1,024) | run | Checks a file named `blender.exe`/`blender` (version, headless start with scripts disabled, glTF/FBX/OBJ importers). Nothing else is ever run |
-| `apply_setup` | any of `storage_budget_gib`, `processing_formats`, `caption_batch_size`, `descriptions_enabled`, `description_engine`, `description_server {url, model}`, `engine_hint` | apply and undo | Validated like the wizard, recorded as set by the agent; a local server must be on this computer, and the response includes its model list |
-| `propose_setup` | `blender_path` (≤1,024) | propose | Stores a pending proposal for a path `validate_blender` passed; the user applies or rejects it |
-| `finish_setup` | `{}` | apply and undo | Marks setup completed by the agent; refused while a proposal is pending |
+| `get_setup_status` | `{}` | read | Checks this computer itself (the configured Blender, or the first one found; runtimes; model weights by size) and returns `found` (plain statements), `ask_user` (the only questions for the user, each with a suggestion and why), `guide` (how to talk to the user), `next_actions` (each with `kind`: `tool` to run without asking, `install`/`download` to ask about with its size, `user`), settings and who set them, proposals and readiness. Changes nothing |
+| `validate_blender` | optional `path` (≤1,024) | run | Checks a file named `blender.exe`/`blender` (version, headless start with scripts disabled, glTF/FBX/OBJ importers); without `path`, the configured one (or a refusal naming the Blenders found). Nothing else is ever run |
+| `verify_weights` | optional `model` (`caption`, `embedding`, `all`) | run | Hashes weights already in `[storage].models` against the pinned file list (`docs/*-model-files.json`) and writes the same receipt a verified download writes. Local only, in the background; waits up to 20 s, then status shows progress |
+| `apply_setup` | `answers {engines[], descriptions, model_server {url, model}, storage_gib}` and/or any of `storage_budget_gib`, `processing_formats`, `caption_batch_size`, `descriptions_enabled`, `description_engine`, `description_server {url, model}`, `search_device`, `engine_hint`; `finish` | apply and undo | Answers become settings (formats from the engines, the description engine and search device from the GPU, the batch size from its memory), each derived one returned in `implied` with why; explicit values override. Validated like the wizard, recorded as set by the agent with the replaced value kept for Undo. A local server must be on this computer, and the response includes its model list. `finish: true` also finishes |
+| `propose_setup` | `blender_path` (≤1,024) | propose | Stores a pending proposal for a path `validate_blender` passed; the user applies or rejects it. `already_applied` when it is the configured Blender |
+| `finish_setup` | `{}` | apply and undo | Ends the agent's part: setup waits in `review` until the user confirms the report in the app (**Looks good** → `completed`); refused while a proposal is pending |
 
 - **Tiers, no session.** Since decision 0024 there is no setup session: what a tool may do depends
   on its tier. *Read* tools always answer; *apply and undo* values are recorded as set by the agent
@@ -174,6 +175,13 @@ An agent can set Assetarium up for the computer it runs on
 - **Proposals.** The Blender path is applied only by the user's **Apply** (app, or
   `local-assets setup agent proposals`), after a fresh check in that process; a changed file
   is refused. `get_setup_status` shows `pending`, `applied`, `rejected`, `superseded` or `failed`.
+- **Guided conversation.** The agent checks everything verifiable itself and asks the user only the
+  `ask_user` questions (engines, AI descriptions or, without an NVIDIA GPU with BF16, whether a local
+  model server already runs, and the storage budget), in one message. The same guide is in the server
+  instructions while setup is unfinished and in the `set_up_assetarium` prompt, so clients without the
+  skill get it too.
+- **Weights placed by hand** are reported as `present` (here, not verified yet) and get `verify_weights`,
+  never a download; `local-assets setup verify-weights` does the same from a terminal.
 - **Degraded mode.** If the configuration does not load, the server starts anyway with only
   `get_setup_status`, which returns `mode: setup_only`, the fault, the file and the exact fix.
   Fix it, then reconnect.

@@ -113,6 +113,8 @@ def parser():
     setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
+    setup.add_parser('verify-weights', help='Verify model weights placed by hand against the pinned file list (reads them; '
+                     'downloads nothing)').add_argument('model', nargs='?', choices=['caption', 'embedding', 'all'], default='all')
     agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium: how to connect it, and its proposals')
     agent.add_argument('agent_action', nargs='?', choices=['show', 'check', 'proposals'], default='show',
                        help='show how to connect your agent and what to ask it (default), check that your agents start this copy '
@@ -808,6 +810,8 @@ def setup_command(args, config):
         result = setup_core.skip_setup(config)
         say(args, 'Setup skipped. Run it any time with: setup')
         return result
+    if args.action == 'verify-weights':
+        return verify_weights_command(args, config)
     result = setup_core.validate_blender(config, args.path)
     show_checks(args, result)
     if args.blender_action == 'check' or result['status'] not in {'passed', 'warning'}:
@@ -816,6 +820,29 @@ def setup_command(args, config):
     say(args, 'Saved to config.local.toml; the next Make previews uses it.' if saved['status'] == 'saved'
         else 'Already the Blender Assetarium uses; nothing was written.')
     return saved
+
+
+def verify_weights_command(args, config):
+    from .config import ConfigError
+    from .engines import weights_ready
+    from .model_storage import verify_weights
+    results = {}
+    for model in (('caption', 'embedding') if args.model == 'all' else (args.model,)):
+        label = 'Description' if model == 'caption' else 'Search'
+        ready = weights_ready(config, model)
+        if ready['ready'] or ready['state'] == 'absent':
+            results[model] = {'status': 'verified' if ready['ready'] else 'absent', **({'reason': ready['reason']} if not ready['ready'] else {})}
+            say(args, f"{label} model: " + ('already verified.' if ready['ready'] else ready['reason']))
+            continue
+        say(args, f"{label} model: verifying {ready['bytes'] / 1024**3:.1f} GiB…")
+        try:
+            results[model] = verify_weights(config, model)
+            say(args, f"{label} model: verified in {results[model]['seconds']} s.")
+        except (ConfigError, OSError) as exc:
+            results[model] = {'status': 'faulty', 'reason': str(exc)}
+            say(args, f"{label} model: {exc}")
+    faulty = any(item['status'] == 'faulty' for item in results.values())
+    return {'status': 'faulty' if faulty else 'ready', 'models': results, **({'reason': 'A model file did not verify'} if faulty else {})}
 
 
 def collections_command(args, config):

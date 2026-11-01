@@ -146,6 +146,7 @@ setup status                           # this computer, Blender, engines and mis
 setup blender check PATH               # executable name, version, headless start, importers
 setup blender set PATH [--confirm-rerender]   # check, then save to config.local.toml
 setup skip                             # record that setup was skipped
+setup verify-weights [caption|embedding|all]  # verify model weights placed by hand; reads them, downloads nothing
 setup agent                            # how to add Assetarium to your AI agent, and what to ask it
 setup agent check                      # do your agents start this copy? reads their settings, changes nothing
 setup agent proposals                  # apply or reject the agent's Blender proposal (interactive)
@@ -163,6 +164,10 @@ with 1 when an entry needs fixing; `setup agent` prints the fix. `doctor` includ
 configuration and the prompt to give your agent; a connected agent can apply setup values at any time
 (each one labeled and noticed). Deciding its Blender proposal (`setup agent proposals`) needs an
 interactive terminal and has no flag, so an agent running commands cannot approve itself.
+
+`setup verify-weights` checks weights you put in `[storage].models` yourself against the pinned file
+list (`docs/caption-model-files.json`, `docs/embedding-model-files.json`) and writes the same receipt a
+verified download writes; a file that differs is named and nothing is recorded.
 
 `setup blender set` writes nothing when the path is already what Assetarium uses. A
 changed Blender marks finished 3D inspections as pending again (the path is part of

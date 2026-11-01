@@ -7,9 +7,10 @@ import type { Json } from "../app/api";
 import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, plural, SEARCH_HELP } from "../app/format";
 import {
   cancelBlenderCheck, checkBlender, getState, chooseBlenderExecutable, finishSetup, goToSetupStep, measureSetupStorage,
-  saveSetup, SETUP_STEPS, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
+  saveSetup, SETUP_STEPS, setupDone, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
 } from "../app/store";
 import { AgentPanel, SetByBadge, SetupPaths } from "./AgentSetup";
+import { SetupReport } from "./SetupReport";
 import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
 import { MODEL_CHECK_HELP, ModelCheck } from "./ModelCheck";
@@ -55,7 +56,9 @@ function Welcome() {
   const env = useApp((s) => s.setup.env);
   const blender = useApp((s) => s.setup.blender);
   const agentMode = useApp((s) => s.setup.agentMode);
+  const done = useApp((s) => setupDone(s.setup.info));
   if (agentMode) return <AgentPanel />;
+  if (done) return <SetupReport />;
   return (
     <>
       <Paragraph>A few questions about this computer and how you’ll use Assetarium. Setup only records your choices, and checks Blender when you ask it to. It doesn’t download, install, process or start anything, and you can change every choice later in Settings → General.</Paragraph>
@@ -98,17 +101,22 @@ function FormatsStep() {
   const info = useApp((s) => s.setup.info);
   const draft = useApp((s) => s.setup.draft);
   const hints: Json[] = info?.hints || [];
-  const hint = hints.find((item) => item.id === draft.engineHint);
+  const chosen = hints.filter((item) => draft.engineHint.includes(item.id));
+  const toggle = (id: string) => {
+    const engineHint = draft.engineHint.includes(id) ? draft.engineHint.filter((h) => h !== id) : [...draft.engineHint, id];
+    const formats = new Set(hints.filter((h) => engineHint.includes(h.id)).flatMap((h) => h.formats));
+    updateSetupDraft({ engineHint, ...(engineHint.length ? { formats: FORMAT_NOTES.map(([f]) => f).filter((f) => formats.has(f)) } : {}) });
+  };
   return (
     <>
       <Paragraph>Processing inspects each 3D asset in Blender, renders its previews, measures geometry and builds search data. Scanning still lists every supported file, but assets that exist only in an unselected format stay unprocessed until you select it. .glb counts as glTF. 2D images are turned on per source in Settings → Asset sources. Changing formats later never deletes results or retries failures.</Paragraph>
-      <Card title="Which engine do you target?" help="A suggestion only; you can change the checkboxes below.">
-        <div role="radiogroup" aria-label="Target engine" id="setup-engine-hint" className="flex flex-wrap gap-2">
+      <Card title="Which engines do you make games with?" help="Choose every one you use. A suggestion only; you can change the checkboxes below.">
+        <div role="group" aria-label="Target engines" id="setup-engine-hint" className="flex flex-wrap gap-2">
           {hints.map((item) => {
-            const active = item.id === draft.engineHint;
+            const active = draft.engineHint.includes(item.id);
             return (
-              <button key={item.id} type="button" role="radio" aria-checked={active} data-value={item.id}
-                onClick={() => updateSetupDraft({ engineHint: item.id, formats: [...item.formats] })}
+              <button key={item.id} type="button" aria-pressed={active} data-value={item.id}
+                onClick={() => toggle(item.id)}
                 className={cn("h-9 rounded-full border px-4 text-[12.5px] font-medium transition-colors", active ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-foreground hover:bg-surface-2")}>
                 {item.label}
               </button>
@@ -116,7 +124,8 @@ function FormatsStep() {
           })}
         </div>
         <p id="setup-hint-reason" role="status" aria-live="polite" className="text-[12.5px] text-muted-foreground">
-          {hint ? `Suggested: ${hint.formats.map(formatLabel).join(", ")} — ${hint.reason}` : "Choose one to preselect formats, or set them yourself."}
+          {chosen.length === 1 ? `Suggested: ${chosen[0].formats.map(formatLabel).join(", ")} — ${chosen[0].reason}`
+            : chosen.length ? `Suggested: the formats of ${chosen.map((h) => h.label).join(" and ")} together.` : "Choose engines to preselect formats, or set them yourself."}
         </p>
       </Card>
       <Card title="Formats to process">
@@ -333,6 +342,9 @@ export function SetupWizard() {
   const Content = CONTENT[step];
   const saved = Boolean(setup.result);
   const agentWelcome = step === "welcome" && setup.agentMode;
+  const done = setupDone(setup.info);
+  const report = step === "welcome" && done && !setup.agentMode;
+  const review = setup.info?.record?.state === "review";
   // Welcome offers its two paths as cards, so it needs no footer.
   return (
     <div id="setup-wizard" role="dialog" aria-modal="true" aria-labelledby={titleId} data-step={step} className="fixed inset-0 z-[45] flex bg-background text-foreground">
@@ -352,9 +364,9 @@ export function SetupWizard() {
                   <button type="button" disabled={saved} aria-current={current ? "step" : undefined} data-step={item} onClick={() => goToSetupStep(index)}
                     className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-[13px] transition-colors disabled:pointer-events-none", current ? "bg-accent-soft font-medium text-accent-soft-foreground" : "text-foreground hover:bg-surface-2", !needed && "text-subtle")}>
                     <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[11px] tabular-nums", current ? "border-primary bg-primary text-primary-foreground" : index < setup.step ? "border-border bg-surface-2" : "border-border")}>
-                      {index < setup.step && !skipped && needed ? <Check className="size-3" aria-hidden /> : index + 1}
+                      {(done && item !== "model" && needed) || (index < setup.step && !skipped && needed) ? <Check className="size-3" aria-hidden /> : index + 1}
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{STEP_LABELS[item]}</span>
+                    <span className="min-w-0 flex-1 truncate">{item === "welcome" && done ? (review ? "Agent's report" : "Summary") : STEP_LABELS[item]}</span>
                     {skipped && <span className="text-[11px] text-muted-foreground">Skipped</span>}
                     {!needed && <span className="text-[11px]">Not needed</span>}
                   </button>
@@ -367,11 +379,12 @@ export function SetupWizard() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 px-8 pt-6">
           <span className="text-[12px] text-muted-foreground tabular-nums md:invisible">Step {setup.step + 1} of {SETUP_STEPS.length}</span>
-          {!saved && <Button variant="quiet" id="setup-skip-all" onClick={() => void skipSetup()}>Skip setup</Button>}
+          {!saved && !done && <Button variant="quiet" id="setup-skip-all" onClick={() => void skipSetup()}>Skip setup</Button>}
+          {!saved && report && <Button variant="quiet" id="setup-close-report" onClick={() => finishSetup("close")}>{review ? "Later" : "Close"}</Button>}
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 pt-2 pb-10 scroll-thin">
           <div className="mx-auto grid max-w-[760px] gap-5">
-            <h1 id="setup-step-title" tabIndex={-1} className="text-[26px] font-semibold outline-none"><span id={titleId}>{saved ? "Setup" : agentWelcome ? "Set up with your AI agent" : TITLES[step]}</span></h1>
+            <h1 id="setup-step-title" tabIndex={-1} className="text-[26px] font-semibold outline-none"><span id={titleId}>{saved ? "Setup" : agentWelcome ? "Set up with your AI agent" : report ? (review ? "Your agent set up Assetarium" : "Setup complete") : TITLES[step]}</span></h1>
             {setup.error && <Banner className="setup-error">{setup.error}</Banner>}
             {setup.loading ? <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Loading current settings…</p> : <Content />}
           </div>

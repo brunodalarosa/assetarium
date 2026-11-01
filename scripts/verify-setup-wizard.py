@@ -217,6 +217,14 @@ def fresh():
         ui.js("(async()=>{$('keep-blender').click();await until(()=>!$('settings-blender-choice'));return true})()")
     ui.js("(async()=>{await lal.loadSetupState();return true})()")
     ui.check('does_not_reopen_after_saving', "lal.state.setup.info.auto_open===false")
+    # A completed setup reopens on its summary (every value with its source), not on the two paths.
+    ui.js("(async()=>{await lal.openSetup();await until(()=>$('setup-report'));await frame();return true})()")
+    ui.check('completed_setup_reopens_on_its_summary', """(async()=>({state:$('setup-report').dataset.state==='completed',
+      title:$('setup-step-title').textContent.includes('Setup complete'), source:$('setup-report-rows').textContent.includes('Set by you'),
+      noSkip:!$('setup-skip-all'), startOver:!!$('setup-report-manual')&&!!$('setup-report-agent')}))()""")
+    shoot('07c-summary')
+    ui.js("(async()=>{lal.closeSetup();return true})()")
+    (FIXTURE / 'data/library/setup.json').unlink()  # As on a computer whose setup was never recorded: Skip setup is offered.
     ui.js("(async()=>{await lal.openSetup();await until(()=>$('setup-skip-all'));$('setup-skip-all').click();await until(()=>!$('setup-wizard'));return true})()")
     assert json.loads((FIXTURE / 'data/library/setup.json').read_text(encoding='utf-8'))['state'] == 'skipped'
     assert json.loads((FIXTURE / 'data/library/settings.json').read_text(encoding='utf-8')) == settings

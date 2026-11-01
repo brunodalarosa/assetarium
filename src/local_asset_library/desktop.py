@@ -239,6 +239,15 @@ class DesktopBridge:
         from .setup_agent import decide
         return self._wait(self._present(decide, self._config, proposal_id, decision, confirm_rerender is True, guarded=False))
 
+    def confirm_setup_review(self):
+        """Looks good on the report of an agent's setup."""
+        from .setup_core import confirm_review
+        return self._wait(self._present(confirm_review, self._config, guarded=False))
+
+    def undo_setup_value(self, key):
+        from .setup_core import undo_value
+        return self._wait(self._present(undo_value, self._config, key, guarded=False))
+
     def choose_blender_executable(self):
         import webview
         try:

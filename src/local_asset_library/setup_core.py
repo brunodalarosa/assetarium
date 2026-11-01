@@ -37,6 +37,7 @@ ENGINE_HINTS = (
      'reason': 'Open, widely supported, keeps PBR materials.'},
     {'id': 'unsure', 'label': 'Not sure', 'formats': ['fbx', 'gltf', 'obj'], 'reason': 'Processes everything; narrow it later.'},
 )
+FORMAT_ORDER = ('fbx', 'gltf', 'obj')
 # Built-in engine, 20 assets on one RTX 5070 (12 GiB): data/evidence/caption-batch-benchmark/batching-2026-10-18a.
 BATCH_BENCHMARK = ({'size': 1, 'seconds_per_asset': 9.24, 'peak_gib': 4.7}, {'size': 2, 'seconds_per_asset': 5.29, 'peak_gib': 5.3},
                    {'size': 4, 'seconds_per_asset': 3.0, 'peak_gib': 5.8}, {'size': 8, 'seconds_per_asset': 2.22, 'peak_gib': 7.1})
@@ -486,6 +487,115 @@ def _registered(config):
     return bool(value['sources'] or value.get('detached') or _legacy_registry(config))  # Or an install awaiting migration.
 
 
+def engine_hints(value):
+    """One engine id or several (stored as a list since several answers are accepted); unknown ids are refused."""
+    hints = [value] if isinstance(value, str) else value
+    known = {item['id'] for item in ENGINE_HINTS}
+    if not isinstance(hints, list) or not hints or any(item not in known for item in hints):
+        raise ConfigError('Unknown engine hint')
+    return list(dict.fromkeys(hints))
+
+
+def hint_formats(hints):
+    """The union of every chosen engine's suggested formats, in the usual order."""
+    chosen = {fmt for item in ENGINE_HINTS if item['id'] in hints for fmt in item['formats']}
+    return [fmt for fmt in FORMAT_ORDER if fmt in chosen]
+
+
+def settings_from_answers(answers, env):
+    """The user's answers to the agent setup questions → settings, each derived one with why (decision 0016).
+
+    Only what is verifiable on this computer is derived: formats from the engines, the description engine and
+    search device from the GPU, the batch size from its memory. The user's own choices pass through as given.
+    """
+    from .engines import gpu_bf16
+    if not isinstance(answers, dict):
+        raise ConfigError('answers must be an object')
+    values, implied = {}, []
+    def imply(key, value, because):
+        values[key] = value
+        implied.append({'key': key, 'value': value, 'because': because})
+    if 'engines' in answers:
+        hints = engine_hints(answers['engines'])
+        values['engine_hint'] = hints
+        imply('processing_formats', hint_formats(hints),
+              'Suggested for ' + ', '.join(item['label'] for item in ENGINE_HINTS if item['id'] in hints))
+    if 'storage_gib' in answers:
+        values['storage_budget_gib'] = answers['storage_gib']
+    bf16 = bool(gpu_bf16(env.get('gpu')))
+    server = answers.get('model_server')
+    if 'descriptions' in answers:
+        if answers['descriptions'] is not True:
+            values['descriptions_enabled'] = False
+        elif server:
+            values.update(descriptions_enabled=True, description_server=server)
+            imply('description_engine', 'local-server', 'The user runs a local model server')
+        elif bf16:
+            values['descriptions_enabled'] = True
+            imply('description_engine', 'builtin', 'This NVIDIA GPU supports BF16, which the built-in engine needs')
+            batch = env.get('recommended_batch')
+            if batch:
+                imply('caption_batch_size', batch['size'], f"Fits this GPU’s {batch['vram_gib']} GiB of memory")
+        else:
+            raise ConfigError('Descriptions need an NVIDIA GPU with BF16 or a local model server on this computer; give '
+                              'model_server, or descriptions false (they can be set up later in Settings → General)')
+    elif server:
+        raise ConfigError('model_server goes with descriptions true')
+    if values:
+        imply('search_device', 'cuda' if bf16 else 'cpu', 'This NVIDIA GPU supports BF16' if bf16 else
+              'No NVIDIA GPU with BF16, so search runs on the CPU with the same model')
+    return values, implied
+
+
+def remember_previous(config, previous):
+    """Keep the value each agent change replaced, so the user can undo it from the report."""
+    def update(value):
+        for key, old in previous.items():
+            value.setdefault('values', {}).setdefault(key, {})['previous'] = old
+    if previous:
+        _change(config, update)
+
+
+def undo_value(config, key):
+    """The user's Undo of one value an agent set: the replaced value comes back, recorded as the user's."""
+    from .settings import SETTING_KEYS, general_settings, save_general_settings
+    record, fault = load_record(config)
+    if fault:
+        raise ConfigError(fault)
+    entry = (record or {}).get('values', {}).get(key) or {}
+    if entry.get('set_by') != 'agent' or 'previous' not in entry:
+        raise ConfigError('Only a value your agent changed can be undone')
+    previous = entry['previous']
+    if key == 'engine_hint':
+        _change(config, lambda value: (value.update(engine_hint=previous),
+                                       value['values'].update(engine_hint={'set_by': 'user', 'utc': utc()})))
+        return {'status': 'undone', 'key': key, 'value': previous}
+    if key not in SETTING_KEYS:
+        raise ConfigError('This value cannot be undone here')
+    values = {**general_settings(config), key: previous}
+    save_general_settings(config, values['storage_budget_gib'], values['processing_formats'], values['caption_batch_size'],
+                          values['descriptions_enabled'], values['description_engine'], values['description_server'],
+                          values['search_device'], actor='user')
+    note_set_by(config, [key], 'user')  # Also when the saved value already matched it.
+    return {'status': 'undone', 'key': key, 'value': previous}
+
+
+def confirm_review(config):
+    """The user's Looks good on the report of an agent's setup: review → completed."""
+    record, fault = load_record(config)
+    if fault:
+        raise ConfigError(fault)
+    if (record or {}).get('state') != 'review':
+        raise ConfigError('Setup is not waiting for your review')
+    stamp = utc()
+    record = _change(config, lambda value: value.update(state='completed', completed_utc=stamp, reviewed_utc=stamp))
+    return {'status': 'completed', 'record': {k: record.get(k) for k in RECORD_FIELDS}}
+
+
+# 'review': an agent finished and the user has not confirmed its report yet.
+RECORD_FIELDS = ('state', 'completed_utc', 'skipped_utc', 'review_utc', 'reviewed_utc', 'by', 'wizard_version', 'engine_hint')
+
+
 def setup_state(config):
     from .engines import DESCRIPTION_ENGINES, SEARCH_DEVICES
     from .settings import general_settings
@@ -497,7 +607,7 @@ def setup_state(config):
     _, configured, source = configured_blender(config)
     run = first_run(config)
     return {'status': 'ready', 'wizard_version': WIZARD_VERSION, 'auto_open': run['fresh'], 'first_run': run,
-            'record': record and {k: record.get(k) for k in ('state', 'completed_utc', 'skipped_utc', 'by', 'wizard_version')},
+            'record': record and {k: record.get(k) for k in RECORD_FIELDS},
             'record_fault': fault, 'set_by': (record or {}).get('values', {}), 'settings': current,
             'settings_fault': settings_fault, 'blender': {'configured': configured, 'config_file': source},
             'engines': list(DESCRIPTION_ENGINES.values()), 'search_devices': list(SEARCH_DEVICES.values()),
@@ -520,6 +630,7 @@ def save_setup(config, choices, actor='user'):
     checked_general(config, values['storage_budget_gib'], values['processing_formats'], values['caption_batch_size'],
                     values['descriptions_enabled'], values['description_engine'], values['description_server'],
                     values['search_device'])
+    hint = engine_hints(choices['engine_hint']) if choices.get('engine_hint') else None
     blender = choices.get('blender_path')
     change = None
     if blender is not None and 'blender' not in skipped:
@@ -540,7 +651,7 @@ def save_setup(config, choices, actor='user'):
         chosen.append('blender')
     def update(value):
         value.update(state='completed', completed_utc=stamp, by=actor, wizard_version=WIZARD_VERSION,
-                     skipped_steps=skipped, engine_hint=choices.get('engine_hint') if isinstance(choices.get('engine_hint'), str) else None)
+                     skipped_steps=skipped, engine_hint=hint)
         value.setdefault('values', {}).update({key: {'set_by': actor, 'utc': stamp} for key in chosen})
     record = _change(config, update)
     return {'status': 'saved' if outcome['status'] != 'faulty' else 'partial', 'settings': saved, 'blender': outcome,
