@@ -114,9 +114,9 @@ def parser():
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
     agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium: how to connect it, and its proposals')
-    agent.add_argument('agent_action', nargs='?', choices=['show', 'proposals'], default='show',
-                       help='show how to connect your agent and what to ask it (default), or apply or reject its Blender proposals '
-                            '(interactive terminal only)')
+    agent.add_argument('agent_action', nargs='?', choices=['show', 'check', 'proposals'], default='show',
+                       help='show how to connect your agent and what to ask it (default), check that your agents start this copy '
+                            '(reads their settings, changes nothing), or apply or reject its Blender proposals (interactive terminal only)')
     blender = setup.add_parser('blender', help='Check or save the Blender executable').add_subparsers(dest='blender_action', required=True)
     blender.add_parser('check').add_argument('path')
     save = blender.add_parser('set', help='Check, then save to config.local.toml')
@@ -735,14 +735,38 @@ def wizard(args, config):
     return result
 
 
+REGISTRATION_STATES = {'ok': 'starts this copy of Assetarium.', 'missing': 'starts a copy of Assetarium that no longer exists.',
+                       'other_checkout': 'starts a different copy of Assetarium.',
+                       'unrecognized': 'starts Assetarium through a command this check cannot follow.',
+                       'unreadable': 'settings could not be read.'}
+
+
 def agent_command(args, config):
     """How to connect an agent; deciding its proposals is a user gesture: interactive terminal only, no flag (decision 0016)."""
     from . import setup_agent
+    if args.agent_action == 'check':
+        found = setup_agent.registrations(config.project_root)
+        say(args, setup_agent.REGISTRATION_NOTE)
+        if not found:
+            say(args, '\nNo agent has Assetarium added yet. Run "setup agent" to see how to add it.')
+        for item in found:
+            where = f" (project {item['folder']})" if item['scope'] == 'project' else ''
+            say(args, f"\n{item['label']}{where}: {REGISTRATION_STATES[item['state']]}"
+                      + (f"\n  Starts: {item['script']}" if item['script'] and item['state'] != 'ok' else '')
+                      + (f"\n  {item.get('reason')}" if item.get('reason') else '') + (f"\n  Fix: {item['fix']}" if item['fix'] else ''))
+        problems = [item for item in found if item['state'] in setup_agent.PROBLEMS]
+        if problems:
+            say(args, '\nThe fix commands and configurations for this computer are shown by: setup agent')
+        return {'status': 'faulty' if problems else 'ready', 'registrations': found}
     if args.agent_action == 'show':
+        problems = [item for item in setup_agent.registrations(config.project_root) if item['state'] in setup_agent.PROBLEMS]
+        for item in problems:
+            say(args, f"Warning: {item['label']} {REGISTRATION_STATES[item['state']]} {item['fix']}\n")
         say(args, 'Add Assetarium to your agent (it can set Assetarium up whenever it is connected):')
         for snippet in setup_agent.snippets(config.project_root):
             say(args, f"\n{snippet['label']} — {snippet['where']}\n{snippet['text']}")
-        say(args, '\nThen ask it:\n' + setup_agent.SETUP_PROMPT + '\n\nApprove its Blender proposal with: setup agent proposals')
+        say(args, '\nThen ask it:\n' + setup_agent.SETUP_PROMPT + '\n\nApprove its Blender proposal with: setup agent proposals'
+                  + '\nCheck that your agents start this copy with: setup agent check')
         return {'status': 'ready', 'prompt': setup_agent.SETUP_PROMPT}
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise ConfigError('Agent proposals are approved by you in an interactive terminal (or in the app); run it yourself')

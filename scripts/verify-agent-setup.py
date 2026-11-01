@@ -1,6 +1,7 @@
 """Real WebView2 check of agent setup (decisions 0016, 0024) with a real STDIO MCP client, on an isolated fresh project.
 
 The app shows both setup paths; Set up with my agent shows the panel (no session to open) and it waits; a
+synthetic Claude Code entry for a deleted copy is named with its fix, and Check again confirms the repair; a
 scripted client launches the fixture's own scripts/asset-mcp.py (code copied, mcp environment
 linked; the owner's library is never touched) and the panel flips to connected; values the agent
 applies appear live with "Set by agent"; the Blender proposal card rejects and applies (a fresh
@@ -55,6 +56,18 @@ if made.returncode:
 missing = str(FIXTURE / 'old-blender' / 'blender.exe')
 (FIXTURE / 'config.local.toml').write_text(setup_core.with_blender((ROOT / 'config.example.toml').read_text(encoding='utf-8'), missing), encoding='utf-8')
 config = load_project_config(FIXTURE)
+# Synthetic agent settings: Claude Code still starts a deleted copy, as after moving the checkout. Never the owner's real ones.
+CLIENT_HOME = FIXTURE / 'client-home'
+CLIENT_HOME.mkdir()
+os.environ['LAL_CLIENT_HOME'] = str(CLIENT_HOME)
+
+
+def register(script):
+    entry = {'type': 'stdio', 'command': str(FIXTURE / '.venv-mcp/Scripts/python.exe'), 'args': [str(script)], 'env': {}}
+    (CLIENT_HOME / '.claude.json').write_text(json.dumps({'mcpServers': {'local_asset_library': entry}}), encoding='utf-8')
+
+
+register(FIXTURE.parent / 'moved-away/scripts/asset-mcp.py')
 
 
 class Agent:
@@ -127,11 +140,23 @@ def verify():
           tabs:$('agent-snippet-tabs').querySelectorAll('[role=tab]').length===4,
           allowlist:$('agent-snippet').textContent.includes('enabled_tools')&&$('agent-snippet').textContent.includes('finish_setup'),
           prompt:$('agent-prompt').textContent.includes('get_setup_status')}))()""")
-        ui.js("(async()=>{$('agent-snippet-tabs').querySelector('[data-client=\"claude-code\"]').click();await frame();return true})()")
-        ui.check('client_tabs_switch_snippets', "$('agent-snippet').dataset.client==='claude-code'&&$('agent-snippet').textContent.startsWith('claude mcp add')")
+        ui.check('stale_registration_is_named_with_its_path_and_a_fix', """(async()=>{const item=document.querySelector('.agent-registration');
+          return {client:item?.dataset.client==='claude-code', state:item?.dataset.state==='missing',
+          path:item?.textContent.includes('moved-away'), connection:$('agent-connection').textContent.includes('Fix the agent entry'),
+          note:$('agent-registration-note').textContent.includes('changes nothing and sends nothing anywhere')}})()""")
+        shoot('01-agent-stale-registration')
+        ui.js("(async()=>{document.querySelector('.agent-registration-show').click();await frame();return true})()")
+        ui.check('fix_shows_the_self_repairing_claude_command', """(async()=>({tab:$('agent-snippet').dataset.client==='claude-code',
+          remove:$('agent-snippet').textContent.startsWith('claude mcp remove --scope user local_asset_library'),
+          add:$('agent-snippet').textContent.includes('claude mcp add --scope user local_asset_library')}))()""")
+        register(FIXTURE / 'scripts/asset-mcp.py')  # As if the user ran the command.
+        ui.js("$('agent-registrations-check').click()")
+        wait("$('agent-registrations').dataset.problems==='0'&&$('agent-registrations-ok')", 15)
+        ui.check('check_again_confirms_this_copy', "$('agent-registrations-ok').textContent.includes('Claude Code starts this copy')")
         shoot('01-agent-waiting')
         agent = Agent()
-        wait("$('agent-connection').dataset.state==='connected'", 30)
+        # The client name is recorded after initialize, a moment after the connection itself.
+        wait("$('agent-connection').dataset.state==='connected'&&$('agent-connection').textContent.includes(' is connected')", 30)
         ui.check('panel_flips_to_connected_with_the_client_name', "$('agent-connection').textContent.includes('agent-setup-check is connected')")
         shoot('02-agent-connected')
         applied, error = agent.call('apply_setup', {'storage_budget_gib': 30, 'processing_formats': ['gltf'], 'engine_hint': 'godot'})
@@ -177,7 +202,7 @@ def verify():
         ui.check('review_shows_who_set_each_value', "$('setup-summary').querySelectorAll('[data-set-by=agent]').length>=2")
         shoot('05-review')
         ui.js("(async()=>{lal.goToSetupStep(3);await until(()=>$('setup-budget'));type('setup-budget','45');await frame();"
-              "lal.goToSetupStep(6);await until(()=>$('setup-summary'));await frame();return true})()")
+              "lal.goToSetupStep(7);await until(()=>$('setup-summary'));await frame();return true})()")  # 7: review, after the model step.
         ui.check('review_edit_is_marked_as_changed', "$('setup-summary').querySelector('[data-step=storage]').textContent.includes('Changed by you')")
         ui.js("$('setup-save').click()")
         wait("lal.state.setup.result&&$('setup-saved-title')", 60)

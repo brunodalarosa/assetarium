@@ -446,14 +446,107 @@ def snippets(root):
     codex = (f'[mcp_servers.{SERVER_NAME}]\ncommand = {json.dumps(python)}\nargs = [{json.dumps(entry)}]\ncwd = {json.dumps(str(root))}\n'
              f'startup_timeout_sec = 30\ntool_timeout_sec = 180\nenabled_tools = {json.dumps(tools())}\n')
     quote = (lambda text: f'"{text}"') if os.name == 'nt' else (lambda text: "'" + text.replace("'", "'\\''") + "'")
-    claude = f'claude mcp add --scope user {SERVER_NAME} -- {quote(python)} {quote(entry)}'
+    # Two lines, so pasting runs both in any shell: the first replaces an entry left by a moved or copied checkout.
+    claude = (f'claude mcp remove --scope user {SERVER_NAME}\n'
+              f'claude mcp add --scope user {SERVER_NAME} -- {quote(python)} {quote(entry)}')
     opencode = json.dumps({'mcp': {SERVER_NAME: {'type': 'local', 'command': [python, entry], 'enabled': True, 'timeout': 180000}}}, indent=2)
     generic = json.dumps({'mcpServers': {SERVER_NAME: {'command': python, 'args': [entry], 'cwd': str(root)}}}, indent=2)
     return [{'id': 'codex', 'label': 'Codex', 'where': 'Add to ~/.codex/config.toml (or the file in CODEX_HOME).', 'language': 'toml', 'text': codex},
-            {'id': 'claude-code', 'label': 'Claude Code', 'where': 'Run in a terminal.', 'language': 'shell', 'text': claude},
+            {'id': 'claude-code', 'label': 'Claude Code', 'language': 'shell', 'text': claude,
+             'where': 'Run both lines in a terminal, then restart Claude Code. The first line removes an older Assetarium entry; '
+                      'if there is none it reports an error, which is fine.'},
             {'id': 'opencode', 'label': 'OpenCode', 'where': 'Merge into your opencode.json.', 'language': 'json', 'text': opencode},
             {'id': 'generic', 'label': 'Other', 'where': 'For clients that read an mcpServers map; adapt the keys if yours differ.',
              'language': 'json', 'text': generic}]
+
+
+# A client that starts a missing or other copy shows only "connection closed"; this finds why, reading nothing else.
+REGISTRATION_NOTE = (f'To check that your agents start this copy of Assetarium, Assetarium reads only its own {SERVER_NAME} '
+                     'entry in the Claude Code, Codex and OpenCode settings on this computer. It changes nothing and sends nothing anywhere.')
+PROBLEMS = ('missing', 'other_checkout')
+_registrations = {}
+
+
+def client_files(home=None, environ=None):
+    """Where each client keeps its MCP servers (user scope). LAL_CLIENT_HOME (tests, verify runs) replaces the whole lookup."""
+    env = os.environ if environ is None else environ
+    if not home and env.get('LAL_CLIENT_HOME'):
+        home, env = env['LAL_CLIENT_HOME'], {}
+    home = Path(home or Path.home())
+    return [('claude-code', 'Claude Code', Path(env['CLAUDE_CONFIG_DIR']) / '.claude.json' if env.get('CLAUDE_CONFIG_DIR') else home / '.claude.json'),
+            ('codex', 'Codex', Path(env.get('CODEX_HOME') or home / '.codex') / 'config.toml'),
+            ('opencode', 'OpenCode', Path(env.get('XDG_CONFIG_HOME') or home / '.config') / 'opencode/opencode.json')]
+
+
+def _entries(client, data):
+    """(scope, folder, command, args) for this server only; every other key is ignored."""
+    def take(map_, scope, folder=None):
+        entry = map_.get(SERVER_NAME) if isinstance(map_, dict) else None
+        if isinstance(entry, dict):
+            command, args = entry.get('command'), entry.get('args') or []
+            if isinstance(command, list):  # OpenCode keeps the program and its arguments together.
+                command, args = (command[0] if command else None), command[1:]
+            yield scope, folder, command, args if isinstance(args, list) else []
+    if client == 'claude-code':
+        yield from take(data.get('mcpServers'), 'user')
+        projects = data.get('projects')
+        for folder, project in (projects.items() if isinstance(projects, dict) else ()):
+            yield from take(project.get('mcpServers') if isinstance(project, dict) else None, 'project', folder)
+    else:
+        yield from take(data.get('mcp_servers' if client == 'codex' else 'mcp'), 'user')
+
+
+def _judge(root, command, args):
+    import shutil
+    script = next((a for a in args if isinstance(a, str) and a.replace('\\', '/').endswith('scripts/asset-mcp.py')), None)
+    if not isinstance(command, str) or not command or script is None:
+        return 'unrecognized'  # A wrapper (uv, a shell script) this check cannot follow.
+    found = shutil.which(command) if os.sep not in command and '/' not in command else Path(command).is_file()
+    if not (found and Path(script).is_file()):
+        return 'missing'
+    same = lambda path: os.path.normcase(os.path.realpath(path))
+    return 'ok' if same(Path(script).parents[1]) == same(root) else 'other_checkout'
+
+
+def _fix(client, scope, folder, path):
+    if client == 'claude-code':
+        return (f'In {folder}, run: claude mcp remove --scope local {SERVER_NAME}' if scope == 'project'
+                else 'Run the Claude Code command shown for this computer, then restart Claude Code.')
+    table = f'[mcp_servers.{SERVER_NAME}]' if client == 'codex' else f'mcp.{SERVER_NAME}'
+    return f'Replace {table} in {path} with the {"Codex" if client == "codex" else "OpenCode"} configuration shown for this computer, then restart it.'
+
+
+def registrations(root, home=None, environ=None):
+    """Read-only: each client's entry for this server and whether it starts this checkout (missing, other_checkout, ok…)."""
+    found = []
+    for client, label, path in client_files(home, environ):
+        try:
+            info = path.stat()
+        except OSError:
+            continue  # Client not used on this computer.
+        key = (str(path), info.st_mtime_ns, info.st_size)
+        if key not in _registrations:  # The panel asks often; Claude Code's file can be large.
+            for old in [item for item in _registrations if item[0] == key[0]]:
+                del _registrations[old]
+            try:
+                text = path.read_text(encoding='utf-8-sig')
+                import tomllib
+                data = tomllib.loads(text) if client == 'codex' else json.loads(text)
+                _registrations[key] = list(_entries(client, data)) if isinstance(data, dict) else ValueError('not a settings object')
+            except (OSError, ValueError, AttributeError) as exc:
+                _registrations[key] = exc
+        parsed = _registrations[key]
+        base = {'client': client, 'label': label, 'file': str(path)}
+        if isinstance(parsed, Exception):
+            found.append({**base, 'scope': None, 'folder': None, 'command': None, 'script': None, 'state': 'unreadable', 'fix': None,
+                          'reason': f'{label} settings could not be read ({type(parsed).__name__}); they were not checked'})
+            continue
+        for scope, folder, command, args in parsed:
+            state = _judge(root, command, args)
+            found.append({**base, 'scope': scope, 'folder': folder, 'command': command if isinstance(command, str) else None,
+                          'script': next((a for a in args if isinstance(a, str) and a.endswith('asset-mcp.py')), None),
+                          'state': state, 'fix': _fix(client, scope, folder, path) if state in PROBLEMS else None})
+    return found
 
 
 def app_state(config, now=None):
@@ -464,4 +557,5 @@ def app_state(config, now=None):
     return {'status': 'ready', 'connections': connections(config.project_root),
             'proposals': [public(item) for item in value['proposals'][-10:]], 'record': state['record'], 'set_by': state['set_by'],
             'settings': state['settings'], 'blender': state['blender'], 'snippets': snippets(config.project_root),
+            'registrations': registrations(config.project_root), 'registration_note': REGISTRATION_NOTE,
             'prompt': SETUP_PROMPT, 'privacy': PRIVACY, 'fault': fault}

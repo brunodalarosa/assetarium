@@ -193,6 +193,9 @@ def main() -> int:
                           numpy_finite_normalized=bool(np.isfinite(vector / np.linalg.norm(vector)).all()),
                           blender_executable_exists=bool(config.blender and config.blender.is_file()),
                           blender_candidates=[str(path) for path in blender_candidates(config)])
+            from .setup_agent import registrations  # Read only: this server's entry in each agent's settings.
+            result['mcp_registrations'] = [{key: item[key] for key in ('label', 'scope', 'folder', 'state', 'script')}
+                                           for item in registrations(root)]
         print(json.dumps(result, indent=2))
         return 0
     except (ConfigError, sqlite3.Error, OSError, ValueError, RuntimeError) as exc:

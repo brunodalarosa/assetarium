@@ -15,6 +15,12 @@ def isolated_hash_cache(tmp_path_factory):
     hash_cache.reset()
 
 
+@pytest.fixture(autouse=True, scope='session')
+def isolated_client_settings(tmp_path_factory):
+    # Agent registration checks read an empty home, never the developer's real agent settings.
+    os.environ['LAL_CLIENT_HOME'] = str(tmp_path_factory.mktemp('client-home'))
+
+
 @pytest.fixture
 def directory_link():
     """A Windows junction (no symlink privilege needed) or a POSIX symlink; skips with the reason."""

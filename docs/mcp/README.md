@@ -182,6 +182,12 @@ An agent can set Assetarium up for the computer it runs on
   process is alive. There is no network listener.
 - **Privacy.** Status goes to the client's model, possibly in the cloud: OS, GPU, disk and
   Blender paths, never user names, environment variables, listings or the project path.
+- **Agent entries.** A client whose entry starts a moved or deleted copy only reports
+  "connection closed", so no tool can explain it. The app's agent panel (step 1) and
+  `local-assets setup agent check` read only the `local_asset_library` entry in the Claude Code,
+  Codex and OpenCode settings, say which copy each one starts and show the fix; nothing is
+  written or sent to the agent. The Claude Code snippet removes an existing user entry before
+  adding this checkout's, so running it again repairs a stale one.
 - **Annotations.** Status is read-only; the setup writes are `readOnlyHint: false`,
   `destructiveHint: false` (values are replaced, recorded and reversible).
 

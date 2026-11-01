@@ -24,6 +24,9 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **No process memory probe in the runtimes**: `.venv-mcp` has no `psutil`, so measuring peak memory
   needed a `kernel32.K32GetProcessMemoryInfo` ctypes snippet (`PeakWorkingSetSize`). A small helper
   in `scripts/gui_harness.py` would make memory checks repeatable. Seen: 2026-10-31
+- **Verify scripts move to wizard steps by number**: `verify-agent-setup.py` used `goToSetupStep(6)`,
+  which stopped being Review when the model step was added. Look steps up by name, as
+  `verify-setup-wizard.py` does (`STEPS.index(name)`). Seen: 2026-11-01
 
 ## Agent setup
 

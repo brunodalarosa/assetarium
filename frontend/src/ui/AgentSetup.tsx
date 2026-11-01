@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/beui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { formatLabel, plural } from "../app/format";
-import { copyText, decideProposal, leaveAgentSetup, reviewAgentSetup, startAgentSetup, useApp } from "../app/store";
+import { copyText, decideProposal, leaveAgentSetup, loadAgentSetup, reviewAgentSetup, startAgentSetup, useApp } from "../app/store";
 import { Badge, Banner, Button, Card, Spinner } from "./primitives";
 
 export function SetByBadge({ entry }: { entry: Json | undefined }) {
@@ -43,8 +43,7 @@ export function SetupPaths() {
   );
 }
 
-function Snippets({ snippets }: { snippets: Json[] }) {
-  const [client, setClient] = useState(snippets[0]?.id);
+function Snippets({ snippets, client, setClient }: { snippets: Json[]; client: string | undefined; setClient: (id: string) => void }) {
   const current = snippets.find((item) => item.id === client) || snippets[0];
   return (
     <div className="grid gap-3">
@@ -65,7 +64,54 @@ function Snippets({ snippets }: { snippets: Json[] }) {
   );
 }
 
-function ConnectionLine({ connections }: { connections: Json[] }) {
+const PROBLEM: Record<string, string> = {
+  missing: "starts a copy of Assetarium that no longer exists, so it cannot connect:",
+  other_checkout: "starts a different copy of Assetarium, so setup would change that copy:",
+};
+
+/** Agents only report "connection closed" when their entry points at a moved or deleted copy; this says which and how to fix it. */
+function Registrations({ agent, onShow }: { agent: Json; onShow: (client: string) => void }) {
+  const [checking, setChecking] = useState(false);
+  const found: Json[] = agent.registrations || [];
+  const problems = found.filter((item) => PROBLEM[item.state]);
+  const ok = [...new Set(found.filter((item) => item.state === "ok").map((item) => item.label))];
+  const again = async () => {
+    setChecking(true);
+    try { await loadAgentSetup(); } finally { setChecking(false); }
+  };
+  return (
+    <div id="agent-registrations" className="grid gap-3" data-problems={problems.length}>
+      {problems.map((item) => (
+        <div key={item.client + (item.folder || "")} className="agent-registration" data-client={item.client} data-state={item.state}>
+        <Banner tone="warning" role="status" className="grid gap-2">
+          <span>
+            <span className="font-medium">{item.label}{item.scope === "project" ? ` (for ${item.folder})` : ""}</span> {PROBLEM[item.state]}{" "}
+            <span className="break-all font-mono text-[11.5px]">{item.script}</span>
+          </span>
+          {item.scope === "project"
+            ? <span className="break-all font-mono text-[11.5px] select-text">{item.fix}</span>
+            : <span className="flex flex-wrap items-center gap-3">
+                <span>Replace it with the {item.label} configuration below, then restart {item.label}.</span>
+                <Button variant="secondary" className="agent-registration-show h-8 px-3 text-[12px]" onClick={() => onShow(item.client)}>Show the {item.label} fix</Button>
+              </span>}
+        </Banner>
+        </div>
+      ))}
+      {!problems.length && ok.length > 0 && (
+        <p id="agent-registrations-ok" className="flex items-center gap-2 text-[12.5px] text-success"><Check className="size-3.5" aria-hidden />{ok.join(", ")} {ok.length > 1 ? "start" : "starts"} this copy of Assetarium.</p>
+      )}
+      <p id="agent-registration-note" className="flex flex-wrap items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
+        <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">{agent.registration_note}</span>
+        <button type="button" id="agent-registrations-check" disabled={checking} className="font-medium text-foreground underline underline-offset-2 disabled:opacity-60" onClick={() => void again()}>
+          {checking ? "Checking…" : "Check again"}
+        </button>
+      </p>
+    </div>
+  );
+}
+
+function ConnectionLine({ connections, blocked }: { connections: Json[]; blocked: boolean }) {
   const live = connections.filter((item) => item.mode === "normal");
   const degraded = connections.some((item) => item.mode === "setup_only");
   const name = live.map((item) => item.client?.name).find(Boolean);
@@ -77,7 +123,9 @@ function ConnectionLine({ connections }: { connections: Json[] }) {
     );
   return (
     <p id="agent-connection" data-state={degraded ? "setup_only" : "waiting"} role="status" aria-live="polite" className="flex items-center gap-2 text-[13px] text-muted-foreground">
-      <Spinner />{degraded ? "An agent is connected, but Assetarium’s configuration does not load; it can read the fault and the fix." : "Waiting for an agent to connect… Agents start Assetarium’s server themselves when they connect, so restart your agent after adding the configuration."}
+      <Spinner />{degraded ? "An agent is connected, but Assetarium’s configuration does not load; it can read the fault and the fix."
+        : blocked ? "Waiting for an agent to connect… Fix the agent entry shown in step 1 first, then restart your agent."
+        : "Waiting for an agent to connect… Agents start Assetarium’s server themselves when they connect, so restart your agent after adding the configuration."}
     </p>
   );
 }
@@ -151,6 +199,7 @@ function Values({ agent }: { agent: Json }) {
 
 export function AgentPanel() {
   const agent = useApp((s) => s.setup.agent);
+  const [client, setClient] = useState<string | undefined>(undefined);
   if (!agent) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Opening agent setup…</p>;
   const pending = (agent.proposals || []).filter((item: Json) => item.state === "pending");
   const finished = agent.record?.state === "completed" && agent.record?.by === "agent";
@@ -169,14 +218,15 @@ export function AgentPanel() {
         </Banner>
       )}
       <Card title="1 · Add Assetarium to your agent" help="Generated for this computer’s folders. Assetarium’s server runs only while your agent is connected.">
-        <Snippets snippets={agent.snippets} />
+        <Registrations agent={agent} onShow={(id) => { setClient(id); requestAnimationFrame(() => document.getElementById("agent-snippet")?.scrollIntoView({ behavior: "smooth", block: "nearest" })); }} />
+        <Snippets snippets={agent.snippets} client={client} setClient={setClient} />
       </Card>
       <Card title="2 · Ask it to set up Assetarium">
         <p id="agent-prompt" className="rounded-xl bg-surface-2 p-3 text-[12.5px] leading-relaxed select-text">{agent.prompt}</p>
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="secondary" id="agent-copy-prompt" onClick={() => void copyText(agent.prompt, "Setup prompt copied. Paste it into your agent.")}><Copy className="size-3.5" aria-hidden />Copy setup prompt</Button>
         </div>
-        <ConnectionLine connections={agent.connections || []} />
+        <ConnectionLine connections={agent.connections || []} blocked={(agent.registrations || []).some((item: Json) => PROBLEM[item.state])} />
         <p id="agent-privacy" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />Your agent’s model receives this computer’s OS, GPU, free space and Blender paths. If that model runs in the cloud, they leave this computer. Your agent runs install commands only with your permission.
         </p>

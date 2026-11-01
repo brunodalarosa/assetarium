@@ -239,7 +239,63 @@ def test_snippets_list_every_tool_for_allowlisting_clients(project):
     codex = tomllib.loads(snippets['codex']['text'])['mcp_servers']['local_asset_library']
     assert codex['enabled_tools'] == list(SCHEMAS) and codex['args'] == [str(project.project_root / 'scripts/asset-mcp.py')]
     assert json.loads(snippets['generic']['text'])['mcpServers']['local_asset_library']['cwd'] == str(project.project_root)
-    assert 'claude mcp add' in snippets['claude-code']['text']
+    remove, add = snippets['claude-code']['text'].splitlines()  # Re-running replaces an entry left by a moved checkout.
+    assert remove == 'claude mcp remove --scope user local_asset_library' and add.startswith('claude mcp add --scope user local_asset_library -- ')
+
+
+def registered(project, tmp_path, script=None, python=None):
+    """Synthetic client settings in a fake home: a Claude Code user entry, an unrelated server and secret, a project entry."""
+    home = tmp_path / 'home'
+    (home / '.codex').mkdir(parents=True)
+    python = python or str(project.project_root / '.venv-mcp/python.exe')
+    script = script or str(project.project_root / 'scripts/asset-mcp.py')
+    for path in (python, script):
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text('', encoding='utf-8')
+    entry = {'type': 'stdio', 'command': python, 'args': [script], 'env': {'TOKEN': 'secret'}}
+    gone = str(tmp_path / 'old/scripts/asset-mcp.py')
+    (home / '.claude.json').write_text(json.dumps({'oauthAccount': {'email': 'x'}, 'mcpServers': {'local_asset_library': entry, 'other': entry},
+                                                   'projects': {'D:/game': {'mcpServers': {'local_asset_library': dict(entry, args=[gone])}}, 'D:/x': []}}), encoding='utf-8')
+    (home / '.codex/config.toml').write_text('[mcp_servers.local_asset_library]\ncommand = "uv"\nargs = ["run", "asset"]\n', encoding='utf-8')
+    return home
+
+
+def test_registrations_report_only_this_server_and_whether_it_starts_this_checkout(project, tmp_path):
+    home = registered(project, tmp_path)
+    found = setup_agent.registrations(project.project_root, home, {})
+    assert [(item['label'], item['scope'], item['state']) for item in found] == [
+        ('Claude Code', 'user', 'ok'), ('Claude Code', 'project', 'missing'), ('Codex', 'user', 'unrecognized')]
+    assert 'secret' not in json.dumps(found) and 'oauth' not in json.dumps(found)  # Only this server's command and script.
+    assert found[1]['fix'] == 'In D:/game, run: claude mcp remove --scope local local_asset_library' and found[0]['fix'] is None
+    assert setup_agent.client_files(home, {'CLAUDE_CONFIG_DIR': str(tmp_path / 'c')})[0][2] == tmp_path / 'c/.claude.json'
+    assert setup_agent.client_files(None, {'LAL_CLIENT_HOME': str(home), 'CODEX_HOME': 'elsewhere'})[1][2] == home / '.codex/config.toml'
+
+
+def test_registration_of_a_moved_or_other_checkout_is_a_problem_with_a_fix(project, tmp_path):
+    other = tmp_path / 'other'
+    home = registered(project, tmp_path, script=str(other / 'scripts/asset-mcp.py'))
+    user = setup_agent.registrations(project.project_root, home, {})[0]
+    assert user['state'] == 'other_checkout' and 'Claude Code command' in user['fix']
+    (other / 'scripts/asset-mcp.py').unlink()  # The copy is deleted; the parsed file is cached but the check is not.
+    assert setup_agent.registrations(project.project_root, home, {})[0]['state'] == 'missing'
+    (home / '.claude.json').write_text('{damaged', encoding='utf-8')
+    damaged = setup_agent.registrations(project.project_root, home, {})[0]
+    assert damaged['state'] == 'unreadable' and 'not checked' in damaged['reason']
+    assert setup_agent.registrations(project.project_root, tmp_path / 'nobody', {}) == []
+
+
+def test_app_and_cli_show_registration_problems(project, tmp_path, monkeypatch, capsys):
+    from local_asset_library import owner_commands
+    home = registered(project, tmp_path, script=str(tmp_path / 'gone/scripts/asset-mcp.py'))
+    (tmp_path / 'gone/scripts/asset-mcp.py').unlink()
+    monkeypatch.setenv('LAL_CLIENT_HOME', str(home))
+    state = setup_agent.app_state(project)
+    assert state['registrations'][0]['state'] == 'missing' and 'changes nothing' in state['registration_note']
+    result = owner_commands.setup_command(owner_commands.parser().parse_args(['setup', 'agent', 'check']), project)
+    out = capsys.readouterr().out
+    assert result['status'] == 'faulty' and 'no longer exists' in out and 'Fix: Run the Claude Code command' in out
+    owner_commands.setup_command(owner_commands.parser().parse_args(['setup', 'agent']), project)
+    assert capsys.readouterr().out.startswith('Warning: Claude Code starts a copy of Assetarium that no longer exists.')
 
 
 def test_cli_shows_how_to_connect_and_proposals_need_an_interactive_terminal(project, monkeypatch, capsys):
