@@ -15,7 +15,7 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
 
 - Read tools: `search_assets`, `get_asset`, `list_collections`, `get_collection`, `get_setup_status`.
   Owner-data writes: `edit_collection`, `tag_assets` (annotated destructive, since they can remove).
-  Setup writes: `validate_blender`, `apply_setup`, `propose_setup`, `finish_setup` (non-destructive,
+  Setup writes: `validate_blender`, `verify_weights`, `apply_setup`, `propose_setup`, `finish_setup` (non-destructive,
   see [Agent setup sessions](Agent%20setup%20sessions.md)). Pack structure (decision 0024): `list_packs`,
   `get_pack_outline`, `get_profile` (read), `propose_profile`, `finish_structure`, `say` (`pack_agent.py`,
   dispatched by `Gateway.call` with the client's name; see [Pack profiles](../Sources%20and%20Catalog/Pack%20profiles.md)).

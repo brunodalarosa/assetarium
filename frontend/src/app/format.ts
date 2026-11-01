@@ -118,7 +118,8 @@ export function notificationContent(item: Json): { tone: Tone; title: string; bo
     return {
       tone: "info",
       title: item.finished ? "Your agent finished setup" : "Your agent changed setup",
-      body: `${changes.length ? "Changed: " + changes.join(", ") + "." : "No values changed."} You can review and change every value.`,
+      body: item.finished ? `${changes.length ? "Changed: " + changes.join(", ") + ". " : ""}Look over its report and confirm it, then choose your asset folders.`
+        : `${changes.length ? "Changed: " + changes.join(", ") + "." : "No values changed."} You can review and change every value.`,
     };
   }
   if (item.kind === "descriptions_ready")
@@ -204,5 +205,6 @@ export function setupRecordText(record: Json | null | undefined) {
   if (!record?.state || record.state === "not_run") return "Setup has not been run on this computer.";
   const when = (value: string) => new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   const by = record.by === "agent" ? " by an agent" : "";
+  if (record.state === "review") return `Your agent finished setup ${when(record.review_utc)}; it waits for you to look over its report.`;
   return record.state === "completed" ? `Setup completed ${when(record.completed_utc)}${by}.` : `Setup skipped ${when(record.skipped_utc)}${by}.`;
 }

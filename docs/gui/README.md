@@ -212,8 +212,13 @@ space and Blender paths; and **What your agent has set**, each value with *Set b
 *Set by you* or *Proposed by agent · approved by you*. A Blender proposal appears as a card
 ("Your agent proposes: Blender → path, checked as Blender 5.2.2 …") with **Apply** (checks
 again, then saves; the re-render confirmation appears when needed) and **Reject**. When the
-agent finishes, **Review choices** opens the review step with the saved values and who set
-them; **Save** records only what the user changed. Agent changes and proposals raise
+agent finishes, the open panel turns into **its report** (and the app opens it at the next start
+until it is confirmed): every value with where it came from (*Set by agent* with **Undo**, *Set by
+you*, *Checked by agent*), a check or a warning icon per row with the copyable command for anything
+that still needs the user, **Change** (opens that step; **Save** records only what the user
+changed), and **Looks good**, which completes setup and leads to Asset sources to choose the asset
+folders (**Later** keeps it for review). A completed setup reopens on the same summary, with
+**Set up with my agent** / **Set it up yourself** to start over. Agent changes and proposals raise
 notices whose **Review** / **Review proposal** lead back to the panel; a decided proposal's
 notice and toast disappear. **Settings → General → Run setup with my agent** opens the same
 panel. Verification: `scripts/verify-agent-setup.py --run-name <unique-name>` (a real STDIO

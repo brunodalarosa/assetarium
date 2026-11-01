@@ -167,7 +167,7 @@ export type SetupStep = (typeof SETUP_STEPS)[number];
 export interface SetupDraft {
   blenderPath: string;
   confirmRerender: boolean;
-  engineHint: string;
+  engineHint: string[];
   formats: string[];
   budget: string;
   descriptionsEnabled: boolean;
@@ -292,7 +292,7 @@ function emptySetup(): SetupState {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
     storage: null, measuring: false, server: null, testing: false, saving: false, result: null,
     agent: null, agentMode: false, agentBusy: null, baseline: null,
-    draft: { blenderPath: "", confirmRerender: false, engineHint: "", formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", skipped: [] },
+    draft: { blenderPath: "", confirmRerender: false, engineHint: [], formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", skipped: [] },
   };
 }
 const idleSearch: SearchState = {
@@ -1312,6 +1312,7 @@ function savedDraft(info: Json): SetupDraft {
   return {
     ...emptySetup().draft,
     blenderPath: info.blender?.configured || "",
+    engineHint: [info.record?.engine_hint || []].flat(),
     formats: values.processing_formats ?? ["fbx", "gltf", "obj"],
     budget: values.storage_budget_gib != null ? String(values.storage_budget_gib) : "",
     descriptionsEnabled: values.descriptions_enabled ?? true,
@@ -1502,7 +1503,7 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   const skipped = new Set(draft.skipped);
   const choices: Json = { skipped_steps: [...skipped] };
   if (!skipped.has("blender") && draft.blenderPath) Object.assign(choices, { blender_path: draft.blenderPath, confirm_rerender: draft.confirmRerender });
-  if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, engine_hint: draft.engineHint || null });
+  if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, engine_hint: draft.engineHint.length ? draft.engineHint : null });
   if (!skipped.has("storage") && draft.budget) choices.storage_budget_gib = draft.budget;
   if (!skipped.has("descriptions"))
     Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
@@ -1589,12 +1590,44 @@ export async function openAgentSetupFromSettings() {
   await openSetup();
   await startAgentSetup();
 }
-/** Notices of agent setup lead back to the panel; a pending proposal is decided there. */
+/** Notices of agent setup lead back to the panel; a pending proposal is decided there. A finished setup shows its report. */
 export async function openAgentPanel() {
   if (!state.setup.open) await openSetup();
-  patchSetup({ agentMode: true });
   goToSetupStep(0);
-  await loadAgentSetup();
+  const agent = await loadAgentSetup();
+  const pending = (agent?.proposals || []).some((p: Json) => p.state === "pending");
+  patchSetup({ agentMode: pending || !setupDone(state.setup.info) });
+}
+export async function showSetupReport() {
+  const info = await loadSetupState();
+  patchSetup({ agentMode: false, draft: savedDraft(info) });
+  goToSetupStep(0);
+}
+/** Setup ended (an agent's waiting for review, or completed): the first page is the report. */
+export const setupDone = (info: Json | null) => ["review", "completed"].includes(info?.record?.state);
+/** Looks good: the agent's setup is confirmed, then the next step is choosing asset folders. */
+export async function confirmSetupReview() {
+  patchSetup({ saving: true, error: null });
+  const result = await api().confirm_setup_review();
+  patchSetup({ saving: false });
+  if (result.status === "faulty") return patchSetup({ error: result.reason });
+  pushToast({ tone: "success", title: "Setup complete", body: "Add the folders with your asset library to start using Assetarium." });
+  await loadSetupState();
+  finishSetup("sources");
+}
+export async function undoSetupValue(key: string) {
+  const result = await api().undo_setup_value(key);
+  if (result.status === "faulty") return pushToast({ tone: "fault", title: "Not undone", body: result.reason });
+  pushToast({ tone: "info", title: "Undone", body: "The value your agent replaced is back, recorded as yours." });
+  const [info] = await Promise.all([loadSetupState(), loadGeneralSettings()]);
+  patchSetup({ draft: savedDraft(info) });
+}
+/** Change one value from the report: that wizard step, filled with what is saved now; Save records only what changes. */
+export async function changeSetupStep(step: SetupStep) {
+  const info = await loadSetupState();
+  const draft = savedDraft(info);
+  patchSetup({ draft, baseline: draft, result: null, agentMode: false });
+  goToSetupStep(SETUP_STEPS.indexOf(step));
 }
 
 /* -------------------------------- appearance ----------------------------- */
@@ -2203,7 +2236,7 @@ async function watchChanges() {
       const agentChanged = next.agent !== tokens.agent;
       Object.assign(tokens, { library: next.library, sources: next.sources, collections: next.collections, agent: next.agent });
       // Agent setup steps, proposals and connections appear live while the panel is open.
-      if (agentChanged && state.setup.open && state.setup.agentMode) void loadAgentSetup();
+      if (agentChanged && state.setup.open) void followAgentSetup();
       if (agentChanged || state.agent.working || state.agent.open) void loadAgentActivity();
       if (libraryChanged) await refreshContext();
       // Agent edits (and this window's own saves) reach the collection views here.
@@ -2226,6 +2259,17 @@ async function watchChanges() {
   }, 1500);
 }
 
+/** While setup is open, the agent's values, proposals and its finish appear live; finishing shows the report. */
+async function followAgentSetup() {
+  const before = state.setup.info?.record?.state;
+  const [info] = await Promise.all([loadSetupState(), state.setup.agentMode ? loadAgentSetup() : null]);
+  const pending = (state.setup.agent?.proposals || []).some((p: Json) => p.state === "pending");
+  if (info.record?.state === "review" && before !== "review" && !pending) {
+    patchSetup({ agentMode: false, draft: savedDraft(info), baseline: null, result: null });
+    goToSetupStep(0);
+  }
+}
+
 /* --------------------------------- startup ------------------------------- */
 
 export async function start(bridge: Bridge) {
@@ -2239,8 +2283,8 @@ export async function start(bridge: Bridge) {
     await loadSources();
     void loadLibraryTree();
     void watchChanges();
-    // Setup opens by itself only on a genuinely fresh install (setup_core.first_run).
-    void loadSetupState().then((info) => info.auto_open && openSetup()).catch(() => undefined);
+    // Setup opens by itself only on a genuinely fresh install (setup_core.first_run), or to show an agent's setup for review.
+    void loadSetupState().then((info) => (info.auto_open || info.record?.state === "review") && openSetup()).catch(() => undefined);
     if (context.managed_sources) await sourceAction("scan");
   } catch (error) {
     setState({ startupError: (error as Error).message, ready: true });

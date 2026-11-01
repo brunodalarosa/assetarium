@@ -24,6 +24,9 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **No process memory probe in the runtimes**: `.venv-mcp` has no `psutil`, so measuring peak memory
   needed a `kernel32.K32GetProcessMemoryInfo` ctypes snippet (`PeakWorkingSetSize`). A small helper
   in `scripts/gui_harness.py` would make memory checks repeatable. Seen: 2026-10-31
+- **Verify scripts move to wizard steps by number**: `verify-agent-setup.py` used `goToSetupStep(6)`,
+  which stopped being Review when the model step was added. Look steps up by name, as
+  `verify-setup-wizard.py` does (`STEPS.index(name)`). Seen: 2026-11-01
 
 ## Agent setup
 
@@ -54,4 +57,4 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **Windows Defender real-time scanning** of the `.venv*` folders accounts for much of the ~20 s
   cold `torch` import. Excluding them is a security setting, so it stays the user's choice and is
   never automated. Seen: 2026-10-17
-- **Multi-file edits through inline Python in shell heredocs** repeatedly broke escaped `\n` and quotes. Use the Edit tool or a script file instead. Seen: 2026-10-31
+- **Multi-file edits through inline Python in shell heredocs** repeatedly broke escaped `\n` and quotes. Use the Edit tool or a script file instead. Seen: 2026-10-31; 2026-11-01 (a heredoc whose text held a typographic `’` failed with "unexpected EOF" in the Bash tool; a script file in the scratchpad worked)

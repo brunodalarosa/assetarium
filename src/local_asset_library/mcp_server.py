@@ -37,22 +37,33 @@ DESCRIPTIONS = {
     'get_collection': 'One collection with its members in order: asset IDs, names, per-collection label and notes, owner tags and availability; paged.',
     'edit_collection': 'Create a collection (optionally with members), rename or describe it, add/remove approved members, or set one member\'s label/notes. No deletion; originals are never touched.',
     'tag_assets': 'Add or remove owner tags (app-wide, not per collection) on approved members.',
-    'get_setup_status': 'Setup status for this computer: OS, GPU and VRAM, free disk, Blender candidates, engine and runtime '
-        'readiness, current settings and who set them, proposals, what is missing and exact commands (next_actions). '
-        'Always available, changes nothing. Its contents go to your model (possibly in the cloud).',
+    'get_setup_status': 'Start here to set up Assetarium. It checks this computer itself (OS, GPU, free disk, Blender, runtimes, '
+        'model weights) and returns what it found, the only questions to ask the user (ask_user), how to talk to them (guide) '
+        'and what is left (next_actions). Changes nothing. Its contents go to your model (possibly in the cloud).',
     'validate_blender': 'Check a Blender executable (named blender.exe or blender only; nothing else is ever run): version, '
-        'headless start with scripts disabled, glTF/FBX/OBJ importers.',
-    'apply_setup': 'Set storage budget, processing formats, description batch size, descriptions on/off, description engine '
-        '(builtin, or local-server for a vision model server already running on this computer) and target-engine hint. '
-        'Validated like the app\'s wizard, recorded as set by the agent; the user sees a notice and can undo.',
+        'headless start with scripts disabled, glTF/FBX/OBJ importers. Without path it checks the configured Blender.',
+    'verify_weights': 'Verify model weights that are already on this computer against the pinned file list and record them as '
+        'ready. Local only: reads the files, downloads nothing; runs in the background and get_setup_status shows progress. '
+        'Safe to run without asking the user.',
+    'apply_setup': 'Apply the user\'s answers ({engines, descriptions, model_server, storage_gib}); Assetarium derives formats, '
+        'description engine, batch size and search device and returns why. Explicit values (storage_budget_gib, '
+        'processing_formats, caption_batch_size, descriptions_enabled, description_engine, description_server, search_device, '
+        'engine_hint) override. finish: true also finishes. Validated like the app\'s wizard, recorded as set by the agent; '
+        'the user can undo each value.',
     'propose_setup': 'Propose a Blender executable that validate_blender passed. The user applies or rejects it in the app; '
-        'get_setup_status then shows applied, rejected or still pending.',
-    'finish_setup': 'Mark setup complete once no proposal is pending. The user can still review and change everything.'}
+        'get_setup_status then shows applied, rejected or still pending. already_applied: it is the configured one.',
+    'finish_setup': 'Finish once no proposal is pending: setup then waits for the user to look over the report in the app '
+        'and confirm it. The user can change everything.'}
 from .pack_agent import DESCRIPTIONS as PACK_DESCRIPTIONS, TOOLS as PACK_TOOLS  # noqa: E402
 DESCRIPTIONS.update(PACK_DESCRIPTIONS)
 SETUP_HINT = (' Setup is not finished on this computer: if the user asks you to set up Assetarium, start with get_setup_status '
-              '(or the set_up_assetarium prompt). Setup changes are recorded as yours and the user can undo them; Blender is only '
-              'proposed for the user to apply. Never add sources, process assets or generate descriptions as part of setup.')
+              '(or the set_up_assetarium prompt) and follow its guide: check things yourself, ask the user only its ask_user '
+              'questions in one message, then apply_setup with answers {engines: [godot|unity|unreal|blender-web|unsure], '
+              'descriptions: bool, model_server: {url, model}, storage_gib: int} and finish: true. Setup changes are recorded as '
+              'yours and the user can undo them; Blender is only proposed for the user to apply. Never add sources, process '
+              'assets or generate descriptions as part of setup.')
+REVIEW_HINT = (' Setup on this computer waits for the user to look over its report in Assetarium; tell them to open it if '
+               'they ask about setup.')
 DEGRADED_INSTRUCTIONS = ('Assetarium\'s configuration failed to load, so only get_setup_status is available. It reports the '
                          'fault and the exact fix; nothing else can run until the configuration loads and the server restarts.')
 
@@ -60,7 +71,8 @@ DEGRADED_INSTRUCTIONS = ('Assetarium\'s configuration failed to load, so only ge
 def instructions(config):
     from .setup_core import load_record
     record, _ = load_record(config)
-    return INSTRUCTIONS + ('' if (record or {}).get('state') == 'completed' else SETUP_HINT)
+    state = (record or {}).get('state')
+    return INSTRUCTIONS + ('' if state == 'completed' else REVIEW_HINT if state == 'review' else SETUP_HINT)
 
 
 WORKER_SILENCE_SECONDS = 90
@@ -348,6 +360,7 @@ ANNOTATIONS = {
     # Setup values are replaced, recorded and reversible; validate_blender runs Blender but changes nothing.
     'apply_setup': {'readOnlyHint': False, 'destructiveHint': False, 'idempotentHint': True},
     'validate_blender': {'readOnlyHint': False, 'destructiveHint': False, 'idempotentHint': True},
+    'verify_weights': {'readOnlyHint': False, 'destructiveHint': False, 'idempotentHint': True},  # Writes only its receipt.
     'propose_setup': {'readOnlyHint': False, 'destructiveHint': False, 'idempotentHint': False},
     'finish_setup': {'readOnlyHint': False, 'destructiveHint': False, 'idempotentHint': True},
     # A proposal is reversible (versions, Undo) and rescan rules wait for the owner; say only writes the audit line.
@@ -369,7 +382,7 @@ async def serve(config, root=None, config_fault=None):
     from mcp.server.stdio import stdio_server
     from mcp.types import (GetPromptResult, ListPromptsResult, ListToolsResult, Prompt, PromptMessage, TextContent, Tool,
                            ToolAnnotations)
-    from .setup_agent import PROCEDURE, remove_connection, write_connection
+    from .setup_agent import GUIDE, PROCEDURE, remove_connection, write_connection
     gateway = Gateway(config, root=root, config_fault=config_fault)
     async def list_tools(ctx, params):
         gateway.note_client(ctx)
@@ -387,7 +400,7 @@ async def serve(config, root=None, config_fault=None):
         if params.name != prompt.name:
             raise ValueError('Unknown prompt')
         return GetPromptResult(description=prompt.description,
-                               messages=[PromptMessage(role='user', content=TextContent(type='text', text=PROCEDURE))])
+                               messages=[PromptMessage(role='user', content=TextContent(type='text', text=PROCEDURE + ' How to talk to me: ' + GUIDE))])
     server = Server('local_asset_library',version='0.1.0',
                     instructions=instructions(config) if config is not None else DEGRADED_INSTRUCTIONS,
                     on_list_tools=list_tools,on_call_tool=call_tool,on_list_prompts=list_prompts,on_get_prompt=get_prompt)

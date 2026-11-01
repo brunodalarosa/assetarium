@@ -73,3 +73,13 @@ clients need the new tool names in `enabled_tools`.
 > gone. Tools are gated by tier: read (always), apply and undo (recorded as the agent's, one notice per day),
 > propose (the user applies; the Blender path stays a proposal) and run (`validate_blender`, Blender only). The
 > owner chose more agent proactivity, with every agent action visible in the app's Agent activity.
+
+> **Since November 1, 2026 (owner):** setup is a conversation Assetarium leads. `get_setup_status` runs the safe
+> checks itself (configured Blender, runtimes, weights by size) and returns `found`, `ask_user` (only engines,
+> descriptions or an already running model server, and the storage budget) and a tone `guide`; the agent asks
+> those questions in one message. `apply_setup` takes the user's `answers` and derives the rest (formats from
+> the engines, several allowed; engine, search device and batch size from the GPU); explicit values still
+> override. `verify_weights` (run tier) checks weights placed by hand locally against `docs/*-model-files.json`
+> and writes the receipt; it never downloads. `finish_setup` sets `review`; the user's **Looks good** on the
+> app's report sets `completed`, and each agent-changed value can be undone there. Installs and downloads
+> still need the user's approval one by one.

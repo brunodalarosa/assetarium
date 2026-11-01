@@ -23,6 +23,17 @@ All notable changes to Assetarium are listed here. The project follows
   says which packs look fine or need a structure and how it decided, then **Let my agent finish** (a prompt
   to paste, your agent's progress and proposals, live), **Review myself** or **Later**. Your agent can start
   before the first scan has finished.
+- **Guided agent setup**: your agent checks this computer itself (Blender, runtimes, model weights) and asks you
+  only what Assetarium needs to know: which game engines you use (several are fine), whether you want AI
+  descriptions (or, without an NVIDIA GPU, whether a local model server already runs), and how much disk space
+  it may use. When it finishes, the app shows its report: every value with where it came from, **Undo** for
+  what it changed, what still needs you, and **Looks good** to complete setup. Model weights you placed yourself
+  are verified locally instead of offered for download (`local-assets setup verify-weights`).
+- **Agent entry check**: when your agent's Assetarium entry starts a copy that was moved or deleted (the agent
+  only says "connection closed"), the agent setup panel says so, shows the fix and has **Check again**;
+  `local-assets setup agent check` and `doctor` report the same. It reads only Assetarium's own entry in the
+  Claude Code, Codex and OpenCode settings and changes nothing. The Claude Code command now replaces an older
+  entry, so running it again repairs it.
 - **Check my model** (Settings → General, an optional setup step, `local-assets model-check`): runs a model on
   a server on this computer through made-up packs with the pack tools and says how many it structures right
   (quick: 8 packs, about 5 minutes; `--full`: 27).

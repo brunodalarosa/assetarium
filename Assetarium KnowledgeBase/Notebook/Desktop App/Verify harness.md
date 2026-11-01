@@ -26,6 +26,8 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
 
 ## Gotchas
 
+- **Routes are not in `location.hash`.** Wait on `lal.state.history[lal.state.historyIndex].page` (for example `'sources'`) to see where `navigate` went.
+
 - `verify-setup-wizard.py`'s opening-focus check (`opens_by_itself_on_a_fresh_install` → `focus`)
   failed on unchanged `develop` when launched from an agent session on 2026-10-28; treat a failure there
   as possibly environmental before blaming a change *(unverified: cause)*.

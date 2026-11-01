@@ -39,6 +39,8 @@ SEARCH_DEVICES = {
 RUNTIME_PACKAGES = {'caption': ('torch', 'transformers'), 'embedding': ('torch', 'sentence-transformers')}
 WEIGHTS = {'caption': ('captions/model-download.json', 'qwen3-vl-2b'),
            'embedding': ('embeddings/model-download.json', 'embeddinggemma-2')}
+# File lists with sizes and hashes, kept apart from the contracts (whose bytes are fingerprint inputs).
+MANIFESTS = {'caption': 'docs/caption-model-files.json', 'embedding': 'docs/embedding-model-files.json'}
 
 
 def active(config):
@@ -125,22 +127,65 @@ def runtime_ready(config, runtime):
             'cpu_only_torch': str(found.get('torch', '')).endswith('+cpu')}
 
 
+def manifest(config, runtime):
+    """The pinned revision's file list (name, size, sha256), or None when this checkout has none."""
+    try:
+        value = json.loads((config.project_root / MANIFESTS[runtime]).read_text(encoding='utf-8'))
+        spec = DESCRIPTION_ENGINES[BUILTIN] if runtime == 'caption' else EMBEDDERS[BUILTIN]
+        contract = json.loads((config.project_root / spec['model_contract']).read_text(encoding='utf-8'))
+        return value if value['revision'] == contract['revision'] and value['files'] else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def weights_path(config, runtime, revision, name):
+    return config.output_path('models', WEIGHTS[runtime][1] + '/' + revision + '/' + name)
+
+
+def present(config, runtime, files, revision):
+    """The first file that is missing or has another size, or None (sizes only; no hashing)."""
+    for item in files:
+        path = weights_path(config, runtime, revision, item['name'])
+        if not path.is_file() or path.stat().st_size != item['size']:
+            return item['name']
+    return None
+
+
 def weights_ready(config, runtime):
-    """Receipt revision matches the contract and every file is present with its recorded size (no hashing)."""
-    receipt_name, folder = WEIGHTS[runtime]
+    """Receipt revision matches the contract and every file is present with its recorded size (no hashing).
+
+    Without a receipt, files that match the manifest by size are 'present': here, but not verified yet. They are
+    never reported as needing a download; verifying them locally writes the receipt.
+    """
+    receipt_name, _ = WEIGHTS[runtime]
     spec = DESCRIPTION_ENGINES[BUILTIN] if runtime == 'caption' else EMBEDDERS[BUILTIN]
     try:
         contract = json.loads((config.project_root / spec['model_contract']).read_text(encoding='utf-8'))
-        receipt = json.loads(config.output_path('data', receipt_name).read_text(encoding='utf-8'))
-        if receipt.get('revision') != contract['revision']:
-            return {'ready': False, 'reason': 'The download receipt is for another model revision'}
-        for item in receipt['files']:
-            path = config.output_path('models', folder + '/' + contract['revision'] + '/' + item['name'])
-            if not path.is_file() or path.stat().st_size != item['size']:
-                return {'ready': False, 'reason': 'Model file missing or changed: ' + item['name']}
+        receipt_path = config.output_path('data', receipt_name)
+        if receipt_path.is_file():
+            receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+            if receipt.get('revision') == contract['revision']:
+                changed = present(config, runtime, receipt['files'], contract['revision'])
+                if changed is None:
+                    return {'ready': True, 'state': 'verified', 'bytes': sum(item['size'] for item in receipt['files'])}
+                return {'ready': False, 'state': 'changed', 'reason': 'Model file missing or changed: ' + changed}
+        listed = manifest(config, runtime)
+        if listed and present(config, runtime, listed['files'], contract['revision']) is None:
+            return {'ready': False, 'state': 'present', 'bytes': sum(item['size'] for item in listed['files']),
+                    'reason': 'The files are here but not verified yet; verifying reads them locally and downloads nothing'}
+        return {'ready': False, 'state': 'absent', 'reason': 'No verified download: receipt missing' if not receipt_path.is_file()
+                else 'The download receipt is for another model revision'}
     except (OSError, ValueError, KeyError, TypeError, ConfigError) as exc:
-        return {'ready': False, 'reason': 'No verified download: ' + (str(exc) if isinstance(exc, ConfigError) else 'receipt missing')}
-    return {'ready': True, 'bytes': sum(item['size'] for item in receipt['files'])}
+        return {'ready': False, 'state': 'absent', 'reason': 'No verified download: ' + (str(exc) if isinstance(exc, ConfigError) else 'receipt missing')}
+
+
+def weights_command(config, runtime, weights, project, extra=''):
+    """Files that are here are verified locally, never downloaded again; only absent weights get the download command."""
+    if weights.get('state') == 'present':
+        script = '.\\scripts\\local-assets.ps1' if os.name == 'nt' else './scripts/local-assets.sh'
+        return f'{script} setup verify-weights {runtime}'
+    script = 'prepare_caption_model.py' if runtime == 'caption' else 'prepare_embedding_model.py'
+    return command(config, runtime, f'run --locked --no-sync --project {project} python scripts/{script}{extra}')
 
 
 def gpu_bf16(gpu):
@@ -165,9 +210,8 @@ def readiness(config, engine_id, gpu=None):
                       'command': None if runtime['ready'] else command(config, 'caption', 'sync --locked --project runtime/caption')})
         weights = weights_ready(config, 'caption')
         items.append({'id': 'caption_weights', 'label': 'Description model weights (about 4.3 GB)', 'ready': weights['ready'],
-                      'detail': weights.get('reason'),
-                      'command': None if weights['ready'] else command(config, 'caption',
-                          'run --locked --no-sync --project runtime/caption python scripts/prepare_caption_model.py')})
+                      'detail': weights.get('reason'), 'weights': weights.get('state'),
+                      'command': None if weights['ready'] else weights_command(config, 'caption', weights, 'runtime/caption')})
     elif engine_id == SERVER:
         server = active(config)['server']
         configured = bool(server['url'] and server['model'])
@@ -216,10 +260,9 @@ def search_readiness(config, gpu=None, device=None):
                   'command': None if runtime['ready'] and not mismatch else command(config, 'embedding', 'sync --locked --project ' + project)})
     weights = weights_ready(config, 'embedding')
     items.append({'id': 'embedding_weights', 'label': 'Search model weights (EmbeddingGemma, about 1.5 GB)', 'ready': weights['ready'],
-                  'detail': weights.get('reason'),
-                  'command': None if weights['ready'] else command(config, 'embedding',
-                      f'run --locked --no-sync --project {project} python scripts/prepare_embedding_model.py'
-                      + (' --device cpu' if device == 'cpu' else ''))})
+                  'detail': weights.get('reason'), 'weights': weights.get('state'),
+                  'command': None if weights['ready'] else weights_command(config, 'embedding', weights, project,
+                                                                           ' --device cpu' if device == 'cpu' else '')})
     capability = capability_ready(config, device)
     items.append({'id': 'embedding_capability', 'label': 'Search check on two of your assets', 'ready': capability['ready'],
                   'detail': capability.get('reason'),

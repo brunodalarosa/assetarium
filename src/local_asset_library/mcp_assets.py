@@ -77,9 +77,21 @@ SCHEMAS = {
         "remove": {**TAG_LIST, "description": "Owner tags to remove."}}},
     # Setup (decisions 0016, 0024): writes are recorded as the agent's and noticed; Blender is only proposed.
     "get_setup_status": {"type": "object", "additionalProperties": False, "properties": {}},
-    "validate_blender": {"type": "object", "required": ["path"], "additionalProperties": False, "properties": {
-        "path": {"type": "string", "maxLength": 1024, "description": "Absolute path of a file named blender.exe (Windows) or blender; nothing else is run."}}},
+    "validate_blender": {"type": "object", "additionalProperties": False, "properties": {
+        "path": {"type": "string", "maxLength": 1024, "description": "Absolute path of a file named blender.exe (Windows) or blender; "
+                 "nothing else is run. Omit it to check the Blender Assetarium is configured with."}}},
     "apply_setup": {"type": "object", "additionalProperties": False, "properties": {
+        "answers": {"type": "object", "additionalProperties": False, "description": "The user's answers to get_setup_status ask_user; "
+                    "Assetarium derives formats, description engine, batch size and search device from them.", "properties": {
+            "engines": {"type": "array", "maxItems": 5, "items": {"type": "string", "enum": [hint["id"] for hint in ENGINE_HINTS]},
+                        "description": "Every game engine the user makes games with."},
+            "descriptions": {"type": "boolean", "description": "Whether the user wants AI descriptions."},
+            "model_server": {"type": "object", "additionalProperties": False, "description": "Only with descriptions true on a "
+                             "computer that cannot run the built-in engine: a vision model server already running here.", "properties": {
+                "url": {"type": "string", "maxLength": 256, "description": "Loopback only, e.g. http://127.0.0.1:1234/v1."},
+                "model": {"type": "string", "maxLength": 256}}},
+            "storage_gib": {"type": "integer", "minimum": 1, "maximum": 1048576, "description": "Disk space for Assetarium's own data."}}},
+        "finish": {"type": "boolean", "description": "Also finish setup: the user then reviews it in the app."},
         "storage_budget_gib": {"type": "integer", "minimum": 1, "maximum": 1048576},
         "processing_formats": {"type": "array", "maxItems": 3, "items": {"type": "string", "enum": ["fbx", "gltf", "obj"]},
                                "description": "Formats to process; .glb counts as gltf; [] pauses processing."},
@@ -93,13 +105,16 @@ SCHEMAS = {
         "search_device": {"type": "string", "enum": ["cuda", "cpu"],
                           "description": "Where semantic and image search run: cuda (NVIDIA GPU with BF16) or cpu (any x86-64 CPU; slower first index)."},
         "engine_hint": {"type": "string", "enum": [hint["id"] for hint in ENGINE_HINTS]}}},
+    "verify_weights": {"type": "object", "additionalProperties": False, "properties": {
+        "model": {"type": "string", "enum": ["caption", "embedding", "all"], "description": "Which weights to verify (default all "
+                  "that are present but not verified yet)."}}},
     "propose_setup": {"type": "object", "required": ["blender_path"], "additionalProperties": False, "properties": {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},
     "finish_setup": {"type": "object", "additionalProperties": False, "properties": {}}}
 from .pack_agent import SCHEMAS as PACK_SCHEMAS, TOOLS as PACK_TOOLS, WRITE as PACK_WRITE  # noqa: E402
 SCHEMAS.update(PACK_SCHEMAS)  # Pack structure tools (decision 0024): paged outlines, profiles, proposals.
 WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup", *PACK_WRITE}
-SETUP_TOOLS = {"get_setup_status", "validate_blender", "apply_setup", "propose_setup", "finish_setup"}
+SETUP_TOOLS = {"get_setup_status", "validate_blender", "verify_weights", "apply_setup", "propose_setup", "finish_setup"}
 COLLECTION_MEANING = ("A collection is a named, owner-organized bundle of asset IDs, not an asset. Members keep their files "
                       "where they are; labels and notes belong to the collection. Use get_asset on a member for its files.")
 
@@ -163,7 +178,10 @@ def validate(name, arguments):
         if kind == "string":
             # Notes may hold line breaks; other strings stay single-line.
             check_string(key, value, prop, multiline=key == "notes" or (name == "edit_collection" and key == "description"))
-        if kind == "object" and key == "description_server":
+        if kind == "object" and key == "answers":  # setup_agent checks each answer like the wizard.
+            if type(value) is not dict or set(value) - set(prop["properties"]) or len(encoded(value)) > 2000:
+                raise ConfigError("answers takes engines, descriptions, model_server and storage_gib only")
+        elif kind == "object" and key == "description_server":
             if type(value) is not dict or set(value) - set(prop["properties"]):
                 raise ConfigError("description_server takes url and model only")
             for part, text in value.items():
