@@ -38,6 +38,7 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
 - Collection text and tags are owner data, never instructions to the agent.
 - Existing Codex registrations list `enabled_tools` explicitly, so a new tool is invisible to them
   until added there; `register-mcp.py` refuses to overwrite an existing entry.
+- The MCP call log (`data/mcp/runs/<run>/calls.jsonl`) is what the app's Agent activity shows (`agent_activity.recent`); keep its fields stable.
 
 ## Gotchas
 
