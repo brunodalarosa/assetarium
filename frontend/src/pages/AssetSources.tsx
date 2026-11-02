@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import {
-  copyText, libraryCover, loadFolderItems, makePreviews, openFolderMenu, pathAction, type SourcesView, setSourcesFilter, startAddFolder, useApp,
+  copyText, libraryCover, loadFolderItems, makePreviews, navigate, openFolderMenu, pathAction, type SourcesView, setSourcesFilter, startAddFolder, useApp,
 } from "../app/store";
 import { AssetGrid } from "../ui/AssetGrid";
 import { FolderTree } from "../ui/FolderTree";
@@ -124,6 +124,10 @@ function FolderHeader() {
           {node.blocked ? ` · ${node.blocked.toLocaleString()} blocked` : ""}
           {node.failed ? ` · ${node.failed.toLocaleString()} recorded ${node.failed === 1 ? "failure" : "failures"}` : ""}
           {node.skipped ? <span title="Assetarium does not process these file types; they are listed so you can find them"> · {node.skipped.toLocaleString()} not processed</span> : ""}
+          {node.hidden ? (
+            <> · <button type="button" id="hidden-formats" className="underline underline-offset-2 hover:text-foreground" title="Their formats are off in Settings → General → Formats Assetarium uses"
+              onClick={() => { navigate({ page: "settings", tab: "general" }); setTimeout(() => document.getElementById("formats-card")?.scrollIntoView({ block: "start" }), 120); }}>{plural(node.hidden, "file", "files")} in formats you don’t use</button></>
+          ) : ""}
           {(node.pack?.markers || []).some((m: Json) => m.kind === "license") ? " · License file" : ""}
         </p>
       </div>

@@ -25,10 +25,10 @@ def shared_input(config, representative, value):
 def index_library(config, backend=None, limit=1000, dry_run=False, description_only=False,
                   cancelled=None, progress=None):
     from .incremental import update_record
-    from .settings import processing_formats, processing_eligible
+    from .settings import processing_eligible, used_formats
     inventory = records(config)
     inventory_by_id = {r['asset_id']: r for r in inventory}
-    formats = processing_formats(config)
+    formats = used_formats(config)
     selected = [record for record in inventory if processing_eligible(record, formats)]
     from .variant_groups import shared_map
     shared = shared_map(config)  # Variants embed their group's description with their own value (decision 0024).

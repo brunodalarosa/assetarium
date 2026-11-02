@@ -629,7 +629,7 @@ def save_setup(config, choices, actor='user'):
     values = {key: choices.get(key, current[key]) for key in SETTING_KEYS}
     checked_general(config, values['storage_budget_gib'], values['processing_formats'], values['caption_batch_size'],
                     values['descriptions_enabled'], values['description_engine'], values['description_server'],
-                    values['search_device'])
+                    values['search_device'], image_formats=values['image_formats'])
     hint = engine_hints(choices['engine_hint']) if choices.get('engine_hint') else None
     blender = choices.get('blender_path')
     change = None
@@ -638,7 +638,7 @@ def save_setup(config, choices, actor='user'):
     saved = save_general_settings(config, values['storage_budget_gib'], values['processing_formats'],
                                   values['caption_batch_size'], values['descriptions_enabled'],
                                   values['description_engine'], values['description_server'], values['search_device'],
-                                  actor=actor)
+                                  actor=actor, image_formats=values['image_formats'])
     outcome = {'status': 'unchanged'} if change in {None, 'unchanged'} else None
     if outcome is None:
         try:

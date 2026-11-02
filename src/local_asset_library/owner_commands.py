@@ -100,7 +100,10 @@ def parser():
     settings =commands.add_parser('settings', help='Show or change Settings → General').add_subparsers(dest='action', required=True)
     settings.add_parser('show')
     change = settings.add_parser('set')
-    change.add_argument('--formats', help='Comma-separated: fbx,gltf,obj (glb counts as gltf); "none" pauses processing')
+    change.add_argument('--formats', help='3D formats Assetarium uses, comma-separated: fbx,gltf,obj (glb counts as gltf); "none" '
+                        'hides every 3D asset')
+    change.add_argument('--image-formats', help='Image formats Assetarium uses, comma-separated: png,jpeg,svg,webp,tga,tiff,bmp,gif,'
+                        'avif (jpg is jpeg, tif is tiff); "none" hides every standalone image. Textures are always read')
     change.add_argument('--budget-gib', type=int, help='Storage budget in whole GiB')
     change.add_argument('--batch-size', type=int, choices=[1, 2, 4, 8], help='Description batch size')
     change.add_argument('--descriptions', choices=['on', 'off'], help='Generate descriptions (off keeps existing ones)')
@@ -568,22 +571,26 @@ def settings_command(args, config):
     current = general_settings(config)
     if args.action == 'set':
         options = (args.formats, args.budget_gib, args.batch_size, args.descriptions, args.engine, args.server_url,
-                   args.server_model, args.search_device, getattr(args, 'search_threads', None))
+                   args.server_model, args.search_device, getattr(args, 'search_threads', None), getattr(args, 'image_formats', None))
         if all(value is None for value in options):
-            raise ConfigError('Give at least one of --formats, --budget-gib, --batch-size, --descriptions, --engine, '
-                              '--server-url, --server-model, --search-device or --search-threads')
-        formats = None if args.formats is None else (
-            [] if args.formats.strip().lower() == 'none' else [f.strip().lower() for f in args.formats.split(',') if f.strip()])
+            raise ConfigError('Give at least one of --formats, --image-formats, --budget-gib, --batch-size, --descriptions, '
+                              '--engine, --server-url, --server-model, --search-device or --search-threads')
+        from .settings import format_key
+        listed = lambda text: None if text is None else [] if text.strip().lower() == 'none' else \
+            [format_key(f.strip().lower()) for f in text.split(',') if f.strip()]
+        formats, images = listed(args.formats), listed(getattr(args, 'image_formats', None))
         server = None if args.server_url is None and args.server_model is None else {
             'url': args.server_url if args.server_url is not None else current['description_server']['url'],
             'model': args.server_model if args.server_model is not None else current['description_server']['model']}
         save_general_settings(config, args.budget_gib if args.budget_gib is not None else current['storage_budget_gib'],
                               formats, args.batch_size, None if args.descriptions is None else args.descriptions == 'on',
-                              args.engine, server, args.search_device, search_threads=getattr(args, 'search_threads', None))
+                              args.engine, server, args.search_device, search_threads=getattr(args, 'search_threads', None),
+                              image_formats=images)
         current = general_settings(config)
         say(args, 'Saved. Changing settings never deletes results or retries faults.')
     engine = current['description_engine']
-    say(args, f"Processing formats: {', '.join(current['processing_formats']) or 'none (processing paused)'}\n"
+    say(args, f"3D formats: {', '.join(current['processing_formats']) or 'none (3D assets are hidden)'}\n"
+              f"Image formats: {', '.join(current['image_formats']) or 'none (standalone images are hidden)'}\n"
               f"Storage budget: {current['storage_budget_gib']:g} GiB\n"
               f"Descriptions: {'on' if current['descriptions_enabled'] else 'off (existing descriptions are kept)'}\n"
               f"Description engine: {engine}" + (f" ({current['description_server']['url']}, model "
@@ -731,6 +738,10 @@ def wizard(args, config):
         choices.update(engine_hint=hint['id'], processing_formats=list(hint['formats']))
     formats = ask('Formats (fbx,gltf,obj)', ','.join(choices.get('processing_formats', current['processing_formats'])))
     choices['processing_formats'] = [f.strip().lower() for f in formats.split(',') if f.strip()]
+    from .settings import format_key
+    images = ask('Image formats (png,jpeg,svg,webp,tga,tiff,bmp,gif,avif; textures are always read)',
+                 ','.join(current['image_formats']))
+    choices['image_formats'] = [format_key(f.strip().lower()) for f in images.split(',') if f.strip()]
     use = setup_core.storage_use(config)
     budget = setup_core.recommended_budget(use.get('allocated_gib'), status['environment']['disk']['free_gib'])
     say(args, '\n3. The storage budget caps the disk space Assetarium uses (its folder, including the library store; '

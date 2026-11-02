@@ -21,8 +21,8 @@ from .settings import SETTING_KEYS
 SERVER_NAME = 'local_asset_library'
 PROPOSAL_STATES = ('pending', 'applied', 'rejected', 'superseded', 'failed')
 APPLY_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
-              'description_engine', 'description_server', 'search_device', 'engine_hint', 'answers')
-LABELS = {'storage_budget_gib': 'storage budget', 'processing_formats': 'formats', 'caption_batch_size': 'batch size',
+              'description_engine', 'description_server', 'search_device', 'engine_hint', 'answers', 'image_formats')
+LABELS = {'storage_budget_gib': 'storage budget', 'processing_formats': 'formats', 'image_formats': 'image formats', 'caption_batch_size': 'batch size',
           'descriptions_enabled': 'descriptions', 'description_engine': 'description engine',
           'description_server': 'model server', 'search_device': 'search device', 'engine_hint': 'target engine',
           'blender': 'Blender'}
@@ -168,7 +168,7 @@ def apply_setup(config, args, now=None):
             merged['description_server'] = {**current['description_server'], **server}
         saved = save_general_settings(config, merged['storage_budget_gib'], merged['processing_formats'], merged['caption_batch_size'],
                                       merged['descriptions_enabled'], merged['description_engine'], merged['description_server'],
-                                      merged['search_device'], actor='agent')
+                                      merged['search_device'], actor='agent', image_formats=merged.get('image_formats'))
         changed = [key for key in SETTING_KEYS if current.get(key) != saved.get(key)]
     record, _ = setup_core.load_record(config)
     previous = {key: current[key] for key in changed}

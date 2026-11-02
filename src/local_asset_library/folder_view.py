@@ -23,7 +23,7 @@ import uuid
 
 from .config import ConfigError
 
-VERSION = 2
+VERSION = 3  # 3: hidden (a format that is off, decision 0026).
 VIEW_ANSWERS = ('variant_axis', 'separate_descriptions')  # Answers a view applies; they are part of its stamp.
 WAIT = 1.5
 # Heavy record fields no view column needs; SQLite drops them before Python parses a row.
@@ -59,10 +59,10 @@ def _place(current):
 
 def stamp(current):
     from .catalog import digest
-    from .settings import processing_formats
+    from .settings import used_formats
     catalog = current.output_path('data', 'catalog.sqlite')
     index = current.output_path('data', 'embeddings/index.sqlite')
-    return digest([VERSION, _stat(catalog), _stat(index), sorted(processing_formats(current)), view_answers(current)])[:16]
+    return digest([VERSION, _stat(catalog), _stat(index), sorted(used_formats(current)), view_answers(current)])[:16]
 
 
 def view_answers(current):
@@ -150,7 +150,8 @@ CREATE TABLE assets (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT 
     name_key TEXT NOT NULL, kind TEXT NOT NULL, asset_type TEXT, path TEXT, formats TEXT NOT NULL, groups TEXT NOT NULL,
     has_preview INTEGER NOT NULL, failed TEXT, failed_stages TEXT, pending_next TEXT, outcome TEXT NOT NULL,
     eligible INTEGER NOT NULL, description TEXT NOT NULL, warning INTEGER NOT NULL, inspection TEXT, digest TEXT NOT NULL,
-    group_key TEXT, variant TEXT, representative INTEGER NOT NULL DEFAULT 1, card TEXT, kind_basis TEXT);
+    group_key TEXT, variant TEXT, representative INTEGER NOT NULL DEFAULT 1, card TEXT, kind_basis TEXT,
+    hidden INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX assets_order ON assets (folder_key, name_key, asset_id);
 CREATE INDEX assets_card ON assets (card);
 CREATE TABLE folders (path TEXT PRIMARY KEY);
@@ -162,7 +163,8 @@ CREATE INDEX files_order ON files (folder_key, name_key, path);
 
 
 _INSERT = ('INSERT INTO assets (asset_id, name, folder, folder_key, name_key, kind, asset_type, path, formats, groups, has_preview, '
-           'failed, failed_stages, pending_next, outcome, eligible, description, warning, inspection, digest, kind_basis) VALUES (' + ','.join('?' * 21) + ')')
+           'failed, failed_stages, pending_next, outcome, eligible, description, warning, inspection, digest, kind_basis, hidden) '
+           'VALUES (' + ','.join('?' * 22) + ')')
 
 
 def group(db, saved):
@@ -188,10 +190,10 @@ def build(current, target):
     """Stream one catalog into a new view file and swap it in; older views of this generation are removed."""
     from .library_view import _folder, kind_of, state_of
     from .publication import read_only
-    from .settings import format_group, processing_eligible, processing_formats
+    from .settings import format_group, processing_eligible, used_formats, uses
     from .sources import description_state, embedding_failures, import_outcome
     catalog, folder, name = _place(current)
-    key, formats, faults = current.source_key, processing_formats(current), embedding_failures(current)
+    key, formats, faults = current.source_key, used_formats(current), embedding_failures(current)
     folder.mkdir(parents=True, exist_ok=True)
     temporary = folder / f'.{target.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp'
     try:
@@ -222,7 +224,8 @@ def build(current, target):
                               int(processing_eligible(record, formats)), description_state(record),
                               int(any(f.get('severity') == 'warning' for f in review if isinstance(f, dict))),
                               record['processing'].get('inspection'), hashlib.sha256(row[1].encode()).hexdigest(),
-                              ((record.get('type_metadata') or {}).get('image_kind') or {}).get('basis')))
+                              ((record.get('type_metadata') or {}).get('image_kind') or {}).get('basis'),
+                              int(not uses(kind_of(record), [f['format'] for f in files], formats))))
                 db.executemany('INSERT OR IGNORE INTO temp.owned VALUES (?)', [(f['path'],) for f in files])
                 if len(batch) >= 500:
                     db.executemany(_INSERT, batch)

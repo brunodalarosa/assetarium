@@ -67,7 +67,7 @@ def test_assets_assetarium_will_not_process_are_skipped_not_counted_as_pending(m
     config, backend, one, _ = managed
     monkeypatch.setattr(library_view, 'blockers', lambda config: {})
     save_general_settings(config, 24, ['obj'])
-    (Path(one['path']) / 'Only.fbx').write_text('fbx')
+    (Path(one['path']) / 'Only.blend').write_text('blend')  # A model file type with no format toggle: listed, not processed.
     sources.scan_source(config, one)
     root = next(n for n in next(f for f in library_view.tree(config)['folders'] if f['key'] == one['key'])['nodes'] if n['path'] == '')
     found = processing_queue.resolve(config, 'previews', {'key': one['key'], 'path': ''})

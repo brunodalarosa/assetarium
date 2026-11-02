@@ -8,6 +8,9 @@ from .publication import atomic_json, read_json
 GIB = 1024**3
 MAX_BUDGET_GIB = 1048576
 PROCESSING_FORMATS = ('fbx', 'gltf', 'obj')
+# Standalone image formats Assetarium can use; each is its own toggle (decision 0026). Textures follow their models.
+IMAGE_FORMATS = ('png', 'jpeg', 'svg', 'webp', 'tga', 'tiff', 'bmp', 'gif', 'avif')
+ALIASES = {'glb': 'gltf', 'jpg': 'jpeg', 'tif': 'tiff'}
 CAPTION_BATCH_SIZES = (1, 2, 4, 8)
 DEFAULT_CAPTION_BATCH_SIZE = 8
 DEFAULT_SERVER = {'url': 'http://127.0.0.1:8080/v1', 'model': ''}
@@ -18,6 +21,42 @@ def validate_formats(value):
             or len(value) != len(set(value))):
         raise ConfigError('Choose processing formats using the FBX, glTF and OBJ checkboxes in Settings → General')
     return [item for item in PROCESSING_FORMATS if item in value]
+
+
+def format_key(extension):
+    """The toggle a file extension belongs to: .glb is glTF, .jpg JPEG, .tif TIFF."""
+    return ALIASES.get(extension, extension)
+
+
+def validate_image_formats(value):
+    if (not isinstance(value, list) or any(type(item) is not str or item not in IMAGE_FORMATS for item in value)
+            or len(value) != len(set(value))):
+        raise ConfigError('Choose image formats using the checkboxes in Settings → General')
+    return [item for item in IMAGE_FORMATS if item in value]
+
+
+def image_formats(config):
+    path = settings_path(config)
+    value = read_json(path) if path.exists() else {}
+    return validate_image_formats(value.get('image_formats', list(IMAGE_FORMATS)))
+
+
+def used_formats(config):
+    """Every format Assetarium uses: the 3D formats and the standalone image formats that are on (decision 0026)."""
+    return processing_formats(config) + image_formats(config)
+
+
+def uses(kind, extensions, formats):
+    """Whether Assetarium uses an asset of ``kind`` with these file extensions, given the formats that are on.
+
+    A model or standalone image is hidden when every file is in a format with a toggle that is off. Textures follow
+    their models, and file types without a toggle (.blend, audio…) stay listed as not processed.
+    """
+    if kind not in {'model_3d', 'image'}:
+        return True
+    toggles = set(PROCESSING_FORMATS if kind == 'model_3d' else IMAGE_FORMATS)
+    keys = {format_key(e) for e in extensions}
+    return bool(keys & set(formats)) or bool(keys - toggles)
 
 
 def processing_formats(config):
@@ -121,10 +160,9 @@ def processing_eligible(record, formats):
     if asset_type(record) == 'audio' or record.get('identity_version') == 'subasset-v1':
         return False  # Recognized content, without an implemented processing adapter.
     if asset_type(record) == 'image':
-        # Sources opt in to images; model-format checkboxes do not filter them,
-        # but the empty selection still pauses all work.
+        # ``formats`` comes from used_formats: an image is processed when one of its formats is on.
         from .image_media import FORMATS
-        return bool(formats) and any(f['format'] in FORMATS for f in record['files'])
+        return any(f['format'] in FORMATS and format_key(f['format']) in formats for f in record['files'])
     # Downstream work belongs to the source actually inspected, even when the
     # inventory also contains an enabled alternate. Settings never replace it.
     path = inspected_path(record) if record['processing'].get('inspection') != 'pending' else None
@@ -156,7 +194,7 @@ def storage_budget(config, fallback=None):
 
 
 SETTING_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
-                'description_engine', 'description_server', 'search_device', 'search_threads')
+                'description_engine', 'description_server', 'search_device', 'search_threads', 'image_formats')
 
 
 def general_settings(config):
@@ -165,7 +203,7 @@ def general_settings(config):
             'processing_formats': processing_formats(config), 'caption_batch_size': caption_batch_size(config),
             'descriptions_enabled': descriptions_enabled(config), 'description_engine': engine['engine'],
             'description_server': engine['server'], 'search_device': search_device(config),
-            'search_threads': search_threads(config)}
+            'search_threads': search_threads(config), 'image_formats': image_formats(config)}
 
 
 def validate_budget_gib(value):
@@ -182,7 +220,7 @@ def validate_budget_gib(value):
 
 def checked_general(config, storage_budget_gib, processing_formats=None, caption_batch_size=None,
                     descriptions_enabled=None, description_engine=None, description_server=None, search_device=None,
-                    search_threads=None):
+                    search_threads=None, image_formats=None):
     """Validated settings.json content; omitted values keep what is saved ("auto" clears search_threads). Writes nothing."""
     limit = validate_budget_gib(storage_budget_gib)
     path = settings_path(config)
@@ -200,15 +238,18 @@ def checked_general(config, storage_budget_gib, processing_formats=None, caption
     threads = (value.get('search_threads') if search_threads is None else validate_search_threads(search_threads))
     value.update(schema_version=1, storage_budget_bytes=limit * GIB, processing_formats=formats,
                  caption_batch_size=batch, descriptions_enabled=enabled, description_engine=engine,
-                 description_server=server, search_device=device, search_threads=threads)
+                 description_server=server, search_device=device, search_threads=threads,
+                 image_formats=validate_image_formats(image_formats if image_formats is not None else
+                                                     value.get('image_formats', list(IMAGE_FORMATS))))
     return value
 
 
 def save_general_settings(config, storage_budget_gib, processing_formats=None, caption_batch_size=None,
                           descriptions_enabled=None, description_engine=None, description_server=None,
-                          search_device=None, actor='user', search_threads=None):
+                          search_device=None, actor='user', search_threads=None, image_formats=None):
     value = checked_general(config, storage_budget_gib, processing_formats, caption_batch_size,
-                            descriptions_enabled, description_engine, description_server, search_device, search_threads)
+                            descriptions_enabled, description_engine, description_server, search_device, search_threads,
+                            image_formats)
     path = settings_path(config)
     try:
         before = general_settings(config)

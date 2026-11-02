@@ -26,7 +26,7 @@ from .incremental import (CAPTION_PROMPT_VERSION, caption_input, checkpoint, led
 from .membership import membership, records
 from .publication import atomic_json, read_json, read_only
 from .retrieval import source_check
-from .settings import processing_formats, processing_eligible
+from .settings import processing_eligible, used_formats
 
 RUN_ROOT = 'overnight-descriptions'
 TERMINAL = {'complete', 'failed', 'skipped'}
@@ -62,7 +62,7 @@ def contract(config):
 def plan(config, packs=None, pending_only=False, peak_reserve_mib=500, asset_ids=None):
     work = working(config)
     all_records = records(work)
-    formats = processing_formats(config)
+    formats = used_formats(config)
     if packs and set(packs) - {r['pack_id'] for r in all_records}:
         raise ConfigError('Description selection contains an unknown pack')
     if asset_ids is not None and set(asset_ids) - {r['asset_id'] for r in all_records}:
@@ -298,7 +298,7 @@ def caption_batch(config, identifier, backend_factory, limit=25):
                 apply_saved(config, identifier, asset_id)
                 continue
             record = detail(work, asset_id)
-            if not processing_eligible(record, processing_formats(config)):
+            if not processing_eligible(record, used_formats(config)):
                 atomic_json(path / 'outcomes' / (asset_id + '.json'),
                             {'asset_id': asset_id, 'status': 'skipped', 'reason': 'Source format is disabled in Settings → General', 'finished_utc': utc()})
                 continue

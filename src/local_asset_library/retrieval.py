@@ -437,9 +437,15 @@ def scope(config, filters):
     return allowed
 
 
-def matches(record, filters, allowed=None):
+def matches(record, filters, allowed=None, formats=None):
+    """``formats`` (settings.used_formats) hides assets whose formats are all off (decision 0026); None keeps every one."""
     if allowed is not None and record["asset_id"] not in allowed:
         return False
+    if formats is not None:
+        from .library_view import kind_of
+        from .settings import uses
+        if not uses(kind_of(record), [f["format"] for f in record["files"]], formats):
+            return False
     from .asset_structure import asset_type
     if 'asset_type' in filters and filters['asset_type'] != asset_type(record):
         return False
@@ -531,8 +537,10 @@ class SearchEngine:
             raise ConfigError("Evaluation cosine floor must be finite in [-1,1]")
         records, source_fingerprints, excluded = {}, {}, []
         allowed = scope(self.config, filters)
+        from .settings import used_formats
+        formats = used_formats(self.config) if self.config.sources_registry else None
         for record in pilot_records(self.config):
-            if not matches(record, filters, allowed):
+            if not matches(record, filters, allowed, formats):
                 continue
             try:
                 source_fingerprints[record["asset_id"]] = source_check(self.config, record)

@@ -169,6 +169,7 @@ export interface SetupDraft {
   confirmRerender: boolean;
   engineHint: string[];
   formats: string[];
+  imageFormats: string[];
   budget: string;
   descriptionsEnabled: boolean;
   engine: string;
@@ -294,7 +295,7 @@ function emptySetup(): SetupState {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
     storage: null, measuring: false, server: null, testing: false, saving: false, result: null,
     agent: null, agentMode: false, agentBusy: null, baseline: null,
-    draft: { blenderPath: "", confirmRerender: false, engineHint: [], formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", includeSamples: true, skipped: [] },
+    draft: { blenderPath: "", confirmRerender: false, engineHint: [], formats: [], imageFormats: ["png", "jpeg", "svg", "webp", "tga", "tiff", "bmp", "gif", "avif"], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", includeSamples: true, skipped: [] },
   };
 }
 const idleSearch: SearchState = {
@@ -1227,11 +1228,11 @@ export interface DescriptionSettings {
   engine: string;
   server: { url: string; model: string };
 }
-export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string, searchThreads?: string) {
+export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string, searchThreads?: string, imageFormats?: string[]) {
   const previousDevice = state.general.values?.search_device;
   setState((s) => ({ general: { ...s.general, busy: true, message: "Saving…" } }));
   try {
-    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null, searchThreads ?? null);
+    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null, searchThreads ?? null, imageFormats ?? null);
     if (result.status === "faulty") throw Error(result.reason);
     const described = !result.descriptions_enabled ? " Descriptions are off; existing descriptions are kept."
       : result.description_engine === "local-server" ? " Descriptions use the local model server." : ` Description batch size: ${result.caption_batch_size}.`;
@@ -1240,12 +1241,14 @@ export async function saveGeneralSettings(budget: string, formats: string[], bat
     setState({
       general: {
         loading: false, busy: false, values: result,
-        message: result.processing_formats.length
-          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described}${searched} Selected formats apply to new processing batches.`
-          : `Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.${searched}`,
+        message: result.processing_formats.length || result.image_formats.length
+          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described}${searched} Assets only in formats that are off are hidden; nothing was deleted.`
+          : `Saved. Every format is off, so nothing is shown or processed. Turning formats back on brings assets back with their results.${searched}`,
       },
     });
-    await Promise.all([loadSources(), loadRenderSettings()]);
+    // Formats decide what the Library shows (decision 0026): refresh it now, not on the next poll.
+    await Promise.all([loadSources(), loadRenderSettings(), loadLibraryTree()]);
+    if (state.sourcesView.key) void refreshFolder();
   } catch (error) {
     setState((s) => ({ general: { ...s.general, busy: false, message: (error as Error).message } }));
   }
@@ -1316,6 +1319,7 @@ function savedDraft(info: Json): SetupDraft {
     blenderPath: info.blender?.configured || "",
     engineHint: [info.record?.engine_hint || []].flat(),
     formats: values.processing_formats ?? ["fbx", "gltf", "obj"],
+    imageFormats: values.image_formats ?? emptySetup().draft.imageFormats,
     budget: values.storage_budget_gib != null ? String(values.storage_budget_gib) : "",
     descriptionsEnabled: values.descriptions_enabled ?? true,
     engine: values.description_engine || "builtin",
@@ -1513,7 +1517,7 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   const skipped = new Set(draft.skipped);
   const choices: Json = { skipped_steps: [...skipped] };
   if (!skipped.has("blender") && draft.blenderPath) Object.assign(choices, { blender_path: draft.blenderPath, confirm_rerender: draft.confirmRerender });
-  if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, engine_hint: draft.engineHint.length ? draft.engineHint : null });
+  if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, image_formats: draft.imageFormats, engine_hint: draft.engineHint.length ? draft.engineHint : null });
   if (!skipped.has("storage") && draft.budget) choices.storage_budget_gib = draft.budget;
   if (!skipped.has("descriptions"))
     Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
@@ -1522,7 +1526,7 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   return choices;
 }
 const STEP_FIELDS: Record<string, (keyof SetupDraft)[]> = {
-  blender: ["blenderPath"], formats: ["formats", "engineHint"], storage: ["budget"],
+  blender: ["blenderPath"], formats: ["formats", "imageFormats", "engineHint"], storage: ["budget"],
   descriptions: ["descriptionsEnabled", "engine", "serverUrl", "serverModel", "searchDevice"], batch: ["batch"],
 };
 /** Which saved values a step shows, for "set by" badges. */

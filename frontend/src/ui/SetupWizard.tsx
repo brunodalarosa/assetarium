@@ -15,6 +15,7 @@ import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
 import { MODEL_CHECK_HELP, ModelCheck } from "./ModelCheck";
 import { Reason } from "./CommandBlock";
+import { FORMATS_HELP, FormatToggles, IMAGE_FORMATS, ImageFormatsNote, MODEL_FORMATS } from "./FormatToggles";
 import { ReadinessList } from "./Readiness";
 import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
 
@@ -22,11 +23,6 @@ const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
   descriptions: "Descriptions and search", batch: "Batch size", agent: "Connect your agent", model: "Your agent’s model", review: "Review and finish",
 };
-const FORMAT_NOTES: [string, string, string][] = [
-  ["fbx", "FBX", "Rigs and animation; common in Unity and Unreal."],
-  ["gltf", "glTF / GLB", "Open format with PBR materials, rigs and animation."],
-  ["obj", "OBJ", "Simple static meshes without skeletons or animation."],
-];
 const PRESETS = [25, 50, 100, 250];
 
 function Paragraph({ children }: { children: ReactNode }) {
@@ -106,11 +102,11 @@ function FormatsStep() {
   const toggle = (id: string) => {
     const engineHint = draft.engineHint.includes(id) ? draft.engineHint.filter((h) => h !== id) : [...draft.engineHint, id];
     const formats = new Set(hints.filter((h) => engineHint.includes(h.id)).flatMap((h) => h.formats));
-    updateSetupDraft({ engineHint, ...(engineHint.length ? { formats: FORMAT_NOTES.map(([f]) => f).filter((f) => formats.has(f)) } : {}) });
+    updateSetupDraft({ engineHint, ...(engineHint.length ? { formats: MODEL_FORMATS.map(([f]) => f).filter((f) => formats.has(f)) } : {}) });
   };
   return (
     <>
-      <Paragraph>Processing inspects each 3D asset in Blender, renders its previews, measures geometry and builds search data. Scanning still lists every supported file, but assets that exist only in an unselected format stay unprocessed until you select it. .glb counts as glTF. 2D images are turned on per source in Settings → Asset sources. Changing formats later never deletes results or retries failures.</Paragraph>
+      <Paragraph>Choose the formats you use. {FORMATS_HELP} .glb counts as glTF. You can change them any time in Settings → General.</Paragraph>
       <Card title="Which engines do you make games with?" help="Choose every one you use. A suggestion only; you can change the checkboxes below.">
         <div role="group" aria-label="Target engines" id="setup-engine-hint" className="flex flex-wrap gap-2">
           {hints.map((item) => {
@@ -129,15 +125,13 @@ function FormatsStep() {
             : chosen.length ? `Suggested: the formats of ${chosen.map((h) => h.label).join(" and ")} together.` : "Choose engines to preselect formats, or set them yourself."}
         </p>
       </Card>
-      <Card title="Formats to process">
-        <fieldset id="setup-formats" className="grid gap-3">
-          <legend className="sr">Formats to process</legend>
-          {FORMAT_NOTES.map(([value, label, note]) => (
-            <Checkbox key={value} id={`setup-format-${value}`} label={label} description={note} checked={draft.formats.includes(value)}
-              onCheckedChange={(checked) => updateSetupDraft({ formats: checked ? FORMAT_NOTES.map(([f]) => f).filter((f) => f === value || draft.formats.includes(f)) : draft.formats.filter((f) => f !== value) })} />
-          ))}
-        </fieldset>
-        {!draft.formats.length && <p className="text-[12.5px] text-warning">With no format selected, processing stays paused.</p>}
+      <Card title="3D models">
+        <FormatToggles id="setup-format" options={MODEL_FORMATS} value={draft.formats} onChange={(update) => updateSetupDraft({ formats: update(getState().setup.draft.formats) })} columns />
+      </Card>
+      <Card title="Images">
+        <FormatToggles id="setup-image-format" options={IMAGE_FORMATS} value={draft.imageFormats} onChange={(update) => updateSetupDraft({ imageFormats: update(getState().setup.draft.imageFormats) })} />
+        <ImageFormatsNote />
+        {!draft.formats.length && !draft.imageFormats.length && <p className="text-[12.5px] text-warning">With every format off, nothing is shown or processed.</p>}
       </Card>
     </>
   );
@@ -252,7 +246,7 @@ function summary(step: SetupStep, draft: Json, info: Json): string {
   if (draft.skipped.includes(step)) return "Skipped — keeps the current value";
   switch (step) {
     case "blender": return draft.blenderPath || "Not saved (the speed test needs a saved Blender)";
-    case "formats": return draft.formats.length ? draft.formats.map(formatLabel).join(", ") : "None (processing paused)";
+    case "formats": return [draft.formats.map(formatLabel).join(", ") || "No 3D formats", draft.imageFormats.length === IMAGE_FORMATS.length ? "every image format" : `${draft.imageFormats.length} image formats`].join(" · ");
     case "storage": return draft.budget ? `${Number(draft.budget).toLocaleString()} GiB` : "Keeps the current value";
     case "descriptions": {
       const search = ` · search on the ${draft.searchDevice === "cpu" ? "CPU" : "NVIDIA GPU"}`;

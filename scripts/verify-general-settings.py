@@ -76,7 +76,7 @@ def verify():
         wait("$('general-panel')&&!$('general-panel').hidden&&$('storage-budget')&&!$('storage-budget').disabled&&$('storage-budget').value==='10'")
         assert ui.js("!$('asset-sources-panel')&&!document.querySelector('#settings-view [role=tablist]')")  # General only (decision 0023).
         assert not settings_path(config).exists()
-        assert ui.js("[...$('processing-formats').querySelectorAll('[role=checkbox]')].every(box=>box.getAttribute('aria-checked')==='true')")
+        assert ui.js("[...$('processing-format').querySelectorAll('[role=checkbox]')].every(box=>box.getAttribute('aria-checked')==='true')")
         assert ui.js("$('caption-batch-size').dataset.value==='8'&&!$('caption-batch-size').querySelector('[aria-haspopup=listbox]').disabled")
         report['checks'].append('General opens by default and shows the historical limit and default batch size 8 without writing them')
         ui.js("""(async()=>{type('storage-budget','24');$('processing-format-fbx').click();$('processing-format-obj').click();
@@ -102,13 +102,14 @@ def verify():
         ui.js("(async()=>{$('nav-home').click();await until(()=>$('library-view'));$('nav-settings').click();return true})()")
         wait("$('storage-budget')&&$('storage-budget').value==='24'&&!$('storage-budget').disabled&&$('caption-batch-size').dataset.value==='4'")
         assert ui.js("['gltf','fbx','obj'].map(f=>$('processing-format-'+f).getAttribute('aria-checked')).join()==='true,false,false'")
-        ui.js("(async()=>{$('processing-format-gltf').click();await frame();$('save-general-settings').click();return true})()")
-        wait("$('general-settings-message').textContent.includes('Processing is paused')")
+        # Every format off (3D and images, decision 0026) is the paused state: nothing is shown or processed.
+        ui.js("(async()=>{$('processing-format-gltf').click();['png','jpeg','svg','webp','tga','tiff','bmp','gif','avif'].forEach(f=>$('image-format-'+f).click());await frame();$('save-general-settings').click();return true})()")
+        wait("$('general-settings-message').textContent.includes('Every format is off')")
         wait("lal.state.sources.every(source=>source.processing_paused&&!source.needs_processing)")
         assert bridge.source_action('process', one['key'])['status'] == 'faulty'
-        report['checks'].append('All unchecked saves a visible paused state, removes pending warnings and starts no source worker')
-        ui.js("(async()=>{$('processing-format-gltf').click();await frame();$('save-general-settings').click();return true})()")
-        wait("$('general-settings-message').textContent.startsWith('Saved.')&&!$('processing-formats').disabled")
+        report['checks'].append('Every format off saves a visible paused state, removes pending warnings and starts no source worker')
+        ui.js("(async()=>{$('processing-format-gltf').click();['png','jpeg','svg','webp','tga','tiff','bmp','gif','avif'].forEach(f=>$('image-format-'+f).click());await frame();$('save-general-settings').click();return true})()")
+        wait("$('general-settings-message').textContent.startsWith('Saved.')&&!$('processing-format').disabled")
         report['checks'].append('Reopening reloads the saved value')
         window.resize(680, 800)
         wait('innerWidth<761')

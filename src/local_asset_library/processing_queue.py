@@ -91,7 +91,7 @@ def resolve(config, action, scope):
     state, state_params, reason, reason_params = state_sql(blocked)
     ids, stopped, kinds = [], {}, {}
     with closing(connect(current, fresh=True)) as view:
-        rows = view.execute(f'SELECT asset_id, kind, {state}, {reason}, description FROM assets WHERE eligible AND {where} '
+        rows = view.execute(f'SELECT asset_id, kind, {state}, {reason}, description FROM assets WHERE eligible AND NOT hidden AND {where} '
                             'ORDER BY asset_id', state_params + reason_params + params)
         for asset_id, kind, item_state, item_reason, description in rows:
             if action == 'previews':

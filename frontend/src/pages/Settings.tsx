@@ -1,7 +1,7 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { motion } from "motion/react";
 import { type FormEvent, useEffect, useState } from "react";
-import { Checkbox } from "@/components/beui/checkbox";
+import { FORMATS_HELP, FormatToggles, IMAGE_FORMATS, ImageFormatsNote, MODEL_FORMATS } from "../ui/FormatToggles";
 import { Switch } from "@/components/beui/switch";
 import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,6 @@ import { BlenderChecks, BlenderPicker } from "../ui/BlenderPicker";
 import { Badge, Banner, Button, Card, SelectField, Spinner, TextField } from "../ui/primitives";
 import { ModelCheckCard } from "../ui/ModelCheck";
 
-const FORMATS: [string, string][] = [["fbx", "FBX"], ["gltf", "glTF / GLB"], ["obj", "OBJ"]];
 const APPEARANCES = [
   { value: "system", label: "Match Windows", icon: Monitor },
   { value: "light", label: "Light", icon: Sun },
@@ -258,6 +257,7 @@ function General() {
   const devices = useApp((s) => s.setup.info?.search_devices) || [];
   const [budget, setBudget] = useState("");
   const [formats, setFormats] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([]);
   const [batch, setBatch] = useState("8");
   const [enabled, setEnabled] = useState(true);
   const [engine, setEngine] = useState("builtin");
@@ -270,6 +270,7 @@ function General() {
     if (!general.values) return;
     setBudget(String(general.values.storage_budget_gib));
     setFormats(general.values.processing_formats);
+    setImages(general.values.image_formats || []);
     setBatch(String(general.values.caption_batch_size));
     setEnabled(general.values.descriptions_enabled);
     setEngine(general.values.description_engine);
@@ -283,7 +284,7 @@ function General() {
     event.preventDefault();
     if (!event.currentTarget.reportValidity()) return;
     if (render && !(await saveRenderSettings(rendering.device, rendering.processes, rendering.memory))) return;
-    void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } }, device, threads);
+    void saveGeneralSettings(budget, formats, batch, { enabled, engine, server: { url, model } }, device, threads, images);
   };
   return (
     <div className="grid gap-5">
@@ -297,20 +298,13 @@ function General() {
         <Card title="Storage budget" help={BUDGET_HELP}>
           <TextField id="storage-budget" label="Storage budget (GiB)" type="number" min={1} max={1048576} step={1} required value={budget} disabled={disabled} onChange={(e) => setBudget(e.target.value)} className="w-48" />
         </Card>
-        <Card title="Formats to process" help="Scanning counts every supported format. New processing batches use only selected formats. Existing results are kept. Uncheck all to pause processing.">
-          <fieldset id="processing-formats" disabled={disabled} className="flex flex-wrap gap-x-8 gap-y-3">
-            <legend className="sr">Formats to process</legend>
-            {FORMATS.map(([value, label]) => (
-              <Checkbox
-                key={value}
-                id={`processing-format-${value}`}
-                label={label}
-                disabled={disabled}
-                checked={formats.includes(value)}
-                onCheckedChange={(checked) => setFormats((current) => (checked ? FORMATS.map(([f]) => f).filter((f) => f === value || current.includes(f)) : current.filter((f) => f !== value)))}
-              />
-            ))}
-          </fieldset>
+        <Card id="formats-card" title="Formats Assetarium uses" help={FORMATS_HELP}>
+          <p className="text-[12.5px] font-medium">3D models</p>
+          <FormatToggles id="processing-format" options={MODEL_FORMATS.map(([f, label]) => [f, label])} value={formats} onChange={setFormats} disabled={disabled} />
+          <p className="pt-2 text-[12.5px] font-medium">Images</p>
+          <FormatToggles id="image-format" options={IMAGE_FORMATS} value={images} onChange={setImages} disabled={disabled} />
+          <ImageFormatsNote />
+          {!formats.length && !images.length && <p className="text-[12.5px] text-warning">With every format off, nothing is shown or processed.</p>}
         </Card>
         <Card id="descriptions-card" title="Descriptions" help="Short texts an AI model on this computer writes for each asset from its previews. They are optional: names, filters, keyword search and image matching work without them.">
           <div className="flex h-10 items-center">

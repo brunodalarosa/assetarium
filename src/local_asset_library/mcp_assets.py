@@ -13,6 +13,7 @@ from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detai
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, search_character_cap
 from .asset_structure import ASSET_TYPES, structure, supported_stage
 from .image_media import FORMATS as IMAGE_FORMATS
+from .settings import IMAGE_FORMATS as IMAGE_TOGGLES
 from .setup_core import ENGINE_HINTS
 
 ID_PATTERN = r"asset_[0-9a-f]{32}"
@@ -96,7 +97,11 @@ SCHEMAS = {
         "finish": {"type": "boolean", "description": "Also finish setup: the user then reviews it in the app."},
         "storage_budget_gib": {"type": "integer", "minimum": 1, "maximum": 1048576},
         "processing_formats": {"type": "array", "maxItems": 3, "items": {"type": "string", "enum": ["fbx", "gltf", "obj"]},
-                               "description": "Formats to process; .glb counts as gltf; [] pauses processing."},
+                               "description": "3D formats Assetarium uses; .glb counts as gltf. Assets only in formats that are "
+                                              "off are hidden (nothing is deleted)."},
+        "image_formats": {"type": "array", "maxItems": 9, "items": {"type": "string", "enum": list(IMAGE_TOGGLES)},
+                          "description": "Standalone image formats Assetarium uses (.jpg is jpeg, .tif tiff). Textures "
+                                         "of 3D models are always read."},
         "caption_batch_size": {"type": "integer", "minimum": 1, "maximum": 8, "enum": [1, 2, 4, 8]},
         "descriptions_enabled": {"type": "boolean"},
         "description_engine": {"type": "string", "enum": ["builtin", "local-server"],
@@ -486,8 +491,8 @@ class AssetService:
                 and not (record.get('inspection_run') or {}).get('errors')
                 and not any(k in record.get('stage_faults', {}) for k in ('inspection', 'previews')))
             if pending_preview:
-                from .settings import processing_eligible, processing_formats
-                eligible = processing_eligible(record, processing_formats(self.config))
+                from .settings import processing_eligible, used_formats
+                eligible = processing_eligible(record, used_formats(self.config))
                 return (({'status': 'pending', 'reason': 'Preview has not been generated.'} if eligible else
                          {'status': 'excluded', 'reason': 'Preview has not been generated because this source format is not selected in Settings → General.'}),
                         None, [])

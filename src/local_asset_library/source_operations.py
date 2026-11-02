@@ -126,8 +126,8 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None):
     if operation in {"process", "describe"} and not get_source(config, key)["enabled"]:
         raise ConfigError("Enable this asset source before processing it")
     if operation in {'process', 'describe'}:
-        from .settings import processing_formats
-        if not processing_formats(config):
+        from .settings import used_formats
+        if not used_formats(config):
             raise ConfigError('Processing is paused. Select formats in Settings → General before processing assets')
     if operation == 'describe':
         from .settings import descriptions_enabled
@@ -327,8 +327,8 @@ def publish_and_verify(config, source, scoped, phase):
 
 def process_source(config, source, token):
     scoped = bound(config, source)
-    from .settings import processing_formats
-    if not processing_formats(config):
+    from .settings import used_formats
+    if not used_formats(config):
         state(scoped, status='complete', phase='Processing paused: no formats selected', progress=1, current_asset=None)
         return
     state(scoped, status="scanning", phase="Checking source", progress=.01)
@@ -414,9 +414,9 @@ def search_test(config, token):
 def description_counts(scoped):
     from collections import Counter
     from .incremental import working
-    from .settings import processing_formats, processing_eligible
+    from .settings import processing_eligible, used_formats
     from .sources import description_state
-    formats = processing_formats(scoped)
+    formats = used_formats(scoped)
     return Counter(description_state(r) for r in read_records(working(scoped)) if processing_eligible(r, formats))
 
 
@@ -489,7 +489,7 @@ def worker_stage(config, source, stage, token):
     from .library_index import index_library
     from .incremental import working
     scoped = bound(config, source)
-    from .settings import processing_formats
+    from .settings import used_formats
     backend = None
     operation = operation_status(scoped).get("operation", "process")
     # Description runs only describe assets whose renders are ready, so unfinished
@@ -509,7 +509,7 @@ def worker_stage(config, source, stage, token):
     for _ in range(10000):
         if cancelled(scoped, token):
             return
-        if not processing_formats(config):
+        if not used_formats(config):
             return
         from .settings import descriptions_enabled
         if stage == "caption" and not descriptions_enabled(config):

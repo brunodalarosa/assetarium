@@ -42,7 +42,7 @@ def test_settings_round_trip_and_validation(managed, capsys):
     assert run(config, 'settings', 'set', '--budget-gib', '0') == 2
     assert 'whole number' in capsys.readouterr().err
     assert run(config, 'settings', 'set', '--formats', 'none') == 0
-    assert 'none (processing paused)' in capsys.readouterr().out
+    assert 'none (3D assets are hidden)' in capsys.readouterr().out
     assert run(config, 'settings', 'set') == 2
 
 

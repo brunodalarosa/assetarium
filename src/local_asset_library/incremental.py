@@ -544,8 +544,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
     selected = records(work)
-    from .settings import processing_formats, processing_eligible
-    formats = processing_formats(config)
+    from .settings import processing_eligible, used_formats
+    formats = used_formats(config)
     # asset_ids narrows the caption/inspection selection; vectors cover the whole source.
     selected = [record for record in selected if processing_eligible(record, formats)
                 and (asset_ids is None or stage == "embeddings" or record["asset_id"] in asset_ids)]

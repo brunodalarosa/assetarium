@@ -19,7 +19,7 @@ import uuid
 
 from .config import ConfigError, _inside, _relative
 from .publication import atomic_json, read_json, read_only
-from .settings import processing_formats, processing_eligible, format_group, PROCESSING_FORMATS
+from .settings import processing_formats, processing_eligible, used_formats, format_group, PROCESSING_FORMATS
 
 SHARED_DATA = {
     "embeddings/capability.json", "embeddings/model-download.json",
@@ -541,7 +541,7 @@ def source_status(config, source):
         "needs_processing": True, "pending": 0, "reason": "Scan this source to discover its assets", "scanned": False}
     work = replace(scoped, catalog_generation='work')
     current = work if work.output_path('data', 'catalog.sqlite').exists() else scoped
-    formats = tuple(processing_formats(config))
+    formats = tuple(used_formats(config))
     paths = [current.output_path('data', 'catalog.sqlite'), scoped.output_path('data', 'catalog.sqlite'),
              current.output_path('data', 'embeddings/index.sqlite')]
     signature = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) if p.exists() else (str(p), None, None) for p in paths)
@@ -676,7 +676,7 @@ def revision(config):
         fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')
         states.append((source["key"], path.stat().st_mtime_ns if path.exists() else None,
                        fault_path.stat().st_mtime_ns if fault_path.exists() else None))
-    return digest([value["revision"], states, processing_formats(config)])[:16]
+    return digest([value["revision"], states, used_formats(config)])[:16]
 
 
 def write_catalog(config, rows, records):
@@ -822,9 +822,9 @@ def scan_source(config, source):
               "export_suggestions": suggestions, "texture_suggestion": texture_suggestion,
               "reason": ("Assets need processing or publication" if pending_ids else
                          "Import finished with recorded failures" if failed else "Up to date and published")}
-    formats = processing_formats(config)
+    formats = used_formats(config)
     status.update(processing_summary(merged, published, formats, vector_faults), processing_paused=not formats,
-                  processing_formats=formats)
+                  processing_formats=processing_formats(config))
     # An unchanged scan keeps its earlier receipt time and leaves views untouched.
     write_changed(status_path, status, ignore=("scanned_utc", "recognized"))
     fault_path = config.project_root / 'data/library/source-faults' / (source['id'] + '.json')

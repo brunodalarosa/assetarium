@@ -70,6 +70,7 @@ function badges(item: Json, thumb?: Thumb) {
   const list: { label: string; tone: "neutral" | "warning" | "fault" }[] = [];
   if (item.asset_type === "image") list.push({ label: (item.formats || []).includes("svg") && item.formats.length === 1 ? "SVG image" : "2D image", tone: "neutral" });
   if (item.source_faulty) list.push({ label: "Source fault", tone: "fault" });
+  if (item.hidden_by_formats) list.push({ label: "Format off", tone: "warning" });
   if (latest.caption_status === "warning") list.push({ label: "Caption warning", tone: "warning" });
   if (hasDescription(latest) && latest.caption_owner_review !== "approved") list.push({ label: "Review " + (latest.caption_owner_review || "pending"), tone: "neutral" });
   if (thumb?.badge) list.push({ label: thumb.badge.label, tone: thumb.badge.tone === "fault" ? "fault" : "neutral" });

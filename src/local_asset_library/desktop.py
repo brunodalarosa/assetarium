@@ -170,11 +170,11 @@ class DesktopBridge:
 
     def save_general_settings(self, storage_budget_gib, processing_formats=None, caption_batch_size=None,
                               descriptions_enabled=None, description_engine=None, description_server=None,
-                              search_device=None, search_threads=None):
+                              search_device=None, search_threads=None, image_formats=None):
         from .settings import save_general_settings
         return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
-                                        search_device, 'user', search_threads, guarded=False))
+                                        search_device, 'user', search_threads, image_formats, guarded=False))
 
     # Rendering (decision 0022): device, parallel renders and memory; the speed test runs as an operation.
     def render_settings(self):

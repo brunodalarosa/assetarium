@@ -22,8 +22,8 @@ from local_asset_library.settings import (GIB, processing_formats, general_setti
                                           settings_path, processing_eligible)
 
 
-def select(config, formats):
-    return save_general_settings(config, 24, formats)
+def select(config, formats, images=None):
+    return save_general_settings(config, 24, formats, image_formats=images)
 
 
 def test_legacy_defaults_roundtrip_pause_and_storage_only_save(library):
@@ -73,7 +73,7 @@ def test_scan_and_live_status_count_all_formats_without_creating_work(managed):
     catalog_file = working(scoped).output_path('data', 'catalog.sqlite')
     before = (status_file.read_bytes(), catalog_file.read_bytes())
     revision = sources.revision(config)
-    select(config, [])
+    select(config, [], [])  # Every format off is the paused state (decision 0026).
     paused = sources.source_status(config, one)
     assert paused['processing_paused'] and not paused['needs_processing'] and paused['pending'] == 0
     assert paused['format_counts'] == scanned['format_counts']
@@ -198,7 +198,7 @@ def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(mana
     update_record(work, row)
     before = sources.importing_failures(config)
     assert before['assets'] == 1
-    select(config, [])
+    select(config, [], [])  # Every format off is the paused state (decision 0026).
     monkeypatch.setattr(source_operations.subprocess, 'Popen', lambda *a, **kw: pytest.fail('No formats should start no worker'))
     with pytest.raises(ConfigError, match='paused'):
         source_operations.start(config, 'process', one['key'])

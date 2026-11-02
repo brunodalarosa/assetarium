@@ -7,7 +7,7 @@ import pytest
 
 from local_asset_library.config import Config, ConfigError
 from local_asset_library.publication import atomic_json
-from local_asset_library.settings import (GIB, general_settings, save_general_settings,
+from local_asset_library.settings import (GIB, IMAGE_FORMATS, general_settings, save_general_settings,
                                           settings_path, storage_budget, caption_batch_size)
 from local_asset_library.incremental import policy
 from local_asset_library import source_operations as operations
@@ -36,7 +36,7 @@ def test_saved_total_survives_reload_and_source_binding_without_hidden_growth_ca
     assert result == {'status': 'saved', 'storage_budget_gib': 24, 'processing_formats': ['fbx', 'gltf', 'obj'],
                       'caption_batch_size': 8, 'descriptions_enabled': True, 'description_engine': 'builtin',
                       'description_server': {'url': 'http://127.0.0.1:8080/v1', 'model': ''}, 'search_device': 'cuda',
-                      'search_threads': None}
+                      'search_threads': None, 'image_formats': list(IMAGE_FORMATS)}
     rebound = replace(config, metadata_root=config.library_store() / 'folders/fixture', source_key='fixture')
     assert general_settings(rebound)['storage_budget_gib'] == 24
     assert settings_path(rebound) == settings_path(config)

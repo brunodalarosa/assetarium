@@ -110,17 +110,20 @@ def folder_tree(config, source, blocked=None):
         return {'offline': False, 'scanned': True, 'reading': True, 'nodes': []}
     state, params, _, _ = state_sql(blockers(config) if blocked is None else blocked)
     with closing(view):
-        groups = view.execute(f'SELECT folder, {state}, has_preview, COUNT(*) FROM assets GROUP BY 1, 2, 3', params).fetchall()
-        fresh = view.execute('SELECT folder, COUNT(*) FROM assets WHERE asset_id IN (SELECT value FROM json_each(?)) GROUP BY 1',
+        groups = view.execute(f'SELECT folder, {state}, has_preview, COUNT(*) FROM assets WHERE NOT hidden GROUP BY 1, 2, 3', params).fetchall()
+        # Files in formats that are off: counted per folder for one quiet line, never listed or offered as work.
+        hidden = view.execute('SELECT folder, COUNT(*) FROM assets WHERE hidden GROUP BY 1').fetchall()
+        fresh = view.execute('SELECT folder, COUNT(*) FROM assets WHERE NOT hidden AND asset_id IN (SELECT value FROM json_each(?)) GROUP BY 1',
                              (json.dumps(_new_ids(config, source)),)).fetchall()
         folders = [r[0] for r in view.execute('SELECT path FROM folders')]
         detected = structure(config, source, view)
-    nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0, 'skipped': 0}}
+    nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0, 'skipped': 0,
+                  'hidden': 0}}
 
     def node(path):
         if path not in nodes:
             nodes[path] = {'path': path, 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0,
-                           'skipped': 0}
+                           'skipped': 0, 'hidden': 0}
             parent = PurePosixPath(path).parent.as_posix()
             node('' if parent == '.' else parent)['children'].add(path)
         return nodes[path]
@@ -141,6 +144,9 @@ def folder_tree(config, source, blocked=None):
     for folder, count in fresh:
         for entry in chain(folder):
             entry['new'] += count
+    for folder, count in hidden:
+        for entry in chain(folder):
+            entry['hidden'] += count
     packs, bundles, names = detected['packs'], set(detected['bundles']), names_of(config, source)
     result = []
     for path, entry in sorted(nodes.items()):
@@ -228,6 +234,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     new = _new_ids(config, source)
     state, state_params, reason, reason_params = state_sql(blockers(config))
     where, params = inside_sql(path)
+    where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0026).
     if filters.get('types'):
         where += f" AND kind IN ({','.join('?' * len(filters['types']))})"
         params += list(filters['types'])

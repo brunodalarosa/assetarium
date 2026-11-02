@@ -116,7 +116,10 @@ class DesktopService(AssetService):
         records = pilot_records(self.config)
         items = []
         allowed = scope(self.config, filters)
-        matching = [r for r in sorted(records, key=lambda r: (r['pack_id'], r['display_name'].casefold(), r['asset_id'])) if matches(r, filters, allowed)]
+        from .settings import used_formats
+        formats = used_formats(self.config) if self.config.sources_registry else None  # Off formats are hidden (decision 0026).
+        matching = [r for r in sorted(records, key=lambda r: (r['pack_id'], r['display_name'].casefold(), r['asset_id']))
+                    if matches(r, filters, allowed, formats)]
         for record in matching[offset:offset + page_size]:
             identifier = record['asset_id']
             faults = list((record.get('inspection_run') or {}).get('source_faults', []))
