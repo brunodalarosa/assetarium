@@ -4,7 +4,6 @@ import { getState, goBack, goForward, navigate, setInspectorOpen, useApp } from 
 import { Home } from "./pages/Home";
 import { Collection } from "./pages/Collection";
 import { Collections } from "./pages/Collections";
-import { Placeholder } from "./pages/Placeholder";
 import { Processing } from "./pages/Processing";
 import { AssetSources } from "./pages/AssetSources";
 import { Settings } from "./pages/Settings";
@@ -19,8 +18,6 @@ import { Rail, TopBar } from "./ui/Shell";
 function Page() {
   const current = useApp((s) => s.history[s.historyIndex]);
   switch (current.page) {
-    case "library":
-      return <Placeholder page="library" />;
     case "collections":
       return <Collections />;
     case "collection":

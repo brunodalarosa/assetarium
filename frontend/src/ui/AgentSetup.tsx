@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { formatLabel, plural } from "../app/format";
 import { copyText, decideProposal, leaveAgentSetup, loadAgentSetup, reviewAgentSetup, setupDone, showSetupReport, startAgentSetup, useApp } from "../app/store";
+import { CommandBlock } from "./CommandBlock";
 import { Badge, Banner, Button, Card, Spinner } from "./primitives";
 
 export function SetByBadge({ entry }: { entry: Json | undefined }) {
@@ -83,7 +84,7 @@ function Problem({ item, onShow }: { item: Json; onShow: (client: string) => voi
           <span className="break-all font-mono text-[11.5px]">{item.script}</span>
         </span>
         {item.scope === "project"
-          ? <span className="break-all font-mono text-[11.5px] select-text">{item.fix}</span>
+          ? <CommandBlock command={item.fix} />
           : <span className="flex flex-wrap items-center gap-3">
               <span>Replace it with the {item.label} configuration below, then restart {item.label}.</span>
               <Button variant="secondary" className="agent-registration-show h-8 px-3 text-[12px]" onClick={() => onShow(item.client)}>Show the {item.label} fix</Button>

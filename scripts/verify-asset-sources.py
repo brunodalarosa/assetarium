@@ -105,8 +105,9 @@ def verify():
         ui.js("$('nav-sources').click()")
         wait("$('sources-view')&&lal.state.sourcesView.tree&&$('folder-tree')")
         order = ui.js("[...document.querySelectorAll('nav [id^=nav-]')].map(b=>b.id).join(',')")
-        assert order.endswith('nav-sources,nav-settings'), order
-        check('The Asset sources rail item sits above Settings; Settings has no Asset sources tab')
+        assert order.endswith('nav-sources,nav-settings') and 'nav-library' not in order, order
+        assert ui.js("$('nav-sources').getAttribute('aria-label').startsWith('Library')&&$('sources-title').textContent==='Library'")
+        check('Library (the former Asset sources tab) sits above Settings; the empty Library placeholder is gone')
         ui.js(f"{ROW % (added['key'], '')}.click()")
         wait("lal.state.sourcesView.key==='Library'&&lal.state.source.items.length>0")
         wait(ROW % (added['key'], 'Tiny Pack_1.0'))

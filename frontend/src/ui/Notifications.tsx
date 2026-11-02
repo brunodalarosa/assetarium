@@ -8,6 +8,7 @@ import { ago, describeActive, notificationContent, plural, type Tone } from "../
 import {
   dismissToast, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
 } from "../app/store";
+import { Reason } from "./CommandBlock";
 import { Button, IconButton, Progress, Spinner } from "./primitives";
 
 export function ToneIcon({ tone, className }: { tone: Tone; className?: string }) {
@@ -73,7 +74,7 @@ function NotificationItem({ item }: { item: Json }) {  const content = notificat
         onDismiss={!["descriptions_ready", "setup_proposal"].includes(item.kind) ? () => void notificationAction("dismiss", item) : undefined}
         dismissLabel={`Dismiss: ${content.title}${item.source_name ? ", " + item.source_name : ""}`}
       >
-        <p className="notification-body text-[12.5px] leading-relaxed text-muted-foreground">{content.body}</p>
+        <Reason text={content.body} className="notification-body text-[12.5px] leading-relaxed text-muted-foreground" />
         {actions}
       </Card>
     </li>
@@ -195,7 +196,7 @@ function ToastView({ toast }: { toast: Toast }) {
       onBlur={(event) => !event.currentTarget.contains(event.relatedTarget) && schedule()}
     >
       <Card tone={toast.tone} title={toast.title} className="flex-1 bg-transparent">
-        <p className="notification-body text-[12.5px] leading-relaxed break-words text-muted-foreground">{toast.body}</p>
+        <Reason text={toast.body} className="notification-body text-[12.5px] leading-relaxed text-muted-foreground" />
         {item && <NotificationActions item={item} onAct={() => dismissToast(toast.id)} />}
         {!item && toast.actions?.length ? (
           <div className="toast-actions mt-1 flex flex-wrap gap-2">

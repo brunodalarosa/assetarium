@@ -88,7 +88,7 @@ export function descriptionSummary(source: Json) {
 
 export function descriptionBlocked(source: Json) {
   const d = source.descriptions || {};
-  if (!source.enabled) return "Include this library folder in search on the Asset sources tab to generate descriptions.";
+  if (!source.enabled) return "Include this library folder in search in Library to generate descriptions.";
   if (source.processing_paused) return "Processing is paused. Select formats in Settings → General to generate descriptions.";
   if (operationActive(source.operation)) return "Available when the current operation for this source finishes.";
   if (!d.missing) return d.failed ? "Nothing left to generate. Failed descriptions are recorded and not retried." : "Nothing to generate right now.";

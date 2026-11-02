@@ -1,7 +1,7 @@
 ---
 area: Desktop App
 tags: [system]
-code: [frontend/src/ui/primitives.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
+code: [frontend/src/ui/primitives.tsx, frontend/src/ui/CommandBlock.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
 verified: 2026-11-01
 branch: feature/library-view
 ---
@@ -15,6 +15,8 @@ behind it are [decision 0025](../../Decisions/0025-design-principles.md); read t
 - **P1 Decide many, commit once, see the outcome**: group alike decisions by signature, stage them, preview,
   one Apply. Cheap and undoable → apply at once with Undo; irreversible → one at a time.
 - **P2 The robot means agents**: `Bot` only for external agents; no sparkles.
+- **P3 Run it, don't type it**: a button when the app can do it; otherwise a `CommandBlock` with Copy, never a command
+  inline in text.
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
 
@@ -44,6 +46,7 @@ are in `lib/ease.ts` (`SPRING_LAYOUT`, `SPRING_PANEL`); honor `useReducedMotion`
 | `SelectField`, `TextField`, `RadioCards` | form inputs; `RadioCards` for 2–4 choices that need a sentence each |
 | beUI `Switch`, `Checkbox`, `Tabs`, `Select`, `ContextMenu`, `Tooltip` | vendored primitives (MIT), adapted where marked "Assetarium" |
 | `ProposalReview` | several agent proposals to decide together (P1): groups, per-member choice, preview, one Apply |
+| `CommandBlock` / `Reason` (`ui/CommandBlock.tsx`) | a command the owner must run (P3); `Reason` shows backend text and splits any command in it into a block |
 | Toasts (`pushToast`) | an outcome or a notice with at most one or two actions (Undo, Review) |
 
 ### Icons (lucide-react)
@@ -52,6 +55,7 @@ are in `lib/ease.ts` (`SPRING_LAYOUT`, `SPRING_PANEL`); honor `useReducedMotion`
 | --- | --- |
 | `Bot` | an external agent (Agent activity, agent setup, "Let my agent finish") |
 | dot | new since your last visit |
+| `CircleSlash` | not processed: a file type Assetarium does not process (state `skipped`) |
 | `TriangleAlert` | warning · `CircleAlert` fault · `Clock` waiting · `Check` done or accepted · `X` close or reject |
 
 ## Gotchas

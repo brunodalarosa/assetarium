@@ -148,6 +148,12 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- **Make previews no longer offers work it then refuses**: assets Assetarium won't process (for example FBX copies
+  while only glTF is processed) are counted as "not processed" instead of "without previews", so the button, the
+  tree and the queue agree.
+- Commands the app asks you to run are shown in a block with **Copy**, including inside processing faults and
+  notices (design principle P3). Identical stops in Asset processing → Recent are one line with a count.
+- **Asset sources is now Library**, at the bottom of the rail above Settings; the empty Library placeholder is gone.
 - Large libraries no longer take over the computer's memory. The Asset sources and Asset processing
   tabs read a small per-folder summary instead of every saved record, so a 73,000-asset library
   folder opens in about a second instead of timing out with 14 GB in use. A library folder read

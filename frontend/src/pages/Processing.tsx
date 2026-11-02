@@ -7,6 +7,7 @@ import type { Json } from "../app/api";
 import { operationActive, plural } from "../app/format";
 import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, sourceAction, useApp } from "../app/store";
 import { Skeleton } from "../ui/Loading";
+import { Reason } from "../ui/CommandBlock";
 import { Badge, Banner, Button, Disclosure, Progress } from "../ui/primitives";
 
 const ACTION = { previews: "Make previews", descriptions: "Generate descriptions" } as Record<string, string>;
@@ -55,7 +56,7 @@ function Running() {
             </Button>
           </div>
           <Progress value={value} label={ACTION[item.action] + " for " + item.label} valueText={`${value}% — ${phase}`} />
-          <p className="text-[12px] text-muted-foreground">{operation.reason || phase}</p>
+          <Reason text={operation.reason || phase} className="text-[12px] text-muted-foreground" />
           {(item.log || []).length > 0 && (
             <Disclosure title="Live log">
               <ul id="running-log" className="grid max-h-64 gap-0.5 overflow-y-auto rounded-xl bg-surface-2 p-2 font-mono text-[11.5px] scroll-thin">
@@ -133,8 +134,7 @@ function Blocked() {
         <li key={b.reason} className="grid gap-1 rounded-xl bg-warning-bg px-4 py-3 text-[13px] text-warning">
           <span className="font-medium">{b.reason}{b.assets ? ` · fixing it unblocks ${plural(b.assets, "asset", "assets")}` : ""}</span>
           <span className="flex flex-wrap items-center gap-2 text-[12.5px]">
-            <span className="min-w-0 break-words select-text">{b.fix}</span>
-            <Button variant="quiet" className="h-7 px-2" onClick={() => void copyText(b.fix, "The fix is on the clipboard.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
+            <Reason text={b.fix} className="flex-1" />
             {b.reason.startsWith("Blender") && <Button variant="quiet" className="h-7 px-2" onClick={() => navigate({ page: "settings" })}>Open Settings</Button>}
           </span>
         </li>
@@ -152,13 +152,13 @@ function Failures() {
         <li key={g.key + g.stage + g.reason} className="grid gap-2 rounded-xl bg-surface-2 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <Badge tone="fault">{g.stage}</Badge>
-            <span className="mr-auto min-w-0 break-words">{g.reason}</span>
+            <Reason text={g.reason} className="mr-auto" />
             <span className="text-[12px] text-muted-foreground">{plural(g.assets.length, "asset", "assets")} · {g.folder}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="quiet" className="h-7 px-2" onClick={() => void copyText(`${g.stage}: ${g.reason}\n` + g.assets.map((a: Json) => a.path || a.name).join("\n"), "The failure and its files are on the clipboard.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
             <Button variant="quiet" className="h-7 px-2" onClick={() => void recheckFailures({ key: g.key })}><RotateCcw className="size-3.5" aria-hidden />Recheck…</Button>
-            <Button variant="quiet" className="h-7 px-2" onClick={() => openSources(g.key, "", g.assets[0]?.asset_id)}><FolderOpen className="size-3.5" aria-hidden />Show in Asset sources</Button>
+            <Button variant="quiet" className="h-7 px-2" onClick={() => openSources(g.key, "", g.assets[0]?.asset_id)}><FolderOpen className="size-3.5" aria-hidden />Show in Library</Button>
           </div>
         </li>
       ))}
@@ -166,20 +166,32 @@ function Failures() {
   );
 }
 
+/** Design principle P1: back-to-back runs that ended the same way (same work, outcome and reason) are one line. */
+function grouped(recent: Json[]) {
+  const runs: { item: Json; count: number }[] = [];
+  for (const item of recent) {
+    const last = runs[runs.length - 1];
+    if (last && ["action", "label", "status", "reason"].every((k) => last.item[k] === item[k])) last.count += 1;
+    else runs.push({ item, count: 1 });
+  }
+  return runs;
+}
+
 function Recent() {
   const recent: Json[] = useApp((s) => s.queue?.recent) || [];
   if (!recent.length) return <p className="text-[13px] text-muted-foreground">Finished work appears here.</p>;
   return (
     <ul id="recent-items" className="grid gap-1.5">
-      {recent.map((item) => {
+      {grouped(recent).map(({ item, count }) => {
         const [label, tone] = OUTCOME[item.status] || [item.status, "neutral"];
         const seconds = item.started_utc && item.finished_utc ? (Date.parse(item.finished_utc) - Date.parse(item.started_utc)) / 1000 : null;
         return (
           <li key={item.id + item.finished_utc} className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-[13px] hover:bg-surface-2">
             <Badge tone={tone}>{label}</Badge>
             <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</span>
+            {count > 1 && <span className="recent-repeat text-[11.5px] text-muted-foreground tabular-nums" title="The same work ended the same way several times in a row">× {count}</span>}
             {seconds !== null && <span className="text-[11.5px] text-muted-foreground tabular-nums">{seconds < 90 ? Math.round(seconds) + " s" : Math.round(seconds / 60) + " min"}</span>}
-            {item.reason && <span className="w-full text-[12px] break-words text-muted-foreground">{item.reason}</span>}
+            {item.reason && <Reason text={item.reason} className="w-full text-[12px] text-muted-foreground" />}
           </li>
         );
       })}

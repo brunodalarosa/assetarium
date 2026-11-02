@@ -1,4 +1,4 @@
-import { Ban, Box, Check, Circle, CircleAlert, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, TriangleAlert, Unlink } from "lucide-react";
+import { Ban, Box, Check, Circle, CircleAlert, CircleSlash, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, TriangleAlert, Unlink } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { type ComponentType, type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
@@ -15,7 +15,7 @@ const packLabel = (item: Json) => (item.pack && typeof item.pack === "object" ? 
 const STATE: Record<string, { icon: typeof Clock; label: string }> = {
   no_previews: { icon: Clock, label: "No previews yet" }, queued: { icon: Clock, label: "Queued" }, running: { icon: Loader, label: "Making previews" },
   blocked: { icon: Ban, label: "Blocked" }, failed: { icon: CircleAlert, label: "Recorded failure" }, missing: { icon: Unlink, label: "Missing" },
-  excluded: { icon: FileX, label: "Excluded" },
+  excluded: { icon: FileX, label: "Excluded" }, skipped: { icon: CircleSlash, label: "Not processed" },
 };
 const DESCRIPTION: Record<string, { icon: typeof FileText; label: string }> = {
   complete: { icon: FileText, label: "Described" }, failed: { icon: FileX, label: "Description failed" }, missing: { icon: FileQuestion, label: "No description yet" },

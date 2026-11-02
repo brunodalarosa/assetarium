@@ -39,8 +39,20 @@ The `Bot` (robot) icon means **an external agent did this or can do it** — and
 (descriptions, embeddings) are ordinary processing and do not get it. Sparkles are not used anywhere: they read
 as generic "AI" and copy another product's identity. "New since your last visit" is a dot.
 
+## P3 — Run it, don't type it
+
+*(Added November 1, 2026.)* Nobody types a command by hand.
+
+1. **Prefer a button that does the work.** When the app can run something itself, it offers the action (for example
+   **Run check** for the search check) instead of a command.
+2. **When a command can't be avoided** (installs and syncs that can't run inside the app), it is shown in a
+   `CommandBlock` with **Copy**, never inline in a sentence. Backend text that carries a command is shown through
+   `Reason`, which splits the command into its own block; `tests/test_command_blocks.py` keeps the pattern in step
+   with the backend's messages.
+
 ## What future work must keep true
 
 - New review flows with several alike decisions group them and commit once, unless the cost table says otherwise.
 - A commit reports per item: one failing item is shown with its reason and stays pending; the others are saved.
 - New agent-related UI uses `Bot`; no sparkle icons.
+- Commands appear only in a `CommandBlock` (or through `Reason`); an action the app can run is a button.

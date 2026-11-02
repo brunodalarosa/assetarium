@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath
 
 from .config import ConfigError
 
-STATES = ('no_previews', 'queued', 'running', 'ready', 'blocked', 'failed', 'missing', 'excluded')
+STATES = ('no_previews', 'queued', 'running', 'ready', 'blocked', 'failed', 'missing', 'excluded', 'skipped')
 TYPES = (('model_3d', '3D models'), ('image', 'Images'), ('material_texture', 'Material textures'))
 
 
@@ -115,11 +115,12 @@ def folder_tree(config, source, blocked=None):
                              (json.dumps(_new_ids(config, source)),)).fetchall()
         folders = [r[0] for r in view.execute('SELECT path FROM folders')]
         detected = structure(config, source, view)
-    nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0}}
+    nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0, 'skipped': 0}}
 
     def node(path):
         if path not in nodes:
-            nodes[path] = {'path': path, 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0}
+            nodes[path] = {'path': path, 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0,
+                           'skipped': 0}
             parent = PurePosixPath(path).parent.as_posix()
             node('' if parent == '.' else parent)['children'].add(path)
         return nodes[path]
@@ -136,6 +137,7 @@ def folder_tree(config, source, blocked=None):
             entry['pending'] += count * (state == 'no_previews')
             entry['blocked'] += count * (state == 'blocked')
             entry['failed'] += count * (state == 'failed')
+            entry['skipped'] += count * (state == 'skipped')
     for folder, count in fresh:
         for entry in chain(folder):
             entry['new'] += count
@@ -146,7 +148,9 @@ def folder_tree(config, source, blocked=None):
         kind = 'library' if path == '' else 'pack' if pack else 'bundle' if path in bundles else 'folder'
         result.append({**entry, 'children': sorted(entry['children']), 'kind': kind,
                        'name': names.get(path) or (PurePosixPath(path).name if path else None),
-                       'coverage': round(entry['previews'] / entry['assets'], 3) if entry['assets'] else None,
+                       # Coverage of what Assetarium processes: skipped assets can never get previews.
+                       'coverage': round(entry['previews'] / (entry['assets'] - entry['skipped']), 3)
+                       if entry['assets'] > entry['skipped'] else None,
                        'pack': {'id': pack['id'], 'cover': pack.get('cover'), 'basis': pack['basis'],
                                 'markers': pack['markers']} if pack else None})
     return {'offline': False, 'scanned': True, 'nodes': result}

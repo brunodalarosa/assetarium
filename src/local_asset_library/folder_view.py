@@ -276,6 +276,9 @@ def _prune(folder, name, keep, generations):
                 pass  # Open in a reader (Windows); removed after a later build.
 
 
+SKIPPED = 'Not processed: Assetarium does not process this file type'
+
+
 def state_sql(blocked):
     """SQL for each asset's work state and reason under the current blockers, with its parameters."""
     cases, params = [], []
@@ -283,11 +286,12 @@ def state_sql(blocked):
         cases.append(f"pending_next IN ({','.join('?' * len(blocker['stages']))}) AND kind IN ({','.join('?' * len(blocker['types']))})")
         params.append((*blocker['stages'], *blocker['types'], blocker['reason']))
     blocks = ''.join(f' WHEN {case} THEN ?' for case in cases)
-    state = f"CASE WHEN failed IS NOT NULL THEN 'failed' WHEN pending_next IS NULL THEN 'ready'{blocks} ELSE 'no_previews' END"
-    reason = (f"CASE WHEN failed IS NOT NULL THEN failed WHEN pending_next IS NULL THEN NULL{blocks}"
+    # Skipped: waiting work Assetarium will not do (not eligible), so no action can offer it (queue and counts agree).
+    state = f"CASE WHEN failed IS NOT NULL THEN 'failed' WHEN pending_next IS NULL THEN 'ready' WHEN NOT eligible THEN 'skipped'{blocks} ELSE 'no_previews' END"
+    reason = (f"CASE WHEN failed IS NOT NULL THEN failed WHEN pending_next IS NULL THEN NULL WHEN NOT eligible THEN ?{blocks}"
               " WHEN pending_next = 'embeddings' THEN 'Search data pending' ELSE NULL END")
     state_params = [v for p in params for v in (*p[:-1], 'blocked')]
-    reason_params = [v for p in params for v in p]
+    reason_params = [SKIPPED] + [v for p in params for v in p]
     return state, state_params, reason, reason_params
 
 

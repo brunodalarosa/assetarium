@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { formatLabel } from "../app/format";
 import { changeSetupStep, confirmSetupReview, finishSetup, leaveAgentSetup, startAgentSetup, type SetupStep, undoSetupValue, useApp } from "../app/store";
-import { CopyCommand } from "./Readiness";
+import { CommandBlock } from "./CommandBlock";
 import { Badge, Button, Card, Spinner } from "./primitives";
 
 /** Readiness items that only processed assets can satisfy are not setup work. */
@@ -100,7 +100,7 @@ export function SetupReport() {
                   {row.missing.map((item) => (
                     <li key={item.id} className="grid gap-1.5" data-item={item.id}>
                       <span className="text-[12.5px]"><span className="font-medium">{item.label}</span>{item.detail ? ` · ${item.detail}` : ""}</span>
-                      {item.command && <CopyCommand command={item.command} />}
+                      {item.command && <CommandBlock command={item.command} />}
                     </li>
                   ))}
                   {row.hint && <li className="text-[12px] text-muted-foreground">{row.hint}</li>}
@@ -113,11 +113,11 @@ export function SetupReport() {
       </Card>
       <section id="setup-next" className="page-enter grid gap-3 rounded-2xl border border-primary/30 bg-accent-soft/40 p-5" style={{ animationDelay: `${list.length * 45 + 60}ms` }}>
         <span className="flex items-center gap-2 text-[15px] font-semibold"><FolderOpen className="size-4.5" aria-hidden />Next: choose your asset folders</span>
-        <p className="text-[13px] leading-relaxed text-muted-foreground">Add the folders with your asset library on the Asset sources tab. Assetarium lists them right away, and makes previews and search data when you start it. Your files are never changed.</p>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">Add the folders with your asset library in the Library tab. Assetarium lists them right away, and makes previews and search data when you start it. Your files are never changed.</p>
         <div className="flex flex-wrap gap-3">
           {review
             ? <Button id="setup-looks-good" disabled={busy} onClick={() => void confirmSetupReview()}>{busy ? "Saving…" : "Looks good"}</Button>
-            : <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Asset sources</Button>}
+            : <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Library</Button>}
           {!review && <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>}
         </div>
       </section>

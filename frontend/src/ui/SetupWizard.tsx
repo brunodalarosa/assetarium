@@ -283,9 +283,9 @@ function Review() {
               : result.blender.status === "faulty" ? `${result.blender.reason} Your other choices were saved.` : "Blender unchanged; nothing was written."}</span>
           </li>
         </ul>
-        <Paragraph>Next: add a library folder on the Asset sources tab, then choose Make previews on a pack.</Paragraph>
+        <Paragraph>Next: add a library folder in Library, then choose Make previews on a pack.</Paragraph>
         <div className="flex flex-wrap gap-3">
-          <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Asset sources</Button>
+          <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Library</Button>
           <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>
         </div>
       </div>

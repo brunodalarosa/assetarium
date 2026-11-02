@@ -59,3 +59,18 @@ def test_bridge_folder_answers_rescan_and_paths_stay_inside_the_folder(managed, 
         assert bridge.library_tree()['status'] == 'ready'
     finally:
         bridge._close()
+
+
+def test_assets_assetarium_will_not_process_are_skipped_not_counted_as_pending(managed, monkeypatch):
+    from local_asset_library import processing_queue
+    from local_asset_library.settings import save_general_settings
+    config, backend, one, _ = managed
+    monkeypatch.setattr(library_view, 'blockers', lambda config: {})
+    save_general_settings(config, 24, ['obj'])
+    (Path(one['path']) / 'Only.fbx').write_text('fbx')
+    sources.scan_source(config, one)
+    root = next(n for n in next(f for f in library_view.tree(config)['folders'] if f['key'] == one['key'])['nodes'] if n['path'] == '')
+    found = processing_queue.resolve(config, 'previews', {'key': one['key'], 'path': ''})
+    assert root['skipped'] == 1 and root['pending'] == len(found['ids'])  # The button's count is what the queue would run.
+    items = {i['name']: i for i in library_view.folder_items(config, one['key'], show_files=False)['items']}
+    assert items['Only']['state'] == 'skipped' and items['Only']['reason'].startswith('Not processed')

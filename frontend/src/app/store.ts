@@ -6,7 +6,7 @@ import { useSyncExternalStore } from "react";
 import { type AssetApi, type Bridge, type Json, libraryApi, sourceApi } from "./api";
 import { describeActive, notificationContent, notificationKey, operationActive, plural, type Tone } from "./format";
 
-export type Page = "home" | "library" | "collections" | "collection" | "processing" | "settings" | "sources";
+export type Page = "home" | "collections" | "collection" | "processing" | "settings" | "sources";
 export type SettingsTab = "general";
 export interface Route {
   page: Page;

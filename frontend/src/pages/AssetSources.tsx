@@ -9,6 +9,7 @@ import {
 } from "../app/store";
 import { AssetGrid } from "../ui/AssetGrid";
 import { FolderTree } from "../ui/FolderTree";
+import { Reason } from "../ui/CommandBlock";
 import { Banner, Button, SelectField, Spinner } from "../ui/primitives";
 
 const SORTS: [string, string][] = [["name", "Name"], ["added", "Recently added"], ["pending", "Most without previews"], ["assets", "Most assets"]];
@@ -38,7 +39,7 @@ function Header() {
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 id="sources-title" tabIndex={-1} className="mr-auto text-[26px] font-semibold outline-none">Asset sources</h1>
+        <h1 id="sources-title" tabIndex={-1} className="mr-auto text-[26px] font-semibold outline-none">Library</h1>
         <SelectField id="sources-sort" label="Sort" value={view.sort} onChange={(value) => setSourcesFilter({ sort: value as SourcesView["sort"] })}
           options={SORTS} className="w-52" />
         <Button id="add-library-folder" disabled={busy} onClick={() => void add()}>{busy ? <Spinner className="size-4" /> : <FolderPlus className="size-4" aria-hidden />}Add library folder</Button>
@@ -77,7 +78,7 @@ function Notices() {
             {(tree.blockers || []).map((b: Json) => (
               <span key={b.reason} className="blocker flex flex-wrap items-baseline gap-x-2">
                 <strong className="font-medium">{b.reason}:</strong>
-                <span className="min-w-0 break-words select-text">{b.fix}</span>
+                <Reason text={b.fix} className="flex-1" />
               </span>
             ))}
             <span className="text-[11.5px] opacity-80">Work that needs it is shown as blocked and waits; it is never offered as something to process.</span>
@@ -122,6 +123,7 @@ function FolderHeader() {
           {node.assets ? ` · ${Math.round((node.coverage || 0) * 100)}% with previews` : ""}
           {node.blocked ? ` · ${node.blocked.toLocaleString()} blocked` : ""}
           {node.failed ? ` · ${node.failed.toLocaleString()} recorded ${node.failed === 1 ? "failure" : "failures"}` : ""}
+          {node.skipped ? <span title="Assetarium does not process these file types; they are listed so you can find them"> · {node.skipped.toLocaleString()} not processed</span> : ""}
           {(node.pack?.markers || []).some((m: Json) => m.kind === "license") ? " · License file" : ""}
         </p>
       </div>
