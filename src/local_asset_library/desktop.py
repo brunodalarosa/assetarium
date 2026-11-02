@@ -193,6 +193,26 @@ class DesktopBridge:
     def render_test(self, action='start'):
         return self._wait(self._present(self._render_test, action, guarded=False))
 
+    def search_check(self, action='status'):
+        return self._wait(self._present(self._search_check, action, guarded=False))
+
+    def _search_check(self, action):
+        """Run check (decision 0026): start it, or read whether it passed, runs or failed (for Settings and setup)."""
+        from . import engines
+        from .source_operations import operation_status
+        if action == 'start':
+            return self._start_source_operation('search-check', None)
+        if action != 'status':
+            raise ConfigError('Unknown search check action')
+        operation = operation_status(self._config)
+        if operation.get('operation') == 'search-check' and operation.get('status') in {'queued', 'processing'}:
+            return {'status': 'running', 'phase': operation.get('phase')}
+        if engines.capability_ready(self._config, engines.search_device(self._config))['ready']:
+            return {'status': 'ready'}
+        if operation.get('operation') == 'search-check' and operation.get('status') == 'faulty':
+            return {'status': 'failed', 'reason': operation.get('reason')}
+        return {'status': 'missing', 'fault': engines.search_runtime_fault(self._config)}
+
     def _render_test(self, action):
         from .source_operations import cancel, operation_status
         if action == 'cancel':

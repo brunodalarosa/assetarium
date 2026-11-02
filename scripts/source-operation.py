@@ -10,11 +10,11 @@ root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'src'))
 from local_asset_library.config import load_project_config
 from local_asset_library.sources import get_source, bound
-from local_asset_library.source_operations import scan_all, process_source, describe_source, worker_stage, state, operation_lease, render_test
+from local_asset_library.source_operations import scan_all, process_source, describe_source, worker_stage, state, operation_lease, render_test, search_check
 from local_asset_library.gpu_queue import lease
 
 parser = argparse.ArgumentParser()
-parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage', 'render-test', 'search-test'])
+parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage', 'render-test', 'search-test', 'search-check'])
 parser.add_argument('--source')
 parser.add_argument('--token', required=True)
 parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'])
@@ -45,6 +45,8 @@ else:
                 describe_source(config, source, args.token)
             elif args.operation == 'render-test':
                 render_test(config, args.token)
+            elif args.operation == 'search-check':
+                search_check(config, args.token)
             else:
                 process_source(config, source, args.token)
     except BaseException as exc:

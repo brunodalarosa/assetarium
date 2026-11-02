@@ -238,7 +238,8 @@ def capability_ready(config, device):
         value = json.loads(config.output_path('data', 'embeddings/capability.json').read_text(encoding='utf-8'))
         recorded = value['contract']['device']
     except (OSError, ValueError, KeyError, TypeError, ConfigError):
-        return {'ready': False, 'reason': 'Not recorded yet. It needs two processed assets with previews.'}
+        return {'ready': False, 'reason': 'Not run yet. It reads two built-in sample images (about a minute); '
+                                          'Make previews runs it by itself when needed.'}
     if recorded != ('cpu' if device == 'cpu' else 'cuda:0'):
         return {'ready': False, 'reason': 'Recorded for the other search device; record it again for this one.'}
     return {'ready': bool(value.get('actual_text_and_image_inference'))}
@@ -264,8 +265,12 @@ def search_readiness(config, gpu=None, device=None):
                   'command': None if weights['ready'] else weights_command(config, 'embedding', weights, project,
                                                                            ' --device cpu' if device == 'cpu' else '')})
     capability = capability_ready(config, device)
-    items.append({'id': 'embedding_capability', 'label': 'Search check on two of your assets', 'ready': capability['ready'],
-                  'detail': capability.get('reason'),
-                  'command': None if capability['ready'] else command(config, 'embedding',
-                      f'run --locked --no-sync --project {project} python scripts/record-embedding-capability.py')})
+    # A button, not a command (design principle P3): the app runs it on built-in samples, and processing runs it
+    # by itself when it is missing (decision 0026).
+    # Offered only when it can pass: the runtime and the model above are installed.
+    runnable = not capability['ready'] and runtime['ready'] and not mismatch and weights['ready']
+    items.append({'id': 'embedding_capability', 'label': 'Search check', 'ready': capability['ready'], 'command': None,
+                  'detail': capability.get('reason') if capability['ready'] or runnable else
+                  'Runs once the search runtime and model above are installed; Make previews then runs it by itself.',
+                  'action': 'search_check' if runnable else None})
     return items

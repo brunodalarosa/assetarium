@@ -654,7 +654,15 @@ def save_setup(config, choices, actor='user'):
                      skipped_steps=skipped, engine_hint=hint)
         value.setdefault('values', {}).update({key: {'set_by': actor, 'utc': stamp} for key in chosen})
     record = _change(config, update)
-    return {'status': 'saved' if outcome['status'] != 'faulty' else 'partial', 'settings': saved, 'blender': outcome,
+    samples = None
+    if choices.get('include_samples'):
+        from .sources import include_samples
+        try:
+            samples = include_samples(config)
+        except (OSError, ConfigError) as exc:  # Reported on its own; the other choices are saved.
+            samples = {'status': 'faulty', 'reason': str(exc)}
+    return {'status': 'saved' if outcome['status'] != 'faulty' and (samples or {}).get('status') != 'faulty' else 'partial',
+            'settings': saved, 'blender': outcome, **({'samples': samples} if samples else {}),
             'record': {k: record.get(k) for k in ('state', 'completed_utc', 'by', 'wizard_version')}}
 
 

@@ -46,7 +46,7 @@ report = {'status': 'running', 'checks': {}, 'screenshots': [], 'synthetic_only'
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
 
 skip = shutil.ignore_patterns('__pycache__', '*.pyc')
-for name in ('src', 'scripts'):
+for name in ('src', 'scripts', 'samples'):
     shutil.copytree(ROOT / name, FIXTURE / name, ignore=skip)
 for relative in ('config.example.toml', 'docs/caption-model.json', 'docs/embedding-model.json'):
     (FIXTURE / relative).parent.mkdir(parents=True, exist_ok=True)
@@ -162,10 +162,12 @@ def verify():
         ui.check('panel_flips_to_connected_with_the_client_name', "$('agent-connection').textContent.includes('agent-setup-check is connected')")
         shoot('02-agent-connected')
         status, _ = agent.call('get_setup_status')
-        assert status['guide'] and [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'storage_gib'], status['ask_user']
+        assert status['guide'] and [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'samples', 'storage_gib'], status['ask_user']
         report['checks']['status_carries_the_guide_and_only_the_users_questions'] = True
-        applied, error = agent.call('apply_setup', {'answers': {'engines': ['godot'], 'descriptions': False, 'storage_gib': 30}})
+        applied, error = agent.call('apply_setup', {'answers': {'engines': ['godot'], 'descriptions': False, 'storage_gib': 30, 'samples': True}})
         assert not error and applied['status'] == 'applied' and applied['settings']['processing_formats'] == ['gltf'], applied
+        assert applied['samples']['status'] == 'added', applied  # The user said yes to the built-in samples (decision 0026).
+        report['checks']['agent_adds_the_samples_when_the_user_says_yes'] = True
         wait("$('agent-values').querySelector('[data-key=processing_formats] [data-set-by=agent]')", 15)
         ui.check('agent_values_appear_live_with_attribution', """(async()=>({formats:$('agent-values').querySelector('[data-key=processing_formats]').textContent.includes('glTF'),
           budget:$('agent-values').querySelector('[data-key=storage_budget_gib]').textContent.includes('30 GiB')}))()""")
@@ -222,7 +224,7 @@ def verify():
           title:$('setup-step-title').textContent.includes('Setup complete'), close:!!$('setup-close-report')}))()""")
         shoot('05-report-completed')
         ui.js("(async()=>{document.querySelector('[aria-label=\"Change Storage budget\"]').click();await until(()=>$('setup-budget'));"
-              "type('setup-budget','45');await frame();lal.goToSetupStep(7);await until(()=>$('setup-summary'));await frame();return true})()")  # 7: review.
+              "type('setup-budget','45');await frame();lal.goToSetupStep(lal.SETUP_STEPS.indexOf('review'));await until(()=>$('setup-summary'));await frame();return true})()")
         ui.check('review_edit_is_marked_as_changed', "$('setup-summary').querySelector('[data-step=storage]').textContent.includes('Changed by you')")
         ui.js("$('setup-save').click()")
         wait("lal.state.setup.result&&$('setup-saved-title')", 60)

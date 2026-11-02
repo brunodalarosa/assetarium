@@ -36,13 +36,14 @@ OUT = ROOT / 'data/gui' / args.run_name
 FIXTURE = ROOT / 'scratch' / args.run_name / args.phase
 OUT.mkdir(parents=True, exist_ok=args.phase == 'existing')
 FIXTURE.mkdir(parents=True, exist_ok=False)
+shutil.copytree(ROOT / 'samples', FIXTURE / 'samples')  # The built-in samples, as a fresh clone has them (decision 0026).
 os.environ.update(PYTHONNET_RUNTIME='netfx', TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
 report = {'status': 'running', 'phase': args.phase, 'checks': {}, 'screenshots': [], 'synthetic_only': True,
           'owner_visual_review': 'pending', 'real_model_load': False}
 probes = []
 real_probe = setup_core._probe
 setup_core._probe = lambda *a: probes.append(a[0][0]) or real_probe(*a)  # Counts every program setup runs.
-STEPS = ['welcome', 'blender', 'formats', 'storage', 'descriptions', 'batch', 'model', 'review']
+STEPS = ['welcome', 'blender', 'formats', 'storage', 'descriptions', 'batch', 'agent', 'model', 'review']
 BLENDER = setup_core.blender_report  # noqa: F841 (discovery is the app's own)
 
 if args.phase == 'fresh':
@@ -172,7 +173,11 @@ def fresh():
               "await until(()=>$('setup-server-result').classList.contains('text-fault'));return true})()")
         ui.check('other_computers_are_refused', "$('setup-server-result').textContent.includes('this computer')")
         ui.js(f"(async()=>{{type('setup-server-url',{json.dumps(url)});await frame();lal.setupNext();"
-              "await until(()=>$('setup-wizard').dataset.step==='model');await frame();return true})()")
+              "await until(()=>$('setup-wizard').dataset.step==='agent');await until(()=>$('setup-agent-connect'));await frame();return true})()")
+        ui.check('connect_agent_step_offers_configurations_and_is_skippable', """(async()=>({snippet:!!$('agent-snippet'),
+          copy:!!$('agent-copy-snippet'), skip:!!$('setup-skip-step')}))()""")
+        shoot('04b-connect-agent')
+        ui.js("(async()=>{lal.setupNext(true);await until(()=>$('setup-wizard').dataset.step==='model');await frame();return true})()")
         ui.check('model_check_step_is_offered_and_skippable', "!!$('setup-model-check')&&!!$('setup-skip-step')")
         ui.js("(async()=>{lal.setupNext(true);await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
         ui.check('batch_step_not_needed_for_a_server', """(async()=>({skippedOver:$('setup-wizard').dataset.step==='review',
@@ -184,8 +189,10 @@ def fresh():
       measured:document.body.innerText.includes('RTX 5070 (12 GiB)')}))()""")
     ui.js("(async()=>{$('setup-batch').querySelector('[data-value=\"4\"]').click();await frame();return true})()")
     shoot('05-batch')
-    ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='model');lal.setupNext(true);"
+    ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='agent');lal.setupNext(true);"
+          "await until(()=>$('setup-wizard').dataset.step==='model');lal.setupNext(true);"
           "await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
+    ui.check('samples_are_offered_and_checked_by_default', "$('setup-include-samples').getAttribute('aria-checked')==='true'||$('setup-include-samples').checked===true")
     shoot('06-review')
     assert not (FIXTURE / 'data/library/settings.json').exists()  # Nothing is saved before Save.
     ui.js("$('setup-save').click()")
@@ -201,6 +208,12 @@ def fresh():
     else:
         assert not (FIXTURE / 'config.local.toml').exists()
     report['checks']['save_writes_settings_setup_record_and_blender'] = True
+    from local_asset_library.sources import registry, samples_folder
+    assert any(Path(s['path']) == samples_folder(config) for s in registry(config)['sources'])
+    ui.check('saved_samples_are_reported', "$('setup-samples-result').textContent.includes('blue cube')")
+    wait("$('setup-search-check')&&$('setup-search-check').dataset.state!=='starting'", 30)
+    ui.check('search_check_says_what_it_needs_without_a_command', """(async()=>({state:$('setup-search-check').dataset.state,
+      noCommand:!$('setup-search-check').querySelector('code')}))()""")
     shoot('07-saved')
     ui.js("(async()=>{$('setup-go-sources').click();await until(()=>!$('setup-wizard')&&$('sources-view'));return true})()")
     ui.check('next_step_opens_asset_sources', "$('nav-sources').closest('[inert]')===null&&$('nav-sources').getAttribute('aria-current')==='page'")

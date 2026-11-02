@@ -109,8 +109,12 @@ def operation_lease(config, scoped, token):
 
 def start(config, operation, key=None, asset_ids=None, queue_item=None):
     """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope."""
-    if operation not in {"scan", "process", "describe", "render-test"}:
+    if operation not in {"scan", "process", "describe", "render-test", "search-check"}:
         raise ConfigError("Unknown asset source operation")
+    if operation == "search-check":
+        from .engines import search_runtime_fault
+        if key or (fault := search_runtime_fault(config)):
+            raise ConfigError(fault if not key else "The search check is not tied to a library folder")
     if operation == "render-test" and (key or not (blender := with_saved_blender(config).blender) or not blender.exists()):
         raise ConfigError("Set up Blender first (Settings → General → Setup), then test render speed")
     if operation == "describe" and not key:
@@ -249,8 +253,6 @@ def publish_source(scoped):
     return target.catalog_generation
 
 
-SEARCH_CHECK = ("Search data is waiting for the one-time search check. Run it in a terminal in the Assetarium folder: "
-                "{command} Then process this source again; previews and other finished work are kept.")
 BUDGET_REACHED = ("Storage budget reached. Increase it in Settings → General, then process this source again; "
                   "completed work is preserved")
 
@@ -346,6 +348,25 @@ def process_source(config, source, token):
     notify_ready(config, source, (status.get("descriptions") or {}).get("missing", 0))
 
 
+def search_check(config, token):
+    """Run Run check (decision 0026) in the search runtime: two built-in sample images, never library assets."""
+    from .search_check import IMAGES
+    runtime, project = stage_runtime(config, "embeddings")
+    state(config, status="processing", phase="Loading the search model for the one-time search check", progress=.1)
+    command = [*runtime_command(config.project_root, runtime), "run", "--locked", "--no-sync", "--offline", "--project",
+               str(config.project_root / "runtime" / project), "python", "-m", "local_asset_library.search_check"]
+    env = os.environ.copy()
+    env.update(PYTHONPATH=str(config.project_root / "src"), HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
+    completed = subprocess.run(command, cwd=config.project_root, env=env, capture_output=True, text=True, errors="replace",
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+    if completed.returncode:
+        lines = [line for line in (completed.stderr or completed.stdout).splitlines() if line.strip()]
+        reason = "The search check did not pass: " + (lines[-1][:400] if lines else f"exit code {completed.returncode}")
+        state(config, status="faulty", phase="Search check failed", reason=reason, progress=1)
+        raise ConfigError(reason)
+    state(config, status="complete", phase=f"Search check passed on {len(list(IMAGES.glob('*.png')))} built-in images", progress=1)
+
+
 def render_test(config, token):
     """The owner-started render speed test (decision 0022); waits for processing like other operations."""
     from .render_devices import label, run
@@ -439,19 +460,28 @@ def describe_source(config, source, token):
     state(scoped, status=status, phase=phase, progress=1, current_asset=None, reason=reason)
 
 
-def require_search_check(config, scoped, token):
-    """Stop the search stage with the search check's command while its receipt is missing or for the other device.
-
-    Setup, not an asset fault: assets stay pending and finished stages are kept.
+def ensure_search_check(config, scoped, token, backend=None):
+    """A missing search check never stops processing (decision 0026): the search stage runs it first, on the
+    built-in sample images, and keeps the loaded model. A failed check stops the stage with its reason; assets stay
+    pending and finished stages are kept.
     """
     from . import engines
-    device = engines.search_device(config)
-    if engines.capability_ready(config, device)["ready"]:
-        return
-    check = next(i for i in engines.search_readiness(config, device=device) if i["id"] == "embedding_capability")
-    reason = SEARCH_CHECK.format(command=check["command"])
-    atomic_json(stage_fault_path(scoped, token), {"reason": reason, "utc": now()})
-    raise ConfigError(reason)
+    from .search_check import record
+    if engines.capability_ready(config, engines.search_device(config))["ready"]:
+        return backend
+    state(scoped, status="processing", phase="Running the one-time search check", stage="embeddings")
+    try:
+        if backend is None:
+            from .search_speed import ensure
+            backend = engines.embedder(scoped)
+            ensure(scoped, backend, progress=lambda phase: state(scoped, status="processing", phase=phase, stage="embeddings"),
+                   cancelled=lambda: cancelled(scoped, token))  # CPU threads, as when the stage loads the model itself.
+        record(config, backend)
+    except (ConfigError, OSError, RuntimeError) as exc:
+        reason = f"The search check did not pass, so search data was not built: {exc}"
+        atomic_json(stage_fault_path(scoped, token), {"reason": reason, "utc": now()})
+        raise ConfigError(reason) from exc
+    return backend
 
 
 def worker_stage(config, source, stage, token):
@@ -489,9 +519,12 @@ def worker_stage(config, source, stage, token):
         try:
             preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
         except (ConfigError, OSError, ValueError):
-            if stage == "embeddings":
-                require_search_check(config, scoped, token)
-            raise
+            if stage != "embeddings":
+                raise
+            backend = ensure_search_check(config, scoped, token, backend)  # The missing receipt is why; then measure again.
+            preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
+        if stage == "embeddings" and preview.get("pending"):
+            backend = ensure_search_check(config, scoped, token, backend)  # Only when there is search data to build.
         if not preview.get("pending") and not preview.get("restored"):
             return  # Reused results whose stage a rescan reset still need the real pass to mark them complete.
         from . import engines

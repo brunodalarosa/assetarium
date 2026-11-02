@@ -122,6 +122,7 @@ def parser():
     setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
+    setup.add_parser('search-check', help='Run the one-time search check on built-in sample images (about a minute)')
     setup.add_parser('verify-weights', help='Verify model weights placed by hand against the pinned file list (reads them; '
                      'downloads nothing)').add_argument('model', nargs='?', choices=['caption', 'embedding', 'all'], default='all')
     agent = setup.add_parser('agent', help='Let your AI agent set up Assetarium: how to connect it, and its proposals')
@@ -664,6 +665,7 @@ def checklist(args, items, indent='  '):
     for item in items:
         say(args, f"{indent}[{'ok  ' if item['ready'] else 'miss'}] {item['label']}"
                   + (f"\n{indent}       {item['command']}" if item.get('command') else '')
+                  + (f"\n{indent}       Run it with: setup search-check" if item.get('action') == 'search_check' else '')
                   + (f" — {item['detail']}" if item.get('detail') and not item['ready'] else ''))
 
 
@@ -757,14 +759,28 @@ def wizard(args, config):
     if choices['search_device'] in status['environment']['search_devices']:
         say(args, '   What search needs on this device (setup installs nothing; run a missing command yourself):')
         checklist(args, status['environment']['search_devices'][choices['search_device']], '   ')
+    say(args, '\n7. Sample assets: a blue cube, a green pyramid and a red sphere, so the library has something to try.')
+    choices['include_samples'] = ask('Include the built-in sample assets? (yes/no)', 'yes').lower() == 'yes'
     say(args, '\nReview:\n' + json.dumps({k: v for k, v in choices.items() if k != 'confirm_rerender'}, indent=2, ensure_ascii=False))
     if ask('Save these choices? (yes/no)', 'yes').lower() != 'yes':
         say(args, 'Nothing was saved.')
         return {'status': 'cancelled'}
     choices['skipped_steps'] = skipped
     result = setup_core.save_setup(config, choices)
+    samples = result.get('samples') or {}
     say(args, 'Saved.' + (f" {result['blender']['reason']}" if result['blender']['status'] == 'faulty' else '')
-              + ' Next: library add PATH, then previews KEY.')
+        + (f" Sample assets were not added: {samples['reason']}" if samples.get('status') == 'faulty' else
+           ' Sample assets are in your library.' if samples else ''))
+    from .engines import search_runtime_fault, search_readiness
+    weights = next(i for i in search_readiness(config) if i['id'] == 'embedding_weights')
+    if search_runtime_fault(config) or not weights['ready']:
+        say(args, 'The search check runs once the search runtime and model are installed (setup status lists them); '
+                  'Make previews also runs it by itself.')
+    else:
+        say(args, 'Running the one-time search check on built-in sample images…')
+        result['search_check'] = search_check_command(args, config)
+    say(args, 'Next: previews KEY makes previews' + (' (the samples are ready to try)' if samples.get('status') in {'added', 'present'}
+              else '; add your own folder with library add PATH') + '. Connect an AI agent with: setup agent')
     return result
 
 
@@ -843,6 +859,8 @@ def setup_command(args, config):
         return result
     if args.action == 'verify-weights':
         return verify_weights_command(args, config)
+    if args.action == 'search-check':
+        return search_check_command(args, config)
     result = setup_core.validate_blender(config, args.path)
     show_checks(args, result)
     if args.blender_action == 'check' or result['status'] not in {'passed', 'warning'}:
@@ -851,6 +869,23 @@ def setup_command(args, config):
     say(args, 'Saved to config.local.toml; the next Make previews uses it.' if saved['status'] == 'saved'
         else 'Already the Blender Assetarium uses; nothing was written.')
     return saved
+
+
+def search_check_command(args, config):
+    """The search check (decision 0026) on built-in sample images; Make previews also runs it by itself when missing."""
+    from . import engines
+    from .source_operations import start
+    if engines.capability_ready(config, engines.search_device(config))['ready']:
+        say(args, 'The search check already passed for this search device.')
+        return {'status': 'ready'}
+    started = start(config, 'search-check')
+    if started.get('status') == 'busy':
+        raise ConfigError(started['reason'])
+    ended = follow(args, config, config)
+    passed = engines.capability_ready(config, engines.search_device(config))['ready']
+    say(args, 'Search check passed: search by description and image is ready.' if passed
+        else 'The search check did not pass: ' + str(ended.get('reason') or ended.get('status')))
+    return dict(ended, status='ready' if passed else 'faulty')
 
 
 def verify_weights_command(args, config):

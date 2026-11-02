@@ -2,7 +2,8 @@
 
 A `.venv-embedding` holding only the base project (what a wrapper sync without --project leaves)
 must give a search error naming the install command, start no worker and keep no fault; Settings →
-General → Search lists it as missing with the command, and Check again sees it fixed. Writes
+General → Search lists it as missing with the command, Run check (the search check, decision 0026) explains
+that it needs the runtime, and Check again sees it fixed. Writes
 data/gui/<run-name>/verification.json.
 """
 import argparse
@@ -53,6 +54,7 @@ profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 ui = Harness(window, OUT, report)
 RUNTIME = "document.querySelector('#search-readiness [data-item=embedding_runtime]')"
+CHECK = "document.querySelector('#search-readiness [data-item=embedding_capability]')"
 
 
 def wait(expression, timeout=60):
@@ -77,6 +79,11 @@ def verify():
         assert ui.js(f"{RUNTIME}.dataset.ready==='false'&&{RUNTIME}.textContent.includes('sync --locked --project runtime/embedding')")
         ui.capture('02-settings-missing.png')
         report['checks'].append('Settings → Search lists the runtime as missing with its install command')
+        assert ui.js(f"!{CHECK}.querySelector('[data-action=run-search-check]')&&!{CHECK}.querySelector('.command-block')"
+                     f"&&{CHECK}.textContent.includes('Runs once the search runtime and model above are installed')")
+        ui.capture('02b-search-check-waits-for-runtime.png')
+        report['checks'].append('The search check is never a command; while the runtime is missing it offers no button that '
+                                'could only fail, and says what it waits for (design principle P3, decision 0026)')
         install('torch', '2.10.0+cu128')
         install('sentence_transformers', '6.1.0')
         ui.js("$('search-readiness-check').click()")

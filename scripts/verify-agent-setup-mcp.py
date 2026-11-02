@@ -150,7 +150,7 @@ try:
     text = json.dumps(status, ensure_ascii=False)
     check('status does not reveal the project path', str(project) not in text and json.dumps(str(project))[1:-1] not in text)
     check('status checked the computer and lists only the user questions', status.get('guide') and status.get('found')
-          and [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'storage_gib'], status.get('ask_user'))
+          and [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'samples', 'storage_gib'], status.get('ask_user'))
     refused, error, _ = client.call('validate_blender')
     check('validate_blender without a path explains itself', error and 'Give path' in refused.get('reason', ''), refused)
     applied, error, _ = client.call('apply_setup', {'answers': {'engines': ['godot', 'unity'], 'descriptions': False, 'storage_gib': 25},

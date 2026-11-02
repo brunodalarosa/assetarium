@@ -161,7 +161,7 @@ export interface CreateRequest {
   sourceKey: string | null;
   name?: string;
 }
-export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "model", "review"] as const;
+export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "agent", "model", "review"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 /** What the wizard will save; nothing is written until Save (or Skip setup, which saves nothing). */
 export interface SetupDraft {
@@ -176,6 +176,7 @@ export interface SetupDraft {
   serverModel: string;
   searchDevice: string;
   batch: string;
+  includeSamples: boolean;
   skipped: SetupStep[];
 }
 export interface SetupState {
@@ -293,7 +294,7 @@ function emptySetup(): SetupState {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
     storage: null, measuring: false, server: null, testing: false, saving: false, result: null,
     agent: null, agentMode: false, agentBusy: null, baseline: null,
-    draft: { blenderPath: "", confirmRerender: false, engineHint: [], formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", skipped: [] },
+    draft: { blenderPath: "", confirmRerender: false, engineHint: [], formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", includeSamples: true, skipped: [] },
   };
 }
 const idleSearch: SearchState = {
@@ -1325,6 +1326,14 @@ function savedDraft(info: Json): SetupDraft {
   };
 }
 /** Reads what is installed for each search device; never installs or starts the model. */
+/** The search check (decision 0026): start it, or read whether it passed, runs or failed. */
+export async function searchCheck(action: "start" | "status"): Promise<Json> {
+  try {
+    return await api().search_check(action);
+  } catch (error) {
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
 export async function checkSearchReadiness() {
   setState((s) => ({ searchCheck: { ...s.searchCheck, checking: true, error: null } }));
   try {
@@ -1509,6 +1518,7 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   if (!skipped.has("descriptions"))
     Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
   if (!skipped.has("batch") && setupStepNeeded("batch", draft)) choices.caption_batch_size = draft.batch;
+  if (draft.includeSamples) choices.include_samples = true;  // Decision 0026: the built-in samples, checked by default.
   return choices;
 }
 const STEP_FIELDS: Record<string, (keyof SetupDraft)[]> = {

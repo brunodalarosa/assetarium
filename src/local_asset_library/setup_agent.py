@@ -42,8 +42,9 @@ GUIDE = ('Be friendly, direct and brief, in the user\'s language; their first ex
 PROCEDURE = (
     'Assetarium setup procedure. 1. get_setup_status: it has already checked this computer (found), lists the only '
     'questions for the user (ask_user) and how to talk to them (guide). 2. Tell the user what you found and ask the '
-    'ask_user questions in one message. 3. apply_setup with answers {engines, descriptions, model_server, storage_gib}; '
-    'Assetarium derives formats, description engine, batch size and search device. 4. Work through next_actions: '
+    'ask_user questions in one message. 3. apply_setup with answers {engines, descriptions, model_server, storage_gib, '
+    'samples}; Assetarium derives formats, description engine, batch size and search device, and adds the built-in '
+    'sample assets when samples is true. 4. Work through next_actions: '
     'items with a tool (verify_weights, propose_setup) are yours to run without asking; items with a command are installs '
     'or downloads: run each only after the user approves it (say its size), and without a shell give them the command. '
     'A Blender proposal waits for the user\'s Apply in the app. 5. apply_setup with finish true (or finish_setup): the user '
@@ -125,6 +126,8 @@ def answers_checked(answers):
     storage = answers.get('storage_gib')
     if storage is not None and (type(storage) is not int or not 1 <= storage <= 1048576):
         raise ConfigError('storage_gib must be a whole number of GiB')
+    if 'samples' in answers and type(answers['samples']) is not bool:
+        raise ConfigError('samples must be true or false')
     server = answers.get('model_server')
     if server is not None and (type(server) is not dict or set(server) - {'url', 'model'}
                                or any(type(v) is not str or len(v) > 256 for v in server.values())):
@@ -143,8 +146,13 @@ def apply_setup(config, args, now=None):
         raise ConfigError('Give the user\'s answers, at least one value, or finish')
     implied = []
     values = {key: args[key] for key in APPLY_KEYS if key in args and key != 'answers'}
+    samples = None
     if 'answers' in args:
-        derived, implied = setup_core.settings_from_answers(answers_checked(args['answers']), environment(config))
+        answers = answers_checked(args['answers'])
+        if answers.get('samples'):
+            from .sources import include_samples
+            samples = include_samples(config)  # Decision 0026: the same built-in samples the wizard offers.
+        derived, implied = setup_core.settings_from_answers({k: v for k, v in answers.items() if k != 'samples'}, environment(config))
         implied = [item for item in implied if item['key'] not in values]
         values = {**derived, **values}
     hint = setup_core.engine_hints(values['engine_hint']) if 'engine_hint' in values else None
@@ -175,8 +183,9 @@ def apply_setup(config, args, now=None):
     shown = {key: (hint if key == 'engine_hint' else saved.get(key)) for key in changed}
     if changed:
         _notice_change(config, change, changed, shown)
-    result = {'status': 'applied' if changed else 'unchanged', 'changed': changed, 'implied': implied,
-              'settings': {key: saved[key] for key in SETTING_KEYS}, 'set_by': 'agent'}
+    result = {'status': 'applied' if changed or (samples or {}).get('status') == 'added' else 'unchanged', 'changed': changed,
+              'implied': implied, 'settings': {key: saved[key] for key in SETTING_KEYS}, 'set_by': 'agent',
+              **({'samples': samples} if samples else {})}
     if saved['description_engine'] == 'local-server' and saved['descriptions_enabled']:
         # Test connection lists the server's models only; it never generates text.
         result['server_check'] = setup_core.check_server(config, saved['description_server']['url'], saved['description_server']['model'])
@@ -404,6 +413,12 @@ def ask_user(config, env, current, record):
                                  'no problem: descriptions can be set up later in Settings → General, and names, filters and '
                                  'keyword search work without them. Do not install a server as part of setup.',
                           'suggestion': False, 'answer': 'descriptions: false, or true with model_server {url, model}'})
+    from .sources import registry, samples_folder
+    has_samples = any(Path(s['path']) == samples_folder(config) for s in registry(config)['sources'])
+    questions.append({'id': 'samples', 'ask': 'Do you want to include the built-in sample assets?',
+                      'why': 'Three tiny models (a blue cube, a green pyramid and a red sphere) so the Library has something to '
+                             'try right away. They take a few KB and can be removed later like any library folder.',
+                      'suggestion': True, 'answer': 'samples: true or false', **({'current': True} if has_samples else {})})
     questions.append({'id': 'storage_gib', 'ask': 'How much disk space may Assetarium use for its own data?',
                       'why': f'Previews, search data and descriptions grow with the size of your asset library; your asset '
                              f'files are never copied or changed. This drive has {free:,.0f} GiB free.',

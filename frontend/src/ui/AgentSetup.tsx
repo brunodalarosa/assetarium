@@ -44,7 +44,7 @@ export function SetupPaths() {
   );
 }
 
-function Snippets({ snippets, client, setClient }: { snippets: Json[]; client: string | undefined; setClient: (id: string) => void }) {
+export function Snippets({ snippets, client, setClient }: { snippets: Json[]; client: string | undefined; setClient: (id: string) => void }) {
   const current = snippets.find((item) => item.id === client) || snippets[0];
   return (
     <div className="grid gap-3">
@@ -131,7 +131,7 @@ function Registrations({ agent, onShow }: { agent: Json; onShow: (client: string
   );
 }
 
-function ConnectionLine({ connections, blocked }: { connections: Json[]; blocked: boolean }) {
+export function ConnectionLine({ connections, blocked }: { connections: Json[]; blocked: boolean }) {
   const live = connections.filter((item) => item.mode === "normal");
   const degraded = connections.some((item) => item.mode === "setup_only");
   const name = live.map((item) => item.client?.name).find(Boolean);

@@ -1,5 +1,5 @@
 import { Check, CircleAlert, Cpu, HardDrive, Monitor } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
 import { cn } from "@/lib/utils";
@@ -7,19 +7,20 @@ import type { Json } from "../app/api";
 import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, plural, SEARCH_HELP } from "../app/format";
 import {
   cancelBlenderCheck, checkBlender, getState, chooseBlenderExecutable, finishSetup, goToSetupStep, measureSetupStorage,
-  saveSetup, SETUP_STEPS, setupDone, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
+  loadAgentSetup, saveSetup, searchCheck, SETUP_STEPS, setupDone, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
 } from "../app/store";
-import { AgentPanel, SetByBadge, SetupPaths } from "./AgentSetup";
+import { AgentPanel, ConnectionLine, SetByBadge, SetupPaths, Snippets } from "./AgentSetup";
 import { SetupReport } from "./SetupReport";
 import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
 import { MODEL_CHECK_HELP, ModelCheck } from "./ModelCheck";
+import { Reason } from "./CommandBlock";
 import { ReadinessList } from "./Readiness";
 import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
 
 const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Batch size", model: "Your agent’s model", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Batch size", agent: "Connect your agent", model: "Your agent’s model", review: "Review and finish",
 };
 const FORMAT_NOTES: [string, string, string][] = [
   ["fbx", "FBX", "Rigs and animation; common in Unity and Unreal."],
@@ -260,6 +261,10 @@ function summary(step: SetupStep, draft: Json, info: Json): string {
       return (draft.engine === "local-server" ? `On · local model server ${draft.serverUrl} · model ${draft.serverModel || "not set"}` : `On · ${engine ? `${engine.label} — ${engine.name}` : draft.engine}`) + search;
     }
     case "batch": return setupStepNeeded("batch", draft) ? draft.batch : "Not used";
+    case "agent": {
+      const live = (getState().setup.agent?.connections || []).filter((c: Json) => c.mode === "normal");
+      return live.length ? `Connected: ${live.map((c: Json) => c.client?.name).filter(Boolean).join(", ") || "an agent"}` : "Not connected (you can connect one later in Settings → General)";
+    }
     case "model": {
       const last = getState().modelCheck?.last;
       return last ? `${last.model}: ${last.passed}/${last.total} · ${last.verdict_text}` : "Not checked (optional)";
@@ -282,8 +287,15 @@ function Review() {
             <span>{result.blender.status === "saved" ? `Blender saved to ${result.blender.file}. Make previews uses it from its next run.`
               : result.blender.status === "faulty" ? `${result.blender.reason} Your other choices were saved.` : "Blender unchanged; nothing was written."}</span>
           </li>
+          {result.samples && (
+            <li className="flex items-start gap-2" id="setup-samples-result">
+              {result.samples.status === "faulty" ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-fault" aria-hidden /> : <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />}
+              <span>{result.samples.status === "faulty" ? `Sample assets were not added: ${result.samples.reason}` : "Sample assets are in your Library: a blue cube, a green pyramid and a red sphere."}</span>
+            </li>
+          )}
+          <SetupSearchCheck />
         </ul>
-        <Paragraph>Next: add a library folder in Library, then choose Make previews on a pack.</Paragraph>
+        <Paragraph>{result.samples && result.samples.status !== "faulty" ? "Next: open Library and choose Make previews on Sample assets, or add your own library folder." : "Next: add a library folder in Library, then choose Make previews on a pack."}</Paragraph>
         <div className="flex flex-wrap gap-3">
           <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Library</Button>
           <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>
@@ -312,7 +324,67 @@ function Review() {
           ))}
         </dl>
       </Card>
+      <Checkbox id="setup-include-samples" label="Include sample assets" checked={draft.includeSamples}
+        description="Adds a small library folder with a blue cube, a green pyramid and a red sphere, so you can try Assetarium right away. Remove it later like any library folder."
+        onCheckedChange={(checked) => updateSetupDraft({ includeSamples: checked })} />
     </>
+  );
+}
+
+/** Agents (MCP) are a core feature (decision 0026): the server is ready; connecting an agent is the owner's choice. */
+function AgentStep() {
+  const agent = useApp((s) => s.setup.agent);
+  const [client, setClient] = useState<string>();
+  useEffect(() => {
+    void loadAgentSetup();
+    const timer = setInterval(() => void loadAgentSetup(), 3000);  // Shows the connection as soon as the agent starts.
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <>
+      <Paragraph>Assetarium has an MCP server: AI agents such as Claude Code or Codex can search your library, read pack structures and propose fixes, which you approve here. Add the configuration for your agent, then restart it. No agent? Skip this step; you can connect one any time from Settings → General.</Paragraph>
+      {!agent ? <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Reading agent configurations…</p> : (
+        <Card title="Add Assetarium to your agent">
+          <div id="setup-agent-connect" className="grid gap-4">
+            <Snippets snippets={agent.snippets || []} client={client} setClient={setClient} />
+            <ConnectionLine connections={agent.connections || []} blocked={false} />
+          </div>
+        </Card>
+      )}
+    </>
+  );
+}
+
+/** After Save: the one-time search check runs here, so search works without an extra step (decision 0026). */
+function SetupSearchCheck() {
+  const [check, setCheck] = useState<Json>({ status: "starting" });
+  useEffect(() => {
+    let live = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async (start: boolean) => {
+      let now = await searchCheck("status");
+      if (start && now.status === "missing" && !now.fault) now = (await searchCheck("start")).status === "faulty" ? await searchCheck("status") : { status: "running" };
+      if (!live) return;
+      setCheck(now);
+      if (now.status === "running") timer = setTimeout(() => void poll(false), 1500);
+    };
+    void poll(true);
+    return () => { live = false; clearTimeout(timer); };
+  }, []);
+  const icon = check.status === "ready" ? <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+    : check.status === "running" || check.status === "starting" ? <Spinner className="mt-0.5 shrink-0" />
+    : <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />;
+  return (
+    <li className="flex items-start gap-2" id="setup-search-check" data-state={check.status}>
+      {icon}
+      <div className="grid min-w-0 gap-1">
+        <span>{check.status === "ready" ? "Search check passed: search by description and image is ready."
+          : check.status === "running" || check.status === "starting" ? check.phase || "Running the search check on built-in sample images…"
+          : check.status === "failed" ? "The search check did not pass. Settings → General shows why and can run it again."
+          : "The search check runs once the search runtime and model are installed (Settings → General lists them). Make previews also runs it by itself."}</span>
+        {check.status === "failed" && <Reason text={check.reason} className="text-[12px] text-muted-foreground" />}
+      </div>
+    </li>
   );
 }
 
@@ -327,11 +399,12 @@ function ModelStep() {
 
 const CONTENT: Record<SetupStep, () => ReactNode> = {
   welcome: Welcome, blender: BlenderStep, formats: FormatsStep, storage: StorageStep,
-  descriptions: DescriptionsStep, batch: BatchStep, model: ModelStep, review: Review,
+  descriptions: DescriptionsStep, batch: BatchStep, agent: AgentStep, model: ModelStep, review: Review,
 };
 const TITLES: Record<SetupStep, string> = {
   welcome: "Set up Assetarium", blender: "Blender", formats: "Formats to process", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Description batch size", model: "Check your agent’s model (optional)", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Description batch size", agent: "Connect your AI agent (optional)",
+  model: "Check your agent’s model (optional)", review: "Review and finish",
 };
 
 export function SetupWizard() {

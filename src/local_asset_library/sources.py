@@ -85,10 +85,30 @@ def _validate_directory(config, value, require_exists=True):
         raise ConfigError("Asset source directory links are not supported")
     if require_exists and not resolved.is_dir():
         raise ConfigError("Asset source directory is unavailable")
+    if resolved == samples_folder(config):
+        return resolved  # The one folder inside Assetarium that may be a library folder: its tracked samples (decision 0026).
     for other in (config.project_root, config.models_root, config.library_root):
         if other and (resolved.is_relative_to(other) or other.is_relative_to(resolved)):
             raise ConfigError("Library folders must not overlap Assetarium, its library store or shared models")
     return resolved
+
+
+def samples_folder(config):
+    """Assetarium's built-in sample assets (a blue cube, a green pyramid, a red sphere; scripts/build-samples.py)."""
+    return (config.project_root / "samples" / "Sample assets").resolve()
+
+
+def include_samples(config):
+    """Add the built-in samples as a library folder and scan them (three tiny files); already there is fine."""
+    folder = samples_folder(config)
+    found = next((s for s in registry(config)["sources"] if Path(s["path"]) == folder), None)
+    if found:
+        return {"status": "present", "key": found["key"]}
+    if not folder.is_dir():
+        raise ConfigError("The built-in sample assets are missing from this copy of Assetarium (samples/Sample assets)")
+    added = add(config, str(folder))
+    scan_source(config, added)
+    return {"status": "added", "key": added["key"]}
 
 
 def get_source(config, key, include_detached=False):

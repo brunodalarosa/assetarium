@@ -8,6 +8,13 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Setup leaves search working** (decision 0026): the one-time search check runs on two built-in sample images,
+  so it needs no library and no command. Setup runs it after Save, **Run check** in Settings → General runs it on
+  demand (`local-assets setup search-check` in a terminal), and Make previews runs it by itself when it is missing
+  instead of stopping.
+- **Built-in sample assets**: a blue cube, a green pyramid and a red sphere (a few KB of GLB in `samples/`). Setup
+  offers them with **Include sample assets** (checked by default); the agent-assisted setup asks the same question.
+- Setup has a **Connect your agent** step with your agent's configuration and Copy, and shows when it connects.
 - **Session logs**: every app run, MCP server and command writes one readable log in `logs/`
   (`2026-11-01_12-13-07_app.log`), and the workers it starts write into the same file. Levels (`[logging] level`,
   `--verbose`, `--log-level`), repeated lines collapsed into counts, the newest 30 sessions kept (200 MiB at most).

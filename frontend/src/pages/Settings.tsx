@@ -238,10 +238,10 @@ function SearchReadiness({ device }: { device: string }) {
   return (
     <div id="search-readiness-card" className="grid gap-3">
       <p className="font-medium text-[12.5px]">What is installed</p>
-      {check.error ? <Banner tone="fault">{check.error}</Banner> : <ReadinessList id="search-readiness" items={check.checking ? undefined : check.devices?.[device]} />}
+      {check.error ? <Banner tone="fault">{check.error}</Banner> : <ReadinessList id="search-readiness" items={check.checking ? undefined : check.devices?.[device]} onChanged={() => void checkSearchReadiness()} />}
       <div className="flex flex-wrap items-center gap-4">
         <Button type="button" variant="secondary" id="search-readiness-check" disabled={check.checking} onClick={() => void checkSearchReadiness()}>Check again</Button>
-        <p className="hint text-[12.5px] leading-relaxed text-muted-foreground">Run a missing command in a terminal in the Assetarium folder, then check again.</p>
+        <p className="hint text-[12.5px] leading-relaxed text-muted-foreground">Copy a missing command into a terminal in the Assetarium folder, then check again.</p>
       </div>
     </div>
   );

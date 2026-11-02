@@ -326,10 +326,10 @@ RTX = {'status': 'nvidia', 'nvidia': [{'name': 'RTX test', 'vram_gib': 12.0, 'dr
 def test_status_checks_itself_and_asks_only_the_users_questions(project, monkeypatch):
     status = setup_agent.status(project)
     assert status['guide'] == setup_agent.GUIDE and 'one message' in status['guide']
-    assert [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'storage_gib']
+    assert [q['id'] for q in status['ask_user']] == ['engines', 'descriptions', 'samples', 'storage_gib']
     descriptions = status['ask_user'][1]
     assert 'local model server' in descriptions['ask'] and 'Settings' in descriptions['why'] and descriptions['suggestion'] is False
-    assert status['ask_user'][2]['suggestion'] == 20 and status['ask_user'][0]['several']
+    assert status['ask_user'][3]['suggestion'] == 20 and status['ask_user'][0]['several'] and status['ask_user'][2]['suggestion'] is True
     assert {line['id'] for line in status['found']} >= {'gpu', 'disk', 'blender'}
     assert next(line for line in status['found'] if line['id'] == 'blender')['ok'] is False
     assert any(action['for'] == 'blender' and action['kind'] == 'install' for action in status['next_actions'])

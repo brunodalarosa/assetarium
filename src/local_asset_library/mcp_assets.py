@@ -90,7 +90,9 @@ SCHEMAS = {
                              "computer that cannot run the built-in engine: a vision model server already running here.", "properties": {
                 "url": {"type": "string", "maxLength": 256, "description": "Loopback only, e.g. http://127.0.0.1:1234/v1."},
                 "model": {"type": "string", "maxLength": 256}}},
-            "storage_gib": {"type": "integer", "minimum": 1, "maximum": 1048576, "description": "Disk space for Assetarium's own data."}}},
+            "storage_gib": {"type": "integer", "minimum": 1, "maximum": 1048576, "description": "Disk space for Assetarium's own data."},
+            "samples": {"type": "boolean", "description": "Whether to add the built-in sample assets (a blue cube, a green "
+                        "pyramid and a red sphere) as a library folder."}}},
         "finish": {"type": "boolean", "description": "Also finish setup: the user then reviews it in the app."},
         "storage_budget_gib": {"type": "integer", "minimum": 1, "maximum": 1048576},
         "processing_formats": {"type": "array", "maxItems": 3, "items": {"type": "string", "enum": ["fbx", "gltf", "obj"]},
