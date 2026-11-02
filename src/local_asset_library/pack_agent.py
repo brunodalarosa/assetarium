@@ -8,6 +8,7 @@ proposal per pack waits at a time; a newer one replaces it. Nothing is written i
 """
 from contextlib import closing
 import json
+import logging
 from pathlib import PurePosixPath
 import uuid
 
@@ -249,6 +250,9 @@ def decide(config, identifier, decision, approved='owner', leave_out=()):
     with closing(_db(config)) as db, db:
         db.execute('UPDATE proposals SET state=?, decided_utc=?, version=COALESCE(?, version) WHERE id=?',
                    (state, now(), result.get('version'), identifier))
+    from .logs import kv
+    logging.getLogger(__name__).info('Pack proposal %s · %s', state, kv(folder=key, pack=pack or '(library folder)', by=approved,
+                                                                      version=result.get('version'), left_out=len(origin.get('left_out', [])) or None))
     return {**result, 'proposal': identifier, 'state': state, 'library_folder': key, 'pack': pack}
 
 

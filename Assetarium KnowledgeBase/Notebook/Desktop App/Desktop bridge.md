@@ -28,6 +28,9 @@ method is callable from the page as `window.pywebview.api.<name>`. Types for the
 
 ## Rules
 
+- **Every bridge call is logged once in `_present`** (debug, info when slow, warning when refused; see
+  [Session logs](../Platform%20and%20Storage/Session%20logs.md)). Don't add per-method log lines; give a new poll a
+  stable name so its repeats collapse.
 - **A read the window polls is bounded by its page, not the library**: read folder views or SQL columns
   ([Sources](../Sources%20and%20Catalog/Sources.md) → Folder views), never whole catalogs, and pass
   `shared=True`. A bigger library may mean a longer wait, never more memory.

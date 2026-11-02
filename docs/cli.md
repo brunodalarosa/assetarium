@@ -120,6 +120,39 @@ settings set --search-threads 24       # auto (the speed test's choice) or CPU t
 Changing settings never deletes results or retries faults. Server addresses must be on
 this computer ([description engines](description-engines.md)).
 
+## Logs
+
+Every app run, MCP server and command run writes one session log in `logs/` (`[storage].logs`), named by when it
+started and what started it: `2026-11-01_12-13-07_app.log`, `…_mcp.log`, `…_cli.log`. Workers it starts (scans,
+processing, the search worker) write into the same file, so one action reads top to bottom:
+
+```text
+12:13:07.123 INFO    app[4120] source_operations: Operation started · operation=scan folder=kaykit pid=5012
+12:13:07.480 INFO    scan[5012] session: Joined the session · process=scan level=info
+12:13:08.002 INFO    scan[5012] operation: Operation finished · operation=scan folder=kaykit seconds=0.5
+```
+
+```text
+logs                          # the newest session at info and above
+logs --list                   # kept sessions, newest first, with sizes
+logs 2026-11-01_12-13-07_app  # one session
+logs --level warning          # only warnings and errors (debug | info | warning | error)
+logs --verbose                # everything, same as --level debug
+logs --follow                 # keep printing new lines until the session ends (Ctrl+C stops)
+logs --next                   # wait for the next app session, then follow it
+logs --kind mcp               # only sessions of one kind (app, mcp, cli)
+```
+
+What gets written depends on the run's level: `[logging] level` in `config.local.toml` (default `info`),
+`ASSETARIUM_LOG_LEVEL`, or `--verbose` / `--log-level` when starting the app. At `info` a session has its start and
+end, operations, settings changes, agent tool calls and decisions, slow calls (2 s or more), warnings and errors;
+`debug` adds every call the window makes. A line repeating within 10 seconds is written once and then summarized
+(`↻ repeated 37 more times`). Raw output stays out of the stream: an operation's worker output is in
+`data/library/operations/<token>.log` (its "Operation started" line names the file) and the search worker's in
+`<session>.worker.log`. Assetarium keeps the newest 30 sessions and at most 200 MiB; a session splits into
+`….2.log` after 20 MiB. Any text viewer works; [lnav](https://github.com/tstack/lnav) and
+[Toolong](https://github.com/Textualize/toolong) add search and merging.
+
 ## Rendering
 
 ```text

@@ -12,6 +12,7 @@ Up: [Notebook](../Notebook.md).
 
 - [Runtimes](Runtimes.md): the four uv environments, their wrappers and how to run tests.
 - [Storage discipline](Storage%20discipline.md): receipts, budgets, hard links, `scratch/`.
+- [Session logs](Session%20logs.md): one log file per app, MCP or CLI session, joined by its workers (`logs.py`).
 - [Retention](Retention.md) *(gap)*: superseded generations and launch audits (`retention.py`,
   decision [0006](../../Decisions/0006-retention.md)).
 - Linux: CLI + MCP only, no desktop app ([docs/linux.md](../../../docs/linux.md), decision

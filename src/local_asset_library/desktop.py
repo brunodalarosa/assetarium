@@ -17,7 +17,11 @@ from .config import ConfigError, load_project_config
 from .desktop_service import DesktopService
 from .mcp_assets import error_payload, validate
 from .mcp_server import Gateway
+from .logs import kv
 from .search_policy import DEFAULT_MODE
+
+log = logging.getLogger(__name__)
+SLOW_MS = 2000  # A call this slow is worth a line at the default level.
 
 
 def show_in_explorer(path):
@@ -52,7 +56,10 @@ class DesktopBridge:
         executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix='asset-present')
         self._loop.set_default_executor(executor)
         try:
-            log = self._config.output_path('logs', 'gui-worker.log')
+            from .logs import session
+            # The worker's raw stderr (library warnings) sits beside the session log, not in it.
+            current = session()
+            log = current.with_name(current.stem + '.worker.log') if current else self._config.output_path('logs', 'worker.log')
             log.parent.mkdir(parents=True, exist_ok=True)
             self._diagnostics = log.open('a', encoding='utf-8')
             self._gateway = Gateway(self._config, audit_namespace='gui', diagnostic_stream=self._diagnostics,
@@ -109,6 +116,7 @@ class DesktopBridge:
             if isinstance(exc, FutureTimeout):
                 future.cancel()
             payload = error_payload(exc)
+            log.error('Call failed · %s', kv(reason=payload['reason']), exc_info=not isinstance(exc, FutureTimeout))
             with (self._gateway.audit_root / 'desktop-faults.jsonl').open('a', encoding='utf-8') as stream:
                 stream.write(encoded(payload) + '\n')
             return {'status': 'faulty', 'reason': payload['reason'], 'payload': payload}
@@ -141,6 +149,13 @@ class DesktopBridge:
                  'faults': result.get('faults', result.get('evidence'))}
         with (self._gateway.audit_root / 'desktop.jsonl').open('a', encoding='utf-8') as stream:
             stream.write(encoded(audit) + '\n')
+        # Polls repeat every few seconds: debug only, one line per call name and repeat window.
+        ms, name = round(audit['elapsed_seconds'] * 1000), operation.__name__.lstrip('_')
+        if audit['status'] == 'faulty':
+            log.warning('%s refused · %s', name, kv(reason=audit['reason'], ms=ms), extra={'repeat_key': ('fault', name, audit['reason'])})
+        else:
+            log.log(logging.INFO if ms >= SLOW_MS else logging.DEBUG, '%s · %s', name, kv(status=audit['status'], ms=ms),
+                    extra={'repeat_key': ('call', name, ms >= SLOW_MS)})
         return result
 
     def context(self):
@@ -1078,6 +1093,8 @@ def record_profile_outcome(bridge, profile):
 def main():
     """Run the window; when it closes, end the process even if a read is still running in a worker thread."""
     code = run()
+    from .logs import stop
+    stop()  # os._exit skips atexit: write the last repeat counts and "Session ended" now.
     logging.shutdown()
     for stream in (sys.stdout, sys.stderr):
         if stream:  # None under pythonw.
@@ -1086,10 +1103,11 @@ def main():
 
 
 def run():
+    from .logs import start
     root = Path(__file__).resolve().parents[2]
-    log_dir = root / 'logs'
-    log_dir.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(filename=log_dir / 'gui.log', level=logging.INFO, encoding='utf-8')
+    argv = sys.argv[1:]
+    level = 'debug' if '--verbose' in argv else argv[argv.index('--log-level') + 1] if '--log-level' in argv[:-1] else None
+    session_log = start(root, 'app', level)
     bridge = None
     profile = None
     try:
@@ -1122,7 +1140,7 @@ def run():
         if os.name == 'nt':
             import ctypes
             ctypes.windll.user32.MessageBoxW(None, 'Assetarium could not start.\n' + str(exc)[:400]
-                + '\nDetails: ' + str(log_dir / 'gui.log'), 'Assetarium — startup fault', 0x10)
+                + '\nDetails: ' + str(session_log), 'Assetarium — startup fault', 0x10)
         return 1
     finally:
         if bridge:

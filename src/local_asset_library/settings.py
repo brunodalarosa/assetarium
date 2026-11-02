@@ -1,5 +1,6 @@
 """Application-owned settings shared by the desktop and processing workers."""
 import json
+import logging
 
 from .config import ConfigError
 from .publication import atomic_json, read_json
@@ -216,7 +217,11 @@ def save_general_settings(config, storage_budget_gib, processing_formats=None, c
     atomic_json(path, value)
     after = general_settings(config)
     from .setup_core import note_set_by
-    note_set_by(config, [key for key in SETTING_KEYS if before.get(key) != after[key]], actor)
+    changed = [key for key in SETTING_KEYS if before.get(key) != after[key]]
+    note_set_by(config, changed, actor)
+    if changed:
+        from .logs import kv
+        logging.getLogger(__name__).info('General settings saved · %s', kv(by=actor, **{k: after[k] for k in changed}))
     return dict(after, status='saved')
 
 

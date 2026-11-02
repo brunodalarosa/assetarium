@@ -8,6 +8,7 @@ only for the first embedding request and unloads after ten idle minutes.
 from pathlib import Path
 import contextlib
 import json
+import logging
 import os
 import sys
 import queue
@@ -30,6 +31,9 @@ def send(value):
 
 
 with contextlib.redirect_stdout(sys.stderr):
+    from local_asset_library.logs import start
+    start(root, 'worker', process='search-worker')  # Joins the app's or MCP server's session.
+    log = logging.getLogger('assetarium.search_worker')
     from local_asset_library.config import load_project_config, ConfigError
     from local_asset_library.engines import embedder, embedder_contract as runtime_contract
     from local_asset_library.mcp_assets import error_payload
@@ -91,6 +95,7 @@ def unload():
         gc.collect()
         if 'torch' in sys.modules:
             sys.modules['torch'].cuda.empty_cache()
+        log.info('Search model unloaded')
         send({'event': 'unloaded'})
     if owned is not None:
         owned.__exit__(None, None, None)
@@ -120,8 +125,10 @@ def embed(request):
             raise
     if backend is None:
         send({'event': 'loading_model'})
+        loading = time.monotonic()
         backend = embedder(config)
         contract = backend.contract
+        log.info('Search model loaded · seconds=%.1f', time.monotonic() - loading)
         send({'event': 'model_ready'})
     if request['op'] == 'text':
         vector = backend.text(request['text'], role=request.get('role', 'query'))
