@@ -98,3 +98,36 @@ def test_activity_turns_call_logs_into_sentences(kit):
 
 def test_every_pack_tool_has_a_schema():
     assert set(pack_agent.TOOLS) <= set(SCHEMAS) and pack_agent.WRITE < set(pack_agent.TOOLS)
+
+
+def test_staged_decisions_save_together_with_one_rescan_per_library_folder(kit):
+    config, one = kit
+    pack(config, one, 'License.txt', 'Props/Barrel.obj', 'Unity FBX/Props/Barrel.obj', 'Samples/Shot.obj', root='Kit_2.0')
+    copy = {'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}
+    first = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[copy])
+    second = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_2.0', rules=[copy, {'kind': 'exclude', 'folder': 'Samples'}])
+    stored = next(p['rules'] for p in pack_agent.proposals(config) if p['id'] == second['proposal_id'])  # Indexes follow the stored list.
+    samples = next(i for i, r in enumerate(stored) if r['kind'] == 'exclude')
+    staged = [{'id': first['proposal_id'], 'decision': 'apply'}, {'id': second['proposal_id'], 'decision': 'apply', 'leave_out': [samples]}]
+    seen = pack_agent.preview(config, staged)
+    assert [p['status'] for p in seen['packs']] == ['ready', 'ready'] and seen['excluded_files'] == 2 and seen['rescan'] == [one['key']]
+    assert sources.excluded_folders(sources.bound(config, one)) == []
+    saved = pack_agent.commit(config, staged)
+    assert saved['status'] == 'saved' and saved['rescan'] == [one['key']] and not saved['faults']
+    assert sorted(sources.excluded_folders(sources.bound(config, one))) == ['Kit_1.0/Unity FBX', 'Kit_2.0/Unity FBX']
+    assert pack_profiles.history(config, one['key'], 'Kit_2.0')[0]['origin']['left_out'] == [{'kind': 'exclude', 'folder': 'Samples'}]
+    assert pack_agent.proposals(config) == []
+
+
+def test_a_failing_staged_decision_stays_waiting_and_the_rest_save(kit):
+    config, one = kit
+    waiting = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    staged = [{'id': 'prop_gone', 'decision': 'apply'}, {'id': waiting['proposal_id'], 'decision': 'apply', 'leave_out': [0]}]
+    assert pack_agent.preview(config, staged)['packs'][0]['status'] == 'faulty'
+    saved = pack_agent.commit(config, staged)
+    assert saved['faults'] == [{'id': 'prop_gone', 'reason': 'This proposal is not saved any more'}]
+    assert saved['decided'][0]['state'] == 'rejected' and not saved['rescan']  # Leaving every rule out rejects it.
+    with pytest.raises(ConfigError, match='leave_out names a rule'):
+        pack_agent.decide(config, waiting['proposal_id'], 'apply', leave_out=[5])
+    with pytest.raises(ConfigError, match='Give a list'):
+        pack_agent.commit(config, [])

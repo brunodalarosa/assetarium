@@ -103,6 +103,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- **Agent proposals are reviewed together**: a library folder's waiting proposals group the rules packs share,
+  you accept or reject rules (all at once or per pack), see a preview, and one **Apply decisions** saves them
+  with a single scan instead of one blocking rescan per pack. Several proposals arriving together raise one
+  notice. **Let my agent finish** uses the robot icon, and "new since your last visit" is a dot (decision 0025).
+
 - Agents no longer need a setup session: a connected agent may apply setup values at any time (each one
   labeled *Set by agent* and noticed); the Blender path is still only a proposal you apply
   (`local-assets setup agent` now just shows how to connect; decision 0024).

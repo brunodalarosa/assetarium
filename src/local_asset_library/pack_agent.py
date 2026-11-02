@@ -203,15 +203,35 @@ def proposals(config, state='pending', limit=50):
              'effect': json.loads(r[5]), 'state': r[6], 'utc': r[7], 'decided_utc': r[8], 'version': r[9], 'previous': r[10]} for r in rows]
 
 
-def decide(config, identifier, decision, approved='owner'):
-    """Apply, reject or undo a proposal. Apply re-measures nothing: the rules are validated again by ``apply``."""
-    from .library_store import now
-    from .pack_profiles import apply, revert
+def _row(config, identifier):
     with closing(_db(config)) as db:
         row = db.execute('SELECT folder_key, pack, rules, origin, state, previous FROM proposals WHERE id=?', (identifier,)).fetchone()
     if row is None:
         raise ConfigError('This proposal is not saved any more')
-    key, pack, rules, origin, state, previous = row[0], row[1], json.loads(row[2]), json.loads(row[3]), row[4], row[5]
+    return row[0], row[1], json.loads(row[2]), json.loads(row[3]), row[4], row[5]
+
+
+def _kept(rules, leave_out):
+    """The rules the owner accepted: ``leave_out`` holds indexes into the proposal's rule list."""
+    leave_out = set(leave_out or ())
+    if not all(isinstance(i, int) and 0 <= i < len(rules) for i in leave_out):
+        raise ConfigError('leave_out names a rule this proposal does not have')
+    return [r for i, r in enumerate(rules) if i not in leave_out], [r for i, r in enumerate(rules) if i in leave_out]
+
+
+def decide(config, identifier, decision, approved='owner', leave_out=()):
+    """Apply, reject or undo a proposal. Apply re-measures nothing: the rules are validated again by ``apply``.
+
+    ``leave_out`` applies the proposal without those rules (recorded in the version's origin); leaving every rule out
+    rejects it.
+    """
+    from .library_store import now
+    from .pack_profiles import apply, revert
+    key, pack, rules, origin, state, previous = _row(config, identifier)
+    if decision == 'apply' and leave_out:
+        rules, left = _kept(rules, leave_out)
+        decision = 'apply' if rules else 'reject'
+        origin = dict(origin, left_out=left) if rules else origin
     if decision == 'undo':
         if state != 'applied':
             raise ConfigError('Only an applied proposal can be undone')
@@ -230,6 +250,59 @@ def decide(config, identifier, decision, approved='owner'):
         db.execute('UPDATE proposals SET state=?, decided_utc=?, version=COALESCE(?, version) WHERE id=?',
                    (state, now(), result.get('version'), identifier))
     return {**result, 'proposal': identifier, 'state': state, 'library_folder': key, 'pack': pack}
+
+
+def _decisions(decisions):
+    if not isinstance(decisions, list) or not decisions or not all(
+            isinstance(d, dict) and isinstance(d.get('id'), str) and d.get('decision') in {'apply', 'reject'} for d in decisions):
+        raise ConfigError('Give a list of {id, decision: apply | reject, leave_out?: [rule indexes]}')
+    return decisions
+
+
+def preview(config, decisions):
+    """What a set of staged decisions would change, measured now; nothing is saved."""
+    from .pack_profiles import effect
+    packs, totals = [], {'excluded_files': 0, 'restored_files': 0, 'rescan': []}
+    for item in _decisions(decisions):
+        try:
+            key, pack, rules, _, state, _ = _row(config, item['id'])
+            if state != 'pending':
+                raise ConfigError(f'This proposal is already {state}')
+            if item['decision'] == 'reject':
+                packs.append({'id': item['id'], 'pack': pack, 'status': 'rejected', 'lines': []})
+                continue
+            kept, _ = _kept(rules, item.get('leave_out'))
+            if not kept:
+                packs.append({'id': item['id'], 'pack': pack, 'status': 'rejected', 'lines': []})
+                continue
+            seen = effect(config, key, pack, kept)
+        except ConfigError as exc:
+            packs.append({'id': item['id'], 'status': 'faulty', 'reason': str(exc), 'lines': []})
+            continue
+        packs.append({'id': item['id'], 'pack': pack, 'status': 'ready', 'lines': seen['lines']})
+        totals['excluded_files'] += seen['excluded_files']
+        totals['restored_files'] += seen['restored_files']
+        if seen['rescan'] and key not in totals['rescan']:
+            totals['rescan'].append(key)
+    return {'status': 'ready', 'packs': packs, **totals}
+
+
+def commit(config, decisions):
+    """Save staged decisions together. A proposal that fails is reported and stays waiting; the others are saved.
+
+    Returns the library folders that need one rescan each; the caller starts it once, after every save.
+    """
+    done, faults, rescan = [], [], []
+    for item in _decisions(decisions):
+        try:
+            result = decide(config, item['id'], item['decision'], leave_out=item.get('leave_out') if item['decision'] == 'apply' else ())
+        except ConfigError as exc:
+            faults.append({'id': item['id'], 'reason': str(exc)})
+            continue
+        done.append({'id': item['id'], 'pack': result['pack'], 'state': result['state'], 'version': result.get('version')})
+        if result.get('rescan') and result['library_folder'] not in rescan:
+            rescan.append(result['library_folder'])
+    return {'status': 'faulty' if faults and not done else 'saved', 'decided': done, 'faults': faults, 'rescan': rescan}
 
 
 def finish(config, args, client=None):

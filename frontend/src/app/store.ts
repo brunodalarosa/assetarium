@@ -250,7 +250,8 @@ export interface AppState {
   notifications: Json[];
   notificationsOpen: boolean;
   /** What agents do (decision 0024): the live feed, who is connected and proposals waiting for the owner. */
-  agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[] };
+  agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[];
+    staged: Record<string, Record<number, RuleChoice>>; committing: string | null };
   /** The Add library folder wizard (decision 0024). */
   addFolder: AddFolder;
   /** Check my model: a running check's progress and the last report (decision 0024). */
@@ -313,7 +314,7 @@ let state: AppState = {
   sourcesView: emptySourcesView(),
   queue: null,
   sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
-  agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [] },
+  agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [], staged: {}, committing: null },
   addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false },
   modelCheck: null,
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
@@ -2168,11 +2169,15 @@ export async function loadAgentActivity() {
     if (state.agent.loaded && !state.agent.open && !(state.addFolder.open && state.addFolder.step === "agent")) {
       for (const entry of fresh.filter((e) => e.kind === "change" && e.proposal_id))
         pushToast({ tone: "info", title: "Your agent changed a pack", body: entry.text, actions: [{ label: "Undo", run: () => void decideAgentProposal(entry.proposal_id, "undo") }] });
-      for (const entry of fresh.filter((e) => e.kind === "waiting" && e.proposal_id))
-        pushToast({ tone: "info", title: "Your agent proposes a change", body: entry.text, actions: [{ label: "Review", run: () => setAgentOpen(true) }] });
+      // Design principle P1: several proposals arriving together make one notice, not one each.
+      const waiting = fresh.filter((e) => e.kind === "waiting" && e.proposal_id);
+      if (waiting.length)
+        pushToast({ tone: "info", title: waiting.length === 1 ? "Your agent proposes a change" : `Your agent proposes changes for ${waiting.length} packs`,
+          body: waiting.length === 1 ? waiting[0].text : "Review them together and apply them at once.", actions: [{ label: "Review", run: () => setAgentOpen(true) }] });
     }
     setState((s) => ({ agent: { ...s.agent, loaded: true, entries: [...s.agent.entries, ...fresh].slice(-200), connected: result.connected,
-      working: result.working, lastUtc: result.last_utc || s.agent.lastUtc, proposals: result.proposals } }));
+      working: result.working, lastUtc: result.last_utc || s.agent.lastUtc, proposals: result.proposals,
+      staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => result.proposals.some((p: Json) => p.id === id))) } }));
   } finally {
     agentLoading = false;
   }
@@ -2195,6 +2200,62 @@ export async function decideAgentProposal(id: string, decision: "apply" | "rejec
   } catch (error) {
     pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
     return { status: "faulty", reason: (error as Error).message };
+  }
+}
+
+/* Staged review (design principle P1): the owner accepts or rejects rules, possibly across packs at once, then one
+   commit saves every decided proposal of a library folder and scans it once. */
+export type RuleChoice = "accept" | "reject";
+export function stageRules(targets: { id: string; index: number }[], choice: RuleChoice | null) {
+  setState((s) => {
+    const staged = { ...s.agent.staged };
+    for (const { id, index } of targets) {
+      const rules = { ...(staged[id] || {}) };
+      if (choice) rules[index] = choice;
+      else delete rules[index];
+      staged[id] = rules;
+    }
+    return { agent: { ...s.agent, staged } };
+  });
+}
+/** Proposals whose every rule has a choice, as bridge decisions: all rejected → reject, else apply without the rejected ones. */
+export function stagedDecisions(proposals: Json[], staged: Record<string, Record<number, RuleChoice>>) {
+  return proposals.flatMap((p) => {
+    const choices = staged[p.id] || {};
+    const count = (p.rules || []).length;
+    if (!count || Object.keys(choices).length < count) return [];
+    const leaveOut = Object.entries(choices).filter(([, c]) => c === "reject").map(([i]) => Number(i));
+    return [leaveOut.length === count ? { id: p.id, decision: "reject" } : { id: p.id, decision: "apply", ...(leaveOut.length ? { leave_out: leaveOut } : {}) }];
+  });
+}
+export async function previewStaged(decisions: Json[]) {
+  try {
+    return await api().agent_proposals_preview(decisions);
+  } catch (error) {
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export async function commitStaged(folder: string, decisions: Json[]) {
+  setState((s) => ({ agent: { ...s.agent, committing: folder } }));
+  try {
+    const result = await api().agent_proposals_commit(decisions);
+    if (result.status === "faulty" && !result.faults) throw Error(result.reason);
+    const applied = result.decided.filter((d: Json) => d.state === "applied").length;
+    const rejected = result.decided.length - applied;
+    if (result.decided.length)
+      pushToast({ tone: "success", title: [applied && `Applied to ${plural(applied, "pack", "packs")}`, rejected && `${plural(rejected, "pack", "packs")} rejected`].filter(Boolean).join(" · "),
+        body: result.rescan.length ? "Scanning the library folder once; nothing is rendered or described." : "" });
+    for (const fault of result.faults)
+      pushToast({ tone: "fault", title: "Not saved", body: `${state.agent.proposals.find((p: Json) => p.id === fault.id)?.pack || "A proposal"}: ${fault.reason}. It still waits for you.` });
+    await loadAgentActivity();
+    await loadLibraryTree();
+    if (state.sourcesView.key) void refreshFolder();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  } finally {
+    setState((s) => ({ agent: { ...s.agent, committing: null } }));
   }
 }
 export function pushToast(toast: Omit<Toast, "id">) {

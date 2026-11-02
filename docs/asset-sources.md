@@ -33,11 +33,17 @@ that holds all your packs); Assetarium finds the structure inside it:
    one card with 3 variants, a numbered series kept separate, two folders that look like exports of the same
    models).
 3. **Who finishes.** **Let my agent finish** adds the folder and shows a prompt to paste into your AI agent,
-   whether it is connected, what it reads and changes here, its proposals with **Apply** / **Reject**, and how
+   whether it is connected, what it reads and changes here, its proposals, and how
    many packs have a structure. If it goes quiet for two minutes, the wizard says so and offers to copy the
    prompt again or take over. **Minimize** keeps it working; follow it with the agent button in the top bar.
    **Review myself** opens the folder (each pack's Structure section says what needs a look); **Later** just
    adds it.
+
+   Proposals that rescan wait for you, grouped by library folder: a rule several packs share ("fbx is an
+   engine copy of gltf" in 5 packs) is one row you **Accept** or **Reject** once, or per pack; a rule only one
+   pack has says so. Choosing saves nothing: a preview shows what would change (files skipped, cards), and
+   **Apply decisions** saves every decided pack together and scans the folder once. A proposal that can't be
+   saved says why and keeps waiting.
 
 Every choice adds the folder and scans it. Your agent can start before the scan finishes: until then it reads
 the names the quick look found. When every pack has a structure, the wizard offers **Make previews**; nothing

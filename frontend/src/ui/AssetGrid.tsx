@@ -1,6 +1,6 @@
-import { Ban, Box, Check, CircleAlert, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, Sparkles, SwatchBook, TriangleAlert, Unlink } from "lucide-react";
+import { Ban, Box, Check, Circle, CircleAlert, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, TriangleAlert, Unlink } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type ComponentType, type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
@@ -22,9 +22,12 @@ const DESCRIPTION: Record<string, { icon: typeof FileText; label: string }> = {
   shared: { icon: FileText, label: "Shares its variant group’s description" },
 };
 
+// "New" is a plain dot: sparkles read as AI, and the robot is reserved for agents (design principle P2).
+const NewDot = ({ className }: { className?: string }) => <Circle className={cn(className, "scale-[0.55] fill-current")} strokeWidth={0} />;
+
 /** The icon strip over a card's preview: its state and overlays, with tooltips. */
 function StateStrip({ item }: { item: Json }) {
-  const icons: { icon: typeof Clock; label: string; tone?: string; spin?: boolean }[] = [];
+  const icons: { icon: ComponentType<{ className?: string; strokeWidth?: number }>; label: string; tone?: string; spin?: boolean }[] = [];
   const state = STATE[item.state];
   if (state && item.state !== "ready") icons.push({ ...state, label: item.reason ? `${state.label}: ${item.reason}` : state.label,
     tone: item.state === "failed" ? "text-fault" : item.state === "blocked" ? "text-warning" : undefined, spin: item.state === "running" });
@@ -32,7 +35,7 @@ function StateStrip({ item }: { item: Json }) {
   if (overlays.warning) icons.push({ icon: TriangleAlert, label: "Description warning", tone: "text-warning" });
   if (overlays.description && DESCRIPTION[overlays.description]) icons.push(DESCRIPTION[overlays.description]);
   if (overlays.collections) icons.push({ icon: Layers, label: `In ${overlays.collections} ${overlays.collections === 1 ? "collection" : "collections"}` });
-  if (item.new) icons.push({ icon: Sparkles, label: "New since your last visit", tone: "text-primary" });
+  if (item.new) icons.push({ icon: NewDot, label: "New since your last visit", tone: "text-primary" });
   if (!icons.length) return null;
   return (
     <span className="state-strip absolute top-3 right-3 z-10 flex gap-1" data-state={item.state}>

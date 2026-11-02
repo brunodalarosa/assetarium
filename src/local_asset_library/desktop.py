@@ -452,6 +452,20 @@ class DesktopBridge:
             result['operation'] = self._start_source_operation('scan', result['library_folder'])
         return result
 
+    # Staged review: decide many proposals, save them together, then scan each library folder once.
+    def agent_proposals_preview(self, decisions):
+        from .pack_agent import preview
+        return self._wait(self._present(preview, self._config, decisions, guarded=False))
+
+    def agent_proposals_commit(self, decisions):
+        return self._wait(self._present(self._agent_proposals_commit, decisions, guarded=False))
+
+    def _agent_proposals_commit(self, decisions):
+        from .pack_agent import commit
+        result = commit(self._config, decisions)
+        result['operations'] = [self._start_source_operation('scan', key) for key in result['rescan']]
+        return result
+
     # Add library folder (decision 0024): a names-only quick look, then add, keep the names and scan.
     def quick_look_start(self, directory):
         from .quick_look import start

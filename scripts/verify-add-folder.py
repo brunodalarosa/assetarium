@@ -2,7 +2,7 @@
 
 Checks the live quick look (the tree fills in by names), What we found (counts, reasons, How did we decide?), Let my
 agent finish (the folder is added and scanned, the copy-paste prompt, the connection line), an in-process agent
-working through the MCP gateway (its lines in the take-over feed, a waiting proposal applied in place, progress to
+working through the MCP gateway (its lines in the take-over feed, a waiting proposal accepted and applied in place, progress to
 "every pack has a structure"), Minimize, the narrow layout, untouched originals and that no model loads.
 Writes data/gui/<run-name>/verification.json.
 """
@@ -114,15 +114,17 @@ def verify():
         pending = tool('propose_profile', library_folder=key, pack=pack, note='Unity FBX repeats FBX for Unity',
                        rules=[{'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': 'FBX'}])
         assert pending['status'] == 'pending', pending
-        wait("document.querySelectorAll('#take-over-feed li').length>=3&&document.querySelector('#add-folder-wizard .agent-proposal')", 30)
+        wait("document.querySelectorAll('#take-over-feed li').length>=3&&document.querySelector('#add-folder-wizard .proposal-review')", 30)
         ui.capture('02-take-over.png')
         report['checks'].append("The agent's lines and its waiting proposal appear in the take-over")
-        ui.js("document.querySelector('#add-folder-wizard .agent-proposal [data-action=apply-proposal]').click()")
-        wait("!document.querySelector('#add-folder-wizard .agent-proposal')", 30)
+        ui.js("document.querySelector('#add-folder-wizard .proposal-review [data-action=accept-all]').click()")
+        wait("!document.querySelector('#add-folder-wizard [data-action=apply-staged]').disabled", 10)
+        ui.js("document.querySelector('#add-folder-wizard [data-action=apply-staged]').click()")
+        wait("!document.querySelector('#add-folder-wizard .proposal-review')", 30)
         tool('finish_structure', library_folder=key, pack=pack)
         wait(f"{WIZARD}.dataset.step==='done'&&$('add-folder-done')", 30)
         ui.capture('03-done.png')
-        report['checks'].append('Apply in place, then finish_structure: the wizard says every pack has a structure and offers Make previews')
+        report['checks'].append('Accept all and Apply in place, then finish_structure: the wizard says every pack has a structure and offers Make previews')
         window.resize(680, 900)
         wait('innerWidth<761')
         wait(f"{WIZARD}.querySelector('section').getBoundingClientRect().right<=innerWidth+1", 10)

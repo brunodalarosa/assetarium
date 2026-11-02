@@ -2,7 +2,8 @@
 
 An in-process MCP gateway plays the agent (the same Gateway.call path a STDIO client uses, so every call lands in
 data/mcp/runs/<run>/calls.jsonl): say, get_pack_outline, an instant proposal (applied at once, Undo in a toast and the
-feed) and a rescan proposal (waits; the top-bar button counts it; Apply in the drawer rescans). Checks the live feed,
+feed) and rescan proposals for two packs (they wait; the top-bar button counts them; the drawer groups the shared engine
+copy rule, the owner accepts and rejects rules, sees a preview and applies both with one scan). Checks the live feed,
 the connection line, Undo, the narrow layout, untouched originals and that no model loads.
 Writes data/gui/<run-name>/verification.json.
 """
@@ -41,10 +42,18 @@ for name in ('Rocks/Rock_01', 'Rocks/Rock_02', 'Rocks/Rock_03', 'Cars/Car_A', 'U
     (kit / name).parent.mkdir(parents=True, exist_ok=True)
     (kit / f'{name}.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
 (kit / 'License.txt').write_text('CC0')
+second = root / 'Kit_2.0'
+for name in ('Props/Barrel', 'Unity FBX/Props/Barrel', 'Samples/Shot'):
+    (second / name).parent.mkdir(parents=True, exist_ok=True)
+    (second / f'{name}.obj').write_text((kit / 'Cars/Car_A.obj').read_text())
+(second / 'License.txt').write_text('CC0')
 added = sources.add(config, str(root))
 sources.scan_source(config, added)
 KEY = added['key']
 originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
+
+
+scans = []
 
 
 class FixtureBridge(DesktopBridge):
@@ -56,6 +65,7 @@ class FixtureBridge(DesktopBridge):
     def _start_source_operation(self, operation, key):
         # The fixture project has no runtimes to start a worker in; run the same scan in-process.
         assert operation == 'scan'
+        scans.append(key)
         sources.scan_source(config, sources.get_source(config, key))
         return {'status': 'ready', 'reason': 'Scanned'}
 
@@ -107,18 +117,33 @@ def verify():
         wait("document.querySelector('#agent-feed [data-kind=change]')", 30)
         ui.capture('01-applied-with-undo.png')
         report['checks'].append('An instant proposal applies at once; a toast (drawer closed) and the feed offer Undo')
-        pending = tool('propose_profile', library_folder=KEY, pack='Kit_1.0',
-                       rules=[{'kind': 'variant_axis', 'folder': 'Rocks', 'values': ['numbers']},
-                              {'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}])
-        assert pending['status'] == 'pending', pending
-        wait("$('agent-waiting-count')&&$('agent-waiting-count').textContent==='1'&&document.querySelector('.agent-proposal')", 30)
-        assert ui.js("document.querySelector('.agent-proposal').textContent.includes('1 file skipped')")
-        ui.capture('02-proposal-waiting.png')
-        report['checks'].append('A rescan proposal waits; the button counts 1 and the card shows its effect')
-        ui.js("document.querySelector('.agent-proposal [data-action=apply-proposal]').click()")
-        wait("!document.querySelector('.agent-proposal')&&!$('agent-waiting-count')", 30)
-        assert sources.excluded_folders(sources.bound(config, sources.get_source(config, KEY))) == ['Kit_1.0/Unity FBX']
-        report['checks'].append('Apply saves the engine copy exclusion and rescans; the badge clears')
+        copy = {'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}
+        for pack, rules in (('Kit_1.0', [{'kind': 'variant_axis', 'folder': 'Rocks', 'values': ['numbers']}, copy]),
+                            ('Kit_2.0', [copy, {'kind': 'exclude', 'folder': 'Samples', 'note': 'screenshots'}])):
+            pending = tool('propose_profile', library_folder=KEY, pack=pack, rules=rules)
+            assert pending['status'] == 'pending', pending
+        review = ".proposal-review"
+        group = lambda packs, text: f"[...document.querySelectorAll('{review} .proposal-group[data-packs=\"{packs}\"]')].find(g=>g.textContent.includes('{text}'))"
+        wait(f"$('agent-waiting-count')&&$('agent-waiting-count').textContent==='2'&&document.querySelectorAll('{review} .proposal-group').length===3", 30)
+        assert ui.js(f"{group(2, 'engine copy')}.textContent.includes('In 2 packs')")
+        assert ui.js(f"{group(1, 'Samples')}.textContent.includes('Only in Kit_2.0')")
+        assert ui.js(f"document.querySelector('{review} [data-action=apply-staged]').disabled")
+        report['checks'].append('Two waiting proposals show as one folder review: the shared engine copy rule is one group "In 2 packs", '
+                                'each pack-only rule says where it applies, and Apply stays disabled until rules are decided')
+        ui.js(f"{group(2, 'engine copy')}.querySelector('[data-choice=accept]').click()")
+        ui.js(f"{group(1, 'Variants')}.querySelector('[data-choice=accept]').click()")
+        ui.js(f"{group(1, 'Samples')}.querySelector('[data-choice=reject]').click()")
+        wait(f"document.querySelector('{review} .proposal-preview').textContent.includes('2 files skipped')", 30)
+        assert ui.js(f"document.querySelector('{review} [data-action=apply-staged]').textContent.includes('2 packs')")
+        assert not scans and sources.excluded_folders(sources.bound(config, sources.get_source(config, KEY))) == []
+        ui.capture('02-staged-review.png')
+        report['checks'].append('Accepting and rejecting rules saves nothing; the preview measures 2 files skipped across both packs')
+        ui.js(f"document.querySelector('{review} [data-action=apply-staged]').click()")
+        wait(f"!document.querySelector('{review}')&&!$('agent-waiting-count')", 30)
+        assert sorted(sources.excluded_folders(sources.bound(config, sources.get_source(config, KEY)))) == ['Kit_1.0/Unity FBX', 'Kit_2.0/Unity FBX']
+        assert scans == [KEY], scans
+        assert pack_profiles.history(config, KEY, 'Kit_2.0')[0]['origin']['left_out'] == [{'kind': 'exclude', 'folder': 'Samples', 'note': 'screenshots'}]
+        report['checks'].append('One Apply saves both packs (Samples left out and recorded), scans the library folder once and clears the badge')
         ui.js("[...document.querySelectorAll('#agent-feed [data-kind=change] button')][0].click()")
         wait("[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Undone'))", 30)
         rules = pack_profiles.current(config, sources.get_source(config, KEY), 'Kit_1.0')

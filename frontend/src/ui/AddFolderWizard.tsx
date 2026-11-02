@@ -1,4 +1,4 @@
-import { Check, CircleCheck, CircleDashed, Copy, Folder, FolderOpen, Minimize2, Package, Sparkles, TriangleAlert, X } from "lucide-react";
+import { Bot, Check, CircleCheck, CircleDashed, Copy, Folder, FolderOpen, Minimize2, Package, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useId, useState } from "react";
 import { SPRING_LAYOUT, SPRING_PANEL } from "@/lib/ease";
@@ -8,7 +8,7 @@ import { plural } from "../app/format";
 import {
   closeAddFolder, copyAgentPrompt, finishAddFolder, makePreviews, minimizeAddFolder, openSources, useApp,
 } from "../app/store";
-import { Proposal } from "./AgentActivity";
+import { ProposalReview } from "./ProposalReview";
 import { Banner, Button, IconButton, Spinner } from "./primitives";
 
 const STEPS = [["look", "Quick look"], ["found", "What we found"], ["agent", "Finish"]] as const;
@@ -104,7 +104,7 @@ function Found({ look }: { look: Json }) {
       {error && <Banner><span>{error}</span></Banner>}
       <div className="grid gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button id="add-folder-agent" disabled={busy} onClick={() => void finishAddFolder("agent")}><Sparkles className="size-4" aria-hidden />Let my agent finish</Button>
+          <Button id="add-folder-agent" disabled={busy} onClick={() => void finishAddFolder("agent")}><Bot className="size-4" aria-hidden />Let my agent finish</Button>
           <Button id="add-folder-myself" variant="secondary" disabled={busy} onClick={() => void finishAddFolder("myself")}>Review myself</Button>
           <Button id="add-folder-later" variant="quiet" disabled={busy} onClick={() => void finishAddFolder("later")}>Later</Button>
         </div>
@@ -160,7 +160,7 @@ function TakeOver() {
         ))}
         {!mine.length && <li className="px-2 py-3 text-[12.5px] text-subtle">What your agent reads, changes and proposes here appears as it happens.</li>}
       </ol>
-      {proposals.length > 0 && <ul className="grid gap-2.5">{proposals.map((p: Json) => <Proposal key={p.id} proposal={p} />)}</ul>}
+      {proposals.length > 0 && <div className="grid gap-2.5"><ProposalReview proposals={proposals} /></div>}
       <div className="grid gap-1.5">
         <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="Packs with a structure">
           <motion.div className="h-full rounded-full bg-primary" animate={{ width: total ? `${(done / total) * 100}%` : "0%" }} transition={SPRING_PANEL} />

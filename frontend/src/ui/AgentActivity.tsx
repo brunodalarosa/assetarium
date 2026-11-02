@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import { decideAgentProposal, setAgentOpen, useApp } from "../app/store";
-import { ruleText } from "./FolderPanel";
-import { Button, IconButton } from "./primitives";
+import { IconButton } from "./primitives";
+import { ProposalReview } from "./ProposalReview";
 
 const KIND = {
   read: { icon: Eye, tone: "text-muted-foreground" }, change: { icon: PencilLine, tone: "text-primary" },
@@ -35,28 +35,6 @@ export function AgentButton() {
       {agent.working && last ? <span className="hidden truncate md:inline">{last.text}</span> : <span className="hidden md:inline">Agent</span>}
       {waiting > 0 && <span id="agent-waiting-count" className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">{waiting}</span>}
     </button>
-  );
-}
-
-export function Proposal({ proposal }: { proposal: Json }) {
-  const rules: Json[] = proposal.rules || [];
-  return (
-    <motion.li layout transition={SPRING_LAYOUT} className="agent-proposal grid gap-2.5 rounded-2xl border border-border bg-surface-2/60 p-4" data-id={proposal.id}>
-      <div className="grid gap-0.5">
-        <p className="text-[13px] font-semibold">{proposal.pack || proposal.library_folder}</p>
-        <p className="text-[11.5px] text-muted-foreground">{proposal.origin?.agent || "Your agent"} · {time(proposal.utc)}{proposal.origin?.note ? ` · “${proposal.origin.note}”` : ""}</p>
-      </div>
-      <ul className="grid gap-1 text-[12.5px]">{(proposal.effect?.lines || []).map((line: string) => <li key={line}>→ {line}</li>)}</ul>
-      <details className="text-[12px] text-muted-foreground">
-        <summary className="cursor-pointer">{plural(rules.length, "rule", "rules")}</summary>
-        <ul className="mt-1.5 grid gap-1">{rules.map((rule, i) => <li key={i}>{ruleText(rule)}{rule.note ? ` (${rule.note})` : ""}</li>)}</ul>
-      </details>
-      <div className="flex flex-wrap gap-2">
-        <Button className="h-8 px-3" data-action="apply-proposal" onClick={() => void decideAgentProposal(proposal.id, "apply")}>Apply</Button>
-        <Button variant="quiet" className="h-8 px-3" data-action="reject-proposal" onClick={() => void decideAgentProposal(proposal.id, "reject")}>Reject</Button>
-      </div>
-      <p className="text-[11.5px] text-muted-foreground">Applying scans the library folder again. Nothing is rendered, described or written into the pack.</p>
-    </motion.li>
   );
 }
 
@@ -111,7 +89,7 @@ export function AgentActivityPanel() {
             {agent.proposals.length > 0 && (
               <section aria-labelledby="agent-proposals-title" className="mb-4 grid gap-2.5">
                 <h3 id="agent-proposals-title" className="px-2 text-[12.5px] font-semibold">Waiting for you</h3>
-                <ul id="agent-proposals" className="grid gap-2.5">{agent.proposals.map((p) => <Proposal key={p.id} proposal={p} />)}</ul>
+                <div id="agent-proposals" className="grid gap-2.5"><ProposalReview proposals={agent.proposals} /></div>
               </section>
             )}
             <h3 className="px-2 pb-1.5 text-[12.5px] font-semibold">What agents did</h3>
