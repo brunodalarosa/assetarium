@@ -1,6 +1,6 @@
-# Asset sources
+# Library (asset sources)
 
-The **Asset sources** tab (the folder icon above Settings in the rail) is where you browse your assets
+**Library** (the books icon above Settings in the rail; it was called Asset sources) is where you browse your assets
 by place and decide what to process. **Home** is for searching; both share the same cards and the same
 inspection panel, and a search result's menu offers **Show in pack** to jump here.
 
@@ -163,17 +163,29 @@ assets. They start at once or wait in line on **Asset processing**:
 
 **Asset processing** shows **Running** (progress, Cancel, a live log with copy buttons on errors and
 warnings), **Up next**, **Blocked** (by reason, with the fix and how many assets it unblocks), **Recorded
-failures** (by stage and reason, with Copy, Recheck and Show in Asset sources) and **Recent**. Pending work
+failures** (by stage and reason, with Copy, Recheck and Show in Library) and **Recent**. Pending work
 and failures are never mixed in one message.
 
 Cancel requests a graceful stop: the current asset finishes, its checkpoint is saved, and nothing else
 starts. Unchanged faults are kept with their evidence and skipped; they are never retried automatically.
 
-## Processing formats
+## Formats Assetarium uses
 
-**Settings → General → Formats to process** (FBX, glTF/GLB, OBJ) chooses which file of a grouped asset is
-inspected when several formats exist. Unchecking everything pauses processing; browsing and search keep working.
-Changing formats never deletes results or retries faults.
+**Settings → General → Formats Assetarium uses** has a toggle for each 3D format Assetarium processes (glTF/GLB,
+FBX, OBJ) and each standalone image format (PNG, JPEG, SVG, WebP, TGA, TIFF, BMP, GIF, AVIF). An asset whose files
+are all in formats that are off is hidden: Library does not list or count it (the header says "N files in formats you
+don't use" and links back here), search and your agent don't return it, and nothing processes it. A collection keeps
+it with a **Format off** badge. Textures used by 3D models are always read, whatever the image toggles say. When a
+grouped asset has several formats on, the format setting also chooses which file is inspected.
+
+Changing formats is instant and never deletes results, scans again or retries faults: turning a format back on
+brings its assets back with everything they had. With every format off, nothing is shown or processed.
+
+## Sample assets
+
+Setup offers **Include sample assets** (checked by default): a library folder with a blue cube, a green pyramid and a
+red sphere, a few KB of GLB shipped with Assetarium in `samples/Sample assets`. Choose **Make previews** on it to try
+previews and search right away; remove it like any library folder.
 
 ## Descriptions
 

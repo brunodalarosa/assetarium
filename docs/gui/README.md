@@ -142,7 +142,7 @@ also appear as a toast with the same actions for 8 s (paused while hovered or
 focused). The bell shows a dot for unread notices or a running job. Escape or a
 click outside closes the panel and marks its notices read.
 
-**Asset sources** (the folder icon above Settings; [decision 0023](../../Assetarium%20KnowledgeBase/Decisions/0023-central-asset-library.md))
+**Library** (the books icon above Settings, formerly Asset sources; [decision 0023](../../Assetarium%20KnowledgeBase/Decisions/0023-central-asset-library.md))
 browses by place: a tree of library folders, bundles, packs and folders (folders only; coverage bars,
 **+N new** since your last visit, **Offline** labels, excluded folders faded with **Include again**), the
 same cards and inspection as Home for the selected folder or pack, and the folder's other files listed
@@ -161,7 +161,7 @@ refuses a folder inside a library folder (**Show it**) and replaces library fold
 rail dot means you must act (a folder offline, an answer to give, files missing, the one-time migration).
 Search results gain **Show in pack**. See [asset sources](../asset-sources.md).
 
-**Asset processing** is the queue. **Make previews** and **Generate descriptions** (from the Asset sources
+**Asset processing** is the queue. **Make previews** and **Generate descriptions** (from the Library
 tab) start at once or wait in **Up next**; previews always go first, items can be moved or removed, and
 **Hold descriptions for overnight** keeps descriptions waiting for the window. Jobs under 10 minutes start on
 the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones ask first with the estimate.
@@ -170,7 +170,7 @@ Work left over when the app closed shows **Paused** with **Resume**. **Running**
 and warnings. **Blocked** groups work that can't run here by reason, with the fix and how many assets it
 unblocks; it is never offered as something to process. **Recorded failures** groups faults by stage and
 reason with **Copy**, **Recheck…** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md))
-and **Show in Asset sources**; **Recent** lists finished jobs with their outcome and duration. The page also
+and **Show in Library**; **Recent** lists finished jobs with their outcome and duration. The page also
 shows the published library (coverage, catalog/index versions, **Refresh published view**). **Settings →
 General → Rendering** says what renders now and why and offers the render device, renders at a time and
 memory for rendering. The **Search** card lists **What is installed** for the chosen device, with a copyable
@@ -221,7 +221,7 @@ agent finishes, the open panel turns into **its report** (and the app opens it a
 until it is confirmed): every value with where it came from (*Set by agent* with **Undo**, *Set by
 you*, *Checked by agent*), a check or a warning icon per row with the copyable command for anything
 that still needs the user, **Change** (opens that step; **Save** records only what the user
-changed), and **Looks good**, which completes setup and leads to Asset sources to choose the asset
+changed), and **Looks good**, which completes setup and leads to Library to choose the asset
 folders (**Later** keeps it for review). A completed setup reopens on the same summary, with
 **Set up with my agent** / **Set it up yourself** to start over. Agent changes and proposals raise
 notices whose **Review** / **Review proposal** lead back to the panel; a decided proposal's
@@ -234,10 +234,16 @@ client against an isolated project, light and dark).
 *Not saved*, *Missing* or *Not found* badge with the path; **Check Blender** and **Change
 Blender…** open the wizard's Blender picker with **Save Blender**, the re-render confirmation and
 **Keep the saved Blender**; the picker is open by itself while no usable Blender is saved), the storage budget (with the exact
-definition of what it counts), formats to process, **Descriptions** (on/off and the
+definition of what it counts), **Formats Assetarium uses** (the 3D formats and each image format; an asset only in
+formats that are off is hidden from the Library, search and your agent, and comes back with its results when you turn
+the format on; textures of 3D models are always read), **Descriptions** (on/off and the
 engine, with the local server's address, model and **Test connection**) and the
-description batch size (built-in engine only). Settings has no Asset sources section any more: library
-folders live in the Asset sources tab.
+description batch size (built-in engine only). Settings has no library folder section: library
+folders live in Library.
+
+**Search** lists what search by description and image needs. The one-time **search check** runs on two
+built-in sample images: setup runs it after Save, **Run check** runs it once the search runtime and model are
+installed, and Make previews runs it by itself when it is missing.
 
 Enabled library folders are scanned at startup; the app watches cheap file stamps every
 1.5 s and reloads library or folder data only when one changes (decision 0002).

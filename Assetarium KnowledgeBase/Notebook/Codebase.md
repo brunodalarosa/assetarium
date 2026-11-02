@@ -31,7 +31,7 @@ read it first. Up: [Notebook](Notebook.md).
   `data/library/settings.json`), `publication` (atomic JSON, pinned immutable generations,
   `verified_hash`), `hash_cache` (shared stat-identity hash record), `library_policy` (neutral
   membership and budget defaults), `retention`, `maintenance_files`, `model_storage`,
-  `notifications`, `logs` (session logs: [Session logs](Platform%20and%20Storage/Session%20logs.md)).
+  `notifications`, `search_check` (the search check on built-in sample images, [Core features](Platform%20and%20Storage/Core%20features.md)), `logs` (session logs: [Session logs](Platform%20and%20Storage/Session%20logs.md)).
 - **Sources and catalog:** `sources` (library folders, scans, the combined catalog), `library_store`
   (`library.sqlite`: folders, recognized assets, recognition history, owner answers), `packs`
   (packs and bundles from folder structure), `pack_profiles` (a pack's answers as versioned rules, effect,

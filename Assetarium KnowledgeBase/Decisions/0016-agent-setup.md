@@ -83,3 +83,5 @@ clients need the new tool names in `enabled_tools`.
 > and writes the receipt; it never downloads. `finish_setup` sets `review`; the user's **Looks good** on the
 > app's report sets `completed`, and each agent-changed value can be undone there. Installs and downloads
 > still need the user's approval one by one.
+
+*Update (November 1, 2026, [decision 0026](0026-setup-leaves-core-features-working.md)):* `apply_setup` also takes `answers.samples` (add the built-in sample assets; `get_setup_status` asks it) and `image_formats` (the standalone image formats Assetarium uses).

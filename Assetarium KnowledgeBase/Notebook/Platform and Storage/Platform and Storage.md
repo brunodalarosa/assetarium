@@ -12,6 +12,8 @@ Up: [Notebook](../Notebook.md).
 
 - [Runtimes](Runtimes.md): the four uv environments, their wrappers and how to run tests.
 - [Storage discipline](Storage%20discipline.md): receipts, budgets, hard links, `scratch/`.
+- [Core features](Core%20features.md) and [Optional features](Optional%20features.md): what setup must leave working (decision 0026).
+- [Formats](Formats.md): formats Assetarium uses; which can be turned off and which are always read.
 - [Session logs](Session%20logs.md): one log file per app, MCP or CLI session, joined by its workers (`logs.py`).
 - [Retention](Retention.md) *(gap)*: superseded generations and launch audits (`retention.py`,
   decision [0006](../../Decisions/0006-retention.md)).

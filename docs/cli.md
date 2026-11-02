@@ -29,7 +29,7 @@ as the old name of `library …`.
 
 | Command | Same as in the app |
 | --- | --- |
-| `library list` | Asset sources tab: each library folder with pending, failed and its reason |
+| `library list` | Library: each library folder with pending, failed and its reason |
 | `library add PATH` | Add library folder; scans it (no rendering or models). A folder inside a library folder is refused as already covered; one around library folders replaces them and keeps their assets, IDs and results |
 | `library enable KEY` / `library disable KEY` | Included in search switch (enabling rescans) |
 | `library exclude KEY PATTERN` / `library include KEY PATTERN` | Exclude folder / Include again: a folder name with `*` or a path inside the folder (rescans; nothing is deleted) |
@@ -98,7 +98,7 @@ the store once, with the app and MCP servers closed (base runtime; nothing rende
 The first run is a dry run that writes a plan to `data/library/migration/`; `--apply` asks for a typed `yes`,
 imports, verifies and writes a receipt, printing progress; run `--apply` again after a fault to import the
 folders that failed and check unverified ones again; `--remove-old` deletes only verified old folders, asking for each.
-See [Asset sources](asset-sources.md#moving-results-into-the-library-store).
+See [Library](asset-sources.md#moving-results-into-the-library-store).
 
 `process --stage inspection|caption|embeddings` is the existing stage-level
 maintenance command (used by `library-batch.py`) and is unchanged.
@@ -107,7 +107,8 @@ maintenance command (used by `library-batch.py`) and is unchanged.
 
 ```text
 settings show
-settings set --formats gltf,fbx        # "none" pauses processing; glb counts as gltf
+settings set --formats gltf,fbx        # 3D formats Assetarium uses; glb counts as gltf; "none" hides every 3D asset
+settings set --image-formats png,jpeg,svg   # standalone image formats; jpg is jpeg, tif is tiff; textures are always read
 settings set --budget-gib 24           # whole GiB
 settings set --batch-size 4            # 1, 2, 4 or 8 (built-in engine only)
 settings set --descriptions off        # on/off; off keeps existing descriptions
@@ -180,6 +181,7 @@ setup blender check PATH               # executable name, version, headless star
 setup blender set PATH [--confirm-rerender]   # check, then save to config.local.toml
 setup skip                             # record that setup was skipped
 setup verify-weights [caption|embedding|all]  # verify model weights placed by hand; reads them, downloads nothing
+setup search-check                     # the one-time search check on built-in sample images (about a minute)
 setup agent                            # how to add Assetarium to your AI agent, and what to ask it
 setup agent check                      # do your agents start this copy? reads their settings, changes nothing
 setup agent proposals                  # apply or reject the agent's Blender proposal (interactive)

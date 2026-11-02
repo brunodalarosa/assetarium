@@ -54,15 +54,16 @@ Qwen3-VL-2B-Instruct (caption quality rules were calibrated on Qwen).
 no fallback between them. Settings → General → Search, the setup wizard, `apply_setup` or
 `local-assets settings set --search-device cpu`. The CPU embedder is the same EmbeddingGemma
 revision in BF16 with its own contract (device, adapter and lock hashes), so its vectors are a
-separate index: after switching, record the search check again and Make previews.
+separate index: after switching, Make previews rebuilds search data and runs the search check for the new device
+by itself (or choose **Run check** in Settings → General → Search).
 
 CPU setup, from the Assetarium folder:
 
 ```powershell
 .\scripts\embedding-runtime.ps1 sync --locked --project runtime/embedding-cpu
 .\scripts\embedding-runtime.ps1 run --locked --no-sync --project runtime/embedding-cpu python scripts/prepare_embedding_model.py --device cpu
-# After processing a source once (its search stage waits for this check):
-.\scripts\embedding-runtime.ps1 run --locked --no-sync --offline --project runtime/embedding-cpu python scripts/record-embedding-capability.py
+# The search check runs by itself in Make previews, or from Run check in Settings; in a terminal:
+.\scripts\local-assets.ps1 setup search-check
 ```
 
 Measured on a Ryzen 9 9950X3D (16 cores, AVX-512): about 1.1 s per image vector and 0.03 s

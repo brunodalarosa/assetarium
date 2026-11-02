@@ -14,6 +14,12 @@ All notable changes to Assetarium are listed here. The project follows
   instead of stopping.
 - **Built-in sample assets**: a blue cube, a green pyramid and a red sphere (a few KB of GLB in `samples/`). Setup
   offers them with **Include sample assets** (checked by default); the agent-assisted setup asks the same question.
+- **Formats Assetarium uses** (Settings → General, setup, `settings set --formats / --image-formats`, agents): a
+  toggle for each 3D format (glTF/GLB, FBX, OBJ) and each image format (PNG, JPEG, SVG, WebP, TGA, TIFF, BMP, GIF,
+  AVIF). Assets only in formats that are off are hidden from the Library, search, agents and processing (a
+  collection keeps them with a **Format off** badge); Library's header says how many and links to the setting.
+  Textures of 3D models are always read. Changing formats never deletes results; turning one back on brings its
+  assets back. Every format off is the paused state.
 - Setup has a **Connect your agent** step with your agent's configuration and Copy, and shows when it connects.
 - **Session logs**: every app run, MCP server and command writes one readable log in `logs/`
   (`2026-11-01_12-13-07_app.log`), and the workers it starts write into the same file. Levels (`[logging] level`,
