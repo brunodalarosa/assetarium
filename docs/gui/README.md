@@ -13,6 +13,11 @@ work. It invokes the prepared `.venv-mcp\Scripts\pythonw.exe`; startup never
 installs packages, downloads weights or starts rendering/model inference.
 It scans enabled asset sources for file changes in the background.
 
+`Assetarium (with log).vbs` starts the same app plus a console window that follows this run's session log live
+(warnings in yellow, errors in red); the console stays open after the app closes. Give the launcher `--verbose` (for
+example in a shortcut's target) to log every call the window makes. Session logs are described in
+[the CLI guide](../cli.md#logs).
+
 ## Using the app
 
 **Layout.** The left rail has **Back**/**Forward** (view history; a mouse's dedicated back and forward

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 from pathlib import Path
 import sqlite3
 import os
@@ -46,6 +47,9 @@ def main() -> int:
     parser.add_argument("--min-similarity", type=float, help="Explicit evaluation cosine floor, not a confidence threshold")
     parser.add_argument("--rankings-output", help="Save complete channel rankings under data/; excluded from compact default response")
     args = parser.parse_args()
+    from .logs import kv, start
+    start(root, 'cli')
+    logging.getLogger('assetarium.cli').info('Command · %s', kv(command=' '.join(sys.argv[1:])[:300]))
     try:
         config = load_config(args.config, root)
         if config.sources_registry:

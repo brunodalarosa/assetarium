@@ -4,6 +4,7 @@ import base64
 import contextlib
 from datetime import datetime, timezone
 import json
+import logging
 import os
 from pathlib import Path
 import sys
@@ -14,7 +15,10 @@ import uuid
 from .catalog import encoded
 from .search_policy import DEFAULT_MODE
 from .config import ConfigError, load_project_config, project_config_path, venv_python
+from .logs import kv
 from .mcp_assets import AssetService, SCHEMAS, SETUP_TOOLS, TransientFault, WRITE_TOOLS, error_payload, validate
+
+log = logging.getLogger(__name__)
 
 INSTRUCTIONS = ('Explicitly configured approved library membership; assets, sources and files are read-only. Search compactly, then get_asset for a candidate; '
     'request include_preview=true to inspect actual image content. Resolve a usable format/dependencies '
@@ -136,6 +140,7 @@ class Gateway:
         self.run_id = uuid.uuid4().hex
         if audit_namespace not in {'mcp', 'gui'}:
             raise ConfigError('Unknown audit namespace')
+        self.audit_namespace = audit_namespace
         self.audit_root = (config.output_path('data', audit_namespace + '/runs/' + self.run_id) if config is not None
                            else self.root / 'data' / audit_namespace / 'runs' / self.run_id)
         self.audit_root.mkdir(parents=True, exist_ok=False)
@@ -350,6 +355,13 @@ class Gateway:
                 'evidence':evidence,'elapsed_seconds':time.perf_counter()-started}
             with (self.audit_root/'calls.jsonl').open('a',encoding='utf-8') as stream:
                 stream.write(encoded(audit)+'\n')
+            # Agent calls are events (info); the app's own gateway calls are routine (debug).
+            ms = round(audit['elapsed_seconds'] * 1000)
+            if error:
+                log.warning('Tool %s refused · %s', name, kv(reason=str(evidence.get('fault', ''))[:300], ms=ms))
+            else:
+                log.log(logging.DEBUG if self.audit_namespace == 'gui' else logging.INFO, 'Tool %s · %s', name,
+                        kv(status=payload.get('status') if isinstance(payload, dict) else None, ms=ms), extra={'repeat_key': ('tool', name)})
             return CallToolResult(content=content,isError=error)
 
 
@@ -414,7 +426,9 @@ async def serve(config, root=None, config_fault=None):
 
 
 def main():
+    from .logs import start
     root = Path(__file__).resolve().parents[2]
+    start(root, 'mcp')  # A file, never stdout: stdout is the MCP wire.
     # Client cwd is never used to resolve source/configuration paths.
     try:
         config = load_project_config(root)

@@ -8,6 +8,12 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Session logs**: every app run, MCP server and command writes one readable log in `logs/`
+  (`2026-11-01_12-13-07_app.log`), and the workers it starts write into the same file. Levels (`[logging] level`,
+  `--verbose`, `--log-level`), repeated lines collapsed into counts, the newest 30 sessions kept (200 MiB at most).
+  `local-assets logs` lists, shows, filters and follows them; `Assetarium (with log).vbs` opens the app with a live
+  log console. `logs/gui.log` and `logs/gui-worker.log` are no longer written.
+
 - **Variant groups**: assets whose names differ only in a last letter, color, material or LOD (`Car_11_R`,
   `Car_11_G`, `Car_11_B`) are one card with a variant badge and chips; hovering a chip previews it. Numbered
   series stay separate. Variants share one description unless you turn on **Generate separate descriptions for

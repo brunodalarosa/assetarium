@@ -2,6 +2,7 @@
 from contextlib import closing, contextmanager
 from dataclasses import replace
 import json
+import logging
 import os
 from pathlib import Path
 import sqlite3
@@ -155,6 +156,9 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None):
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0, start_new_session=os.name != "nt")
             # The child waits for this handoff before updating the same state.
             state(scoped, pid=process.pid)
+            from .logs import kv
+            logging.getLogger(__name__).info('Operation started · %s', kv(operation=operation, folder=key, pid=process.pid,
+                                                                           token=token[:8], output=log))
         except OSError as exc:
             if not python.is_file():
                 command = r'.\scripts\uv.ps1 sync --locked' if os.name == 'nt' else './scripts/uv.sh sync --locked'

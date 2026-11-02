@@ -7,6 +7,7 @@ terminal: agents can run commands, and only the owner deletes (decision 0012).
 """
 import argparse
 import json
+import logging
 from pathlib import Path
 import sys
 import time
@@ -14,7 +15,7 @@ import time
 from .config import ConfigError, load_config, project_config_path
 
 COMMANDS = {'library', 'sources', 'packs', 'previews', 'queue', 'forget-missing', 'settings', 'rendering', 'process', 'describe',
-            'cancel', 'failures', 'recheck', 'collections', 'setup', 'model-check'}
+            'cancel', 'failures', 'recheck', 'collections', 'setup', 'model-check', 'logs'}
 ENDED_OK = {'complete'}
 
 
@@ -60,6 +61,14 @@ def parser():
             change.add_argument('--yes', action='store_true', help='Apply without asking after the effect is shown')
         if action == 'revert':
             change.add_argument('version', type=int)
+    logs = commands.add_parser('logs', help='Show or follow a session log (one per app, MCP server or command run)')
+    logs.add_argument('session', nargs='?', default='latest', help='A session name from --list (default: the newest)')
+    logs.add_argument('--follow', '-f', action='store_true', help='Keep printing new lines until the session ends')
+    logs.add_argument('--level', choices=['debug', 'info', 'warning', 'error'], default='info', help='Lowest level shown')
+    logs.add_argument('--verbose', '-v', action='store_true', help='Same as --level debug')
+    logs.add_argument('--kind', choices=['app', 'mcp', 'cli'], help='Only sessions of this kind')
+    logs.add_argument('--next', action='store_true', help='Wait for the next session to start, then follow it')
+    logs.add_argument('--list', action='store_true', help='List the kept sessions, newest first')
     check = commands.add_parser('model-check', help='Check my model: can a local model structure packs through the pack tools?')
     check.add_argument('--url', default='http://127.0.0.1:1234/v1', help='An OpenAI-compatible server on this computer')
     check.add_argument('--model', required=True, help='The model name the server lists')
@@ -259,6 +268,28 @@ def queue_list(args, config):
     if not running and not state['up_next']:
         say(args, 'Nothing running or waiting.')
     return state
+
+
+def logs_command(args, root):
+    """Session logs: list them, print one, or follow it live (the console launcher runs ``logs --next --follow``)."""
+    from . import logs
+    try:
+        if args.list:
+            listed = logs.sessions(logs.folder(root)) if logs.folder(root).is_dir() else []
+            for stem, files in listed:
+                size = sum(f.stat().st_size for f in files if f.exists())
+                say(args, f'{stem}  {size / 1024:,.0f} KiB')
+            if args.json:
+                print(json.dumps({'status': 'ready', 'sessions': [stem for stem, _ in listed]}))
+            return 0
+        logs.show(root, args.session, 'debug' if args.verbose else args.level, follow=args.follow or args.next,
+                  kind=args.kind or ('app' if args.next else None), wait_new=args.next)
+        return 0
+    except ValueError as exc:
+        print(f'logs: {exc}', file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        return 130
 
 
 def say(args, text):
@@ -900,6 +931,11 @@ def main(argv, config=None):
         sys.stdout.reconfigure(errors='replace')  # A narrow console code page must never crash a command.
     args = parser().parse_args(argv)
     root = Path(__file__).resolve().parents[2]
+    if args.command == 'logs':
+        return logs_command(args, root)
+    from .logs import kv, start
+    start(root, 'cli')
+    logging.getLogger('assetarium.cli').info('Command · %s', kv(command=' '.join(argv)[:300]))
     try:
         config = config or load_config(args.config or project_config_path(root), root)
         if not config.sources_registry:

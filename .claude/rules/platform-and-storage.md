@@ -8,6 +8,8 @@ paths:
   - "runtime/**"
   - "pyproject.toml"
   - "src/local_asset_library/retention.py"
+  - "src/local_asset_library/logs.py"
+  - "tests/test_logs.py"
   - "src/local_asset_library/maintenance_files.py"
   - "src/local_asset_library/model_storage.py"
   - "src/local_asset_library/source_storage.py"

@@ -11,6 +11,9 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 
 ## Tooling and build
 
+- **Tests patch module-level `time.sleep` globally**: `test_owner_commands` sets `owner_commands.time.sleep`, which is
+  the shared `time` module, so any code that sleeps during those tests gets their fake. Patch a local alias instead.
+  Seen: 2026-11-01
 - **Fingerprints hash raw file bytes, so line endings matter**: `core.autocrlf` can turn LF into
   CRLF on checkout and change `blender_worker.py`, caption or embedding code hashes.
   `incremental.recorded_fingerprint` and `retrieval.recorded_contract` tolerate LF/CRLF-only

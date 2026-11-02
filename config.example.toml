@@ -26,3 +26,8 @@ environment = ".venv"
 # (`local-assets doctor` lists the candidates). To pin one executable:
 #   blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 #   blender = '/opt/blender-5.2.2-linux-x64/blender'
+
+[logging]
+# Session logs (one file per app, MCP server or command run) in [storage].logs.
+# debug | info | warning | error; --verbose or --log-level on a run overrides it.
+level = "info"

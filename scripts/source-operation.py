@@ -1,5 +1,6 @@
 """App-owned source scanner/coordinator, using existing offline runtimes."""
 import argparse
+import logging
 import os
 from pathlib import Path
 import sys
@@ -18,6 +19,10 @@ parser.add_argument('--source')
 parser.add_argument('--token', required=True)
 parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'])
 args = parser.parse_args()
+from local_asset_library.logs import kv, start
+start(root, 'operation', process=args.operation)  # Joins the session that started it (app or CLI).
+log = logging.getLogger('assetarium.operation')
+started = time.monotonic()
 config = load_project_config(root)
 source = get_source(config, args.source) if args.source else None
 scoped = bound(config, source) if source else config
@@ -44,7 +49,10 @@ else:
                 process_source(config, source, args.token)
     except BaseException as exc:
         state(scoped, status='faulty', phase='Operation stopped', reason=str(exc))
+        log.error('Operation stopped · %s', kv(operation=args.operation, folder=args.source, reason=exc), exc_info=True)
         raise
+    else:
+        log.info('Operation finished · %s', kv(operation=args.operation, folder=args.source, seconds=round(time.monotonic() - started, 1)))
     finally:
         if args.operation in {'process', 'describe'}:
             # The next queued item starts when this one ends, with or without the app (decision 0023).
