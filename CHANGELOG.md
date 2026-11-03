@@ -161,6 +161,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Asset inspection uses its resolved data revision for 3D and image viewing in Library, Search and Collections.
+  A genuine revision change offers Refresh inspection and is not mislabeled as a recorded asset failure.
+
 - Missing entries are hidden from normal Library browsing and counts. Pack/folder inspection provides a paged
   review, distinguishes existing but unrecognized files, and confirms scoped “Forget all missing files” with
   Delete on the left. Forgetting keeps originals, cached results and collection entries.

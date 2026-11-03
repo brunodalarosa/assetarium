@@ -5,6 +5,10 @@ source format. **Open fullscreen** opens it across the app window, rather
 than launching another application or entering operating-system fullscreen.
 The original image, view choices and inspection evidence remain available.
 
+Library, Search and Collections use the same resolved asset, selected source format and inspection revision.
+If the library changes during loading, **Refresh inspection** loads current details. A changed view is not
+an asset failure; genuine file/import failures remain recorded with their evidence.
+
 ## Interaction
 
 - Drag to rotate; right-drag or Shift-drag to pan; scroll or pinch to zoom.

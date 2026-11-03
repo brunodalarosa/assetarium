@@ -31,6 +31,7 @@ export interface Thumb {
   presentation?: Json;
 }
 export interface Detail {
+  stale?: boolean;
   assetId: string;
   format: string | null;
   view: string;
@@ -623,7 +624,7 @@ async function drainThumbs() {
 /* --------------------------------- detail -------------------------------- */
 
 let detailGeneration = { library: 0, source: 0, collection: 0 };
-export async function selectAsset(id: GridId, assetId: string, format: string | null = null, view = "three_quarter", moveFocus = true) {
+export async function selectAsset(id: GridId, assetId: string, format: string | null = null, view = "three_quarter", moveFocus = true, fresh = false) {
   if (id === "source" && !format) {
     const cards = state.source.items.flatMap((item: Json) => [item, ...(item.variants || [])]);
     format = cards.find((item: Json) => item.asset_id === assetId)?.source_format ?? null;
@@ -642,8 +643,12 @@ export async function selectAsset(id: GridId, assetId: string, format: string | 
     detail: { assetId, format, view, loading: true, result: c.detail?.assetId === assetId ? c.detail.result : null, error: null, focusToken: (c.detail?.focusToken ?? 0) + (moveFocus ? 1 : 0) },
   }));
   try {
-    const result = await gridApi(id, assetId).asset(assetId, format, view, gridVersion(state, id));
+    const result = await gridApi(id, assetId).asset(assetId, format, view, fresh ? null : gridVersion(state, id));
     if (generation !== detailGeneration[id]) return;
+    if (result.status === "stale") {
+      patchGrid(id, (c) => ({ detail: c.detail && { ...c.detail, loading: false, result: null, error: result.reason, stale: true } }));
+      return;
+    }
     if (!result.payload) throw Error(result.reason || "Asset detail unavailable");
     patchGrid(id, (c) => ({ detail: c.detail && { ...c.detail, loading: false, result } }));
   } catch (error) {

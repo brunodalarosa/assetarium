@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { display, packName, plural, VIEWS } from "../app/format";
 import {
-  activeGridId, assetTags, type GridId, gridApi, gridVersion, copyText, getState, type InspectorTab, packProfileAction, saveAssetTags, selectAsset,
+  activeGridId, assetTags, type GridId, gridApi, copyText, getState, type InspectorTab, packProfileAction, saveAssetTags, selectAsset,
   pushToast, setCollectionItem, startSelection,
   setInspectorOpen, setInspectorTab, setInspectorWidth, useApp,
 } from "../app/store";
@@ -53,9 +53,8 @@ function faultText(fault: Json) {
 /** The 3D still and interactive viewer from ui/interactive-preview.js, mounted per selection. */
 function ModelPreview({ grid, assetId, result, view }: { grid: GridId; assetId: string; result: Json; view: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const gridVer = useApp((s) => gridVersion(s, grid));
-  // Collection members come from the library or a source; the card's own generation is the one its preview must match.
-  const version = grid === "collection" ? result.generation ?? null : gridVer;
+  // Every entry point uses the snapshot that actually produced this resolved detail.
+  const version = result.generation ?? null;
   useEffect(() => {
     const p = result.payload, info = p.presentation || {};
     const container = ref.current;
@@ -65,10 +64,11 @@ function ModelPreview({ grid, assetId, result, view }: { grid: GridId; assetId: 
     container.replaceChildren();
     window.LALPreview.mount(container, {
       assetId, name, sourceFormat: p.selected_source?.format, version,
+      onRefresh: () => void selectAsset(grid, assetId, p.selected_source?.format ?? null, view, false, true),
       onSearch: () => document.getElementById({ library: "query", source: "source-grid", collection: "collection-query" }[grid])?.focus(),
       image: result.image, imageAlt: `${name} — ${VIEWS[view] || view} view`,
       imageReason: p.preview?.reason || p.reason || "Requested view unavailable; no substitute.",
-    }, gridApi(grid));
+    }, gridApi(grid, assetId));
     return () => {
       window.LALPreview.dispose();
       container.replaceChildren();
@@ -239,7 +239,7 @@ function imageFacts(t: Json): [string, unknown][] {
 function OverviewTab({ grid, result, assetId, format, view }: { grid: GridId; result: Json; assetId: string; format: string | null; view: string }) {
   const p = result.payload, info = p.presentation || {}, t = info.technical || {};
   const context = useApp((s) => s.context);
-  const version = useApp((s) => gridVersion(s, grid));
+  const version = result.generation ?? null;
   const formats: string[] = info.formats || [];
   const formatValue = format || p.selected_source?.format || formats[0] || "";
   const prefix = { library: "", source: "source-", collection: "collection-" }[grid];
@@ -250,7 +250,7 @@ function OverviewTab({ grid, result, assetId, format, view }: { grid: GridId; re
       <div className="grid gap-5">
         <div className="detail-preview">
           {processed ? (
-            <ImageViewer key={assetId + formatValue} assetId={assetId} name={info.name || p.name || assetId} image={result.image} api={gridApi(grid)} version={version} native={[t.width, t.height]} pixelArt={Boolean(t.pixel_art_candidate)} vector={t.format === "svg"} />
+            <ImageViewer key={assetId + formatValue} assetId={assetId} name={info.name || p.name || assetId} image={result.image} api={gridApi(grid, assetId)} version={version} native={[t.width, t.height]} pixelArt={Boolean(t.pixel_art_candidate)} vector={t.format === "svg"} />
           ) : (
             <div className="grid min-h-40 place-items-center rounded-2xl bg-thumb p-6 text-center text-[12.5px] text-muted-foreground">
               {({ pending: "This image has not been processed yet. Process this source in Asset processing to measure it and prepare image search.", failed: "This image could not be processed; the recorded fault is listed under Evidence.", unsupported: "This image is recognized but not supported yet; the reason is listed under Evidence." } as Record<string, string>)[info.processing?.inspection] || p.preview?.reason || "Image unavailable."}
@@ -555,7 +555,9 @@ function DetailBody({ grid }: { grid: GridId }) {
   if (detail.unavailable) return <UnavailableDetail entry={detail.unavailable} />;
   if (!detail.result)
     return detail.error ? (
-      <div className="p-6"><Banner>Detail fault: {detail.error}</Banner></div>
+      <div className="grid gap-3 p-6"><Banner tone={detail.stale ? "info" : "fault"}>{detail.stale ? "Inspection changed" : "Detail fault"}: {detail.error}</Banner>
+        {detail.stale && <Button variant="secondary" onClick={() => void selectAsset(grid, detail.assetId, detail.format, detail.view, false, true)}>Refresh inspection</Button>}
+      </div>
     ) : (
       waiting ? <InspectorGhost /> : <span className="sr" role="status">Loading asset evidence…</span>
     );

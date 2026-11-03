@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from test_sources import managed, ready_source  # noqa: E402
 from test_source_exports import kit  # noqa: E402
-from local_asset_library import desktop, processing_queue, source_operations, sources  # noqa: E402
+from local_asset_library import asset_collections, desktop, processing_queue, source_operations, sources  # noqa: E402
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome  # noqa: E402
 from local_asset_library.publication import atomic_json  # noqa: E402
 from gui_harness import Harness, isolate_hash_cache  # noqa: E402
@@ -37,6 +37,8 @@ fixture = ROOT / 'scratch' / args.run_name
 fixture.mkdir()
 config, backend, one, two = managed.__wrapped__(fixture)
 ready_source(config, backend, one)
+preview_id = sources.read_records(sources.bound(config, one))[0]['asset_id']
+preview_collection = asset_collections.create(config, 'Preview consistency', members=[preview_id])['collection_id']
 library = fixture / 'Library'
 kit(library / 'Kit')
 pack = library / 'Tiny Pack_1.0'
@@ -53,6 +55,7 @@ sources.scan_source(config, added)
 sources.scan_source(config, added)
 originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in library.rglob('*') if p.is_file()}
 revealed, started = [], []
+revealed_event = threading.Event()
 
 
 def fake_start(config, operation, key=None, asset_ids=None, queue_item=None):
@@ -66,7 +69,10 @@ def fake_start(config, operation, key=None, asset_ids=None, queue_item=None):
 
 
 source_operations.start = fake_start  # No runtimes in the fixture project: the queue's start is recorded.
-desktop.show_in_explorer = lambda path: revealed.append(path)
+def fake_reveal(path):
+    revealed.append(path)
+    revealed_event.set()
+desktop.show_in_explorer = fake_reveal
 
 
 class FixtureBridge(DesktopBridge):
@@ -153,8 +159,7 @@ def verify():
         check('The tree is a tree with treeitems and arrow-key movement')
         # Double-click a folder: Explorer opens on it (stubbed).
         ui.js(f"{ROW % (added['key'], 'Kit')}.dispatchEvent(new MouseEvent('dblclick',{{bubbles:true}}))")
-        wait("true")
-        ui.js("until(()=>true,300)")
+        assert revealed_event.wait(5)
         assert revealed and revealed[-1].endswith('Kit'), revealed
         check('Double-clicking a folder shows it in Explorer')
         # Context menu on a folder, then Make this a pack.
@@ -205,6 +210,35 @@ def verify():
         ui.js(f"lal.showInPack('{identifier}')")
         wait(f"lal.state.history[lal.state.historyIndex].page==='sources'&&lal.state.sourcesView.key==='{one['key']}'&&lal.state.source.selected==='{identifier}'")
         check('Show in pack opens the Asset sources tab with the asset selected and its folder expanded')
+        wait("lal.state.source.detail?.result&&LALPreview.current")
+        assert ui.js("LALPreview.current.item.version===lal.state.source.detail.result.generation")
+        ui.js("LALPreview.current.start(false)")
+        wait("LALPreview.current?.ready")
+        ui.capture('05a-library-3d.png')
+        ui.js("LALPreview.current.stop();$('nav-home').click()")
+        ui.js(f"lal.selectAsset('library','{identifier}','obj')")
+        wait("lal.state.library.detail?.result&&LALPreview.current")
+        assert ui.js("LALPreview.current.item.version===lal.state.library.detail.result.generation")
+        ui.js("LALPreview.current.start(false)")
+        wait("LALPreview.current?.ready")
+        ui.js(f"LALPreview.current.stop();lal.openCollection('{preview_collection}')")
+        wait("lal.state.history[lal.state.historyIndex].page==='collection'&&lal.state.collection.items.length")
+        ui.js(f"lal.selectAsset('collection','{identifier}','obj')")
+        wait("lal.state.collection.detail?.result&&LALPreview.current")
+        ui.js("LALPreview.current.start(false)")
+        wait("LALPreview.current?.ready")
+        check('The same OBJ renders in Library, Search and Collections using each resolved detail revision')
+        ui.js("LALPreview.current.stop();window.fixturePrepare=LALPreview.current.api.preview_prepare;LALPreview.current.api.preview_prepare=()=>Promise.resolve({status:'stale',reason:'Library changed; refresh the inspection card.'})")
+        ui.js("LALPreview.current.start(false)")
+        wait("LALPreview.current&&!LALPreview.current.refresh.hidden")
+        assert ui.js("!LALPreview.current.retainedFault&&!LALPreview.current.warning.textContent.includes('Recorded failure')")
+        ui.js("LALPreview.current.api.preview_prepare=fixturePrepare;LALPreview.current.refresh.click()")
+        wait("lal.state.collection.detail?.result&&LALPreview.current&&LALPreview.current.refresh.hidden")
+        ui.js("LALPreview.current.start(false)")
+        wait("LALPreview.current?.ready")
+        check('A changed revision is refreshable, with no fake retained fault; Refresh loads a working current inspection')
+        ui.js(f"LALPreview.current.stop();lal.showInPack('{identifier}')")
+        wait("lal.state.history[lal.state.historyIndex].page==='sources'")
         window.resize(700, 900)
         wait('innerWidth<761')
         wait("$('sources-view').scrollWidth<=$('sources-view').clientWidth+1", 10)  # Once the resize has settled.
