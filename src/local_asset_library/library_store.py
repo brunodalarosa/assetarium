@@ -190,7 +190,11 @@ def missing_assets(config, folder_id=None, prefix=None):
         rows = db.execute(query + (' AND folder_id=?' if folder_id else ''), (folder_id,) if folder_id else ()).fetchall()
     found = [{'asset_id': r[0], 'folder_id': r[1], 'locator': r[2], 'last_seen': r[3], 'record': json.loads(r[4]) if r[4] else None}
              for r in rows]
-    return [a for a in found if not prefix or a['locator'] == prefix or a['locator'].startswith(prefix.rstrip('/') + '/')]
+    def within(asset):
+        places = [asset['locator'].removeprefix('image:')]
+        places += [f['path'].split('/', 1)[-1] for f in (asset.get('record') or {}).get('files', [])]
+        return not prefix or any(p == prefix or p.startswith(prefix.rstrip('/') + '/') for p in places)
+    return [a for a in found if within(a)]
 
 
 def missing_count(config, folder_id):
@@ -206,21 +210,25 @@ def missing_list(config, folder_id):
         return []
     with closing(connect(config)) as db:
         rows = db.execute("SELECT asset_id, locator, last_seen, json_extract(record, '$.display_name'), "
-                          "json_extract(record, '$.files[0].path'), json_extract(record, '$.asset_type'), "
+                          "json_extract(record, '$.files'), json_extract(record, '$.asset_type'), "
                           "json_extract(record, '$.type_metadata.image_kind') FROM assets WHERE state='missing' AND folder_id=?",
                           (folder_id,)).fetchall()
     return [{'asset_id': r[0], 'locator': r[1], 'last_seen': r[2], 'record': {
-        'display_name': r[3], 'files': [{'path': r[4]}] if r[4] else [], 'asset_type': r[5],
+        'display_name': r[3], 'files': [{'path': f['path'], 'format': f.get('format')} for f in json.loads(r[4] or '[]')], 'asset_type': r[5],
         'type_metadata': {'image_kind': json.loads(r[6])} if r[6] else {}} if r[3] or r[4] else None} for r in rows]
 
 
-def forget_missing(config, folder_id, prefix=None):
+def forget_missing(config, folder_id, prefix=None, expected_revision=None):
     """Forget Missing assets (all of a folder, or those under ``prefix``); the history keeps the evidence."""
-    chosen = missing_assets(config, folder_id, prefix)
-    if not chosen:
-        raise ConfigError('Nothing is missing here')
     stamp = now()
     with closing(connect(config)) as db, db:
+        db.execute('BEGIN IMMEDIATE')
+        current = db.execute("SELECT value FROM meta WHERE key='revision'").fetchone()
+        if expected_revision is not None and expected_revision != (current[0] if current else 'empty'):
+            raise ConfigError('The library changed. Review the missing entries again before deleting.')
+        chosen = missing_assets(config, folder_id, prefix)
+        if not chosen:
+            raise ConfigError('Nothing is missing here')
         for asset in chosen:
             db.execute('DELETE FROM assets WHERE asset_id=?', (asset['asset_id'],))
             db.execute('INSERT INTO recognition(utc, asset_id, kind, folder_id, locator, evidence) VALUES (?,?,?,?,?,?)',

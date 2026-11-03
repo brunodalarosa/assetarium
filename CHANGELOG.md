@@ -161,6 +161,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Missing entries are hidden from normal Library browsing and counts. Pack/folder inspection provides a paged
+  review, distinguishes existing but unrecognized files, and confirms scoped “Forget all missing files” with
+  Delete on the left. Forgetting keeps originals, cached results and collection entries.
+
 - Format folders show assets with source files in that folder, select that source format in the inspector, and
   keep parent counts deduplicated. Shared thumbnails identify their source; measurements are never attributed to another format.
 

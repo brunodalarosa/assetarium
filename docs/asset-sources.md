@@ -81,8 +81,14 @@ An asset's ID is assigned once, when it is first seen, and kept by recognizing i
   by content), your reviews and its collection entries. Its search data is rebuilt by the next Make previews.
 - A **copy** of an asset is a new asset that shares the copied asset's finished results: nothing renders twice.
 - A file **edited** in place keeps its ID and needs previews again.
-- A file that **vanished** becomes **Missing**: shown faded with when it was last seen, with its results and
-  collection entries kept until you choose **Forget missing** on its library folder or pack.
+- An asset no longer recognized by a scan keeps a retained entry. These entries are hidden from normal Library
+  browsing and counts. In its pack/folder inspection panel, open **Unavailable assets → Review entries** to see
+  last known paths and distinguish missing files, an offline folder, and existing files whose old identity is
+  no longer recognized (for example after grouping changes). Existing identities are never merged on a guess.
+- **Forget all missing files** applies only to the inspected folder and descendants. Its confirmation shows
+  the number of retained entries; **Delete** is red and on the left. It permanently forgets those library
+  records, keeping original files, cached processing results, collection entries and recognition history.
+  A later scan can discover the files again. Collection members remain visible with their availability reason.
 
 ## Variants
 

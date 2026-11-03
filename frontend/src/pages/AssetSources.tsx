@@ -13,7 +13,7 @@ import { Reason } from "../ui/CommandBlock";
 import { Banner, Button, SelectField, Spinner } from "../ui/primitives";
 
 const SORTS: [string, string][] = [["name", "Name"], ["added", "Recently added"], ["pending", "Most without previews"], ["assets", "Most assets"]];
-const STATUS: [string, string][] = [["new", "Has new"], ["no_previews", "Needs previews"], ["blocked", "Blocked"], ["failed", "Failures"], ["missing", "Missing"]];
+const STATUS: [string, string][] = [["new", "Has new"], ["no_previews", "Needs previews"], ["blocked", "Blocked"], ["failed", "Failures"]];
 const TYPE_ICON: Record<string, typeof Box> = { model_3d: Box, image: ImageIcon, material_texture: Layers };
 
 function Chip({ active, onClick, children, id }: { active: boolean; onClick: () => void; children: React.ReactNode; id?: string }) {

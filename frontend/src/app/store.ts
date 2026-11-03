@@ -127,6 +127,7 @@ export interface MenuRequest {
   keyboard?: boolean;
 }
 export interface ConfirmRequest {
+  deleteOnLeft?: boolean;
   title: string;
   body: string;
   confirmLabel: string;
@@ -994,6 +995,22 @@ export async function folderAction(action: string, key: string, path = "", value
   } catch (error) {
     pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
     return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export async function loadMissingEntries(key: string, path = "", offset = 0) {
+  const result = await api().folder_missing(key, path, offset, 30);
+  if (result.status === "faulty") throw Error(result.reason);
+  return result;
+}
+export async function confirmForgetMissing(key: string, path = "", name = "this folder") {
+  try {
+    const preview = await loadMissingEntries(key, path);
+    if (!preview.total) return pushToast({ tone: "info", title: "No missing entries here", body: "" });
+    askConfirm({ title: "Forget all missing files?", confirmLabel: "Delete", deleteOnLeft: true,
+      body: `Permanently forget ${plural(preview.total, "missing entry", "missing entries")} in “${name}”. Original files, saved processing results, and collection entries are kept. This cannot be undone.`,
+      run: () => folderAction("forget_missing", key, path, { revision: preview.revision }) });
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Could not review missing entries", body: (error as Error).message });
   }
 }
 /** A pack's profile (decision 0024): its rules, versions and structure signals. */

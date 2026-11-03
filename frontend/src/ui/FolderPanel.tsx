@@ -4,7 +4,7 @@ import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
 import type { Json } from "../app/api";
 import { nearMissText, operationActive, plural } from "../app/format";
-import { confirmRemoveSource, folderAction, loadPackProfile, packProfileAction, pathAction, sourceAction, sourceFolders, useApp } from "../app/store";
+import { confirmForgetMissing, loadMissingEntries, confirmRemoveSource, folderAction, loadPackProfile, packProfileAction, pathAction, sourceAction, sourceFolders, useApp } from "../app/store";
 import { Badge, Banner, Button, RadioCards, TextField } from "./primitives";
 
 const where = (anchor: string) => (anchor ? `In ${anchor}` : "At the top of this library folder");
@@ -234,6 +234,44 @@ function PackName({ folderKey, path, name }: { folderKey: string; path: string; 
   );
 }
 
+function MissingEntries({ folderKey, path, name, count, revision }: { folderKey: string; path: string; name: string; count: number; revision: string }) {
+  const [open, setOpen] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [page, setPage] = useState<Json | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setPage(null); setError("");
+    void loadMissingEntries(folderKey, path, offset).then((result) => { if (active) setPage(result); })
+      .catch((e) => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, [open, folderKey, path, offset, revision]);
+  return <section id="missing-entries" className="grid gap-2 border-t border-border pt-4">
+    <h3 className="text-[13px] font-medium">Unavailable assets · {count.toLocaleString()}</h3>
+    <p className="text-[12px] leading-relaxed text-muted-foreground">Retained entries whose source files disappeared or whose previous identity is no longer recognized. Their results and collection entries are kept.</p>
+    <details onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-[12.5px] text-primary">Review entries</summary>
+      {open && <div className="mt-3 grid gap-3 text-[12px]" aria-busy={!page && !error}>
+        {error && <Banner>{error}</Banner>}
+        {!page && !error && <p>Reading saved entries…</p>}
+        {page?.items.map((item: Json) => <details key={item.asset_id} className="rounded-xl bg-surface-2 p-3">
+          <summary className="cursor-pointer break-words font-medium">{item.name} · {item.state === "unrecognized" ? "No longer recognized" : item.state === "offline" ? "Offline" : "Files missing"}</summary>
+          <p className="mt-2 leading-relaxed text-muted-foreground">{item.reason}</p>
+          <p className="mt-2 text-subtle">Last recorded {item.last_recorded?.slice(0, 10)}</p>
+          <ul className="mt-2 grid gap-1 break-all text-muted-foreground">{item.paths.map((p: string) => <li key={p}>{p}</li>)}</ul>
+        </details>)}
+        {page && <div className="flex items-center gap-2">
+          <Button variant="quiet" disabled={!offset} onClick={() => setOffset(Math.max(0, offset - 30))}>Previous</Button>
+          <span className="mr-auto tabular-nums">{page.total ? offset + 1 : 0}–{Math.min(offset + 30, page.total)} / {page.total}</span>
+          <Button variant="quiet" disabled={offset + 30 >= page.total} onClick={() => setOffset(offset + 30)}>Next</Button>
+        </div>}
+      </div>}
+    </details>
+    <Button variant="danger" className="w-fit" data-action="forget-missing" onClick={() => void confirmForgetMissing(folderKey, path, name)}>Forget all missing files</Button>
+  </section>;
+}
+
 /** Inspection for a library folder, bundle, pack or folder: what it is, its answers and its actions. */
 export function FolderPanel() {
   const view = useApp((s) => s.sourcesView);
@@ -263,8 +301,8 @@ export function FolderPanel() {
         <div><dt className="text-muted-foreground">With previews</dt><dd className="font-medium tabular-nums">{node.assets ? Math.round((node.coverage || 0) * 100) + "%" : "—"}</dd></div>
         {node.blocked > 0 && <div><dt className="text-muted-foreground">Blocked</dt><dd className="font-medium tabular-nums">{node.blocked.toLocaleString()}</dd></div>}
         {node.failed > 0 && <div><dt className="text-muted-foreground">Recorded failures</dt><dd className="font-medium tabular-nums">{node.failed.toLocaleString()}</dd></div>}
-        {kind === "library" && folder.missing > 0 && <div><dt className="text-muted-foreground">Missing</dt><dd className="font-medium tabular-nums">{folder.missing.toLocaleString()}</dd></div>}
       </dl>
+      {(view.path ? node.missing : folder.missing) > 0 && <MissingEntries key={folder.key + ":" + view.path} folderKey={folder.key} path={view.path} name={name} count={view.path ? node.missing : folder.missing} revision={folder.missing_revision} />}
       {kind === "pack" && (
         <section className="grid gap-1.5">
           <h3 className="text-[13px] font-medium">License</h3>
@@ -297,7 +335,6 @@ export function FolderPanel() {
           <section className="flex flex-wrap items-center gap-3">
             <Switch checked={source.enabled} onCheckedChange={(checked) => void sourceAction("enabled", folder.key, null, checked)} label="Included in search" ariaLabel={"Include " + folder.name + " in search"} />
             <Button variant="secondary" className="h-9 px-3" data-action="rescan" disabled={busy || folder.offline} onClick={() => void sourceAction("scan", folder.key)}><RefreshCw className="size-4" aria-hidden />Rescan</Button>
-            {folder.missing > 0 && <Button variant="secondary" className="h-9 px-3" data-action="forget-missing" onClick={() => void folderAction("forget_missing", folder.key, "")}>Forget {plural(folder.missing, "missing asset", "missing assets")}</Button>}
             <Button variant="danger" className="h-9 px-3" data-action="remove" disabled={busy} onClick={() => confirmRemoveSource(source)}><Trash2 className="size-4" aria-hidden />Remove…</Button>
           </section>
           <SourceFolders source={source} busy={busy} />

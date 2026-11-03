@@ -410,6 +410,10 @@ class DesktopBridge:
     def folder_action(self, action, key, path='', value=None):
         return self._wait(self._present(self._folder_action, action, key, path, value, guarded=False))
 
+    def folder_missing(self, key, path='', offset=0, page_size=30):
+        from .library_view import unavailable
+        return self._wait(self._present(unavailable, self._config, key, path, offset, page_size, guarded=False, shared=True))
+
     def _folder_action(self, action, key, path, value):
         from . import library_store, packs, sources
         source = sources.get_source(self._config, key)
@@ -425,7 +429,9 @@ class DesktopBridge:
             chosen = current + [path] if action == 'exclude' else [p for p in current if p != path]
             sources.set_excluded_folders(self._config, key, chosen)
         elif action == 'forget_missing':
-            return {'status': 'saved', 'forgotten': library_store.forget_missing(self._config, source['id'], path or None)}
+            if not isinstance(value, dict) or not value.get('revision'):
+                raise ConfigError('Review and confirm the missing entries before deleting.')
+            return {'status': 'saved', 'forgotten': library_store.forget_missing(self._config, source['id'], path or None, value['revision'])}
         else:
             raise ConfigError('Unknown folder action')
         from .pack_profiles import record_change

@@ -29,7 +29,7 @@ def test_tree_counts_coverage_and_new_and_items_carry_states(managed, monkeypatc
     assert [i['name'] for i in inside['items']] == ['new'] and inside['items'][0]['pack']['path'] == 'Kit_1.0'
 
 
-def test_blocked_work_names_its_fix_and_missing_assets_stay_listed(managed, monkeypatch):
+def test_blocked_work_names_its_fix_and_missing_entries_have_a_separate_review(managed, monkeypatch):
     config, backend, one, _ = managed
     sources.scan_source(config, one)
     monkeypatch.setattr(library_view, 'blockers', lambda config: {'previews': {
@@ -39,7 +39,12 @@ def test_blocked_work_names_its_fix_and_missing_assets_stay_listed(managed, monk
     (Path(one['path']) / 'item0.obj').unlink()
     sources.scan_source(config, one)
     items = library_view.folder_items(config, one['key'], show_files=False)['items']
-    assert [i['name'] for i in items if i['state'] == 'missing'] == ['item0']
+    assert not [i for i in items if i['state'] == 'missing']
+    review = library_view.unavailable(config, one['key'])
+    assert review['total'] == 1 and review['items'][0]['name'] == 'item0'
+    assert review['items'][0]['state'] == 'missing'
+    assert library_view.folder_items(config, one['key'], filters={'types': ['image']}, show_files=False)['items'] == []
+    assert library_view.tree(config)['folders'][0]['nodes'][0]['missing'] == 1
     assert next(f for f in library_view.tree(config)['folders'] if f['key'] == one['key'])['attention'] == ['Files missing']
 
 
@@ -104,3 +109,29 @@ def test_alternate_files_belong_to_each_physical_folder_once(managed, monkeypatc
     save_general_settings(config, 24, ['gltf', 'obj'])
     assert not library_view.folder_items(config, one['key'], 'Kit/fbx', show_files=False)['items']
     assert library_view.folder_items(config, one['key'], 'Kit', show_files=False)['assets'] == 1
+
+
+def test_review_distinguishes_existing_files_and_forgetting_requires_current_confirmation(managed):
+    from local_asset_library import library_store
+    config, _, one, _ = managed
+    root = Path(one['path'])
+    (root / 'Kit').mkdir()
+    (root / 'Kit/gone.obj').write_text('v 7 8 9')
+    sources.scan_source(config, one)
+    original = (root / 'Kit/gone.obj').read_text()
+    (root / 'Kit/gone.obj').unlink()
+    sources.scan_source(config, one)
+    review = library_view.unavailable(config, one['key'], 'Kit')
+    assert review['total'] == 1
+    (root / 'Kit/gone.obj').write_text(original)
+    assert library_view.unavailable(config, one['key'], 'Kit')['items'][0]['state'] == 'unrecognized'
+    bridge = DesktopBridge(config, prestart_worker=False)
+    try:
+        assert bridge.folder_action('forget_missing', one['key'], 'Kit')['status'] == 'faulty'
+        assert bridge.folder_action('forget_missing', one['key'], 'Kit', {'revision': 'outdated'})['status'] == 'faulty'
+        assert len(library_store.missing_assets(config)) == 1
+        assert bridge.folder_action('forget_missing', one['key'], 'Kit', {'revision': review['revision']})['forgotten'] == 1
+        assert not library_store.missing_assets(config)
+        assert (root / 'Kit/gone.obj').read_text() == original
+    finally:
+        bridge._close()

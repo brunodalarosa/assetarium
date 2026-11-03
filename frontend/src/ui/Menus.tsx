@@ -16,7 +16,7 @@ import {
   addToCollection, assetMenuSource, closeConfirm, closeCreateCollection, closeMenu, collectionsFor, confirmDeleteCollection,
   createCollection, exportCollection, type GridId, type MenuRequest, openCollection, openCreateCollection, pushToast, removeFromCollection, revealAsset, selectAsset,
   startSelection, useApp, pathAction, folderAction, makePreviews, makeDescriptions, showInPack, sourceAction, confirmRemoveSource, expandAll,
-  inspectFolder, navigate, copyText, recheckFailures,
+  inspectFolder, navigate, copyText, recheckFailures, confirmForgetMissing,
 } from "../app/store";
 import { Skeleton } from "./Loading";
 import { Button, IconButton, Spinner } from "./primitives";
@@ -343,7 +343,7 @@ function FolderMenuItems({ request }: { request: MenuRequest }) {
           {work}
           <ContextMenuItem textValue="Rename" onSelect={() => inspectFolder(key, path)}><Pencil className={ICON} aria-hidden />Rename…</ContextMenuItem>
           {path !== "" && <ContextMenuItem textValue="Merge into parent pack" onSelect={() => void folderAction("merge", key, path)}><Merge className={ICON} aria-hidden />Merge into parent pack</ContextMenuItem>}
-          {item.folder?.missing > 0 && <ContextMenuItem textValue="Forget missing" onSelect={() => void folderAction("forget_missing", key, path)}><Ban className={ICON} aria-hidden />Forget missing</ContextMenuItem>}
+          {item.node?.missing > 0 && <ContextMenuItem textValue="Forget all missing files" onSelect={() => void confirmForgetMissing(key, path, item.name)}><Ban className={ICON} aria-hidden />Forget all missing files</ContextMenuItem>}
           {reveal}
         </>
       )}
@@ -555,7 +555,7 @@ export function ConfirmDialog() {
           <div className="flex justify-end gap-2">
             <Button variant="secondary" id="confirm-cancel" data-autofocus="" disabled={busy} onClick={closeConfirm}>{request.run ? "Cancel" : "Close"}</Button>
             {request.run && (
-              <Button variant={neutral ? "primary" : "destructive"} id="confirm-accept" disabled={busy} onClick={() => void confirm()}>
+              <Button variant={neutral ? "primary" : "destructive"} className={request.deleteOnLeft ? "order-first mr-auto" : undefined} id="confirm-accept" disabled={busy} onClick={() => void confirm()}>
                 {busy && <Spinner className="size-3.5" />}{request.confirmLabel}
               </Button>
             )}

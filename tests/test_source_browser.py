@@ -137,9 +137,10 @@ def test_faulty_saved_assets_remain_visible_with_inspection_evidence(managed):
     sources.scan_source(config, one)
     page = contents.call('browse', one['key'], 0, 40)
     assert record['asset_id'] not in {item['asset_id'] for item in page['items']}
-    from local_asset_library.library_view import folder_items
-    missing = next(i for i in folder_items(config, one['key'])['items'] if i.get('asset_id') == record['asset_id'])
-    assert missing['state'] == 'missing' and missing['reason'].startswith('Not found since')
+    from local_asset_library.library_view import folder_items, unavailable
+    assert record['asset_id'] not in {i.get('asset_id') for i in folder_items(config, one['key'])['items']}
+    missing = next(i for i in unavailable(config, one['key'])['items'] if i['asset_id'] == record['asset_id'])
+    assert missing['state'] == 'missing' and missing['paths']
     published = sources.read_records(sources.bound(config, one))
     assert record['asset_id'] in {r['asset_id'] for r in published}  # Its published evidence is untouched.
 

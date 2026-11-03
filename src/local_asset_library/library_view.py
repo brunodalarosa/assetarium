@@ -150,6 +150,16 @@ def folder_tree(config, source, blocked=None):
     for folder, count in hidden:
         for entry in [node(folder)]:
             entry['hidden'] += count
+    from .library_store import missing_list
+    for asset in missing_list(config, source['id']):
+        places = {''}
+        for file in (asset.get('record') or {}).get('files', []):
+            parent = PurePosixPath(file['path'].removeprefix(source['key'] + '/')).parent
+            parts = () if parent.as_posix() == '.' else parent.parts
+            places.update('/'.join(parts[:i]) for i in range(len(parts) + 1))
+        for place in places:
+            entry = node(place)
+            entry['missing'] = entry.get('missing', 0) + 1
     packs, bundles, names = detected['packs'], set(detected['bundles']), names_of(config, source)
     result = []
     for path, entry in sorted(nodes.items()):
@@ -168,7 +178,7 @@ def folder_tree(config, source, blocked=None):
 def tree(config):
     """Every library folder with its tree, what needs the owner, and the migration notice."""
     from .library_migration import needed
-    from .library_store import missing_count
+    from .library_store import missing_count, revision
     from .sources import registry, source_status
     folders, blocked = [], blockers(config)
     for source in registry(config)['sources']:
@@ -182,7 +192,7 @@ def tree(config):
             ('Duplicate export folders to answer', bool(status.get('export_suggestions'))),
             ('A texture folder to choose', bool((status.get('texture_suggestion') or {}).get('folders')) and not status.get('texture_folder')),
             ('Could not be read', bool(status.get('scan_fault')))) if active]
-        folders.append({**source, **entry, 'attention': attention, 'missing': missing_count(config, source['id']),
+        folders.append({**source, **entry, 'attention': attention, 'missing': missing_count(config, source['id']), 'missing_revision': revision(config),
                         'excluded_folders': status.get('excluded_folders', []), 'exclusions': status.get('exclusions', []),
                         'export_suggestions': status.get('export_suggestions', []), 'export_decisions': status.get('export_decisions', []),
                         'texture_suggestion': status.get('texture_suggestion'), 'texture_folder': status.get('texture_folder'),
@@ -220,7 +230,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     for asset in missing_list(config, source['id']):
         saved = asset.get('record') or {}
         folder = _folder(saved, key) if saved.get('files') else PurePosixPath(asset['locator']).parent.as_posix().replace('.', '')
-        if inside(folder) and (not wanted or 'missing' in wanted):
+        if inside(folder) and 'missing' in wanted and (not filters.get('types') or kind_of(saved) in filters['types']):
             missing.append({'asset_id': asset['asset_id'], 'name': saved.get('display_name') or PurePosixPath(asset['locator']).stem,
                             'kind': kind_of(saved) if saved else 'model_3d', 'state': 'missing', 'folder': folder,
                             'reason': 'Not found since ' + asset['last_seen'][:10], 'overlays': {}, 'formats': [], 'has_preview': False,
@@ -306,6 +316,39 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
                 files_params + [page_size - len(page), max(0, offset - cards)])]
     return {'status': 'ready', 'key': key, 'path': path, 'items': page, 'total': cards + files, 'cards': cards,
             'assets': assets, 'files': files, 'counts': counts, 'offset': offset, 'page_size': page_size}
+
+
+def unavailable(config, key, path='', offset=0, page_size=30):
+    """A bounded review of retained identities; file existence is checked only for the requested page."""
+    from .library_store import missing_list, revision
+    from .sources import get_source
+    if type(offset) is not int or offset < 0 or type(page_size) is not int or not 1 <= page_size <= 100:
+        raise ConfigError('Invalid page')
+    source = get_source(config, key)
+    entries = []
+    for entry in missing_list(config, source['id']):
+        files = (entry.get('record') or {}).get('files', [])
+        paths = [f['path'].removeprefix(key + '/') for f in files]
+        if not path or any(p.startswith(path.rstrip('/') + '/') for p in paths):
+            entries.append((entry, paths))
+    items = []
+    offline = not Path(source['path']).is_dir()
+    for entry, paths in entries[offset:offset + page_size]:
+        existing = False
+        if not offline:
+            from .config import _inside
+            for p in paths:
+                try:
+                    existing = existing or _inside(Path(source['path']), p).is_file()
+                except (OSError, ValueError):
+                    pass
+        state = 'offline' if offline else 'unrecognized' if existing else 'missing'
+        reason = {'offline': 'Library folder is offline; file availability is unknown.',
+                  'unrecognized': 'Original files still exist, but this saved asset identity is no longer recognized. Grouping or exclusions may have changed.',
+                  'missing': 'The last known source files could not be found.'}[state]
+        items.append({'asset_id': entry['asset_id'], 'name': (entry.get('record') or {}).get('display_name') or PurePosixPath(entry['locator']).name,
+                      'paths': paths, 'last_recorded': entry['last_seen'], 'state': state, 'reason': reason})
+    return {'status': 'ready', 'items': items, 'total': len(entries), 'revision': revision(config), 'offset': offset}
 
 
 def locate(config, asset_id):
