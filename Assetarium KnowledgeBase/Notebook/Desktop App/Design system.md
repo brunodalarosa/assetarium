@@ -17,6 +17,9 @@ behind it are [decision 0025](../../Decisions/0025-design-principles.md); read t
 - **P2 The robot means agents**: `Bot` only for external agents; no sparkles.
 - **P3 Run it, don't type it**: a button when the app can do it; otherwise a `CommandBlock` with Copy, never a command
   inline in text.
+- **P4 Make progress measurable**: long work shows its phase and a compact measured count. Hover or keyboard
+  focus reveals totals, remaining work and outcomes. Unknown totals stay indeterminate; phase percentages are
+  labeled as phase progress (`OperationProgress`, `progressInfo`, `source_operations.scan_reporter`).
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
 

@@ -150,10 +150,10 @@ export function Spinner({ className }: { className?: string }) {
   return <span className={cn("search-spinner", className)} aria-hidden />;
 }
 
-export function Progress({ value, label, valueText }: { value: number; label: string; valueText: string }) {
+export function Progress({ value, label, valueText }: { value?: number; label: string; valueText: string }) {
   return (
-    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value)} aria-valuetext={valueText} className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
-      <motion.div className="h-full rounded-full bg-primary" initial={false} animate={{ width: `${Math.max(2, Math.min(100, value))}%` }} transition={{ type: "spring", stiffness: 160, damping: 26 }} />
+    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value === undefined ? undefined : Math.round(value)} aria-valuetext={valueText} className="relative h-2 w-full overflow-hidden rounded-full bg-surface-2">
+      {value === undefined ? <span className="activity-sweep absolute inset-y-0 w-1/3 rounded-full bg-primary/70" /> : <motion.div className="h-full rounded-full bg-primary" initial={false} animate={{ width: `${Math.max(0, Math.min(100, value))}%` }} transition={{ type: "spring", stiffness: 160, damping: 26 }} />}
     </div>
   );
 }

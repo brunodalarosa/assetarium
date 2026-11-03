@@ -75,6 +75,11 @@ run models or renders. Unchanged files reuse their verified hashes (decision 000
 
 ## Identity: moves, copies and edits
 
+Scans show measured progress in Asset processing and the background activity popover. File discovery reports
+files checked so far (the total is not known yet); image classification reports checked / total image files.
+Hover or focus the progress indicator for the current phase, remaining work, cached hashes and recorded faults.
+Phase completion is not whole-scan completion: saving and publication remain visibly active until finished.
+
 An asset's ID is assigned once, when it is first seen, and kept by recognizing it:
 
 - A file **moved or renamed** inside your library keeps its ID, its previews and descriptions (found again

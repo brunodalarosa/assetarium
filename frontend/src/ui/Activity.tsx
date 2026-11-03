@@ -2,6 +2,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 import { useDismiss } from "@/lib/hooks/use-dismiss";
+import { Tooltip } from "@/components/beui/tooltip";
 import { SPRING_LAYOUT, SPRING_PANEL, SPRING_SWAP } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import { type Activity, activities, navigate, useApp } from "../app/store";
@@ -28,7 +29,7 @@ function ActivityMark({ className }: { className?: string }) {
 }
 
 const amount = (item: Activity, previews: number) =>
-  item.progress !== undefined ? `${Math.round(item.progress * 100)}%` : item.id === "previews" ? previews.toLocaleString() : "";
+  item.metric || (item.progress !== undefined ? `${Math.round(item.progress * 100)}%` : item.id === "previews" ? previews.toLocaleString() : "");
 
 function ActivityRow({ item, previews, done, onOpen }: { item: Activity; previews: number; done: boolean; onOpen: (source: string) => void }) {
   const body = (
@@ -51,9 +52,9 @@ function ActivityRow({ item, previews, done, onOpen }: { item: Activity; preview
   );
   return item.source ? (
     <li>
-      <button type="button" data-activity={item.id} onClick={() => onOpen(item.source!)} className="group block w-full rounded-xl px-3 py-2.5 text-left outline-none hover:bg-surface-2 focus-visible:bg-surface-2">
+      <Tooltip content={item.progressDetail || item.detail}><button type="button" data-activity={item.id} onClick={() => onOpen(item.source!)} className="group block w-full rounded-xl px-3 py-2.5 text-left outline-none hover:bg-surface-2 focus-visible:bg-surface-2">
         {body}
-      </button>
+      </button></Tooltip>
     </li>
   ) : (
     <li data-activity={item.id} className="px-3 py-2.5">{body}</li>
@@ -67,9 +68,10 @@ function ActivityRow({ item, previews, done, onOpen }: { item: Activity; preview
 export function ActivityIndicator() {
   const ready = useApp((s) => s.ready);
   const sources = useApp((s) => s.sources);
+  const globalScan = useApp((s) => s.globalScan);
   const worker = useApp((s) => s.worker);
   const previews = useApp((s) => s.previews);
-  const list = useMemo(() => activities(ready, sources, worker, previews), [ready, sources, worker, previews]);
+  const list = useMemo(() => activities(ready, sources, worker, previews, globalScan), [ready, sources, worker, previews, globalScan]);
   // Short bursts (a few thumbnails) stay silent; once shown, the mark lingers long enough to read.
   const shown = useShownWhile(list.length > 0, 450, 1200);
   const last = useRef<Activity[]>(list);
@@ -148,7 +150,7 @@ export function ActivityIndicator() {
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.14 } }}
             transition={SPRING_PANEL}
             style={{ transformOrigin: "top right" }}
-            className="absolute top-full right-0 z-40 mt-2 w-[min(340px,calc(100vw-32px))] rounded-[20px] border border-border bg-surface p-2 shadow-panel"
+            className="absolute top-full right-0 z-40 mt-2 w-[min(420px,calc(100vw-32px))] rounded-[20px] border border-border bg-surface p-2 shadow-panel"
           >
             <h2 id="activity-title" className="px-3 pt-2 pb-1 text-[12px] font-medium tracking-wide text-muted-foreground uppercase">{done ? "Finished" : "Running now"}</h2>
             <ul aria-live="polite" className="grid grid-cols-[minmax(0,1fr)]">

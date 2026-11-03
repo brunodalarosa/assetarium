@@ -353,7 +353,7 @@ class DesktopBridge:
         if action in {'process', 'describe'}:
             return self._start_source_operation(action, key)
         if action == 'cancel':
-            return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
+            return cancel(sources.bound(self._config, sources.get_source(self._config, key)) if key else self._config)
         raise ConfigError('Unknown asset source action')
 
     # The Asset sources tab (decision 0023): library folders → bundles → packs → folders, read from saved data.

@@ -4,7 +4,7 @@
 // notifications and processing: this file only presents its answers.
 import { useSyncExternalStore } from "react";
 import { type AssetApi, type Bridge, type Json, libraryApi, sourceApi } from "./api";
-import { describeActive, notificationContent, notificationKey, operationActive, plural, type Tone } from "./format";
+import { describeActive, notificationContent, notificationKey, operationActive, plural, progressInfo, type Tone } from "./format";
 
 export type Page = "home" | "collections" | "collection" | "processing" | "settings" | "sources";
 export type SettingsTab = "general";
@@ -245,6 +245,7 @@ export interface AppState {
   /** The processing queue (decision 0023); null until first loaded. */
   queue: Json | null;
   sources: Json[];
+  globalScan: Json | null;
   /** False until the first sources answer (or fault), so "no sources" is never shown early. */
   sourcesLoaded: boolean;
   sourcesRevision: string | null;
@@ -317,7 +318,7 @@ let state: AppState = {
   inspector: { open: false, width: boot.inspector_width, tab: "overview" },
   sourcesView: emptySourcesView(),
   queue: null,
-  sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
+  sources: [], globalScan: null, sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [], staged: {}, committing: null },
   addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false },
   modelCheck: null,
@@ -760,7 +761,7 @@ export async function loadSources() {
     const result = await api().sources();
     if (result.status === "faulty") throw Error(result.reason);
     const changed = state.sourcesRevision !== result.revision;
-    setState({ sources: result.sources || [], sourcesLoaded: true, sourcesRevision: result.revision, sourcesError: null });
+    setState({ sources: result.sources || [], globalScan: result.scan ?? null, sourcesLoaded: true, sourcesRevision: result.revision, sourcesError: null });
     updateNotifications(result.notifications || []);
     if (route().page === "processing" && changed) await loadImportFailures();
     if (changed && state.context && result.revision !== state.context.sources_revision) await refreshContext();
@@ -1762,7 +1763,7 @@ export async function notificationAction(action: string, item: Json) {
 }
 export const runningDescriptions = (s: AppState = state) => s.sources.filter(describeActive);
 export const processingAttention = (s: AppState) =>
-  s.sources.some((source) => source.needs_processing || source.scan_fault || operationActive(source.operation));
+  operationActive(s.globalScan) || s.sources.some((source) => source.needs_processing || source.scan_fault || operationActive(source.operation));
 
 /** Work running in the background, for the top-bar activity indicator; `source` opens Asset processing. */
 export interface Activity {
@@ -1771,22 +1772,26 @@ export interface Activity {
   detail: string;
   progress?: number;
   source?: string;
+  metric?: string;
+  progressDetail?: string;
 }
 const OPERATION_VERBS: Record<string, string> = { queued: "Queued", scanning: "Scanning", publishing: "Publishing", cancelling: "Cancelling", verifying: "Verifying" };
 const WORKER_ACTIVITY: Record<string, [string, string]> = {
   loading_libraries: ["Preparing search", "Preparing the search runtime"],
   loading_model: ["Loading search model", "Loading the search model for the first ranked search"],
 };
-export function activities(ready: boolean, sources: Json[], worker: string, previews: number): Activity[] {
+export function activities(ready: boolean, sources: Json[], worker: string, previews: number, globalScan: Json = null): Activity[] {
   const list: Activity[] = [];
+  if (operationActive(globalScan)) sources = [{ key: "__scan__", name: "All library folders", operation: globalScan }, ...sources];
   if (!ready) list.push({ id: "startup", label: "Opening library", detail: "Reading the published library." });
   for (const source of sources) {
     const operation = source.operation;
     if (!operationActive(operation)) continue;
     const verb = operation.operation === "describe" && operation.status !== "cancelling" ? "Describing" : OPERATION_VERBS[operation.status] || "Processing";
-    const counted = operation.total ? ` · ${operation.completed || 0} / ${operation.total}` : "";
-    const progress = ["queued", "scanning"].includes(operation.status) || !operation.progress ? undefined : Math.min(1, operation.progress);
-    list.push({ id: "source:" + source.key, label: verb, detail: `${verb} ${source.name}${counted}`, progress, source: source.key });
+    const measured = progressInfo(operation);
+    list.push({ id: "source:" + source.key, label: verb, detail: `${operation.phase || verb} · ${source.name}`,
+      progress: measured.value === undefined ? undefined : measured.value / 100,
+      metric: measured.label, progressDetail: measured.detail, source: source.key });
   }
   if (WORKER_ACTIVITY[worker]) list.push({ id: "worker", label: WORKER_ACTIVITY[worker][0], detail: WORKER_ACTIVITY[worker][1] });
   if (previews > 0) list.push({ id: "previews", label: "Previews", detail: `Loading ${plural(previews, "preview", "previews")}`, progress: undefined });
@@ -2346,7 +2351,7 @@ async function watchChanges() {
         await refreshCollections();
       }
       // Running operations also report worker liveness, which is not a file change.
-      if (sourcesChanged || state.sources.some((source) => operationActive(source.operation))) await loadSources();
+      if (sourcesChanged || operationActive(state.globalScan) || state.sources.some((source) => operationActive(source.operation))) await loadSources();
       // The tree and the shown folder follow scans and processing; the rail's folder dot follows the tree.
       if (sourcesChanged) {
         await loadLibraryTree();

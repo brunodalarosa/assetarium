@@ -194,6 +194,23 @@ def verify():
         wait("$('running')&&$('up-next-section')&&$('blocked')&&$('failures')&&$('recent')")
         wait("$('running-item')")
         ui.capture('05-processing.png')
+        assert ui.js("$('running-item').querySelector('.operation-progress').textContent.includes('1 / 3 assets')")
+        source_operations.state(config, token='fixture-global', pid=os.getpid(), operation='scan', status='scanning', phase='Checking files',
+                                metrics={'phase': 'Checking files', 'completed': 1284, 'total': None, 'unit': 'files', 'failed': 2, 'reused': 1000})
+        wait("lal.state.globalScan?.metrics?.completed===1284")
+        wait("$('running').textContent.includes('1,284 files checked')")
+        assert ui.js("[...$('running').querySelectorAll('[role=progressbar]')].find(e=>e.getAttribute('aria-label')==='Scanning All library folders').getAttribute('aria-valuenow')===null")
+        source_operations.state(config, phase='Classifying images', metrics={'phase': 'Classifying images', 'completed': 420, 'total': 700, 'unit': 'images'})
+        wait("$('running').textContent.includes('420 / 700 images')")
+        ui.js("$('activity').click()")
+        wait("$('activity-panel')?.textContent.includes('420 / 700 images')")
+        ui.js("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true}));document.querySelector('[data-activity=\"source:__scan__\"]').focus()")
+        wait("[...document.querySelectorAll('[role=tooltip]')].some(e=>e.textContent.includes('280 remaining')&&e.textContent.includes('60% of this phase'))")
+        ui.capture('05b-measured-progress.png')
+        ui.js("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));$('activity').click()")
+        source_operations.state(config, status='complete', phase='Scan complete', metrics=None)
+        wait("lal.state.globalScan?.status==='complete'")
+        check('Scan counts stay visible in processing and activity, unknown totals have no percentage, and keyboard tooltips show remaining phase work')
         check('Asset processing shows Running, Up next, Blocked, Recorded failures and Recent, never one mixed banner')
         # Disabling a library folder hides its cards from an active search at once; enabling brings them back.
         ui.js("(async()=>{$('nav-home').click();await until(()=>$('library-view'));lal.setState({filters:{...lal.state.filters,mode:'keyword'}});"

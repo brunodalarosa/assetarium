@@ -8,6 +8,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Make progress measurable** (design principle P4): long work shows a compact measured count, with phase,
+  remaining work and outcomes available on hover or keyboard focus. Scans report checked files, cached hashes,
+  faults and image classification counts; unknown totals use an indeterminate indicator. Asset processing,
+  background activity and description notifications share the same presentation.
+
 - **Setup leaves search working** (decision 0026): the one-time search check runs on two built-in sample images,
   so it needs no library and no command. Setup runs it after Save, **Run check** in Settings → General runs it on
   demand (`local-assets setup search-check` in a terminal), and Make previews runs it by itself when it is missing

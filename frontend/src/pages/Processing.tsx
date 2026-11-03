@@ -8,7 +8,8 @@ import { operationActive, plural } from "../app/format";
 import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, sourceAction, useApp } from "../app/store";
 import { Skeleton } from "../ui/Loading";
 import { Reason } from "../ui/CommandBlock";
-import { Badge, Banner, Button, Disclosure, Progress } from "../ui/primitives";
+import { Badge, Banner, Button, Disclosure } from "../ui/primitives";
+import { OperationProgress } from "../ui/OperationProgress";
 
 const ACTION = { previews: "Make previews", descriptions: "Generate descriptions" } as Record<string, string>;
 const OUTCOME: Record<string, [string, "success" | "warning" | "fault" | "neutral"]> = {
@@ -38,12 +39,13 @@ function since(utc?: string) {
 function Running() {
   const queue = useApp((s) => s.queue);
   const sources = useApp((s) => s.sources);
+  const globalScan = useApp((s) => s.globalScan);
   const item = queue?.running;
   const scans = sources.filter((s: Json) => operationActive(s.operation) && s.operation?.token !== item?.token);
+  if (operationActive(globalScan)) scans.unshift({ key: "", name: "All library folders", operation: globalScan });
   if (!item && !scans.length) return <p id="nothing-running" className="text-[13px] text-muted-foreground">Nothing is running. Make previews or Generate descriptions on the Asset sources tab; they start here.</p>;
   const operation = item?.operation || {};
-  const value = Math.round((operation.progress || 0) * 100);
-  const phase = `${operation.phase || "Starting"}${operation.total ? " · " + operation.completed + " / " + operation.total : ""}`;
+  const phase = operation.phase || "Starting";
   return (
     <div className="grid gap-4">
       {item && (
@@ -55,7 +57,7 @@ function Running() {
               <X className="size-3.5" aria-hidden />{item.status === "cancelling" ? "Stopping…" : "Cancel"}
             </Button>
           </div>
-          <Progress value={value} label={ACTION[item.action] + " for " + item.label} valueText={`${value}% — ${phase}`} />
+          <OperationProgress operation={operation} label={ACTION[item.action] + " for " + item.label} />
           <Reason text={operation.reason || phase} className="text-[12px] text-muted-foreground" />
           {(item.log || []).length > 0 && (
             <Disclosure title="Live log">
@@ -76,7 +78,7 @@ function Running() {
       {scans.map((s: Json) => (
         <div key={s.key} className="grid gap-1.5">
           <p className="text-[13px]">{s.operation.operation === "scan" ? "Scanning" : "Working on"} {s.name}</p>
-          <Progress value={Math.round((s.operation.progress || 0) * 100)} label={"Scanning " + s.name} valueText={s.operation.phase || ""} />
+          <OperationProgress operation={s.operation} label={"Scanning " + s.name} />
           <div className="flex items-center gap-2">
             <p className="mr-auto text-[12px] text-muted-foreground">{s.operation.phase}</p>
             <Button variant="quiet" className="h-7 px-2" onClick={() => void sourceAction("cancel", s.key)}>Cancel</Button>

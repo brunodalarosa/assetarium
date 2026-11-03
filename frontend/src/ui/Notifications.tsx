@@ -9,7 +9,8 @@ import {
   dismissToast, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
 } from "../app/store";
 import { Reason } from "./CommandBlock";
-import { Button, IconButton, Progress, Spinner } from "./primitives";
+import { Button, IconButton, Spinner } from "./primitives";
+import { OperationProgress } from "./OperationProgress";
 
 export function ToneIcon({ tone, className }: { tone: Tone; className?: string }) {
   const Icon = tone === "success" ? CircleCheck : tone === "info" ? Info : TriangleAlert;
@@ -83,8 +84,7 @@ function NotificationItem({ item }: { item: Json }) {  const content = notificat
 
 function RunningItem({ source }: { source: Json }) {
   const operation = source.operation;
-  const value = Math.round((operation.progress || 0) * 100);
-  const phase = `${operation.phase || "Working"}${operation.total ? " · " + operation.completed + " / " + operation.total : ""}`;
+  const phase = operation.phase || "Working";
   return (
     <div className="notification running grid gap-2 rounded-2xl bg-surface-2 p-4">
       <div className="notification-head flex items-center gap-2.5">
@@ -92,7 +92,7 @@ function RunningItem({ source }: { source: Json }) {
         <h3 className="flex-1 text-[13.5px] font-medium">Generating descriptions</h3>
       </div>
       <p className="notification-meta text-[11.5px] text-muted-foreground">{source.name}</p>
-      <Progress value={value} label={"Description progress for " + source.name} valueText={`${value}% — ${phase}`} />
+      <OperationProgress operation={operation} label={"Description progress for " + source.name} />
       <p className="notification-body text-[12px] text-muted-foreground">{phase}</p>
       <div className="notification-actions flex gap-2">
         <Button variant="secondary" className="h-9 px-4 text-[12.5px]" data-notification={"running-" + source.key} data-action="cancel" disabled={operation.status === "cancelling"} onClick={() => void sourceAction("cancel", source.key)}>

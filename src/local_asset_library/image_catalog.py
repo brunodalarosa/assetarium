@@ -122,7 +122,7 @@ def _pack(detected, folder):
     return next((f for f in chain if f in detected['packs']), chain[-2] if len(chain) > 1 else '')
 
 
-def image_assets(config, rows, models, license_for, previous=(), answers=()):
+def image_assets(config, rows, models, license_for, previous=(), answers=(), progress=None):
     """Logical image records; model textures and other excluded candidates keep a visible role.
 
     ``previous``: the folder's last records (Blender's texture lists, recorded pixel evidence). ``answers``: saved
@@ -146,9 +146,10 @@ def image_assets(config, rows, models, license_for, previous=(), answers=()):
     pixels = {r['files'][0]['path']: (r.get('type_metadata') or {}).get('pixel_kind') for r in previous
               if r.get('asset_type') == 'image' and r.get('files')}
     groups = {}
-    for row in rows:
-        if image_format(row['path']) is None or row.get('role') == 'boundary_exclusion':
-            continue
+    images = [row for row in rows if image_format(row['path']) is not None and row.get('role') != 'boundary_exclusion']
+    for number, row in enumerate(images):
+        if progress:
+            progress(dict(phase='Classifying images', completed=number, total=len(images), unit='images'))
         role, reason = excluded_role(row, sheets)
         if not role:
             folder = _folder(inside(row['path']))
@@ -166,6 +167,8 @@ def image_assets(config, rows, models, license_for, previous=(), answers=()):
         path = PurePosixPath(row['path'])
         row['role'] = 'image_asset'
         groups.setdefault((path.parent.as_posix(), path.stem), []).append(row)
+    if progress:
+        progress(dict(phase='Classifying images', completed=len(images), total=len(images), unit='images'))
     source_folders = list(Path(config.source_root).parts[-3:]) if config.source_root else []
     assets = []
     for (parent, stem), files in sorted(groups.items()):

@@ -61,6 +61,10 @@ def active_operation(config):
 def state(config, **updates):
     path = config.output_path("data", "library/source-operation.json")
     value = read_json(path) if path.exists() else {}
+    if 'phase' in updates and 'metrics' not in updates:
+        updates['metrics'] = None
+    if 'stage' in updates and updates['stage'] != value.get('stage') and 'completed' not in updates:
+        updates.update(completed=None, total=None)
     if ('progress' in updates and updates.get('token', value.get('token')) == value.get('token')
             and updates.get('status') in RUNNING):
         updates['progress'] = max(value.get('progress', 0), updates['progress'])
@@ -146,7 +150,7 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None):
                     if operation == "render-test" else "This operation is already running"}
         token = uuid.uuid4().hex
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
-              operation=operation, key=key, reason=None, current_asset=None,
+              operation=operation, key=key, reason=None, current_asset=None, completed=None, total=None, stage=None,
               asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item)
         command = [str(python), str(config.project_root / "scripts/source-operation.py"), operation, "--token", token]
         if key:
@@ -186,7 +190,7 @@ def scan_all(config, token, key=None):
             return
         state(scoped, status="scanning", phase="Scanning " + source["name"], progress=i / max(1, len(sources)))
         try:
-            scan_source(config, source)
+            scan_source(config, source, progress=scan_reporter(scoped, source['name']))
         except (OSError, ValueError, sqlite3.Error) as exc:
             fault = {"key": source["key"], "reason": str(exc), "status": "faulty", "utc": now()}
             faults.append(fault)
@@ -197,8 +201,23 @@ def scan_all(config, token, key=None):
             fault_root = config.project_root / 'data/library/source-faults'
             atomic_json(fault_root / 'history' / (source['id'] + '-' + uuid.uuid4().hex + '.json'),diagnostic)
             atomic_json(fault_root / (source['id'] + '.json'),diagnostic)
+    state(scoped, phase='Publishing library', metrics=dict(phase='Publishing library', completed=len(sources), total=None, unit='library folders'))
     aggregate(config)
-    state(scoped, status="complete_with_faults" if faults else "complete", phase="Scan complete", progress=1, faults=faults)
+    state(scoped, status="complete_with_faults" if faults else "complete", phase="Scan complete", progress=1, faults=faults, metrics=None)
+
+
+def scan_reporter(config, source_name=None):
+    """Persist measured scan progress at most twice per second, plus phase boundaries."""
+    previous = [None, 0.0, None]
+    def report(metrics):
+        if source_name:
+            metrics = dict(metrics, source_name=source_name)
+        phase, tick = metrics['phase'], time.monotonic()
+        finished = metrics.get('total') is not None and metrics['completed'] == metrics['total']
+        if phase != previous[0] or tick - previous[1] >= .5 or (finished and metrics != previous[2]):
+            state(config, phase=phase, metrics=metrics)
+            previous[:] = [phase, tick, dict(metrics)]
+    return report
 
 
 def ensure_index(config, scoped):
@@ -322,7 +341,7 @@ def publish_and_verify(config, source, scoped, phase):
     state(scoped, status="publishing", phase="Updating searches", progress=.95)
     aggregate(config)
     state(scoped, status="verifying", phase="Scanning to verify publication", progress=.98)
-    return scan_source(config, source)
+    return scan_source(config, source, progress=scan_reporter(scoped))
 
 
 def process_source(config, source, token):
@@ -332,7 +351,7 @@ def process_source(config, source, token):
         state(scoped, status='complete', phase='Processing paused: no formats selected', progress=1, current_asset=None)
         return
     state(scoped, status="scanning", phase="Checking source", progress=.01)
-    scan_source(config, source)
+    scan_source(config, source, progress=scan_reporter(scoped))
     ensure_index(config, scoped)
     state(scoped, status='processing', phase='Preparing processing', progress=.02)
     base = storage_base(config, token)
@@ -437,7 +456,7 @@ def describe_source(config, source, token):
     scoped = bound(config, source)
     started = time.monotonic()
     state(scoped, status="scanning", phase="Checking source", progress=.01)
-    scan_source(config, source)
+    scan_source(config, source, progress=scan_reporter(scoped))
     ensure_index(config, scoped)
     before = description_counts(scoped)
     state(scoped, status='processing', phase='Preparing descriptions', progress=.02)

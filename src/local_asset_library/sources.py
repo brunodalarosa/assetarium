@@ -701,7 +701,7 @@ def write_membership(config, records):
         "packs": sorted({r["pack_id"] for r in records}), "approval": "Configured asset sources; manual processing"})
 
 
-def scan_source(config, source):
+def scan_source(config, source, progress=None):
     from .catalog import build_inventory, digest, encoded
     from .incremental import working
     scoped = bound(config, source)
@@ -717,12 +717,15 @@ def scan_source(config, source):
                      (read_records(working(child_scoped)) or read_records(child_scoped)) if r["asset_id"] not in mine]
     old = {r["asset_id"]: r for r in previous}
     suggestions = []
-    rows, fresh, _, _ = build_inventory(scoped, suggestions, previous)
+    rows, fresh, _, _ = build_inventory(scoped, suggestions, previous, **({'progress': progress} if progress else {}))
     from .catalog import snapshot, walk_source
-    if snapshot(rows) != snapshot(walk_source(scoped)):
+    verified = walk_source(scoped, progress, 'Verifying files') if progress else walk_source(scoped)
+    if snapshot(rows) != snapshot(verified):
         raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
     # Identity by recognition: kept IDs for known places, moves and edits; new IDs only at first sight.
     skipped = [r["path"].split("/", 1)[1] for r in rows if r.get("status") == "excluded_folder"]
+    if progress:
+        progress(dict(phase='Updating asset identities', completed=0, total=len(fresh), unit='assets'))
     fresh, recognized = library_store.recognize(config, source, fresh, previous, skipped)
     # Isolate file failures to their assets; other assets in the source continue.
     rejected = [r for r in rows if r.get("status") == "rejected"]
@@ -774,6 +777,8 @@ def scan_source(config, source):
     before = {r['asset_id']: r.get('texture_repair') for r in merged}
     texture_suggestion = apply_texture_folder(merged, rows, texture_folder(scoped))
     changed.update(r['asset_id'] for r in merged if r.get('texture_repair') != before[r['asset_id']])
+    if progress:
+        progress(dict(phase='Saving catalog', completed=len(fresh), total=None, unit='assets'))
     inventory_hash = digest(rows)
     status_path = scoped.output_path("data", "library/source-status.json")
     prior_status = read_json(status_path) if status_path.exists() else {}

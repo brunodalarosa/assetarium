@@ -61,6 +61,27 @@ export function cardMeta(item: Json, card?: Json) {
 export function operationActive(operation: Json) {
   return ["queued", "scanning", "processing", "publishing", "cancelling", "verifying"].includes(operation?.status);
 }
+
+/** Measured work in the current phase; weighted legacy progress is never presented as a measured percentage. */
+export function progressInfo(operation: Json): { label: string; detail: string; value?: number } {
+  const metrics = operation.metrics?.phase === operation.phase ? operation.metrics : null;
+  const count = metrics?.completed ?? operation.completed;
+  const total = metrics ? metrics.total : operation.total;
+  const phase = operation.phase || "Starting";
+  const unit = metrics?.unit || "assets";
+  const known = typeof total === "number" && total > 0 && typeof count === "number";
+  const value = known ? Math.max(0, Math.min(100, count / total * 100)) : undefined;
+  const label = known ? `${count.toLocaleString()} / ${total.toLocaleString()} ${unit}`
+    : typeof count === "number" ? `${count.toLocaleString()} ${unit} checked` : phase;
+  const details = [phase, label];
+  if (metrics?.source_name) details.push(metrics.source_name);
+  if (known) details.push(`${Math.max(0, total - count).toLocaleString()} remaining · ${Math.round(value!)}% of this phase`);
+  else if (metrics && !/saving|updating|publishing/i.test(phase)) details.push("Total not yet known");
+  else if (metrics) details.push("Finalizing; checked counts are not whole-operation completion");
+  if (typeof metrics?.failed === "number") details.push(`${(count - metrics.failed).toLocaleString()} successful checks · ${metrics.failed.toLocaleString()} faults recorded`);
+  if (typeof metrics?.reused === "number") details.push(`${metrics.reused.toLocaleString()} cached hashes reused`);
+  return { label, detail: details.join(" · "), value };
+}
 export function describeActive(source: Json) {
   return source.operation?.operation === "describe" && operationActive(source.operation);
 }

@@ -93,7 +93,7 @@ def coordinator(config, monkeypatch, allocations, after_stage=None):
     calls, states = [], []
     monkeypatch.setattr(operations, 'bound', lambda *args: config)
     monkeypatch.setattr(operations, 'state', lambda config, **kw: states.append(kw))
-    monkeypatch.setattr(operations, 'scan_source', lambda *args: {'failed': 0, 'needs_processing': False})
+    monkeypatch.setattr(operations, 'scan_source', lambda *args, **kwargs: {'failed': 0, 'needs_processing': False})
     monkeypatch.setattr(operations, 'ensure_index', lambda *args: None)
     monkeypatch.setattr(operations, 'cancelled', lambda *args: False)
     monkeypatch.setattr(operations, 'publish_source', lambda *args: None)

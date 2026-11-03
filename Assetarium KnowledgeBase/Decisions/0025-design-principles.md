@@ -50,6 +50,18 @@ as generic "AI" and copy another product's identity. "New since your last visit"
    `Reason`, which splits the command into its own block; `tests/test_command_blocks.py` keeps the pattern in step
    with the backend's messages.
 
+## P4 — Make progress measurable
+
+*(Added November 2, 2026; co-designed and approved by the owner.)* Long operations show their current phase
+and one compact numeric measure without requiring hover. Hover or keyboard focus reveals further detail:
+completed / total, remaining work, the unit being counted and separate successful and faulty outcomes.
+
+- A known total uses a count or percentage. Label phase progress as phase progress, never whole-operation completion.
+- When the total is unknown, show measured work so far and say the total is still being discovered; use an
+  indeterminate indicator. Do not manufacture a percentage or perform another scan just to count files.
+- Saving or finalizing stays visibly active until it finishes, even after every counted item has been checked.
+- Asset processing, background activity and notifications present the same measurements consistently.
+
 ## What future work must keep true
 
 - New review flows with several alike decisions group them and commit once, unless the cost table says otherwise.
