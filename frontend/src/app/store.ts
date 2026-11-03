@@ -623,6 +623,10 @@ async function drainThumbs() {
 
 let detailGeneration = { library: 0, source: 0, collection: 0 };
 export async function selectAsset(id: GridId, assetId: string, format: string | null = null, view = "three_quarter", moveFocus = true) {
+  if (id === "source" && !format) {
+    const cards = state.source.items.flatMap((item: Json) => [item, ...(item.variants || [])]);
+    format = cards.find((item: Json) => item.asset_id === assetId)?.source_format ?? null;
+  }
   window.LALPreview?.dispose();
   if (id === "source" && state.sourcesView.panel !== "asset") setState((s) => ({ sourcesView: { ...s.sourcesView, panel: "asset" } }));
   const generation = ++detailGeneration[id];
@@ -682,7 +686,7 @@ export async function copyText(text: string, message: string) {
 /** Select the original file in Explorer: the format open in the inspector for this asset, else its primary file. */
 export async function revealAsset(id: GridId, assetId: string) {
   const detail = state[id].detail;
-  const format = detail?.assetId === assetId ? detail.format : null;
+  const format = detail?.assetId === assetId ? detail.format : state[id].items.find((item) => item.asset_id === assetId)?.source_format ?? null;
   try {
     const result = await gridApi(id, assetId).reveal(assetId, format);
     if (result.status !== "revealed") throw Error(result.reason);

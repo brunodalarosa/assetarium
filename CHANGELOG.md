@@ -161,6 +161,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Format folders show assets with source files in that folder, select that source format in the inspector, and
+  keep parent counts deduplicated. Shared thumbnails identify their source; measurements are never attributed to another format.
+
 - Show in Explorer opens inside library folders and packs, and selects original files using the Windows Shell,
   including paths containing spaces, commas or Unicode. Unavailable locations report an error.
 

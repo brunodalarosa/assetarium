@@ -172,7 +172,7 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
           </span>
         </Tooltip>
       )}
-      <div className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb",
+      <div title={item.source_format && thumb?.card?.format && item.source_format !== thumb.card.format ? `Shared preview from ${thumb.card.format.toUpperCase()}; this file is ${item.source_format.toUpperCase()}.` : undefined} className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb",
         grid === "source" && item.state === "missing" && "opacity-60")}>
         {thumb?.image ? (
           <img

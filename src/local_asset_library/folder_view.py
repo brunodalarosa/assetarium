@@ -23,7 +23,7 @@ import uuid
 
 from .config import ConfigError
 
-VERSION = 3  # 3: hidden (a format that is off, decision 0026).
+VERSION = 4  # 4: physical source locations and deduplicated ancestor membership.
 VIEW_ANSWERS = ('variant_axis', 'separate_descriptions')  # Answers a view applies; they are part of its stamp.
 WAIT = 1.5
 # Heavy record fields no view column needs; SQLite drops them before Python parses a row.
@@ -155,6 +155,12 @@ CREATE TABLE assets (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT 
 CREATE INDEX assets_order ON assets (folder_key, name_key, asset_id);
 CREATE INDEX assets_card ON assets (card);
 CREATE TABLE folders (path TEXT PRIMARY KEY);
+CREATE TABLE locations (asset_id TEXT NOT NULL, path TEXT NOT NULL, folder TEXT NOT NULL, format TEXT NOT NULL,
+    visible INTEGER NOT NULL, PRIMARY KEY(asset_id, path));
+CREATE INDEX locations_folder ON locations(folder, asset_id);
+CREATE TABLE asset_folders (asset_id TEXT NOT NULL, folder TEXT NOT NULL, visible INTEGER NOT NULL,
+    PRIMARY KEY(asset_id, folder));
+CREATE INDEX asset_folders_scope ON asset_folders(folder, visible, asset_id);
 CREATE TABLE inventory (path TEXT PRIMARY KEY);
 CREATE TABLE files (path TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT NOT NULL, folder_key TEXT NOT NULL,
     name_key TEXT NOT NULL, role TEXT, excluded INTEGER NOT NULL);
@@ -215,6 +221,19 @@ def build(current, target):
                 following = next((s for s in ('inspection', 'previews', 'embeddings') if s in outcome['pending_stages']), None)
                 review = (record.get('caption_provenance') or {}).get('findings') or []
                 files = record.get('files') or []
+                ancestors = {}
+                for file in files:
+                    parent = PurePosixPath(file['path'].removeprefix(key + '/')).parent
+                    parent = '' if parent.as_posix() == '.' else parent.as_posix()
+                    visible = int(uses(kind_of(record), [file['format']], formats))
+                    db.execute('INSERT INTO locations VALUES (?,?,?,?,?)',
+                               (record['asset_id'], file['path'], parent, file['format'], visible))
+                    parts = PurePosixPath(parent).parts if parent else ()
+                    for depth in range(len(parts) + 1):
+                        ancestor = '/'.join(parts[:depth])
+                        ancestors[ancestor] = max(ancestors.get(ancestor, 0), visible)
+                db.executemany('INSERT INTO asset_folders VALUES (?,?,?)',
+                               [(record['asset_id'], p, visible) for p, visible in ancestors.items()])
                 where = _folder(record, key)
                 batch.append((record['asset_id'], record['display_name'], where, where.casefold(), record['display_name'].casefold(),
                               kind_of(record), record.get('asset_type'), files[0]['path'] if files else None,
@@ -304,6 +323,11 @@ def inside_sql(path, column='folder'):
         return '1', []
     prefix = path.rstrip('/') + '/'
     return f'({column} = ? OR substr({column}, 1, ?) = ?)', [path, len(prefix), prefix]
+
+
+def asset_scope_sql(path):
+    """Logical assets with a visible source file in this physical folder or below, once each."""
+    return 'asset_id IN (SELECT asset_id FROM asset_folders WHERE folder=? AND visible)', [path or '']
 
 
 def summary(current, published, formats):

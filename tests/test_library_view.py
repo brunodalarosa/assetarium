@@ -74,3 +74,33 @@ def test_assets_assetarium_will_not_process_are_skipped_not_counted_as_pending(m
     assert root['skipped'] == 1 and root['pending'] == len(found['ids'])  # The button's count is what the queue would run.
     items = {i['name']: i for i in library_view.folder_items(config, one['key'], show_files=False)['items']}
     assert items['Only']['state'] == 'skipped' and items['Only']['reason'].startswith('Not processed')
+
+
+def test_alternate_files_belong_to_each_physical_folder_once(managed, monkeypatch):
+    from local_asset_library.incremental import working, update_record
+    from local_asset_library import processing_queue
+    from local_asset_library.settings import save_general_settings
+    config, _, one, _ = managed
+    monkeypatch.setattr(library_view, 'blockers', lambda config: {})
+    sources.scan_source(config, one)
+    work = working(sources.bound(config, one))
+    record = sources.read_records(work)[0]
+    original = record['files'][0]
+    record['files'] = [dict(original, path=one['key'] + '/Kit/' + fmt + '/bench.' + fmt, format=fmt)
+                       for fmt in ('fbx', 'glb', 'obj')]
+    update_record(work, record)
+    for fmt in ('fbx', 'glb', 'obj'):
+        items = library_view.folder_items(config, one['key'], 'Kit/' + fmt, show_files=False)
+        assert items['assets'] == 1
+        card = items['items'][0]
+        assert card['asset_id'] == record['asset_id'] and card['source_format'] == fmt
+        assert card['formats'] == [fmt] and card['path'].endswith('/bench.' + fmt)
+        assert processing_queue.resolve(config, 'previews', {'key': one['key'], 'path': 'Kit/' + fmt})['ids'] == [record['asset_id']]
+    parent = library_view.folder_items(config, one['key'], 'Kit', show_files=False)
+    assert parent['assets'] == 1 and parent['items'][0]['source_format'] is None
+    nodes = {n['path']: n for n in library_view.tree(config)['folders'][0]['nodes']}
+    assert all(nodes['Kit/' + fmt]['assets'] == 1 for fmt in ('fbx', 'glb', 'obj'))
+    assert nodes['Kit']['assets'] == 1
+    save_general_settings(config, 24, ['gltf', 'obj'])
+    assert not library_view.folder_items(config, one['key'], 'Kit/fbx', show_files=False)['items']
+    assert library_view.folder_items(config, one['key'], 'Kit', show_files=False)['assets'] == 1

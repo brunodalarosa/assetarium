@@ -110,10 +110,13 @@ def folder_tree(config, source, blocked=None):
         return {'offline': False, 'scanned': True, 'reading': True, 'nodes': []}
     state, params, _, _ = state_sql(blockers(config) if blocked is None else blocked)
     with closing(view):
-        groups = view.execute(f'SELECT folder, {state}, has_preview, COUNT(*) FROM assets WHERE NOT hidden GROUP BY 1, 2, 3', params).fetchall()
+        groups = view.execute(f'SELECT asset_folders.folder, {state}, has_preview, COUNT(*) FROM assets '
+                              'JOIN asset_folders USING(asset_id) WHERE asset_folders.visible GROUP BY 1, 2, 3', params).fetchall()
         # Files in formats that are off: counted per folder for one quiet line, never listed or offered as work.
-        hidden = view.execute('SELECT folder, COUNT(*) FROM assets WHERE hidden GROUP BY 1').fetchall()
-        fresh = view.execute('SELECT folder, COUNT(*) FROM assets WHERE NOT hidden AND asset_id IN (SELECT value FROM json_each(?)) GROUP BY 1',
+        hidden = view.execute('SELECT asset_folders.folder, COUNT(*) FROM assets JOIN asset_folders USING(asset_id) '
+                              'WHERE NOT asset_folders.visible GROUP BY 1').fetchall()
+        fresh = view.execute('SELECT asset_folders.folder, COUNT(*) FROM assets JOIN asset_folders USING(asset_id) '
+                             'WHERE asset_folders.visible AND asset_id IN (SELECT value FROM json_each(?)) GROUP BY 1',
                              (json.dumps(_new_ids(config, source)),)).fetchall()
         folders = [r[0] for r in view.execute('SELECT path FROM folders')]
         detected = structure(config, source, view)
@@ -134,7 +137,7 @@ def folder_tree(config, source, blocked=None):
     for folder in folders:  # Folders only; files are listed in the grid.
         node(folder)
     for folder, state, preview, count in groups:
-        for entry in chain(folder):
+        for entry in [node(folder)]:
             entry['assets'] += count
             entry['previews'] += count * (state == 'ready' or (state != 'failed' and bool(preview)))
             entry['pending'] += count * (state == 'no_previews')
@@ -142,10 +145,10 @@ def folder_tree(config, source, blocked=None):
             entry['failed'] += count * (state == 'failed')
             entry['skipped'] += count * (state == 'skipped')
     for folder, count in fresh:
-        for entry in chain(folder):
+        for entry in [node(folder)]:
             entry['new'] += count
     for folder, count in hidden:
-        for entry in chain(folder):
+        for entry in [node(folder)]:
             entry['hidden'] += count
     packs, bundles, names = detected['packs'], set(detected['bundles']), names_of(config, source)
     result = []
@@ -201,7 +204,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     listing every member; ``assets`` counts assets, ``cards`` and ``total`` count what pages through.
     """
     from .asset_collections import load
-    from .folder_view import Reading, connect, inside_sql, state_sql
+    from .folder_view import Reading, connect, inside_sql, asset_scope_sql, state_sql
     from .library_store import missing_list
     from .packs import names_of, pack_of, structure
     from .settings import descriptions_enabled
@@ -233,7 +236,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
         return {'status': 'reading', 'reason': str(exc), 'key': key, 'path': path}
     new = _new_ids(config, source)
     state, state_params, reason, reason_params = state_sql(blockers(config))
-    where, params = inside_sql(path)
+    where, params = asset_scope_sql(path)
     where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0026).
     if filters.get('types'):
         where += f" AND kind IN ({','.join('?' * len(filters['types']))})"
@@ -277,9 +280,16 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
                 found['description'] = description
             if collections.get(asset_id):
                 found['collections'] = collections[asset_id]
-            return {'asset_id': asset_id, 'name': name, 'kind': kind, 'state': item_state, 'reason': item_reason,
+            local_where, local_params = inside_sql(path)
+            local_files = view.execute(f'SELECT path, format FROM locations WHERE asset_id=? AND visible AND {local_where} ORDER BY path',
+                                       [asset_id] + local_params).fetchall()
+            local_formats = sorted({f[1] for f in local_files})
+            selected_format = local_formats[0] if path and len(local_formats) == 1 else None
+            first = local_files[0][0] if local_files else first
+            return {'asset_id': asset_id, 'name': name, 'kind': kind, 'asset_type': 'image' if kind in {'image', 'material_texture'} else 'model_3d',
+                    'state': item_state, 'reason': item_reason, 'source_format': selected_format,
                     'folder': folder, 'pack': pack_of(config, source, {'files': [{'path': first}]}, detected, names) if first else None,
-                    'formats': json.loads(formats), 'has_preview': bool(preview), 'path': first, 'overlays': found,
+                    'formats': local_formats, 'has_preview': bool(preview), 'path': first, 'overlays': found,
                     'new': asset_id in new}
         page = []
         for row in rows:

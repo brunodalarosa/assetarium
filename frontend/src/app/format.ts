@@ -48,11 +48,12 @@ export function hasDescription(item: Json) {
 /** Card meta line from measured facts: "GLB · 1,248 tris", or "PNG · 512 × 512" for images. */
 export function cardMeta(item: Json, card?: Json) {
   const formats: string[] = item.formats || [];
-  const format = (card?.format || (formats.length === 1 ? formats[0] : "") || "").toUpperCase();
+  const format = (item.source_format || card?.format || (formats.length === 1 ? formats[0] : "") || "").toUpperCase();
   const fact =
     item.asset_type === "image"
       ? card?.width ? `${card.width} × ${card.height}` : null
-      : typeof card?.triangles === "number" ? `${card.triangles.toLocaleString()} tris` : null;
+      : typeof card?.triangles === "number" && (!item.source_format || item.source_format === card?.format)
+        ? `${card.triangles.toLocaleString()} tris` : null;
   const extra = !card?.format && formats.length > 1 ? formats.map((f) => f.toUpperCase()).join(" / ") : null;
   return [format || extra, fact].filter(Boolean).join(" · ");
 }

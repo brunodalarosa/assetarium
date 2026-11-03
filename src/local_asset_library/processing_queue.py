@@ -76,7 +76,7 @@ def validate_scope(config, scope):
 
 def resolve(config, action, scope):
     """The assets an item would process now, and those it cannot (blocked), from the folder's up-to-date view."""
-    from .folder_view import connect, inside_sql, state_sql
+    from .folder_view import connect, asset_scope_sql, state_sql
     from .library_view import _current, blockers
     from .settings import descriptions_enabled
     from .sources import get_source
@@ -87,7 +87,7 @@ def resolve(config, action, scope):
     if current is None or (action != 'previews' and not descriptions_enabled(config)):
         return {'ids': [], 'blocked': {}, 'kinds': {}, 'fixes': fixes}
     picked = scope.get('asset_ids')
-    where, params = ('asset_id IN (SELECT value FROM json_each(?))', [json.dumps(picked)]) if picked else inside_sql(scope.get('path') or '')
+    where, params = ('asset_id IN (SELECT value FROM json_each(?))', [json.dumps(picked)]) if picked else asset_scope_sql(scope.get('path') or '')
     state, state_params, reason, reason_params = state_sql(blocked)
     ids, stopped, kinds = [], {}, {}
     with closing(connect(current, fresh=True)) as view:
