@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Bell, House, LayoutGrid, LibraryBig, PanelRight, Pencil, Settings, Workflow } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, Folder, House, LayoutGrid, PanelRight, Pencil, Settings, Workflow } from "lucide-react";
 import { motion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/beui/tooltip";
@@ -58,7 +58,7 @@ export function Rail() {
         {NAV.map((item) => <RailItem key={item.page} {...item} dot={item.page === "processing" && attention} />)}
       </div>
       <div className="mt-auto flex flex-col items-center gap-4">
-        <RailItem page="sources" label="Library" icon={<LibraryBig className="size-5" strokeWidth={1.75} />} dot={owner} />
+        <RailItem page="sources" label="Library" icon={<Folder className="size-5" strokeWidth={1.75} />} dot={owner} />
         <RailItem page="settings" label="Settings" icon={<Settings className="size-5" strokeWidth={1.75} />} />
       </div>
     </nav>

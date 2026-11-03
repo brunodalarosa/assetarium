@@ -127,6 +127,8 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- The Library navigation button uses a folder icon.
+
 - **Agent proposals are reviewed together**: a library folder's waiting proposals group the rules packs share,
   you accept or reject rules (all at once or per pack), see a preview, and one **Apply decisions** saves them
   with a single scan instead of one blocking rescan per pack. Several proposals arriving together raise one
