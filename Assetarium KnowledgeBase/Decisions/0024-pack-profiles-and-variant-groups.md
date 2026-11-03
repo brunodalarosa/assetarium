@@ -47,11 +47,17 @@ draft the structure and raise signals, and an agent (or the owner) corrects it a
   prompt, the connection, the agent's lines and proposals for this folder, progress, a hint after two quiet
   minutes), *Review myself* or *Later*. The quick look's names are kept as a snapshot so agents can work before
   the first scan (hashing) ends. The wizard offers Make previews at the end and never starts it.
-- **Check my model** (CLI `model-check`, Settings → General, an optional setup wizard step): a local model on a
-  loopback OpenAI-compatible server works through synthetic pack trees (`model_check_trees.py`; quick 8, full
-  27) with the same prompt and pack tools, the owner's part simulated by applying its proposals; scored by
-  outcome (packs, cards, excluded folders, image kinds, settled signals). Disposable project under `scratch/`,
-  report and transcripts under `data/evidence/model-check/`.
+- **Try your agent** (Settings → General, an optional setup step; replaces Check my model, owner-approved
+  November 2, 2026): generates tiny valid practice packs on demand, uses the connected agent and reuses the
+  Library's discovery, prompt, pack tools, grouped owner review and scans. It checks pack organization and
+  import review only. Outcomes come from the resulting scanned structure, not the agent's declaration that
+  signals are reviewed. There is no local-model benchmark, model verdict or `model-check` CLI command.
+  Practice owns a separate disposable store, activity and caches under `scratch/`; files and test-specific
+  data are removed on finish, cancellation or normal app close. Results stay in memory only until dismissed.
+  Unexpected-shutdown leftovers are cleaned on the next app launch. Cleanup must wait for in-flight work,
+  refuse links, reject expired calls and show failures without claiming deletion succeeded. Practice data
+  never enters the permanent library or logs. This explicitly replaces the former requirement to retain
+  model-check reports; the agent's external chat history remains under that agent's control.
 - Search returns each variant group once; `get_asset` lists the variants and the shared description.
 - An asset whose folder becomes excluded is `excluded`, not Missing; including the folder again brings it
   back with its ID.

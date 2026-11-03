@@ -36,7 +36,8 @@ read it first. Up: [Notebook](Notebook.md).
   (`library.sqlite`: folders, recognized assets, recognition history, owner answers), `packs`
   (packs and bundles from folder structure), `pack_profiles` (a pack's answers as versioned rules, effect,
   signals), `variant_groups` (variant groups assigned in folder views), `quick_look` (names-only walk for the Add library
-  folder wizard), `pack_agent` (pack tools for agents), `agent_activity` (the app's agent feed), `model_check` and `model_check_trees` (Check my model), `image_kinds` (model texture, material texture or 2D
+  folder wizard), `pack_agent` (pack tools for agents), `agent_activity` (the app's agent feed), `agent_practice`
+  and `agent_practice_assets` (Try your agent), `transient` (practice log/cache isolation), `image_kinds` (model texture, material texture or 2D
   image), `library_view` (the Asset sources tab's tree, states and folder contents), `folder_view`
   (the small per-catalog views those tabs read instead of whole records),
   `library_migration` (the one-time move into the store; the only code naming the old folder),

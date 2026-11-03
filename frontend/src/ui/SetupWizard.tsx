@@ -13,7 +13,7 @@ import { AgentPanel, ConnectionLine, SetByBadge, SetupPaths, Snippets } from "./
 import { SetupReport } from "./SetupReport";
 import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
-import { MODEL_CHECK_HELP, ModelCheck } from "./ModelCheck";
+import { TRY_AGENT_HELP, TryAgent } from "./TryAgent";
 import { Reason } from "./CommandBlock";
 import { FORMATS_HELP, FormatToggles, IMAGE_FORMATS, ImageFormatsNote, MODEL_FORMATS } from "./FormatToggles";
 import { ReadinessList } from "./Readiness";
@@ -21,7 +21,7 @@ import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./p
 
 const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Batch size", agent: "Connect your agent", model: "Your agent’s model", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Batch size", agent: "Connect your agent", practice: "Try your agent", review: "Review and finish",
 };
 const PRESETS = [25, 50, 100, 250];
 
@@ -259,9 +259,8 @@ function summary(step: SetupStep, draft: Json, info: Json): string {
       const live = (getState().setup.agent?.connections || []).filter((c: Json) => c.mode === "normal");
       return live.length ? `Connected: ${live.map((c: Json) => c.client?.name).filter(Boolean).join(", ") || "an agent"}` : "Not connected (you can connect one later in Settings → General)";
     }
-    case "model": {
-      const last = getState().modelCheck?.last;
-      return last ? `${last.model}: ${last.passed}/${last.total} · ${last.verdict_text}` : "Not checked (optional)";
+    case "practice": {
+      return "Optional practice import; results are never saved";
     }
     default: return "";
   }
@@ -382,23 +381,23 @@ function SetupSearchCheck() {
   );
 }
 
-function ModelStep() {
+function PracticeStep() {
   return (
     <div className="grid gap-5">
-      <Paragraph>{MODEL_CHECK_HELP} It saves nothing; skip it if you use a large cloud model, or run it later from Settings → General.</Paragraph>
-      <ModelCheck id="setup-model-check" />
+      <Paragraph>{TRY_AGENT_HELP} You can skip this and try it later from Settings → General.</Paragraph>
+      <TryAgent id="setup-try-agent" />
     </div>
   );
 }
 
 const CONTENT: Record<SetupStep, () => ReactNode> = {
   welcome: Welcome, blender: BlenderStep, formats: FormatsStep, storage: StorageStep,
-  descriptions: DescriptionsStep, batch: BatchStep, agent: AgentStep, model: ModelStep, review: Review,
+  descriptions: DescriptionsStep, batch: BatchStep, agent: AgentStep, practice: PracticeStep, review: Review,
 };
 const TITLES: Record<SetupStep, string> = {
   welcome: "Set up Assetarium", blender: "Blender", formats: "Formats to process", storage: "Storage budget",
   descriptions: "Descriptions and search", batch: "Description batch size", agent: "Connect your AI agent (optional)",
-  model: "Check your agent’s model (optional)", review: "Review and finish",
+  practice: "Try your agent (optional)", review: "Review and finish",
 };
 
 export function SetupWizard() {
@@ -431,7 +430,7 @@ export function SetupWizard() {
                   <button type="button" disabled={saved} aria-current={current ? "step" : undefined} data-step={item} onClick={() => goToSetupStep(index)}
                     className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-[13px] transition-colors disabled:pointer-events-none", current ? "bg-accent-soft font-medium text-accent-soft-foreground" : "text-foreground hover:bg-surface-2", !needed && "text-subtle")}>
                     <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[11px] tabular-nums", current ? "border-primary bg-primary text-primary-foreground" : index < setup.step ? "border-border bg-surface-2" : "border-border")}>
-                      {(done && item !== "model" && needed) || (index < setup.step && !skipped && needed) ? <Check className="size-3" aria-hidden /> : index + 1}
+                      {(done && item !== "practice" && needed) || (index < setup.step && !skipped && needed) ? <Check className="size-3" aria-hidden /> : index + 1}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{item === "welcome" && done ? (review ? "Agent's report" : "Summary") : STEP_LABELS[item]}</span>
                     {skipped && <span className="text-[11px] text-muted-foreground">Skipped</span>}

@@ -8,6 +8,13 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Try your agent** replaces **Check my model** in Settings and optional setup. It generates tiny practice packs
+  on demand and uses the connected agent, the Library discovery flow, real pack tools, grouped proposal review
+  and scans. Results describe the observed organization rather than rating a model. Practice files, store,
+  activity and reports are removed on finish or cancellation; results remain in memory until closed.
+  Abandoned sessions are cleaned on the next app launch. The old local-model benchmark and `model-check` CLI
+  command have been removed; no model server, download or extra runtime is needed.
+
 - **Make progress measurable** (design principle P4): long work shows a compact measured count, with phase,
   remaining work and outcomes available on hover or keyboard focus. Scans report checked files, cached hashes,
   faults and image classification counts; unknown totals use an indeterminate indicator. Asset processing,
@@ -58,9 +65,6 @@ All notable changes to Assetarium are listed here. The project follows
   `local-assets setup agent check` and `doctor` report the same. It reads only Assetarium's own entry in the
   Claude Code, Codex and OpenCode settings and changes nothing. The Claude Code command now replaces an older
   entry, so running it again repairs it.
-- **Check my model** (Settings → General, an optional setup step, `local-assets model-check`): runs a model on
-  a server on this computer through made-up packs with the pack tools and says how many it structures right
-  (quick: 8 packs, about 5 minutes; `--full`: 27).
 - **Asset sources** tab (the folder icon above Settings): browse by place through library folders,
   bundles, packs and folders, with coverage, "+N new", a card state for every asset (no previews
   yet, queued, ready, blocked with its fix, recorded failure, missing), a pack header with its

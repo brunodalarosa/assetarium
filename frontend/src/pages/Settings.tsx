@@ -19,7 +19,7 @@ import { SkeletonLines } from "../ui/Loading";
 import { ReadinessList } from "../ui/Readiness";
 import { BlenderChecks, BlenderPicker } from "../ui/BlenderPicker";
 import { Badge, Banner, Button, Card, SelectField, Spinner, TextField } from "../ui/primitives";
-import { ModelCheckCard } from "../ui/ModelCheck";
+import { TryAgentCard } from "../ui/TryAgent";
 
 const APPEARANCES = [
   { value: "system", label: "Match Windows", icon: Monitor },
@@ -292,7 +292,7 @@ function General() {
         <AppearancePicker />
       </Card>
       <SetupCard />
-      <ModelCheckCard />
+      <TryAgentCard />
       <BlenderInstallation />
       <form id="general-settings-form" onSubmit={submit} className="grid gap-5">
         <Card title="Storage budget" help={BUDGET_HELP}>

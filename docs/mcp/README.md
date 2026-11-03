@@ -230,12 +230,18 @@ Search returns each variant group once (`variant`, `variants`), and `get_asset` 
 `description_shared_from` when it shares its group's description. Every call appears in the app's Agent
 activity, built from the server's call log.
 
-**Check my model** (Settings → General, a setup step, or `local-assets model-check --model NAME`) tells you
-whether a local model is good enough for this: it gives the model the same prompt and the six pack tools on
-made-up packs (engine copies, version folders, big name sets, material folders, texture and sprite folders,
-packs that are fine as they are) and scores the outcome, not the rules it wrote. The conversation is trimmed
-to fit a 4,096-token context. Reports and transcripts are saved under `data/evidence/model-check/`. Existing Codex registrations must add the six tool names to
-`enabled_tools`.
+**Try your agent** (Settings → General or optional setup) generates small practice packs and opens the same
+discovery, handoff and proposal review used by the Library. Connect your agent, copy the practice prompt into it,
+then accept or reject its proposed rules in Assetarium. The check observes engine copies, pack boundaries, image
+classification and a correctly organized pack; marking signals reviewed alone does not pass it. Finish at any
+time to see what worked and what remains unresolved. Practice does not render or generate descriptions.
+
+Practice has a separate temporary library, hashes and activity. Generated files and test data are removed when
+you finish or cancel; results exist only on the open results screen. If the app stops unexpectedly, it cleans up
+on the next launch. A cleanup failure stays visible. The agent's own chat history is controlled by that agent.
+The practice prompt scopes every call to its temporary `library_folder`; `say` also accepts that optional field.
+No new MCP registration or tool names are needed. Existing Codex registrations must include the six pack tool
+names in `enabled_tools`.
 
 ## Privacy
 

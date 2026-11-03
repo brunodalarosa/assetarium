@@ -48,6 +48,13 @@ class DesktopBridge:
         self._owned_source_operations = set()
         self._pending_prints = {}
         self._shared = {}
+        self._practice_key = None
+        self._practice_recovery_fault = None
+        from .agent_practice import recover
+        try:
+            recover(config)
+        except (OSError, ValueError, ConfigError) as exc:
+            self._practice_recovery_fault = str(exc)
         self._thread = threading.Thread(target=self._run, name='asset-gateway', daemon=True)
         self._thread.start()
         if not self._ready.wait(10):
@@ -547,44 +554,27 @@ class DesktopBridge:
         from .pack_agent import counts
         return self._wait(self._present(counts, self._config, key, guarded=False, shared=True))
 
-    # Check my model (decision 0024): a local model works through synthetic packs; one check at a time.
-    def model_check_state(self):
-        from .model_check import latest
-        job = getattr(self, '_model_check', None)
-        return {'status': 'ready', 'running': bool(job and not job['done']), 'job': job and {k: v for k, v in job.items() if k != 'thread'},
-                'last': latest(self._config)}
-
-    def model_check_start(self, url, model, full=False):
-        import threading
-        from .engine_server import checked_model, checked_url
-        from .model_check import run
-        job = getattr(self, '_model_check', None)
-        if job and not job['done']:
-            return {'status': 'faulty', 'reason': 'A check is already running'}
-        try:
-            url, model = checked_url(url), checked_model(model)
-        except ConfigError as exc:
-            return {'status': 'faulty', 'reason': str(exc)}
-        job = self._model_check = {'done': False, 'cancel': False, 'index': 0, 'total': 0, 'tree': None, 'report': None, 'reason': None,
-                                   'model': model, 'url': url, 'full': bool(full)}
-
-        def work():
-            def progress(index, total, name):
-                job.update(index=index, total=total, tree=name)
-            try:
-                job['report'] = run(self._config, url, model, bool(full), progress=progress, cancelled=lambda: job['cancel'])
-            except Exception as exc:  # Shown in the card; the check never retries by itself.
-                job['reason'] = str(exc)
-            finally:
-                job['done'] = True
-        threading.Thread(target=work, name='model-check', daemon=True).start()
-        return {'status': 'started'}
-
-    def model_check_cancel(self):
-        job = getattr(self, '_model_check', None)
-        if job and not job['done']:
-            job['cancel'] = True
-        return {'status': 'cancelling' if job and not job['done'] else 'idle'}
+    def practice_action(self, action, key=None, payload=None):
+        """Practice has its own disposable audit; do not put its results in the desktop call log."""
+        from . import agent_practice
+        from .setup_agent import connections
+        if action == 'available':
+            return {'status': 'ready', 'reason': self._practice_recovery_fault}
+        async def run():
+            result = await asyncio.to_thread(agent_practice.action, self._config, action, key, payload)
+            if action == 'start' and result['status'] == 'started':
+                self._practice_key = result['key']
+                self._practice_recovery_fault = None
+            if result.get('cleaned'):
+                self._practice_key = None
+            if action == 'status' and result['status'] == 'ready':
+                from datetime import datetime, timezone
+                live = connections(self._config.project_root)
+                result['connected'] = [c.get('client') or {} for c in live if c.get('mode') == 'normal']
+                last = result['entries'][-1]['utc'] if result['entries'] else None
+                result['working'] = bool(last and (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() < 120)
+            return result
+        return self._wait(run())
 
     def _save_profile(self, key, pack):
         import webview
@@ -1018,6 +1008,9 @@ class DesktopBridge:
     def _close(self):
         if self._closed:
             return
+        if self._practice_key:
+            from .agent_practice import action
+            action(self._config, 'cancel', self._practice_key)
         self._closed = True
         if self._config.sources_registry:
             from .sources import registry, bound

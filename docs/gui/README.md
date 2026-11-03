@@ -23,11 +23,19 @@ example in a shortcut's target) to log every call the window makes. Session logs
 **Layout.** The left rail has **Back**/**Forward** (view history; a mouse's dedicated back and forward
 buttons do the same), **Home**,
 **Library**, **Collections** and **Asset processing**, with **Settings** at the
-bottom; every icon has a label and a focus/hover tooltip. Library is reserved for
-a later version and offers no actions yet. The top bar holds the background
+bottom; every icon has a label and a focus/hover tooltip. The Library lets you add
+folders, organize packs and review agent proposals. The top bar holds the background
 activity indicator (only while something runs), the notifications bell and the
 inspection toggle. Asset processing shows a dot while a source needs
 processing or an operation runs.
+
+**Try your agent.** In Settings → General or optional setup, connect your agent and choose **Try your agent**.
+Assetarium generates small practice packs and opens the Library import wizard. Choose **Let my agent finish**,
+paste the prompt into your agent, then review its proposals here. The results show observed organization and
+anything unresolved. Practice files and test data are removed when you finish or cancel; closing the results
+forgets them. An interrupted session is cleaned on the next app launch. This checks pack organization and import
+review only and does not run models, render previews or change your real library. The old local-model checker
+has been removed.
 
 **Collections** ([decision 0012](../../Assetarium%20KnowledgeBase/Decisions/0012-collections-and-tags.md)). The
 Collections tab shows every collection as a card (four member covers, name, asset

@@ -39,6 +39,7 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
 - Existing Codex registrations list `enabled_tools` explicitly, so a new tool is invisible to them
   until added there; `register-mcp.py` refuses to overwrite an existing entry.
 - The MCP call log (`data/mcp/runs/<run>/calls.jsonl`) is what the app's Agent activity shows (`agent_activity.recent`); keep its fields stable.
+- Exception: [Agent practice](Agent%20practice.md) keeps its activity in the disposable session, never in the permanent call log.
 
 ## Gotchas
 

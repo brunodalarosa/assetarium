@@ -163,7 +163,7 @@ export interface CreateRequest {
   sourceKey: string | null;
   name?: string;
 }
-export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "agent", "model", "review"] as const;
+export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "agent", "practice", "review"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 /** What the wizard will save; nothing is written until Save (or Skip setup, which saves nothing). */
 export interface SetupDraft {
@@ -259,8 +259,8 @@ export interface AppState {
     staged: Record<string, Record<number, RuleChoice>>; committing: string | null };
   /** The Add library folder wizard (decision 0024). */
   addFolder: AddFolder;
-  /** Check my model: a running check's progress and the last report (decision 0024). */
-  modelCheck: Json | null;
+  /** Practice results live in memory only until the results screen closes. */
+  practiceResult: Json | null;
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
@@ -320,8 +320,8 @@ let state: AppState = {
   queue: null,
   sources: [], globalScan: null, sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
   agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [], staged: {}, committing: null },
-  addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false },
-  modelCheck: null,
+  addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false, practice: false, practiceState: null, result: null },
+  practiceResult: null,
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
@@ -1085,8 +1085,10 @@ export async function addLibraryFolder(directory: string) {
 // Decision 0024: a names-only quick look first (seconds), then the owner chooses who finishes the structure.
 
 export type AddFolder = { open: boolean; step: "look" | "found" | "agent" | "done"; job: string | null; look: Json | null; key: string | null;
-  name: string; prompt: string; copiedAt: number | null; signals: Json | null; error: string | null; busy: boolean };
-const closedAddFolder = (): AddFolder => ({ open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false });
+  name: string; prompt: string; copiedAt: number | null; signals: Json | null; error: string | null; busy: boolean;
+  practice: boolean; practiceState: Json | null; result: Json | null };
+const closedAddFolder = (): AddFolder => ({ open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false,
+  practice: false, practiceState: null, result: null });
 export const patchAddFolder = (patch: Partial<AddFolder>) => setState((s) => ({ addFolder: { ...s.addFolder, ...patch } }));
 let lookTimer: ReturnType<typeof setTimeout> | undefined;
 /** Choose a folder and start the quick look; the wizard shows the tree as it is read. */
@@ -1109,7 +1111,7 @@ async function pollQuickLook() {
   clearTimeout(lookTimer);
   const job = state.addFolder.job;
   if (!job || !state.addFolder.open) return;
-  const look = await api().quick_look_status(job);
+  const look = state.addFolder.practice ? await api().practice_action("look", state.addFolder.key) : await api().quick_look_status(job);
   if (job !== state.addFolder.job) return;
   if (look.status === "faulty") return patchAddFolder({ error: look.reason, look });
   patchAddFolder({ look, ...(look.status === "done" && state.addFolder.step === "look" ? { step: "found" } : {}) });
@@ -1118,11 +1120,13 @@ async function pollQuickLook() {
 /** Add the folder (it starts scanning) and go on: the agent takes over, the owner reviews, or it waits. */
 export async function finishAddFolder(choice: "agent" | "myself" | "later") {
   patchAddFolder({ busy: true, error: null });
-  const result = await api().quick_look_add(state.addFolder.job);
+  const result = state.addFolder.practice ? await api().practice_action("add", state.addFolder.key) : await api().quick_look_add(state.addFolder.job);
   if (result.status === "faulty") return patchAddFolder({ busy: false, error: result.reason });
   patchAddFolder({ busy: false, key: result.key, prompt: result.prompt });
-  await loadSources();
-  await loadLibraryTree();
+  if (!state.addFolder.practice) {
+    await loadSources();
+    await loadLibraryTree();
+  }
   if (choice === "agent") {
     patchAddFolder({ step: "agent" });
     void pollFolderSignals();
@@ -1137,6 +1141,17 @@ async function pollFolderSignals() {
   clearTimeout(signalsTimer);
   const { key, open, step } = state.addFolder;
   if (!key || !open || step !== "agent") return;
+  if (state.addFolder.practice) {
+    const result = await api().practice_action("status", key);
+    if (key !== state.addFolder.key || !state.addFolder.open || state.addFolder.step !== "agent") return;
+    if (result.status === "faulty") patchAddFolder({ error: result.reason });
+    else {
+      patchAddFolder({ practiceState: result, signals: result.signals });
+      if (result.complete) { await finishPractice(); return; }
+    }
+    signalsTimer = setTimeout(() => void pollFolderSignals(), 2000);
+    return;
+  }
   const signals = await api().pack_signals(key);
   if (signals.status !== "faulty") {
     patchAddFolder({ signals });
@@ -1149,12 +1164,15 @@ export function copyAgentPrompt() {
   void copyText(state.addFolder.prompt, "Prompt copied. Paste it into your agent.");
 }
 export function closeAddFolder() {
+  if (state.addFolder.practice && !state.addFolder.result) { void finishPractice(true); return; }
   clearTimeout(lookTimer);
   clearTimeout(signalsTimer);
   setState({ addFolder: closedAddFolder() });
+  setState({ practiceResult: null });
 }
 /** Keep working elsewhere: the agent button in the top bar keeps the work visible. */
 export function minimizeAddFolder() {
+  if (state.addFolder.practice) return;
   const key = state.addFolder.key;
   closeAddFolder();
   if (key) pushToast({ tone: "info", title: "Your agent keeps working", body: "Follow it with the agent button in the top bar.", actions: [{ label: "Open", run: () => setAgentOpen(true) }] });
@@ -1499,28 +1517,39 @@ export async function measureSetupStorage() {
   const storage = await api().setup_storage_use(true);
   patchSetup({ measuring: false, storage: storage.status === "faulty" ? { status: "faulty", reason: storage.reason } : storage });
 }
-/* ------------------------------ check my model ----------------------------- */
-// Decision 0024: a local model works through synthetic packs with the pack tools; scored by outcome.
-
-let modelCheckTimer: ReturnType<typeof setTimeout> | undefined;
-export async function loadModelCheck() {
-  clearTimeout(modelCheckTimer);
-  const result = await api().model_check_state();
-  if (result.status === "faulty") return;
-  setState({ modelCheck: result });
-  if (result.running) modelCheckTimer = setTimeout(() => void loadModelCheck(), 2000);
-}
-export async function startModelCheck(url: string, model: string, full = false) {
-  const result = await api().model_check_start(url, model, full);
+/* ------------------------------ try your agent ----------------------------- */
+export async function startAgentPractice() {
+  if (state.addFolder.open) return;
+  const result = await api().practice_action("start");
   if (result.status === "faulty") {
-    pushToast({ tone: "fault", title: "Check not started", body: result.reason });
+    pushToast({ tone: "fault", title: "Practice not started", body: result.reason });
     return;
   }
-  void loadModelCheck();
+  setState({ practiceResult: null, addFolder: { ...closedAddFolder(), open: true, practice: true, key: result.key,
+    job: result.job, name: result.name } });
+  void pollQuickLook();
 }
-export async function cancelModelCheck() {
-  await api().model_check_cancel();
-  void loadModelCheck();
+export async function finishPractice(cancel = false) {
+  if (!state.addFolder.practice || state.addFolder.busy) return;
+  const key = state.addFolder.key;
+  clearTimeout(lookTimer);
+  clearTimeout(signalsTimer);
+  patchAddFolder({ busy: true, error: null });
+  const result = await api().practice_action(cancel ? "cancel" : "finish", key);
+  if (key !== state.addFolder.key) return;
+  if (!result.cleaned) return patchAddFolder({ busy: false, error: result.reason || "Practice cleanup did not finish. Try closing again." });
+  const ids = new Set([...(state.addFolder.practiceState?.proposals || []), ...(state.addFolder.practiceState?.applied || [])].map((p: Json) => p.id));
+  setState((s) => ({ agent: { ...s.agent, staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => !ids.has(id))) } }));
+  if (cancel) setState({ addFolder: closedAddFolder(), practiceResult: null });
+  else {
+    patchAddFolder({ busy: false, step: "done", result, practiceState: null, prompt: "", look: null, job: null });
+    setState({ practiceResult: result });
+  }
+}
+export async function undoPractice(id: string) {
+  const result = await api().practice_action("undo", state.addFolder.key, id);
+  patchAddFolder({ error: result.status === "faulty" ? result.reason : null });
+  await pollFolderSignals();
 }
 /** List a local model server's models (never generates text); shared by setup and Settings → General. */
 export async function checkServer(url: string, model: string): Promise<Json> {
@@ -2222,7 +2251,8 @@ export async function loadAgentActivity() {
     }
     setState((s) => ({ agent: { ...s.agent, loaded: true, entries: [...s.agent.entries, ...fresh].slice(-200), connected: result.connected,
       working: result.working, lastUtc: result.last_utc || s.agent.lastUtc, proposals: result.proposals,
-      staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => result.proposals.some((p: Json) => p.id === id))) } }));
+      staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => result.proposals.some((p: Json) => p.id === id)
+        || s.addFolder.practiceState?.proposals?.some((p: Json) => p.id === id))) } }));
   } finally {
     agentLoading = false;
   }
@@ -2275,6 +2305,8 @@ export function stagedDecisions(proposals: Json[], staged: Record<string, Record
 }
 export async function previewStaged(decisions: Json[]) {
   try {
+    if (state.addFolder.practice && decisions.every((d) => state.addFolder.practiceState?.proposals?.some((p: Json) => p.id === d.id)))
+      return await api().practice_action("preview", state.addFolder.key, decisions);
     return await api().agent_proposals_preview(decisions);
   } catch (error) {
     return { status: "faulty", reason: (error as Error).message };
@@ -2283,6 +2315,13 @@ export async function previewStaged(decisions: Json[]) {
 export async function commitStaged(folder: string, decisions: Json[]) {
   setState((s) => ({ agent: { ...s.agent, committing: folder } }));
   try {
+    if (state.addFolder.practice && folder === state.addFolder.key) {
+      const result = await api().practice_action("commit", folder, decisions);
+      if (result.status === "faulty" && !result.faults) throw Error(result.reason);
+      patchAddFolder({ error: result.faults?.map((f: Json) => f.reason).join(" · ") || null });
+      await pollFolderSignals();
+      return result;
+    }
     const result = await api().agent_proposals_commit(decisions);
     if (result.status === "faulty" && !result.faults) throw Error(result.reason);
     const applied = result.decided.filter((d: Json) => d.state === "applied").length;

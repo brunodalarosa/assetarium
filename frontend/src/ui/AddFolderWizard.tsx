@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import {
-  closeAddFolder, copyAgentPrompt, finishAddFolder, makePreviews, minimizeAddFolder, openSources, useApp,
+  closeAddFolder, copyAgentPrompt, finishAddFolder, finishPractice, makePreviews, minimizeAddFolder, openSources, startAgentPractice, undoPractice, useApp,
 } from "../app/store";
 import { ProposalReview } from "./ProposalReview";
 import { Banner, Button, IconButton, Spinner } from "./primitives";
@@ -72,6 +72,7 @@ const TILE = {
 
 function Found({ look }: { look: Json }) {
   const result = look.result, busy = useApp((s) => s.addFolder.busy), error = useApp((s) => s.addFolder.error);
+  const practice = useApp((s) => s.addFolder.practice);
   const needs: Json[] = result.packs.filter((p: Json) => p.status !== "fine");
   return (
     <div className="grid gap-5">
@@ -105,10 +106,10 @@ function Found({ look }: { look: Json }) {
       <div className="grid gap-2">
         <div className="flex flex-wrap gap-2">
           <Button id="add-folder-agent" disabled={busy} onClick={() => void finishAddFolder("agent")}><Bot className="size-4" aria-hidden />Let my agent finish</Button>
-          <Button id="add-folder-myself" variant="secondary" disabled={busy} onClick={() => void finishAddFolder("myself")}>Review myself</Button>
-          <Button id="add-folder-later" variant="quiet" disabled={busy} onClick={() => void finishAddFolder("later")}>Later</Button>
+          {!practice && <Button id="add-folder-myself" variant="secondary" disabled={busy} onClick={() => void finishAddFolder("myself")}>Review myself</Button>}
+          {!practice && <Button id="add-folder-later" variant="quiet" disabled={busy} onClick={() => void finishAddFolder("later")}>Later</Button>}
         </div>
-        <p className="text-[11.5px] text-subtle">Each choice adds the folder and scans it (reading every file once); nothing is rendered or described until you ask.</p>
+        <p className="text-[11.5px] text-subtle">{practice ? "Adds and scans these practice packs in a temporary library. Review your agent’s proposals here; everything is removed when you finish or cancel." : "Each choice adds the folder and scans it (reading every file once); nothing is rendered or described until you ask."}</p>
       </div>
     </div>
   );
@@ -125,13 +126,15 @@ function useNow(ms: number) {
 
 /** The take-over: the prompt to paste, who is connected, what the agent does here, what waits for you, progress. */
 function TakeOver() {
-  const add = useApp((s) => s.addFolder), agent = useApp((s) => s.agent);
+  const add = useApp((s) => s.addFolder), normalAgent = useApp((s) => s.agent);
+  const agent = add.practice ? { entries: [], proposals: [], connected: [], working: false, ...add.practiceState } : normalAgent;
   const reduce = useReducedMotion();
   const now = useNow(5000);
   const mine = agent.entries.filter((e: Json) => e.library_folder === add.key || e.kind === "say").slice(-8);
   const proposals = agent.proposals.filter((p: Json) => p.library_folder === add.key);
   const signals = add.signals;
-  const total = signals?.total || 0, done = total - (signals?.needs_structure || 0);
+  const total = add.practice ? (add.practiceState?.checks || []).length : signals?.total || 0;
+  const done = add.practice ? (add.practiceState?.checks || []).filter((c: Json) => c.passed).length : total - (signals?.needs_structure || 0);
   const last = mine.length ? Date.parse(mine[mine.length - 1].utc) : 0;
   const idle = add.copiedAt !== null && now - Math.max(last, add.copiedAt) > IDLE_MS;
   return (
@@ -149,7 +152,7 @@ function TakeOver() {
         <Banner tone="warning">
           <span id="agent-idle" className="flex flex-wrap items-center gap-2">Your agent seems idle.
             <Button variant="quiet" className="h-7 px-2" onClick={() => copyAgentPrompt()}>Copy the prompt again</Button>
-            <Button variant="quiet" className="h-7 px-2" onClick={() => { closeAddFolder(); openSources(add.key || undefined, ""); }}>Take over myself</Button>
+            {!add.practice && <Button variant="quiet" className="h-7 px-2" onClick={() => { closeAddFolder(); openSources(add.key || undefined, ""); }}>Take over myself</Button>}
           </span>
         </Banner>
       )}
@@ -161,12 +164,20 @@ function TakeOver() {
         {!mine.length && <li className="px-2 py-3 text-[12.5px] text-subtle">What your agent reads, changes and proposes here appears as it happens.</li>}
       </ol>
       {proposals.length > 0 && <div className="grid gap-2.5"><ProposalReview proposals={proposals} /></div>}
+      {add.practice && <div className="grid gap-3">
+        <ul className="grid gap-1 text-[12.5px]" aria-label="Practice outcomes">{(add.practiceState?.checks || []).map((check: Json) =>
+          <li key={check.label} className={check.passed ? "text-success" : "text-muted-foreground"}>{check.passed ? "✓" : "○"} {check.label}</li>)}</ul>
+        {(add.practiceState?.applied || []).map((p: Json) => <div key={p.id} className="flex items-center gap-2 text-[12px]">
+          <span>Applied to {p.pack || "practice packs"}</span><Button variant="quiet" onClick={() => void undoPractice(p.id)}>Undo</Button></div>)}
+        <div><Button variant="secondary" disabled={add.busy} onClick={() => void finishPractice()}>{add.busy ? "Finishing and cleaning up…" : "Finish and see results"}</Button></div>
+        <p className="text-[11.5px] text-subtle">Finishing checks the current outcome and removes the practice files, including unresolved proposals.</p>
+      </div>}
       <div className="grid gap-1.5">
-        <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label="Packs with a structure">
+        <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} aria-label={add.practice ? "Practice outcomes verified" : "Packs with a structure"}>
           <motion.div className="h-full rounded-full bg-primary" animate={{ width: total ? `${(done / total) * 100}%` : "0%" }} transition={SPRING_PANEL} />
         </div>
         <p id="take-over-progress" className="text-[12px] text-muted-foreground tabular-nums">
-          {signals ? `${done} of ${plural(total, "pack", "packs")} structured${signals.waiting ? ` · ${plural(signals.waiting, "proposal waits", "proposals wait")} for you` : ""}${signals.scanning ? " · scanning files" : ""}` : "Reading…"}
+          {signals ? `${done} of ${add.practice ? `${total} outcomes verified` : `${plural(total, "pack", "packs")} structured`}${signals.waiting ? ` · ${plural(signals.waiting, "proposal waits", "proposals wait")} for you` : ""}${signals.scanning ? " · scanning files" : ""}` : "Reading…"}
         </p>
       </div>
     </div>
@@ -175,6 +186,16 @@ function TakeOver() {
 
 function Done() {
   const add = useApp((s) => s.addFolder);
+  if (add.practice) return <div id="agent-practice-result" className="grid gap-4" role="status">
+    <p className="text-[15px] font-semibold">Practice finished. Practice files and test data were removed.</p>
+    <ul className="grid gap-2 text-[13px]">{(add.result?.checks || []).map((check: Json) =>
+      <li key={check.label} className={check.passed ? "text-success" : "text-warning"}>{check.passed ? "✓" : "○"} {check.label}{!check.passed && " — unresolved"}</li>)}</ul>
+    {!!add.result?.waiting && <p className="text-[13px] text-warning">{plural(add.result.waiting, "proposal was", "proposals were")} still waiting for your review when you finished.</p>}
+    {!!add.result?.faults?.length && <details className="text-[12px] text-warning"><summary>Tool calls that were refused ({add.result.faults.length})</summary>
+      <ul className="mt-2 grid gap-1">{add.result.faults.map((fault: string, i: number) => <li key={i}>{fault}</li>)}</ul></details>}
+    <p className="text-[12px] text-muted-foreground">These observations cover this practice import only. Closing this screen forgets the results.</p>
+    <div className="flex gap-2"><Button onClick={() => closeAddFolder()}>Close</Button><Button variant="secondary" onClick={() => { closeAddFolder(); void startAgentPractice(); }}>Try again</Button></div>
+  </div>;
   return (
     <div id="add-folder-done" className="grid justify-items-start gap-4">
       <span className="grid size-11 place-items-center rounded-2xl bg-accent-soft text-accent-soft-foreground"><Check className="size-5" aria-hidden /></span>
@@ -198,31 +219,32 @@ export function AddFolderWizard() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      if (add.step === "agent") minimizeAddFolder();
+      if (add.step === "agent" && !add.practice) minimizeAddFolder();
       else closeAddFolder();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [add.open, add.step]);
+  }, [add.open, add.step, add.practice]);
   return (
     <AnimatePresence>
       {add.open && (
         <motion.div id="add-folder-wizard" role="dialog" aria-modal="true" aria-labelledby={titleId} data-step={add.step}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[45] grid place-items-center bg-background/70 p-4 backdrop-blur-sm">
+          className="fixed inset-0 z-[55] grid place-items-center bg-background/70 p-4 backdrop-blur-sm">
           <motion.section initial={reduce ? false : { y: 16, scale: 0.98 }} animate={{ y: 0, scale: 1 }} transition={SPRING_PANEL}
             className="flex max-h-[88vh] w-[min(760px,100%)] flex-col overflow-hidden rounded-[28px] border border-border bg-surface shadow-panel">
             <header className="flex items-start justify-between gap-4 px-7 pt-6 pb-4">
               <div className="grid min-w-0 gap-2">
-                <h2 id={titleId} className="truncate text-[19px] font-semibold">{add.step === "look" ? "Reading" : "Adding"} {add.name}</h2>
+                <h2 id={titleId} className="truncate text-[19px] font-semibold">{add.practice ? "Try your agent" : `${add.step === "look" ? "Reading" : "Adding"} ${add.name}`}</h2>
                 <Steps step={add.step} />
               </div>
               <div className="flex items-center gap-1">
-                {add.step === "agent" && <IconButton label="Minimize; your agent keeps working" onClick={() => minimizeAddFolder()} className="size-9"><Minimize2 className="size-4" /></IconButton>}
-                <IconButton label="Close" onClick={() => (add.step === "agent" ? minimizeAddFolder() : closeAddFolder())} className="size-9"><X className="size-4" /></IconButton>
+                {add.step === "agent" && !add.practice && <IconButton label="Minimize; your agent keeps working" onClick={() => minimizeAddFolder()} className="size-9"><Minimize2 className="size-4" /></IconButton>}
+                <IconButton label={add.practice && add.step !== "done" ? "Cancel practice and remove test data" : "Close"} disabled={add.busy} onClick={() => (add.step === "agent" && !add.practice ? minimizeAddFolder() : closeAddFolder())} className="size-9"><X className="size-4" /></IconButton>
               </div>
             </header>
             <div className="min-h-0 overflow-y-auto px-7 pb-7 scroll-thin">
+              {add.practice && add.error && add.step !== "look" && <Banner><span>{add.error}</span></Banner>}
               {add.error && add.step === "look" ? <Banner><span>{add.error}</span></Banner>
                 : add.step === "look" ? <Look look={add.look} />
                 : add.step === "found" && add.look?.result ? <Found look={add.look} />

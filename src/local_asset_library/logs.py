@@ -131,6 +131,9 @@ class SessionHandler(logging.Handler):
         return lines
 
     def emit(self, record):
+        from .transient import active
+        if active.get():
+            return
         try:
             now = record.created
             key = getattr(record, 'repeat_key', None) or (record.name, record.levelno, record.getMessage())
