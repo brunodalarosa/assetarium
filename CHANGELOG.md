@@ -161,6 +161,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- Show in Explorer opens inside library folders and packs, and selects original files using the Windows Shell,
+  including paths containing spaces, commas or Unicode. Unavailable locations report an error.
+
 - **Make previews no longer offers work it then refuses**: assets Assetarium won't process (for example FBX copies
   while only glTF is processed) are counted as "not processed" instead of "without previews", so the button, the
   tree and the queue agree.

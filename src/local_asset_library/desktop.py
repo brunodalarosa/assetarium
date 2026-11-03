@@ -25,10 +25,15 @@ SLOW_MS = 2000  # A call this slow is worth a line at the default level.
 
 
 def show_in_explorer(path):
-    """Open Explorer with ``path`` selected. Windows only (decision 0013); no shell, and Explorer's exit code is meaningless."""
+    """Open inside a directory, or select an original file using the Windows Shell."""
     if os.name != 'nt':
         raise ConfigError('Show in Explorer is only available on Windows')
-    subprocess.Popen(['explorer.exe', '/select,' + os.path.normpath(path)], creationflags=subprocess.CREATE_NO_WINDOW)
+    target = Path(path).resolve(strict=True)
+    if target.is_dir():
+        os.startfile(str(target))
+    else:
+        from .windows_shell import select_file
+        select_file(str(target))
 
 
 class DesktopBridge:
