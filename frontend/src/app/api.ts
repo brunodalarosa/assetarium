@@ -5,6 +5,7 @@
 export type Json = any;
 
 export interface Bridge {
+  practice_action(action: string, key?: string | null, payload?: Json): Promise<Json>;
   context(): Promise<Json>;
   sources(): Promise<Json>;
   changes(): Promise<Json>;

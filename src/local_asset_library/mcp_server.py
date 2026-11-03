@@ -310,6 +310,21 @@ class Gateway:
         from mcp.types import CallToolResult, ImageContent, TextContent
         async with self.lock:
             self.sequence += 1
+            # A practice key selects disposable state, never the real library. Keep unscoped follow-up
+            # list_packs/say calls on that same connection in the practice session as well.
+            from . import agent_practice
+            if self.config is not None and name in PACK_TOOLS and isinstance(args, dict):
+                explicit = args.get('library_folder')
+                key = explicit or getattr(self, '_practice_key', None)
+                if explicit and not agent_practice.is_key(explicit):
+                    self._practice_key = None
+                if agent_practice.is_key(key):
+                    self._practice_key = key
+                    try:
+                        payload, error = await asyncio.to_thread(agent_practice.tool, self.config, key, name, args, self.client)
+                    except Exception as exc:
+                        payload, error = {'status': 'refused', 'reason': str(exc)}, True
+                    return CallToolResult(content=[TextContent(type='text', text=encoded(payload))], isError=error)
             started = time.perf_counter()
             image = None
             try:

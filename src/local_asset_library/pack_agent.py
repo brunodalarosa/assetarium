@@ -387,6 +387,7 @@ SCHEMAS = {
     'finish_structure': {'type': 'object', 'required': ['library_folder', 'pack'], 'additionalProperties': False, 'properties': {
         'library_folder': _KEY, 'pack': _PACK}},
     'say': {'type': 'object', 'required': ['message'], 'additionalProperties': False, 'properties': {
+        'library_folder': _KEY,
         'message': {'type': 'string', 'maxLength': SAY, 'description': 'What you are doing now, for the owner watching the app.'}}}}
 DESCRIPTIONS = {
     'list_packs': 'Packs in the library, those that need a structure first, with the reasons; paged (cursor).',

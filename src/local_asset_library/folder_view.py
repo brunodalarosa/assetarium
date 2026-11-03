@@ -95,6 +95,12 @@ def connect(current, wait=None, fresh=False):
         raise ConfigError('Catalog missing; run scan first')
     wait = WAIT if wait is None else wait
     target = folder / f'{name}-{stamp(current)}.sqlite'
+    from .transient import active
+    if active.get():
+        # Tiny practice views finish inside the session lock, so cleanup never races a rebuild thread.
+        if not target.exists():
+            build(current, target)
+        return _open(target)
     if not target.exists():
         job = _start(current, target, fresh or _latest(folder, name) is None)
         if job:

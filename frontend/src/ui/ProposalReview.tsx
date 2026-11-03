@@ -103,7 +103,7 @@ function FolderReview({ folder, proposals }: { folder: string; proposals: Json[]
     <section className="proposal-review grid gap-2.5 rounded-2xl border border-border bg-surface-2/60 p-4" data-folder={folder}>
       <div className="flex flex-wrap items-center gap-2">
         <div className="grid min-w-0 flex-1 gap-0.5">
-          <p className="text-[13px] font-semibold">{folder}</p>
+          <p className="text-[13px] font-semibold">{folder.startsWith("agent-practice-") ? "Practice packs" : folder}</p>
           <p className="text-[11.5px] text-muted-foreground">{plural(proposals.length, "pack", "packs")} · {plural(list.length, "different rule", "different rules")}</p>
         </div>
         <Button variant="quiet" className="h-8 px-3 text-[12px]" data-action="accept-all" onClick={() => stageRules(all, "accept")}>Accept all</Button>

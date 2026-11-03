@@ -53,7 +53,6 @@ as the old name of `library …`.
 | `packs export KEY PACK --output FILE` | Write a pack profile file outside the library folder |
 | `packs apply KEY PACK [FILE] [--rules JSON] [--yes]` | Show a profile's effect, then make it the pack's profile (asks first; a file must match 80% of the pack's names) |
 | `packs revert KEY PACK VERSION` | Restore an earlier profile version as a new version |
-| `model-check --model NAME [--url URL] [--full] [--run-name NAME]` | Check my model: a model on an OpenAI-compatible server on this computer (default `http://127.0.0.1:1234/v1`) structures made-up packs through the pack tools; prints each pack and the verdict, and saves `data/evidence/model-check/<run>.json` with transcripts. Quick: 8 packs; `--full`: 27 |
 
 ## Processing
 
