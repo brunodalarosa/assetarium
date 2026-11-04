@@ -25,6 +25,7 @@ KEEP_SESSIONS, PART_BYTES, FOLDER_BYTES = 30, 20 * 1024 * 1024, 200 * 1024 * 102
 REPEAT_SECONDS = 10
 SESSION = re.compile(r'^(\d{4}-\d\d-\d\d_\d\d-\d\d-\d\d_([a-z]+)(?:-\d+)?)(?:\.(\d+))?(?:\.[a-z]+)?\.log$')
 _session = None
+_native = None  # The app's open stream for native crash stacks (faulthandler).
 
 
 def _settings(root):
@@ -216,6 +217,8 @@ def start(root, kind, level=None, process=None):
     for noisy in ('asyncio', 'urllib3', 'httpx', 'httpcore', 'PIL', 'pywebview', 'mcp', 'filelock', 'huggingface_hub'):
         logging.getLogger(noisy).setLevel(max(LEVELS[name], logging.WARNING))
     _session = (path, handler, not joined, restore)
+    if kind == 'app':
+        _crash_stacks(path)
     log = logging.getLogger('assetarium.session')
     if joined:
         log.info('Joined the session · %s', kv(process=process or kind, level=name))
@@ -236,9 +239,14 @@ def start(root, kind, level=None, process=None):
 
 def stop():
     """Write pending repeat counts and close the session handler (also runs at exit)."""
-    global _session
+    global _session, _native
     if _session is None:
         return
+    if _native is not None:
+        import faulthandler
+        faulthandler.disable()
+        _native.close()
+        _native = None
     path, handler, owner, (level, hook, thread_hook) = _session
     handler.flush_repeats()  # Before "Session ended", which a console following the log stops at.
     if owner:
@@ -248,6 +256,17 @@ def stop():
     sys.excepthook, threading.excepthook = hook, thread_hook
     handler.close()
     _session = None
+
+
+def _crash_stacks(path):
+    """A native crash (WebView2, a driver) has no Python traceback; faulthandler writes its stacks into the log."""
+    global _native
+    import faulthandler
+    try:
+        _native = open(path, 'a', encoding='utf-8')
+        faulthandler.enable(_native, all_threads=True)
+    except (OSError, RuntimeError, ValueError):
+        _native = None
 
 
 def session():

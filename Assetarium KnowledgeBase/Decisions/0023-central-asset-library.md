@@ -30,8 +30,13 @@ plan in [ASSETRM-0002 plan](../Notebook/Roadmap/Features/ASSETRM-0002%20plan.md)
   and "Generate descriptions" act on a pack, folder or selection. They start at once or wait in
   line, and their scope is resolved when they start. Previews always go ahead of descriptions.
   Jobs estimated under 10 minutes start on a click; 10–30 minutes start with an Undo toast; over
-  30 minutes ask first. Descriptions can be held for an overnight window. A queue left over after
-  a restart is shown as paused and never resumes by itself.
+  30 minutes ask first. Every operation that ends starts the next waiting item. *(Updated November 4,
+  2026, owner co-design on the PR 21 review: the overnight hold is removed.)* While the app is open it
+  owns the queue: closing it while work runs asks first ("Asset processing ongoing"), and Stop & close
+  stops the running item at once. The next start shows "N items stopped when you closed Assetarium ·
+  Continue"; nothing resumes by itself. Work the app started never outlives it: if the app crashes,
+  its operations stop too, the reason is logged and the items go to Recent with a link to the log
+  (no recovery). Work queued from a terminal while the app is closed runs to the end.
 - **Missing and offline.** An unreachable library folder is Offline; vanished files are Missing.
   Their results and collection entries are kept until the owner chooses "Forget missing". Results
   nothing points to are removed only by an explicit action.

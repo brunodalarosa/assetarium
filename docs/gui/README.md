@@ -173,7 +173,9 @@ Search results gain **Show in pack**. See [asset sources](../asset-sources.md).
 tab) start at once or wait in **Up next**; previews always go first, and items can be moved or removed. An
 item that waits for a busy folder (a scan) starts as soon as that work ends. Jobs under 10 minutes start on
 the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones ask first with the estimate.
-Work left over when the app closed shows **Paused** with **Resume**. **Running** shows progress, **Cancel**
+Closing the app while work runs asks first; **Stop & close** stops it at once, and the next start shows
+"2 items stopped when you closed Assetarium" with **Continue** (after a crash the items go to Recent with
+**Show log** instead). **Running** shows progress, **Cancel**
 (the running renders finish and are saved first; decision 0022) and a live log with copy buttons on errors
 and warnings. **Blocked** groups work that can't run here by reason, with the fix and how many assets it
 unblocks; it is never offered as something to process. **Recorded failures** groups faults by stage and

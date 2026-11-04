@@ -64,7 +64,7 @@ as the old name of `library …`.
 | `previews … --dry-run` | What it would do: counts, an estimated time range and disk, and what is blocked with its fix |
 | `queue list` | Asset processing: Running, Up next, Blocked |
 | `queue move ID POSITION` / `queue remove ID` | Reorder or remove an item; removing the running one cancels it cleanly |
-| `queue pause` / `queue resume` | A queue left over after a restart is paused and never resumes by itself |
+| `queue pause` / `queue resume` | Work the app stopped when it closed waits paused; resume continues it |
 | `process --asset-source KEY` | Process a whole library folder now, watching its progress |
 | `cancel --asset-source KEY` | Cancel |
 | `refresh --asset-source KEY` | Refresh published view (publishes usable partial results) |

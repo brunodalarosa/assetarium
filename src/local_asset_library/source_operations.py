@@ -1,4 +1,4 @@
-"""Durable, cancellable source operations. Cancellation never kills a worker."""
+"""Durable, cancellable source operations. Cancellation never kills a worker; only its owning app going away does."""
 from contextlib import closing, contextmanager
 from dataclasses import replace
 import json
@@ -6,8 +6,10 @@ import logging
 import os
 from pathlib import Path
 import sqlite3
+import signal
 import subprocess
 import sys
+import threading
 import time
 import uuid
 
@@ -111,8 +113,11 @@ def operation_lease(config, scoped, token):
         acquired.__exit__(None,None,None)
 
 
-def start(config, operation, key=None, asset_ids=None, queue_item=None):
-    """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope."""
+def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None):
+    """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope.
+
+    ``owner`` is the open app's process ID: the operation stops with that app (``watch_owner``).
+    """
     if operation not in {"scan", "process", "describe", "render-test", "search-check"}:
         raise ConfigError("Unknown asset source operation")
     if operation == "search-check":
@@ -151,10 +156,12 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None):
         token = uuid.uuid4().hex
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
               operation=operation, key=key, reason=None, current_asset=None, completed=None, total=None, stage=None,
-              asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item)
+              asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item, owner=owner)
         command = [str(python), str(config.project_root / "scripts/source-operation.py"), operation, "--token", token]
         if key:
             command.extend(["--source", key])
+        if owner:
+            command.extend(["--owner", str(owner)])
         log = scoped.output_path("data", "library/operations/" + token + ".log")
         log.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -178,6 +185,41 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None):
         from .notifications import clear_ready
         clear_ready(config, get_source(config, key)["id"])
     return {"status": "started", "token": token}
+
+
+def watch_owner(config, scoped, owner, poll=1.0, end=None):
+    """Work the app started never outlives it: once that app is gone, closed or crashed, this operation and its
+    child processes stop at once. A crash is logged with its reason and its queue items go to Recent."""
+    def run():
+        while process_alive(owner):
+            time.sleep(poll)
+        from .logs import kv
+        from .processing_queue import owner_gone
+        try:
+            closed = owner_gone(config, owner)
+        except Exception:
+            closed = False
+        reason = ('Stopped when you closed Assetarium' if closed
+                  else 'Assetarium closed unexpectedly; this run stopped with it. Finished assets are saved.')
+        state(scoped, status='cancelled' if closed else 'faulty', phase='Stopped', reason=reason)
+        logging.getLogger(__name__).log(logging.INFO if closed else logging.ERROR, 'Operation stopped with its app · %s',
+                                        kv(app=owner, reason=reason))
+        (end or end_tree)()
+    thread = threading.Thread(target=run, name='owner-watch', daemon=True)
+    thread.start()
+    return thread
+
+
+def end_tree():
+    """End this operation process and every process it started (renders, description and search runtimes)."""
+    try:
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/T', '/F', '/PID', str(os.getpid())], capture_output=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            os.killpg(os.getpgrp(), signal.SIGKILL)  # Started in its own session: the group is this operation.
+    finally:
+        os._exit(1)
 
 
 def scan_all(config, token, key=None):

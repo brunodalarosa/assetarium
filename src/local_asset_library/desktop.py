@@ -45,6 +45,7 @@ class DesktopBridge:
         self._ready = threading.Event()
         self._presentation_lock = threading.Lock()
         self._closed = False
+        self._allow_close = False  # Set by Stop & close: the closing guard lets the window go.
         self._owned_source_operations = set()
         self._pending_prints = {}
         self._shared = {}
@@ -81,9 +82,11 @@ class DesktopBridge:
                 aggregate(self._config)
             self._service = DesktopService(self._config)
             if self._config.sources_registry:
-                from .processing_queue import after_restart
+                from .logs import session
+                from .processing_queue import claim
                 try:
-                    after_restart(self._config)  # A leftover queue is paused; it never resumes by itself.
+                    # The app owns the queue while it is open; what it stopped on close waits behind Continue.
+                    claim(self._config, os.getpid(), Path(session()).name if session() else None)
                 except (ConfigError, OSError, ValueError):
                     pass  # The Asset processing tab reads the queue again and shows what it can.
             from .interactive_preview import InteractivePreviewService
@@ -394,6 +397,43 @@ class DesktopBridge:
         return {'status': 'ready', 'image': base64.b64encode(png_bytes(thumbnail(decode(path, fmt)[0])[0])).decode('ascii')}
 
     # The processing queue (decision 0023).
+    def _close_question(self):
+        """What the close dialog says while an item is processing; None lets the window close."""
+        from .processing_queue import running_item
+        if self._closed or self._allow_close or not self._config.sources_registry:
+            return None
+        item = running_item(self._config)
+        if item is None:
+            return None
+        operation = item['operation']
+        done = (f" ({operation['completed']:,} / {operation['total']:,})"
+                if operation.get('total') and operation.get('completed') is not None else '')
+        more = f", and {item['waiting']} more {'waits' if item['waiting'] == 1 else 'wait'}" if item['waiting'] else ''
+        verb = 'Make previews' if item['action'] == 'previews' else 'Generate descriptions'
+        return {'title': 'Asset processing ongoing',
+                'body': f"{verb} · {item['label']} is running{done}{more}. Stop it and close Assetarium? "
+                        'Finished assets are kept, and Continue picks up the rest next time you open it.'}
+
+    def stop_and_close(self):
+        """The close dialog's Stop & close: the window closes now and closing stops the running item."""
+        self._allow_close = True
+        window = getattr(self, '_window', None)
+        if window is not None:
+            threading.Thread(target=window.destroy, name='stop-and-close', daemon=True).start()
+        return {'status': 'closing'}
+
+    def show_log(self, name):
+        """Show one session log of this project in Explorer (a crash's Recent entry links to it)."""
+        def reveal():
+            from .logs import SESSION, folder
+            root = folder(self._config.project_root)
+            path = root / str(name)
+            if not SESSION.match(path.name) or path.parent != root or not path.is_file():
+                raise ConfigError('That log is not there any more')
+            show_in_explorer(str(path))
+            return {'status': 'revealed'}
+        return self._wait(self._present(reveal, guarded=False))
+
     def queue_state(self):
         from .processing_queue import state
         return self._wait(self._present(state, self._config, guarded=False, shared=True))
@@ -1013,6 +1053,11 @@ class DesktopBridge:
             action(self._config, 'cancel', self._practice_key)
         self._closed = True
         if self._config.sources_registry:
+            from .processing_queue import release
+            try:
+                release(self._config, os.getpid())  # The running item stops now; every item waits for Continue.
+            except (ConfigError, OSError, ValueError):
+                log.exception('The queue could not be released on close')
             from .sources import registry, bound
             from .source_operations import cancel, operation_status
             for source in registry(self._config)['sources']:
@@ -1073,6 +1118,22 @@ def create_window(config, bridge):
     window = webview.create_window('Assetarium', html=html, js_api=bridge,
         width=1280, height=860, min_size=(640, 480), resizable=True, background_color=WINDOW_BACKGROUND[theme])
     bridge._window = window
+
+    def guard_close():
+        # Closing while assets are processing asks first; the dialog's Stop & close lets the window go.
+        try:
+            question = bridge._close_question()
+        except Exception:
+            log.exception('Close check failed; closing anyway')  # Never trap the owner in the app.
+            return None
+        if not question:
+            return None
+        # The handler runs on the UI thread: asking the page from it would wait on itself.
+        threading.Thread(target=lambda: window.evaluate_js(f'window.lal && window.lal.askClose({json.dumps(question)})'),
+                         name='ask-close', daemon=True).start()
+        return False
+    if hasattr(window, 'events'):  # Shell tests stand in a plain record for the window.
+        window.events.closing += guard_close
     return window
 
 

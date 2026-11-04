@@ -1,5 +1,9 @@
 """The implicit processing queue (decision 0023)."""
+import os
 from pathlib import Path
+import subprocess
+import sys
+import time
 
 import pytest
 
@@ -15,9 +19,9 @@ def fake(managed, monkeypatch):
     config, backend, one, two = managed
     started, status = [], {}
 
-    def start(config, operation, key=None, asset_ids=None, queue_item=None):
+    def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None):
         token = f'token-{len(started)}'
-        started.append({'operation': operation, 'key': key, 'asset_ids': asset_ids, 'item': queue_item})
+        started.append({'operation': operation, 'key': key, 'asset_ids': asset_ids, 'item': queue_item, 'owner': owner})
         status[key] = {'status': 'processing', 'token': token}
         return {'status': 'started', 'token': token}
     monkeypatch.setattr(source_operations, 'start', start)
@@ -87,10 +91,92 @@ def test_a_leftover_queue_is_paused_after_a_restart_until_resumed(fake):
     value['items'] = [i for i in value['items'] if i['status'] == 'waiting']
     queue.save(config, value)
     started_before = len(started)
-    queue.after_restart(config)
+    queue.claim(config, os.getpid())
     assert queue.state(config)['paused'] and queue.advance(config) is None
     queue.control(config, 'resume')
     assert len(started) == started_before + 1
+
+
+def dead_pid():
+    process = subprocess.Popen([sys.executable, '-c', 'pass'])
+    process.wait()
+    return process.pid
+
+
+def test_closing_the_app_stops_its_work_and_reopening_offers_continue(fake):
+    config, one, two, started, finish, _ = fake
+    queue.claim(config, os.getpid(), 'app.log')
+    queue.add(config, 'previews', {'key': one['key']})
+    queue.add(config, 'previews', {'key': two['key']})
+    assert started[0]['owner'] == os.getpid()  # The work it starts stops with the app.
+    assert queue.running_item(config)['waiting'] == 1
+    assert queue.release(config, os.getpid()) == 2
+    value = queue.load(config)
+    assert [i['status'] for i in value['items']] == ['waiting', 'waiting'] and value['paused'] and value['owner']['closing']
+    assert 'token' not in value['items'][0] and queue.running_item(config) is None
+    assert queue.owner_gone(config, os.getpid())  # Closed on purpose: the items stay for Continue.
+    queue.claim(config, os.getpid() + 1)  # The next app start.
+    state = queue.state(config)
+    assert state['paused'] and state['stopped_on_close'] == 2 and len(started) == 1
+    queue.control(config, 'resume')
+    state = queue.state(config)
+    assert len(started) == 2 and started[1]['key'] == one['key'] and state['stopped_on_close'] == 0
+
+
+def test_after_a_crash_nothing_resumes_and_recent_says_why(fake):
+    config, one, two, started, finish, _ = fake
+    queue.claim(config, os.getpid(), 'app.log')
+    queue.add(config, 'previews', {'key': one['key']})
+    queue.add(config, 'previews', {'key': two['key']})
+    assert not queue.owner_gone(config, os.getpid())  # The worker saw its app vanish without closing.
+    value = queue.load(config)
+    assert not value['items'] and [r['status'] for r in value['recent'][:2]] == ['stopped', 'stopped']
+    assert value['recent'][0]['log'] == 'app.log' and 'closed unexpectedly' in value['recent'][0]['reason']
+    # A crash with no worker running: the next start moves what waited to Recent as well.
+    queue.claim(config, dead_pid(), 'crashed.log')
+    queue.control(config, 'pause')
+    queue.add(config, 'previews', {'key': two['key']})
+    queue.claim(config, os.getpid())
+    value = queue.load(config)
+    assert not value['items'] and value['recent'][0]['log'] == 'crashed.log' and not value['paused']
+
+
+def test_work_started_from_a_terminal_has_no_owner(fake):
+    config, one, _, started, _, _ = fake
+    queue.claim(config, dead_pid())
+    queue.add(config, 'previews', {'key': one['key']})
+    assert started[0]['owner'] is None
+
+
+def test_an_operation_stops_when_its_app_is_gone(fake):
+    config, one, _, _, _, _ = fake
+    owner = dead_pid()  # The app that started it, gone without closing.
+    queue.claim(config, owner)
+    queue.add(config, 'previews', {'key': one['key']})
+    scoped = sources.bound(config, one)
+    ended = []
+    source_operations.watch_owner(config, scoped, owner, poll=0.01, end=lambda: ended.append(True)).join(5)
+    value = source_operations.read_json(scoped.output_path('data', 'library/source-operation.json'))
+    assert ended and value['status'] == 'faulty' and 'closed unexpectedly' in value['reason']
+
+
+def test_ending_an_operation_ends_every_process_it_started(tmp_path):
+    marker = tmp_path / 'grandchild.pid'
+    script = tmp_path / 'operation.py'
+    script.write_text(f'''import subprocess, sys, time
+sys.path.insert(0, {str(Path(__file__).parents[1] / "src")!r})
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+open({str(marker)!r}, "w").write(str(child.pid))
+from local_asset_library.source_operations import end_tree
+end_tree()
+''', encoding='utf-8')
+    operation = subprocess.Popen([sys.executable, str(script)], start_new_session=os.name != 'nt')
+    assert operation.wait(30) != 0
+    from local_asset_library.gpu_queue import process_alive
+    deadline = time.monotonic() + 10
+    while process_alive(int(marker.read_text())) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not process_alive(int(marker.read_text()))
 
 
 def test_removing_a_cancelling_item_again_keeps_it_until_its_operation_ends(fake):

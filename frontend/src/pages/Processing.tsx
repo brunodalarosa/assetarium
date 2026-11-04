@@ -1,10 +1,10 @@
-import { ArrowDown, ArrowUp, Copy, FolderOpen, Pause, Play, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, FileText, FolderOpen, Pause, Play, RotateCcw, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { operationActive, plural } from "../app/format";
-import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, sourceAction, useApp } from "../app/store";
+import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, showLog, sourceAction, useApp } from "../app/store";
 import { Skeleton } from "../ui/Loading";
 import { Reason } from "../ui/CommandBlock";
 import { Badge, Banner, Button, Disclosure } from "../ui/primitives";
@@ -14,6 +14,7 @@ const ACTION = { previews: "Make previews", descriptions: "Generate descriptions
 const OUTCOME: Record<string, [string, "success" | "warning" | "fault" | "neutral"]> = {
   complete: ["Done", "success"], complete_with_faults: ["Done · failures recorded", "warning"], cancelled: ["Cancelled", "neutral"],
   faulty: ["Stopped", "fault"], interrupted: ["Interrupted", "warning"], nothing_to_do: ["Nothing to do", "neutral"],
+  stopped: ["Stopped · app closed", "fault"],
 };
 
 function Section({ id, title, count, children, hint }: { id: string; title: string; count?: number; children: ReactNode; hint?: ReactNode }) {
@@ -96,12 +97,14 @@ function UpNext() {
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-4">
         {queue?.paused ? (
-          <Button id="resume-queue" className="h-8 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />Resume</Button>
+          <Button id="resume-queue" className="h-8 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />{queue.stopped_on_close ? "Continue" : "Resume"}</Button>
         ) : items.length > 0 && (
           <Button variant="quiet" className="h-8 px-3" onClick={() => void queueControl("pause")}><Pause className="size-3.5" aria-hidden />Pause</Button>
         )}
       </div>
-      {queue?.paused && <Banner tone="info"><span id="queue-paused">Paused. Work left over from the last session waits here and never starts by itself.</span></Banner>}
+      {queue?.paused && <Banner tone="info"><span id="queue-paused">{queue.stopped_on_close
+        ? "Stopped when you closed Assetarium. Finished assets are kept; Continue picks up the rest."
+        : "Paused. Nothing here starts until you resume."}</span></Banner>}
       {!items.length ? <p className="text-[13px] text-muted-foreground">Nothing waiting. Previews always run before descriptions.</p> : (
         <ol id="up-next" className="grid gap-1.5">
           <AnimatePresence initial={false}>
@@ -188,6 +191,7 @@ function Recent() {
             <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</span>
             {count > 1 && <span className="recent-repeat text-[11.5px] text-muted-foreground tabular-nums" title="The same work ended the same way several times in a row">× {count}</span>}
             {seconds !== null && <span className="text-[11.5px] text-muted-foreground tabular-nums">{seconds < 90 ? Math.round(seconds) + " s" : Math.round(seconds / 60) + " min"}</span>}
+            {item.log && <Button variant="quiet" className="h-7 px-2" onClick={() => void showLog(item.log)}><FileText className="size-3.5" aria-hidden />Show log</Button>}
             {item.reason && <Reason text={item.reason} className="w-full text-[12px] text-muted-foreground" />}
           </li>
         );

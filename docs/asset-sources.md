@@ -168,7 +168,11 @@ assets. They start at once or wait in line on **Asset processing**:
   Longer jobs, or jobs that would reach the storage budget, ask first with an estimate (counts, a time range,
   disk). The estimate comes from the render speed test and recent runs; without either it says
   "no measurement yet".
-- Queued work left over when the app closed shows as **Paused** with **Resume**. It never resumes by itself.
+- Closing Assetarium while work runs asks first (**Asset processing ongoing**): **Keep open** or **Stop & close**,
+  which stops the running item at once. Finished assets are kept. The next time you open Assetarium a line on
+  every page says how many items stopped, with **Continue**; nothing resumes by itself.
+- Processing never outlives the app that started it. If Assetarium crashes, its work stops too, and the items
+  go to **Recent** as **Stopped · app closed** with **Show log**; nothing is resumed.
 - Every operation that ends (a job, a scan, a speed test) starts the next waiting item, so nothing waits for a click.
 
 **Asset processing** shows **Running** (progress, Cancel, a live log with copy buttons on errors and

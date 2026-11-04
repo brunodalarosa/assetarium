@@ -18,6 +18,7 @@ parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage'
 parser.add_argument('--source')
 parser.add_argument('--token', required=True)
 parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'])
+parser.add_argument('--owner', type=int, help='The app that started this work; it stops when that app is gone')
 args = parser.parse_args()
 from local_asset_library.logs import kv, start
 start(root, 'operation', process=args.operation)  # Joins the session that started it (app or CLI).
@@ -35,6 +36,9 @@ else:
     # Wait for the parent to finish its short, atomic process handoff.
     with lease(config, 'source-operation-handoff', resource='sources'):
         state(scoped, pid=os.getpid())
+    if args.owner:
+        from local_asset_library.source_operations import watch_owner
+        watch_owner(config, scoped, args.owner)
     try:
         with operation_lease(config, scoped, args.token) as ready:
             if not ready:

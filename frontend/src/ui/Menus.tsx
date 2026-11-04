@@ -1,6 +1,6 @@
 import {
   Ban, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, ExternalLink, FileText, FolderMinus, FolderOpen, FolderPlus, FolderSearch, Image as ImageIcon,
-  ListX, Merge, Package, Pencil, Plus, RefreshCw, RotateCcw, ScanSearch, Search, ToggleLeft, Trash2, Undo2, Wrench, X,
+  ListX, Merge, Package, Pencil, Plus, RefreshCw, RotateCcw, ScanSearch, Search, Square, ToggleLeft, Trash2, Undo2, Wrench, X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -544,7 +544,7 @@ export function ConfirmDialog() {
         <div className="grid gap-4 p-6">
           <div className="flex items-start gap-3">
             <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full", neutral ? "bg-surface-2 text-primary" : "bg-fault-bg text-fault")}>
-              {neutral ? <RotateCcw className="size-[18px]" /> : <Trash2 className="size-[18px]" />}
+              {request.icon === "stop" ? <Square className="size-[16px]" /> : neutral ? <RotateCcw className="size-[18px]" /> : <Trash2 className="size-[18px]" />}
             </span>
             <div className="min-w-0">
               <h2 id="confirm-title" className="text-[17px] font-semibold break-words">{request.title}</h2>
@@ -553,7 +553,7 @@ export function ConfirmDialog() {
           </div>
           {error && <p role="alert" className="rounded-xl bg-fault-bg px-4 py-3 text-[12.5px] text-fault">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" id="confirm-cancel" data-autofocus="" disabled={busy} onClick={closeConfirm}>{request.run ? "Cancel" : "Close"}</Button>
+            <Button variant="secondary" id="confirm-cancel" data-autofocus="" disabled={busy} onClick={closeConfirm}>{request.cancelLabel || (request.run ? "Cancel" : "Close")}</Button>
             {request.run && (
               <Button variant={neutral ? "primary" : "destructive"} className={request.deleteOnLeft ? "order-first mr-auto" : undefined} id="confirm-accept" disabled={busy} onClick={() => void confirm()}>
                 {busy && <Spinner className="size-3.5" />}{request.confirmLabel}

@@ -132,6 +132,10 @@ export interface ConfirmRequest {
   title: string;
   body: string;
   confirmLabel: string;
+  /** The button that keeps things as they are (default Cancel, or Close without run). */
+  cancelLabel?: string;
+  /** "stop" for a dialog that stops running work (the default icon reads as undo or delete). */
+  icon?: "stop";
   /** Without run, the dialog only informs and offers Close. */
   run?: () => Promise<unknown>;
   /** Deletions are "danger" (the default); other confirmations are "neutral". */
@@ -2114,6 +2118,16 @@ export function closeMenu() {
 export function askConfirm(request: ConfirmRequest) {
   setState({ confirm: request, menu: null });
 }
+/** Closing while assets are processing asks first; the backend's closing guard calls this (decision 0023). */
+export function askClose(question: { title: string; body: string }) {
+  askConfirm({ tone: "neutral", title: question.title, body: question.body, confirmLabel: "Stop & close", cancelLabel: "Keep open", icon: "stop",
+    run: () => api().stop_and_close() });
+}
+/** Show the session log a crash's Recent entry names. */
+export async function showLog(name: string) {
+  const result = await api().show_log(name);
+  if (result.status === "faulty") pushToast({ tone: "fault", title: "Log not shown", body: result.reason });
+}
 export function closeConfirm() {
   setState({ confirm: null });
 }
@@ -2428,6 +2442,7 @@ export async function start(bridge: Bridge) {
     await loadSources();
     void loadLibraryTree();
     void watchChanges();
+    void loadQueue();  // Work stopped when the app last closed shows its Continue banner at once.
     // Setup opens by itself only on a genuinely fresh install (setup_core.first_run), or to show an agent's setup for review.
     void loadSetupState().then((info) => (info.auto_open || info.record?.state === "review") && openSetup()).catch(() => undefined);
     if (context.managed_sources) await sourceAction("scan");

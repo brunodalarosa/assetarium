@@ -13,7 +13,7 @@ import { NotificationsPanel, RunReport, Toasts } from "./ui/Notifications";
 import { AgentActivityPanel } from "./ui/AgentActivity";
 import { AddFolderWizard } from "./ui/AddFolderWizard";
 import { SetupWizard } from "./ui/SetupWizard";
-import { Rail, TopBar } from "./ui/Shell";
+import { Rail, StoppedBanner, TopBar } from "./ui/Shell";
 
 function Page() {
   const current = useApp((s) => s.history[s.historyIndex]);
@@ -96,6 +96,7 @@ export function App() {
         <Rail />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
+          <StoppedBanner />
           <div className="relative flex min-h-0 flex-1">
             <main className="min-w-0 flex-1">
               <PageFrame />

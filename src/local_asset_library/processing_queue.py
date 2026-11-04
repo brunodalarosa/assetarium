@@ -4,7 +4,9 @@ An item names an action and a scope (a folder or pack of a library folder, or pi
 resolved when the item starts: "whatever there still lacks previews". Previews always run ahead of
 descriptions; otherwise items run in the owner's order. Items run one at a time through the durable source
 operations, and every operation (scans included) starts the next item when it ends, so an item that waited
-for a busy folder never stalls. A queue left over after a restart is paused and never resumes by itself. Blocked work is never queued: its prerequisite and fix are shown instead.
+for a busy folder never stalls. While the app is open it owns the queue: closing it stops the running item at
+once and keeps every item for Continue next time; work it started never outlives it, and after a crash nothing
+is recovered (the items go to Recent with the reason). Nothing resumes by itself. Blocked work is never queued: its prerequisite and fix are shown instead.
 """
 from contextlib import closing
 from datetime import datetime, timezone
@@ -284,7 +286,8 @@ def advance(config):
                                      'reason': 'Everything here was already done or is blocked'}] + queue['recent'])[:RECENT]
                 continue
             try:
-                result = start(config, OPERATION[item['action']], item['scope']['key'], asset_ids=found['ids'], queue_item=item['id'])
+                result = start(config, OPERATION[item['action']], item['scope']['key'], asset_ids=found['ids'], queue_item=item['id'],
+                               owner=_owner(queue))
             except ConfigError as exc:
                 queue['items'].remove(item)
                 queue['recent'] = ([{**item, 'status': 'faulty', 'finished_utc': now(), 'reason': str(exc)}] + queue['recent'])[:RECENT]
@@ -321,6 +324,9 @@ def control(config, action, identifier=None, value=None):
             queue['items'].insert(max(0, min(len(queue['items']), value)), item)
         elif action in {'pause', 'resume'}:
             queue['paused'] = action == 'pause'
+            if action == 'resume':
+                for waiting in queue['items']:
+                    waiting.pop('stopped_on_close', None)
         else:
             raise ConfigError('Unknown queue action')
         save(config, queue)
@@ -329,14 +335,93 @@ def control(config, action, identifier=None, value=None):
     return state(config)
 
 
-def after_restart(config):
-    """At app start: a leftover queue is shown paused, with Resume; it never resumes by itself."""
+def _owner(queue):
+    """The open app's process ID, handed to the work it starts so that work stops with it; None from a terminal."""
+    from .gpu_queue import process_alive
+    owner = queue.get('owner') or {}
+    return owner['pid'] if owner.get('pid') and not owner.get('closing') and process_alive(owner['pid']) else None
+
+
+def _stopped_unexpectedly(queue, log=None):
+    """After a crash nothing is recovered: every item goes to Recent with the reason and the log that holds it."""
+    reason = 'Assetarium closed unexpectedly; this work stopped with it'
+    queue['recent'] = ([{**i, 'status': 'stopped', 'finished_utc': now(), 'reason': reason, **({'log': log} if log else {})}
+                        for i in queue['items']] + queue['recent'])[:RECENT]
+    queue['items'], queue['paused'] = [], False
+
+
+def claim(config, pid, log=None):
+    """At app start the app owns the queue. ``log`` is its session log's file name, shown after a crash.
+
+    Items the last app stopped when it closed wait paused behind Continue; if that app crashed instead, they go to
+    Recent. Work left waiting from a terminal is paused too: nothing resumes by itself.
+    """
+    from .gpu_queue import process_alive
     with _locked(config):
         queue = load(config)
         _finish_running(config, queue)
-        if any(i['status'] == 'waiting' for i in queue['items']) and not any(i['status'] == 'running' for i in queue['items']):
+        last = queue.get('owner') or {}
+        if last.get('pid') and last['pid'] != pid and not last.get('closing') and not process_alive(last['pid']):
+            _stopped_unexpectedly(queue, last.get('log'))
+        if any(i['status'] == 'waiting' for i in queue['items']) and not any(i['status'] in {'running', 'cancelling'} for i in queue['items']):
             queue['paused'] = True
+        queue['owner'] = {'pid': pid, 'closing': False, **({'log': log} if log else {})}
         save(config, queue)
+
+
+def release(config, pid):
+    """The app closes: its running item stops at once and every item waits for Continue next time."""
+    from .source_operations import cancel
+    from .sources import bound, get_source
+    with _locked(config):
+        queue = load(config)
+        owner = queue.get('owner') or {}
+        if owner.get('pid') != pid:
+            return 0
+        for item in queue['items']:
+            if item['status'] in {'running', 'cancelling'}:
+                try:
+                    cancel(bound(config, get_source(config, item['scope']['key'])))
+                except ConfigError:
+                    pass  # The folder was removed; its operation ends with the app all the same.
+                for key in ('token', 'started_utc', 'resolved'):
+                    item.pop(key, None)
+                item['status'] = 'waiting'  # Its scope resolves again on Continue, so finished assets are skipped.
+            item['stopped_on_close'] = True
+        queue['paused'] = queue['paused'] or bool(queue['items'])
+        queue['owner'] = dict(owner, closing=True)
+        save(config, queue)
+        return len(queue['items'])
+
+
+def owner_gone(config, pid):
+    """A worker's app is gone. True when it closed on purpose; after a crash its items go to Recent."""
+    with _locked(config):
+        queue = load(config)
+        owner = queue.get('owner') or {}
+        if owner.get('pid') != pid or owner.get('closing'):
+            return True
+        _stopped_unexpectedly(queue, owner.get('log'))
+        save(config, queue)
+        return False
+
+
+def running_item(config):
+    """The item running now (with its operation's progress), so closing the app can ask first."""
+    from .source_operations import operation_status
+    from .sources import bound, get_source
+    with _locked(config):
+        queue = load(config)
+        if _finish_running(config, queue):
+            save(config, queue)
+    item = next((i for i in queue['items'] if i['status'] in {'running', 'cancelling'}), None)
+    if item is None:
+        return None
+    try:
+        operation = operation_status(bound(config, get_source(config, item['scope']['key'])))
+    except ConfigError:
+        operation = {}
+    return {**item, 'operation': operation, 'waiting': sum(i['status'] == 'waiting' for i in queue['items'])}
 
 
 def _log_lines(config, item):
@@ -412,4 +497,5 @@ def state(config):
         except ConfigError:
             pass
     return {'status': 'ready', 'paused': queue['paused'], 'running': running, 'up_next': _order(queue['items']),
+            'stopped_on_close': sum(bool(i.get('stopped_on_close')) for i in queue['items']),
             'blocked': blocked_groups(config), 'failures': failures(config), 'recent': queue['recent']}
