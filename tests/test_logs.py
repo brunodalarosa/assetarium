@@ -113,6 +113,23 @@ def test_retention_keeps_the_newest_sessions_and_the_current_one(fresh):
     assert logs.retire(fresh, sessions_kept=30, limit=250) == ['2026-10-05_10-00-00_app', '2026-10-01_10-00-00_app']
 
 
+
+def test_retention_never_removes_a_session_that_is_still_running(fresh):
+    fresh.mkdir()
+    live = fresh / '2026-10-01_10-00-00_mcp.log'  # An MCP server up for days while commands come and go.
+    live.write_text('x' * 100)
+    handler = logs.SessionHandler(live, 'mcp')
+    for day in range(2, 6):
+        (fresh / f'2026-10-0{day}_10-00-00_cli.log').write_text('x' * 100)
+    try:
+        removed = logs.retire(fresh, keep=fresh / '2026-10-05_10-00-00_cli.log', sessions_kept=1)
+        assert '2026-10-01_10-00-00_mcp' not in removed and live.exists() and (fresh / '.2026-10-01_10-00-00_mcp.lock').exists()
+        assert removed == ['2026-10-04_10-00-00_cli', '2026-10-03_10-00-00_cli', '2026-10-02_10-00-00_cli']
+    finally:
+        handler.close()
+    assert logs.retire(fresh, keep=fresh / '2026-10-05_10-00-00_cli.log', sessions_kept=1) == ['2026-10-01_10-00-00_mcp']
+    assert not live.exists() and not (fresh / '.2026-10-01_10-00-00_mcp.lock').exists()
+
 def test_show_filters_by_level_and_keeps_tracebacks_with_their_line(fresh):
     path = logs.start(ROOT, 'app', 'debug')
     log = logging.getLogger('local_asset_library.test')

@@ -62,10 +62,20 @@ def kv(**fields):
 
 
 class _Lock:
-    """An exclusive lock on a sidecar file, held only while one line is appended."""
+    """An exclusive lock on a sidecar file, held only while one line is appended.
+
+    The file also says the session is live: every process writing to it keeps it open for its whole life (Windows
+    then refuses to delete it) and, off Windows, holds a shared lock on its second byte (``live``).
+    """
 
     def __init__(self, path):
         self.stream = open(path, 'a+b')
+        if os.name != 'nt':
+            import fcntl
+            try:
+                fcntl.lockf(self.stream, fcntl.LOCK_SH | fcntl.LOCK_NB, 1, 1)
+            except OSError:
+                pass  # Only a cleanup's brief check holds it exclusively; this session stays usable.
 
     def __enter__(self):
         if os.name == 'nt':
@@ -306,8 +316,30 @@ def sessions(logs):
     return sorted(found.items(), reverse=True)
 
 
+def _release(lock):
+    """Remove a session's lock file unless a process of that session still runs; False when it is live."""
+    if not lock.exists():
+        return True
+    if os.name != 'nt':
+        import fcntl
+        try:
+            with open(lock, 'a+b') as stream:
+                fcntl.lockf(stream, fcntl.LOCK_EX | fcntl.LOCK_NB, 1, 1)
+        except OSError:
+            return False
+    try:
+        lock.unlink()  # Windows refuses while any process of the session keeps it open.
+    except FileNotFoundError:
+        pass
+    except OSError:
+        return False
+    return True
+
+
 def retire(logs, keep=None, sessions_kept=KEEP_SESSIONS, limit=FOLDER_BYTES):
-    """Remove whole old sessions beyond the newest ``sessions_kept`` or over ``limit`` bytes; never ``keep``'s."""
+    """Remove whole old sessions beyond the newest ``sessions_kept`` or over ``limit`` bytes; never ``keep``'s.
+
+    A session that is still running (an MCP server up for days while many commands run) is never removed."""
     current = SESSION.match(Path(keep).name).group(1) if keep else None
     listed = sessions(logs)
     total, removed = 0, []
@@ -315,6 +347,8 @@ def retire(logs, keep=None, sessions_kept=KEEP_SESSIONS, limit=FOLDER_BYTES):
         size = sum(f.stat().st_size for f in files if f.exists())
         total += size
         if stem != current and (index >= sessions_kept or total > limit):
+            if not _release(Path(logs) / f'.{stem}.lock'):
+                continue
             for path in files:
                 try:
                     path.unlink(missing_ok=True)
