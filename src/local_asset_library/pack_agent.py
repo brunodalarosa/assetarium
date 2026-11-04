@@ -227,7 +227,7 @@ def decide(config, identifier, decision, approved='owner', leave_out=()):
     rejects it.
     """
     from .library_store import now
-    from .pack_profiles import apply, history, revert
+    from .pack_profiles import _lanes, apply, current, history, revert, version_rules
     key, pack, rules, origin, state, _ = _row(config, identifier)
     if decision == 'apply' and leave_out:
         rules, left = _kept(rules, leave_out)
@@ -237,9 +237,15 @@ def decide(config, identifier, decision, approved='owner', leave_out=()):
         if state != 'applied':
             raise ConfigError('Only an applied proposal can be undone')
         # Back to the version just below the proposal's own (the 'earlier' v1 for a pack's first profile).
-        own = next((h['version'] for h in history(config, key, pack) if h['origin'].get('proposal') == identifier), None)
+        versions = history(config, key, pack)
+        own = next((h['version'] for h in versions if h['origin'].get('proposal') == identifier), None)
         if own is None:
             raise ConfigError('This proposal changed nothing, so there is nothing to undo')
+        # Undo restores the version before it, so it is refused once anything changed since: it would erase that too.
+        from .sources import get_source
+        if versions[0]['version'] != own or _lanes(current(config, get_source(config, key), pack), version_rules(config, key, pack, own)):
+            raise ConfigError('This pack changed since this proposal, so undoing it would also undo those changes. '
+                              'Undo the later changes first, or change the pack in its profile.')
         result, state = revert(config, key, pack, own - 1, {'by': 'owner', 'undid': identifier}), 'undone'
     elif state != 'pending':
         raise ConfigError(f'This proposal is already {state}')

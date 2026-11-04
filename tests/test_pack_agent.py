@@ -141,3 +141,18 @@ def test_a_failing_staged_decision_stays_waiting_and_the_rest_save(kit):
         pack_agent.decide(config, waiting['proposal_id'], 'apply', leave_out=[5])
     with pytest.raises(ConfigError, match='Give a list'):
         pack_agent.commit(config, [])
+
+
+def test_undo_is_refused_once_the_pack_changed_since_the_proposal(kit):
+    config, one = kit
+    rules = [{'kind': 'variant_axis', 'folder': 'Rocks', 'values': ['numbers']}]
+    first = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=rules)
+    pack_profiles.apply(config, one['key'], 'Kit_1.0', rules + [{'kind': 'pack_name', 'value': 'Starter Kit'}], {'by': 'owner'})
+    with pytest.raises(ConfigError, match='changed since this proposal'):
+        pack_agent.decide(config, first['proposal_id'], 'undo')
+    assert {'kind': 'pack_name', 'value': 'Starter Kit'} in pack_profiles.current(config, one, 'Kit_1.0')  # Nothing erased.
+    # An answer saved outside any profile version counts as a change too.
+    second = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=rules)
+    library_store.save_answer(config, one['id'], 'Kit_1.0', 'pack_name', 'Renamed')
+    with pytest.raises(ConfigError, match='changed since this proposal'):
+        pack_agent.decide(config, second['proposal_id'], 'undo')

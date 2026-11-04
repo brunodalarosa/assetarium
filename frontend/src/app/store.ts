@@ -2303,7 +2303,7 @@ export async function decideAgentProposal(id: string, decision: "apply" | "rejec
     if (state.sourcesView.key) void refreshFolder();
     return result;
   } catch (error) {
-    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    pushToast({ tone: "fault", title: decision === "undo" ? "Not undone" : "Not saved", body: (error as Error).message });
     return { status: "faulty", reason: (error as Error).message };
   }
 }

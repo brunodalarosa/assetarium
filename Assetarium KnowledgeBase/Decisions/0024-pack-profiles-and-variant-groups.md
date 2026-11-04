@@ -39,7 +39,9 @@ draft the structure and raise signals, and an agent (or the owner) corrects it a
   as the agent's and undoable; propose tools wait for the owner; run is Blender's check only. Pack tools
   (`list_packs`, `get_pack_outline`, `get_profile`, `propose_profile`, `finish_structure`, `say`) page through
   folders in bounded responses. A proposal whose rules need no scan applies at once with Undo; any other waits
-  in the app's **Agent activity** drawer, one per pack (a newer one replaces it).
+  in the app's **Agent activity** drawer, one per pack (a newer one replaces it). Undo restores the version
+  before the proposal, so it is refused once the pack changed after it *(added November 4, 2026, owner choice
+  on the PR 21 review)*: it says so instead of erasing the later change.
 - **Agent activity** is app-wide: every MCP call becomes a sentence (from the server's call log), with the
   connected client, proposals waiting and Undo; toasts tell an owner who is elsewhere in the app.
 - **Add library folder is a wizard**: a names-only quick look (seconds; the tree fills in live), what was

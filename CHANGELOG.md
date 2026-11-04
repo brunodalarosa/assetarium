@@ -10,6 +10,8 @@ All notable changes to Assetarium are listed here. The project follows
 
 - Adding a library folder around others keeps their answers (excluded folders, export folder decisions, texture
   folder, packs, image kinds) under the new folder's path, so excluded engine copies are not scanned again.
+- Undoing an agent's pack proposal is refused, with the reason, once the pack changed after it; it used to
+  restore the earlier version and silently drop the later change.
 - **Format off**: a model shown in the Library whose previews were made from a file in a format that is off
   now says so (its descriptions and search by meaning skip it) and offers **Turn FBX on** in the inspector,
   instead of looking ready. Design principle P5, *No silent states*, records the rule.
