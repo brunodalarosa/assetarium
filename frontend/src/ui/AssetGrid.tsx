@@ -1,4 +1,4 @@
-import { Ban, Box, Check, Circle, CircleAlert, CircleSlash, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, TriangleAlert, Unlink } from "lucide-react";
+import { Ban, Box, Check, Circle, CircleAlert, CircleSlash, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, ToggleLeft, TriangleAlert, Unlink } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { type ComponentType, type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
@@ -16,6 +16,7 @@ const STATE: Record<string, { icon: typeof Clock; label: string }> = {
   no_previews: { icon: Clock, label: "No previews yet" }, queued: { icon: Clock, label: "Queued" }, running: { icon: Loader, label: "Making previews" },
   blocked: { icon: Ban, label: "Blocked" }, failed: { icon: CircleAlert, label: "Recorded failure" }, missing: { icon: Unlink, label: "Missing" },
   excluded: { icon: FileX, label: "Excluded" }, skipped: { icon: CircleSlash, label: "Not processed" },
+  format_off: { icon: ToggleLeft, label: "Format off" },
 };
 const DESCRIPTION: Record<string, { icon: typeof FileText; label: string }> = {
   complete: { icon: FileText, label: "Described" }, failed: { icon: FileX, label: "Description failed" }, missing: { icon: FileQuestion, label: "No description yet" },
@@ -30,7 +31,7 @@ function StateStrip({ item }: { item: Json }) {
   const icons: { icon: ComponentType<{ className?: string; strokeWidth?: number }>; label: string; tone?: string; spin?: boolean }[] = [];
   const state = STATE[item.state];
   if (state && item.state !== "ready") icons.push({ ...state, label: item.reason ? `${state.label}: ${item.reason}` : state.label,
-    tone: item.state === "failed" ? "text-fault" : item.state === "blocked" ? "text-warning" : undefined, spin: item.state === "running" });
+    tone: item.state === "failed" ? "text-fault" : item.state === "blocked" || item.state === "format_off" ? "text-warning" : undefined, spin: item.state === "running" });
   const overlays = item.overlays || {};
   if (overlays.warning) icons.push({ icon: TriangleAlert, label: "Description warning", tone: "text-warning" });
   if (overlays.description && DESCRIPTION[overlays.description]) icons.push(DESCRIPTION[overlays.description]);

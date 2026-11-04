@@ -70,6 +70,13 @@ class DesktopService(AssetService):
         self.item_faults[(identifier, channel)] = fault
         return fault
 
+    def _format_off(self, record):
+        from .settings import format_off, used_formats
+        try:
+            return format_off(record, used_formats(self.config))
+        except (ConfigError, OSError, ValueError):
+            return None  # A damaged settings file is reported by Settings; the asset itself still opens.
+
     @pinned
     def context(self):
         version = self.synchronize()
@@ -287,7 +294,8 @@ class DesktopService(AssetService):
             'type_metadata': record.get('type_metadata') if record.get('asset_type') == 'image' else None,
             'model_input': next(({'derivation': p.get('derivation'), 'path': p.get('path')} for p in record['previews']
                                  if p.get('role') == 'model_input'), None),
-            'processing': record['processing'], 'license_evidence': relevant_license_evidence(record),
+            'processing': record['processing'], 'format_off': self._format_off(record),
+            'license_evidence': relevant_license_evidence(record),
             'source_faults': (record.get('inspection_run') or {}).get('source_faults', []),
             'stage_faults':record.get('stage_faults',{}),
             'caption_faults': (record.get('caption_provenance') or {}).get('visual_faults', []),

@@ -20,6 +20,9 @@ behind it are [decision 0025](../../Decisions/0025-design-principles.md); read t
 - **P4 Make progress measurable**: long work shows its phase and a compact measured count. Hover or keyboard
   focus reveals totals, remaining work and outcomes. Unknown totals stay indeterminate; phase percentages are
   labeled as phase progress (`OperationProgress`, `progressInfo`, `source_operations.scan_reporter`).
+- **P5 No silent states**: every asset, item and action shows its state and why; facts first, then only the
+  actions that resolve it. Nothing is skipped, hidden or "nothing to do" without a reason. A chip or one line is
+  always visible; the reason and actions live in the inspector, a tooltip or an expanded row.
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
 
@@ -59,6 +62,7 @@ are in `lib/ease.ts` (`SPRING_LAYOUT`, `SPRING_PANEL`); honor `useReducedMotion`
 | `Bot` | an external agent (Agent activity, agent setup, "Let my agent finish") |
 | dot | new since your last visit |
 | `CircleSlash` | not processed: a file type Assetarium does not process (state `skipped`) |
+| `ToggleLeft` | format off: shown, but made from a file whose format is off (state `format_off`, P5) |
 | `TriangleAlert` | warning · `CircleAlert` fault · `Clock` waiting · `Check` done or accepted · `X` close or reject |
 
 ## Gotchas

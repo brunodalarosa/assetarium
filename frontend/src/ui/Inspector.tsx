@@ -9,7 +9,7 @@ import type { Json } from "../app/api";
 import { display, packName, plural, VIEWS } from "../app/format";
 import {
   activeGridId, assetTags, type GridId, gridApi, copyText, getState, type InspectorTab, packProfileAction, saveAssetTags, selectAsset,
-  pushToast, setCollectionItem, startSelection,
+  pushToast, setCollectionItem, startSelection, turnFormatOn,
   setInspectorOpen, setInspectorTab, setInspectorWidth, useApp,
 } from "../app/store";
 import { FolderPanel } from "./FolderPanel";
@@ -534,6 +534,22 @@ function Variants({ grid, group, assetId }: { grid: GridId; group: Json; assetId
   );
 }
 
+/** Shown, but made from a file whose format is off: the facts, and the one action that resolves it (P5). */
+function FormatOff({ hold }: { hold: Json }) {
+  const [busy, setBusy] = useState(false);
+  const label = hold.format === "gltf" ? "glTF" : String(hold.format).toUpperCase();
+  return (
+    <Banner tone="warning" className="format-off mt-1 grid gap-2">
+      <span>{hold.reason}</span>
+      <span>
+        <Button variant="secondary" className="h-8 px-3" disabled={busy} onClick={() => { setBusy(true); void turnFormatOn(hold.format).finally(() => setBusy(false)); }}>
+          {busy && <Spinner className="size-3.5" />}Turn {label} on
+        </Button>
+      </span>
+    </Banner>
+  );
+}
+
 function DetailBody({ grid }: { grid: GridId }) {
   const detail = useApp((s) => s[grid].detail);
   const tab = useApp((s) => s.inspector.tab);
@@ -575,6 +591,7 @@ function DetailBody({ grid }: { grid: GridId }) {
           {detail.loading && <Spinner className="ml-1 size-3.5 self-center text-muted-foreground" />}
         </div>
         {p.status === "faulty" && <Banner className="state-banner mt-1">{p.reason}</Banner>}
+        {info.format_off && <FormatOff hold={info.format_off} />}
       </div>
       {info.variant_group && <Variants grid={grid} group={info.variant_group} assetId={detail.assetId} />}
       {grid === "collection" && <CollectionEntry assetId={detail.assetId} />}

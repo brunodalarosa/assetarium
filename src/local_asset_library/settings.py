@@ -170,6 +170,45 @@ def processing_eligible(record, formats):
     return any(format_group(f['format']) in formats for f in files)
 
 
+def format_off(record, formats):
+    """Why a shown model is left out of processing: its previews came from a file whose format is off, while
+    another of its formats is on (so it stays listed). ``{'file', 'format', 'reason'}``; None otherwise.
+
+    Its results stay; descriptions and search by meaning skip it until that format is on (P5: no silent states).
+    """
+    from .asset_structure import asset_type
+    if asset_type(record) != 'model_3d' or record['processing'].get('inspection') == 'pending':
+        return None
+    path = inspected_path(record)
+    source = next((f for f in record['files'] if f['path'] == path), None)
+    if source is None or format_group(source['format']) in formats:
+        return None
+    if not any(format_group(f['format']) in formats for f in record['files']):
+        return None  # Every format it has is off: the asset is hidden, not shown with a reason.
+    name, shown = path.rsplit('/', 1)[-1], format_group(source['format']).upper().replace('GLTF', 'glTF')
+    return {'file': name, 'format': format_group(source['format']),
+            'reason': f'Previews were made from {name}, and {shown} is off, so descriptions and search by meaning '
+                      f'leave it out. Turn {shown} on to include it again; its results are kept.'}
+
+
+def turn_format_on(config, extension, actor='user'):
+    """Turn one 3D format on and keep every other saved setting (an asset's Turn FBX on)."""
+    group = format_group(format_key(str(extension)))
+    if group not in PROCESSING_FORMATS:
+        raise ConfigError('Only a 3D model format can be turned on here')
+    formats = processing_formats(config)
+    if group not in formats:
+        path = settings_path(config)
+        value = read_json(path) if path.exists() else {'schema_version': 1}
+        value['processing_formats'] = validate_formats(formats + [group])
+        atomic_json(path, value)
+        from .setup_core import note_set_by
+        note_set_by(config, ['processing_formats'], actor)
+        from .logs import kv
+        logging.getLogger(__name__).info('General settings saved · %s', kv(by=actor, processing_formats=processing_formats(config)))
+    return dict(general_settings(config), status='saved')
+
+
 def settings_path(config):
     # Settings belong to the application, even when config is bound to a source.
     return config.storage_root('data') / 'library/settings.json'

@@ -11,7 +11,7 @@ from pathlib import Path, PurePosixPath
 
 from .config import ConfigError
 
-STATES = ('no_previews', 'queued', 'running', 'ready', 'blocked', 'failed', 'missing', 'excluded', 'skipped')
+STATES = ('no_previews', 'queued', 'running', 'ready', 'blocked', 'failed', 'missing', 'excluded', 'skipped', 'format_off')
 TYPES = (('model_3d', '3D models'), ('image', 'Images'), ('material_texture', 'Material textures'))
 
 

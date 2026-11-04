@@ -8,6 +8,9 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- **Format off**: a model shown in the Library whose previews were made from a file in a format that is off
+  now says so (its descriptions and search by meaning skip it) and offers **Turn FBX on** in the inspector,
+  instead of looking ready. Design principle P5, *No silent states*, records the rule.
 - **Try your agent** replaces **Check my model** in Settings and optional setup. It generates tiny practice packs
   on demand and uses the connected agent, the Library discovery flow, real pack tools, grouped proposal review
   and scans. Results describe the observed organization rather than rating a model. Practice files, store,

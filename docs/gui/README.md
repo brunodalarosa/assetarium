@@ -246,7 +246,9 @@ Blender…** open the wizard's Blender picker with **Save Blender**, the re-rend
 **Keep the saved Blender**; the picker is open by itself while no usable Blender is saved), the storage budget (with the exact
 definition of what it counts), **Formats Assetarium uses** (the 3D formats and each image format; an asset only in
 formats that are off is hidden from the Library, search and your agent, and comes back with its results when you turn
-the format on; textures of 3D models are always read), **Descriptions** (on/off and the
+the format on; a model that also has a file in a format that is on stays listed, and if its previews were made
+from the file that is off it shows **Format off** with the reason and **Turn FBX on** in the inspector, because
+descriptions and search by meaning leave it out; textures of 3D models are always read), **Descriptions** (on/off and the
 engine, with the local server's address, model and **Test connection**) and the
 description batch size (built-in engine only). Settings has no library folder section: library
 folders live in Library.

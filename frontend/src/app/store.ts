@@ -1272,6 +1272,22 @@ export async function loadGeneralSettings() {
     setState((s) => ({ general: { ...s.general, loading: false, message: (error as Error).message } }));
   }
 }
+/** An asset made from a file whose format is off: turn that one format on and show the result everywhere. */
+export async function turnFormatOn(format: string) {
+  const result = await api().turn_format_on(format);
+  if (result.status === "faulty") {
+    pushToast({ tone: "fault", title: "Format not turned on", body: result.reason });
+    return;
+  }
+  const label = format === "gltf" ? "glTF" : format.toUpperCase();
+  pushToast({ tone: "info", title: `${label} is on`, body: `Assets in ${label} are shown and processed again. Nothing was deleted while it was off.` });
+  setState((s) => ({ general: { ...s.general, values: s.general.values ? { ...s.general.values, processing_formats: result.processing_formats } : s.general.values } }));
+  await Promise.all([loadSources(), loadLibraryTree()]);
+  if (state.sourcesView.key) void refreshFolder();
+  const grid = activeGridId();
+  const detail = state[grid].detail;
+  if (detail?.assetId) void selectAsset(grid, detail.assetId, detail.format, detail.view, false, true);
+}
 export interface DescriptionSettings {
   enabled: boolean;
   engine: string;

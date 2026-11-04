@@ -135,3 +135,40 @@ def test_review_distinguishes_existing_files_and_forgetting_requires_current_con
         assert (root / 'Kit/gone.obj').read_text() == original
     finally:
         bridge._close()
+
+
+def test_a_model_made_from_a_format_that_is_off_says_so_and_can_turn_it_on(managed, monkeypatch):
+    from local_asset_library.incremental import working, update_record
+    from local_asset_library.settings import format_off, processing_formats, save_general_settings, turn_format_on
+    from local_asset_library.source_operations import publish_source
+    config, backend, one, _ = managed
+    monkeypatch.setattr(library_view, 'blockers', lambda config: {})
+    ready_source(config, backend, one)
+    work = working(sources.bound(config, one))
+    record = sources.read_records(work)[0]
+    obj = record['files'][0]
+    fbx = dict(obj, path=obj['path'][:-4] + '.fbx', format='fbx')
+    record['files'] = [fbx, obj]
+    record['primary_inspection_path'] = fbx['path']
+    record['technical'] = dict(record['technical'], inspected_path=fbx['path'], inspected_format='fbx')
+    update_record(work, record)
+    publish_source(sources.bound(config, one))
+    sources.aggregate(config)
+    assert format_off(record, ['fbx', 'obj']) is None and format_off(record, ['gltf']) is None  # On, or hidden.
+    save_general_settings(config, 24, ['obj'])
+    hold = format_off(record, ['obj'])
+    assert hold['format'] == 'fbx' and hold['reason'].startswith(f"Previews were made from {fbx['path'].rsplit('/', 1)[-1]}, and FBX is off")
+    items = {i['asset_id']: i for i in library_view.folder_items(config, one['key'], show_files=False)['items']}
+    card = items[record['asset_id']]
+    assert card['state'] == 'format_off' and card['reason'] == hold['reason']  # Never shown as Ready, never silent.
+    bridge = DesktopBridge(config, prestart_worker=False)
+    try:
+        detail = bridge.asset(record['asset_id'])
+        assert detail['payload']['presentation']['format_off']['format'] == 'fbx', detail.get('reason')
+        assert bridge.turn_format_on('fbx')['status'] == 'saved'
+    finally:
+        bridge._close()
+    assert processing_formats(config) == ['fbx', 'obj']
+    assert turn_format_on(config, 'glb')['processing_formats'] == ['fbx', 'gltf', 'obj']
+    items = {i['asset_id']: i for i in library_view.folder_items(config, one['key'], show_files=False)['items']}
+    assert items[record['asset_id']]['state'] == 'ready'

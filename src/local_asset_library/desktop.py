@@ -422,6 +422,11 @@ class DesktopBridge:
             threading.Thread(target=window.destroy, name='stop-and-close', daemon=True).start()
         return {'status': 'closing'}
 
+    def turn_format_on(self, extension):
+        """An asset made from a file whose format is off offers to turn that format on (P5)."""
+        from .settings import turn_format_on
+        return self._wait(self._present(turn_format_on, self._config, extension, guarded=False))
+
     def show_log(self, name):
         """Show one session log of this project in Explorer (a crash's Recent entry links to it)."""
         def reveal():

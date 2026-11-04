@@ -62,9 +62,24 @@ completed / total, remaining work, the unit being counted and separate successfu
 - Saving or finalizing stays visibly active until it finishes, even after every counted item has been checked.
 - Asset processing, background activity and notifications present the same measurements consistently.
 
+## P5 — No silent states
+
+*(Added November 4, 2026; co-designed and approved by the owner on the PR 21 review.)* Assetarium is built for
+people who want to know everything about a file, a process or an action. Every asset, queue item and action shows
+its state and why it is in it: the facts first, then only the actions that actually resolve it. Nothing is
+skipped, hidden or "nothing to do" without saying why. Explicit is not verbose: a state chip or one line is
+always visible, and the reason and actions sit in the inspector, a tooltip or an expanded row.
+
+- First applied to a model shown in the Library whose previews were made from a file in a format that is off
+  (an FBX inspected model that also has an OBJ, with FBX off). It used to look Ready while descriptions and search
+  by meaning quietly left it out. It is now **Format off** (`settings.format_off`, the folder view's `format_off`
+  state) with the reason and **Turn FBX on** in the inspector.
+- Closing the app while work runs says so and asks; the next start says what stopped (decision 0023).
+
 ## What future work must keep true
 
 - New review flows with several alike decisions group them and commit once, unless the cost table says otherwise.
 - A commit reports per item: one failing item is shown with its reason and stays pending; the others are saved.
 - New agent-related UI uses `Bot`; no sparkle icons.
 - Commands appear only in a `CommandBlock` (or through `Reason`); an action the app can run is a button.
+- A new state, skip or exclusion carries its reason and the actions that resolve it (P5).
