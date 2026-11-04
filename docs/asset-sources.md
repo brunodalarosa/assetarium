@@ -168,9 +168,8 @@ assets. They start at once or wait in line on **Asset processing**:
   Longer jobs, or jobs that would reach the storage budget, ask first with an estimate (counts, a time range,
   disk). The estimate comes from the render speed test and recent runs; without either it says
   "no measurement yet".
-- **Hold descriptions for overnight** keeps description jobs waiting until the window (22:00–07:00 by default).
 - Queued work left over when the app closed shows as **Paused** with **Resume**. It never resumes by itself.
-- Each finished job starts the next one, with or without the app open.
+- Every operation that ends (a job, a scan, a speed test) starts the next waiting item, so nothing waits for a click.
 
 **Asset processing** shows **Running** (progress, Cancel, a live log with copy buttons on errors and
 warnings), **Up next**, **Blocked** (by reason, with the fix and how many assets it unblocks), **Recorded

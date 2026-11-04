@@ -1,5 +1,4 @@
 """The implicit processing queue (decision 0023)."""
-from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -47,22 +46,35 @@ def test_previews_start_at_once_and_the_scope_is_resolved_when_an_item_starts(fa
     assert queue.state(config)['recent'][0]['status'] == 'complete'
 
 
-def test_previews_go_ahead_of_descriptions_and_overnight_holds_descriptions(fake):
+def test_previews_go_ahead_of_descriptions(fake):
     config, one, two, started, finish, monkeypatch = fake
     queue.add(config, 'previews', {'key': one['key']})
     monkeypatch.setattr(queue, 'resolve', lambda config, action, scope: {'ids': ['asset_x'], 'blocked': {}, 'kinds': {'model_3d': 1}, 'records': []})
     queue.add(config, 'descriptions', {'key': two['key']})
     queue.add(config, 'previews', {'key': two['key']})
     assert [i['action'] for i in queue.state(config)['up_next']] == ['previews', 'descriptions']
-    queue.control(config, 'overnight', value={'enabled': True, 'start': '00:00', 'end': '00:01'})
-    monkeypatch.setattr(queue, 'in_window', lambda window, moment=None: False)
     finish(one['key'])
-    assert started[-1]['operation'] == 'process'  # The second previews item, not the held descriptions.
+    assert started[-1]['operation'] == 'process'  # The second previews item, though descriptions were added first.
     finish(two['key'])
-    assert len(started) == 2 and queue.state(config)['up_next'][0]['held']
-    monkeypatch.setattr(queue, 'in_window', lambda window, moment=None: True)
-    queue.advance(config)
-    assert started[-1]['operation'] == 'describe'
+    assert started[-1]['operation'] == 'describe' and 'overnight' not in queue.state(config)
+
+
+def test_an_item_that_found_its_folder_busy_starts_when_that_operation_ends(fake):
+    config, one, _, started, _, monkeypatch = fake
+    real = source_operations.start
+    busy = {'scan': True}
+    monkeypatch.setattr(source_operations, 'start', lambda *a, **k: {'status': 'busy'} if busy['scan'] else real(*a, **k))
+    assert queue.add(config, 'previews', {'key': one['key']})['status'] == 'queued' and not started
+    assert queue.state(config)['up_next'][0]['status'] == 'waiting' and not queue.state(config)['paused']
+    busy['scan'] = False
+    queue.advance(config)  # What every operation (the scan here) does when it ends.
+    assert len(started) == 1 and queue.state(config)['running']
+
+
+def test_every_operation_starts_the_next_item_when_it_ends():
+    script = (Path(__file__).parents[1] / 'scripts/source-operation.py').read_text(encoding='utf-8')
+    hook = script[script.index('    finally:'):]
+    assert 'advance(config)' in hook and 'args.operation' not in hook.split('advance(config)')[0]
 
 
 def test_a_leftover_queue_is_paused_after_a_restart_until_resumed(fake):
@@ -130,5 +142,3 @@ def test_estimates_use_the_speed_test_and_recent_runs_or_say_no_measurement(fake
     batches = config.library_store() / 'folders' / one['id'] / 'library/batches'
     atomic_json(batches / 'inspection-a.json', {'elapsed_seconds': 100, 'complete': 10, 'failed': 0})
     assert queue._batch_rate(config, 'inspection') == 10
-    assert queue.in_window({'start': '22:00', 'end': '07:00'}, datetime(2026, 1, 1, 23, 0))
-    assert not queue.in_window({'start': '22:00', 'end': '07:00'}, datetime(2026, 1, 1, 12, 0))

@@ -77,7 +77,7 @@ def parser():
         command.add_argument('--asset-source', metavar='KEY', help=argparse.SUPPRESS)  # The old form: the whole folder.
         command.add_argument('--dry-run', action='store_true', help='Print what it would do and its estimate; queue nothing')
         command.add_argument('--yes', action='store_true', help='Accept the estimate of a long job (over 30 minutes)')
-    queue = commands.add_parser('queue', help='The processing queue: list, move, remove, pause, resume, overnight'
+    queue = commands.add_parser('queue', help='The processing queue: list, move, remove, pause, resume'
                                 ).add_subparsers(dest='action', required=True)
     queue.add_parser('list')
     move = queue.add_parser('move')
@@ -86,9 +86,6 @@ def parser():
     queue.add_parser('remove', help='Remove a waiting item, or cancel the running one cleanly').add_argument('item')
     queue.add_parser('pause')
     queue.add_parser('resume')
-    overnight = queue.add_parser('overnight', help='Hold descriptions until a window (for example 22:00-07:00)')
-    overnight.add_argument('state', choices=['on', 'off'])
-    overnight.add_argument('--window', metavar='HH:MM-HH:MM')
     forget = commands.add_parser('forget-missing', help='Forget assets whose files vanished (their history stays)')
     forget.add_argument('key')
     forget.add_argument('--pack', metavar='FOLDER', help='Only under this folder or pack')
@@ -249,9 +246,6 @@ def queue_list(args, config):
         state = queue.control(config, 'move', args.item, args.position)
     elif args.action == 'remove':
         state = queue.control(config, 'remove', args.item)
-    elif args.action == 'overnight':
-        start, _, end = (args.window or '').partition('-')
-        state = queue.control(config, 'overnight', value={'enabled': args.state == 'on', **({'start': start, 'end': end} if args.window else {})})
     else:
         state = queue.control(config, args.action)
     running = state['running']
@@ -259,7 +253,7 @@ def queue_list(args, config):
         operation = running.get('operation') or {}
         say(args, f"Running: {running['action']} · {running['label']} ({running['id'][:8]}) {progress_line(operation)}")
     for index, item in enumerate(state['up_next']):
-        say(args, f"{index}. {item['action']} · {item['label']} ({item['id'][:8]}){' · held for tonight' if item['held'] else ''}")
+        say(args, f"{index}. {item['action']} · {item['label']} ({item['id'][:8]})")
     if state['paused']:
         say(args, 'Paused: resume with "queue resume".')
     for group in state['blocked']:

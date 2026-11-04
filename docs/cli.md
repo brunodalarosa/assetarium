@@ -65,7 +65,6 @@ as the old name of `library …`.
 | `queue list` | Asset processing: Running, Up next, Blocked |
 | `queue move ID POSITION` / `queue remove ID` | Reorder or remove an item; removing the running one cancels it cleanly |
 | `queue pause` / `queue resume` | A queue left over after a restart is paused and never resumes by itself |
-| `queue overnight on\|off [--window 22:00-07:00]` | Hold descriptions until the overnight window |
 | `process --asset-source KEY` | Process a whole library folder now, watching its progress |
 | `cancel --asset-source KEY` | Cancel |
 | `refresh --asset-source KEY` | Refresh published view (publishes usable partial results) |

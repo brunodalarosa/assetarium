@@ -3,12 +3,11 @@
 An item names an action and a scope (a folder or pack of a library folder, or picked assets). The scope is
 resolved when the item starts: "whatever there still lacks previews". Previews always run ahead of
 descriptions; otherwise items run in the owner's order. Items run one at a time through the durable source
-operations, and each operation starts the next item when it ends, so the queue needs no open window. An
-overnight switch holds descriptions until the chosen window. A queue left over after a restart is paused and
-never resumes by itself. Blocked work is never queued: its prerequisite and fix are shown instead.
+operations, and every operation (scans included) starts the next item when it ends, so an item that waited
+for a busy folder never stalls. A queue left over after a restart is paused and never resumes by itself. Blocked work is never queued: its prerequisite and fix are shown instead.
 """
 from contextlib import closing
-from datetime import datetime, time as clock, timezone
+from datetime import datetime, timezone
 from itertools import islice
 import json
 from pathlib import PurePosixPath
@@ -39,7 +38,7 @@ def load(config):
     value.setdefault('items', [])
     value.setdefault('recent', [])
     value.setdefault('paused', False)
-    value.setdefault('overnight', {'enabled': False, 'start': '22:00', 'end': '07:00'})
+    value.pop('overnight', None)  # The overnight hold was removed; a queue saved with it loads unchanged otherwise.
     return value
 
 
@@ -222,7 +221,7 @@ def add(config, action, scope, confirmed=False):
     long = value['seconds'] is not None and value['seconds'][1] > LONG
     if (long or value['budget_reached']) and not confirmed:
         return {'status': 'confirm', 'estimate': value, 'title': f'{verb} for {label}?',
-                'body': describe_estimate(value) + ' It runs in the background; you can keep working, cancel it, or hold descriptions overnight.',
+                'body': describe_estimate(value) + ' It runs in the background; you can keep working or cancel it.',
                 'confirm_label': f"{verb} ({value['assets']:,} {'asset' if value['assets'] == 1 else 'assets'})"}
     item = {'id': uuid.uuid4().hex, 'action': action, 'scope': scope, 'label': label, 'added_utc': now(), 'status': 'waiting',
             'estimate': value}
@@ -241,18 +240,10 @@ def add(config, action, scope, confirmed=False):
             'body': f'{verb} for {label}. {text}'}
 
 
-def _order(items, overnight_hold):
-    """Previews always go ahead of descriptions; otherwise the owner's order. Held descriptions wait."""
+def _order(items):
+    """Previews always go ahead of descriptions; otherwise the owner's order."""
     waiting = [i for i in items if i['status'] == 'waiting']
-    previews = [i for i in waiting if i['action'] == 'previews']
-    descriptions = [] if overnight_hold else [i for i in waiting if i['action'] == 'descriptions']
-    return previews + descriptions
-
-
-def in_window(window, moment=None):
-    moment = (moment or datetime.now()).time()
-    start, end = (clock.fromisoformat(window['start']), clock.fromisoformat(window['end']))
-    return start <= moment < end if start < end else moment >= start or moment < end
+    return [i for i in waiting if i['action'] == 'previews'] + [i for i in waiting if i['action'] == 'descriptions']
 
 
 def _finish_running(config, queue):
@@ -285,8 +276,7 @@ def advance(config):
         if running or queue['paused']:
             save(config, queue)
             return running
-        hold = queue['overnight']['enabled'] and not in_window(queue['overnight'])
-        for item in _order(queue['items'], hold):
+        for item in _order(queue['items']):
             found = resolve(config, item['action'], item['scope'])  # The scope is resolved when the item starts.
             if not found['ids']:
                 queue['items'].remove(item)
@@ -308,7 +298,7 @@ def advance(config):
 
 
 def control(config, action, identifier=None, value=None):
-    """Up next: remove, move, pause, resume, overnight. Removing the running item cancels it cleanly."""
+    """Up next: remove, move, pause, resume. Removing the running item cancels it cleanly."""
     from .source_operations import cancel
     from .sources import bound, get_source
     with _locked(config):
@@ -331,17 +321,10 @@ def control(config, action, identifier=None, value=None):
             queue['items'].insert(max(0, min(len(queue['items']), value)), item)
         elif action in {'pause', 'resume'}:
             queue['paused'] = action == 'pause'
-        elif action == 'overnight':
-            window = dict(queue['overnight'], **(value or {}))
-            if type(window.get('enabled')) is not bool:
-                raise ConfigError('Overnight must be on or off')
-            for key in ('start', 'end'):
-                clock.fromisoformat(window[key])
-            queue['overnight'] = {k: window[k] for k in ('enabled', 'start', 'end')}
         else:
             raise ConfigError('Unknown queue action')
         save(config, queue)
-    if action in {'resume', 'remove', 'overnight', 'move'}:
+    if action in {'resume', 'remove', 'move'}:
         advance(config)
     return state(config)
 
@@ -428,8 +411,5 @@ def state(config):
                        'log': _log_lines(config, running)}
         except ConfigError:
             pass
-    hold = queue['overnight']['enabled'] and not in_window(queue['overnight'])
-    order = _order(queue['items'], False)
-    return {'status': 'ready', 'paused': queue['paused'], 'overnight': {**queue['overnight'], 'holding': hold},
-            'running': running, 'up_next': [{**i, 'held': hold and i['action'] == 'descriptions'} for i in order],
+    return {'status': 'ready', 'paused': queue['paused'], 'running': running, 'up_next': _order(queue['items']),
             'blocked': blocked_groups(config), 'failures': failures(config), 'recent': queue['recent']}

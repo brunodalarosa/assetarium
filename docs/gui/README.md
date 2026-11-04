@@ -170,8 +170,8 @@ rail dot means you must act (a folder offline, an answer to give, files missing,
 Search results gain **Show in pack**. See [asset sources](../asset-sources.md).
 
 **Asset processing** is the queue. **Make previews** and **Generate descriptions** (from the Library
-tab) start at once or wait in **Up next**; previews always go first, items can be moved or removed, and
-**Hold descriptions for overnight** keeps descriptions waiting for the window. Jobs under 10 minutes start on
+tab) start at once or wait in **Up next**; previews always go first, and items can be moved or removed. An
+item that waits for a busy folder (a scan) starts as soon as that work ends. Jobs under 10 minutes start on
 the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones ask first with the estimate.
 Work left over when the app closed shows **Paused** with **Resume**. **Running** shows progress, **Cancel**
 (the running renders finish and are saved first; decision 0022) and a live log with copy buttons on errors

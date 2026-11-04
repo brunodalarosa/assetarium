@@ -56,10 +56,10 @@ else:
     else:
         log.info('Operation finished · %s', kv(operation=args.operation, folder=args.source, seconds=round(time.monotonic() - started, 1)))
     finally:
-        if args.operation in {'process', 'describe'}:
-            # The next queued item starts when this one ends, with or without the app (decision 0023).
-            from local_asset_library.processing_queue import advance
-            try:
-                advance(config)
-            except Exception as exc:  # The queue shows the item's outcome; a start fault is recorded there.
-                print(f'Queue: the next item did not start: {exc}', flush=True)
+        # Every operation ends by starting the next queued item, so one that found this folder busy (a scan,
+        # a speed test) never waits for someone to touch the queue.
+        from local_asset_library.processing_queue import advance
+        try:
+            advance(config)
+        except Exception as exc:  # The queue shows the item's outcome; a start fault is recorded there.
+            print(f'Queue: the next item did not start: {exc}', flush=True)

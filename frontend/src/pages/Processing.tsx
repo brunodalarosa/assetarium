@@ -1,7 +1,6 @@
-import { ArrowDown, ArrowUp, Copy, FolderOpen, Moon, Pause, Play, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, FolderOpen, Pause, Play, RotateCcw, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect } from "react";
-import { Switch } from "@/components/beui/switch";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { operationActive, plural } from "../app/format";
@@ -93,12 +92,9 @@ function UpNext() {
   const queue = useApp((s) => s.queue);
   const reduce = useReducedMotion();
   const items: Json[] = queue?.up_next || [];
-  const overnight = queue?.overnight || { enabled: false, start: "22:00", end: "07:00" };
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-4">
-        <Switch checked={overnight.enabled} onCheckedChange={(enabled) => void queueControl("overnight", null, { enabled })}
-          label={`Hold descriptions for overnight (${overnight.start}–${overnight.end})`} ariaLabel="Hold descriptions for overnight" />
         {queue?.paused ? (
           <Button id="resume-queue" className="h-8 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />Resume</Button>
         ) : items.length > 0 && (
@@ -113,7 +109,6 @@ function UpNext() {
               <motion.li key={item.id} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[13px]" data-action={item.action}>
                 <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}</span>
-                {item.held && <Badge tone="neutral" className="gap-1"><Moon className="size-3" aria-hidden />Tonight</Badge>}
                 {item.estimate?.seconds && <span className="text-[11.5px] text-muted-foreground tabular-nums">~{Math.round(item.estimate.seconds[1] / 60)} min</span>}
                 <button type="button" aria-label="Move up" disabled={index === 0} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, Math.max(0, index - 1))}><ArrowUp className="size-3.5" /></button>
                 <button type="button" aria-label="Move down" disabled={index === items.length - 1} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, index + 1)}><ArrowDown className="size-3.5" /></button>

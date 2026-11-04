@@ -184,7 +184,7 @@ def test_search_threads_setting(managed, capsys, monkeypatch):
 
 def test_library_packs_queue_and_forget_missing_from_a_terminal(managed, monkeypatch, capsys):
     """The commands of decision 0023: the same backend calls as the Asset sources tab and the queue."""
-    from local_asset_library import library_view, processing_queue
+    from local_asset_library import library_view
     config, _, one, _ = managed
     monkeypatch.setattr(library_view, 'blockers', lambda config: {})
     started = []
@@ -201,8 +201,6 @@ def test_library_packs_queue_and_forget_missing_from_a_terminal(managed, monkeyp
     capsys.readouterr()
     assert run(config, '--json', 'queue', 'list') == 0
     assert json.loads(capsys.readouterr().out)['running']['action'] == 'previews'
-    assert run(config, 'queue', 'overnight', 'on', '--window', '23:00-06:00') == 0
-    assert processing_queue.load(config)['overnight'] == {'enabled': True, 'start': '23:00', 'end': '06:00'}
     (Path(one['path']) / 'item0.obj').unlink()
     sources.scan_source(config, one)
     monkeypatch.setattr('sys.stdin', io.StringIO('yes\n'))
