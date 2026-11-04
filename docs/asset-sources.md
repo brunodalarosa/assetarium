@@ -169,7 +169,8 @@ assets. They start at once or wait in line on **Asset processing**:
 - Under about 10 minutes a job starts on the click. From 10 to 30 minutes it starts with an **Undo** toast.
   Longer jobs, or jobs that would reach the storage budget, ask first with an estimate (counts, a time range,
   disk). The estimate comes from the render speed test and recent runs; without either it says
-  "no measurement yet".
+  "no measurement yet", and a job of more than 100 assets with no time or storage measurement yet asks first
+  too, since it may well be your longest.
 - Closing Assetarium while work runs asks first (**Asset processing ongoing**): **Keep open** or **Stop & close**,
   which stops the running item at once. Finished assets are kept. The next time you open Assetarium a line on
   every page says how many items stopped, with **Continue**; nothing resumes by itself.

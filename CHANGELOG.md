@@ -79,7 +79,7 @@ All notable changes to Assetarium are listed here. The project follows
   you can make a folder a pack, merge it into its parent or rename it (`local-assets packs`).
 - **Make previews** and **Generate descriptions** on a pack, folder or picked assets go to a
   processing queue: they start at once or wait in line, previews go first, long jobs show an
-  estimate and ask first, an item waiting for a busy folder starts when that work ends, closing
+  estimate and ask first (as does a job of more than 100 assets before anything is measured), an item waiting for a busy folder starts when that work ends, closing
   the app while work runs asks first and the next start offers Continue, and work never outlives
   the app (after a crash it stops, is logged and shows in Recent) (`local-assets previews`, `describe`, `queue`).
 - Asset processing shows Running (with a copyable live log), Up next, Blocked (with the fix),

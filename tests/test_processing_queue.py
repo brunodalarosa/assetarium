@@ -208,6 +208,23 @@ def test_thresholds_ask_first_for_long_work_and_offer_undo_in_between(fake):
             queue.control(config, 'remove', result['item']['id'])
 
 
+
+def test_a_big_job_with_no_measurement_yet_asks_first(fake):
+    config, one, _, started, _, monkeypatch = fake
+    def estimate(assets, seconds=None, budget=None, used=None):
+        return lambda config, action, found: {'assets': assets, 'kinds': {'model_3d': assets}, 'seconds': seconds,
+                                              'measured': seconds is not None, 'disk_bytes': None, 'budget_reached': False,
+                                              'budget_bytes': budget, 'used_bytes': used}
+    monkeypatch.setattr(queue, 'estimate', estimate(4000))  # A fresh install: no speed test, no history.
+    result = queue.add(config, 'previews', {'key': one['key']})
+    assert result['status'] == 'confirm' and 'no measurement yet' in result['body'] and not started
+    monkeypatch.setattr(queue, 'estimate', estimate(4000, [60, 90], budget=10 * 2**30))  # Timed, but no storage receipt.
+    result = queue.add(config, 'previews', {'key': one['key']})
+    assert result['status'] == 'confirm' and "Storage use isn't measured yet" in result['body']
+    monkeypatch.setattr(queue, 'estimate', estimate(100))  # Small enough to start on the click, measured or not.
+    assert queue.add(config, 'previews', {'key': one['key']})['status'] == 'started'
+
+
 def test_blocked_only_scope_is_refused_with_its_fix(fake):
     config, one, _, started, _, monkeypatch = fake
     monkeypatch.setattr(library_view, 'blockers', lambda config: {'previews': {

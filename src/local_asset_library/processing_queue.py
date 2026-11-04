@@ -22,6 +22,7 @@ from .publication import atomic_json, read_json
 ACTIONS = ('previews', 'descriptions')
 OPERATION = {'previews': 'process', 'descriptions': 'describe'}
 QUICK, LONG = 10 * 60, 30 * 60  # Seconds: start on a click; above QUICK an Undo toast; above LONG ask first.
+UNMEASURED = 100  # Assets: with no time or storage measurement yet, more than this asks first (it may be the longest job).
 RECENT = 30
 
 
@@ -196,7 +197,14 @@ def describe_estimate(value):
             else 'no measurement yet (run the render speed test in Settings → General for an estimate)')
     disk = f", about {value['disk_bytes'] / 2**20:,.0f} MiB in the library store" if value['disk_bytes'] else ''
     budget = ' This would reach your storage budget; the run stops there and keeps finished work.' if value['budget_reached'] else ''
+    if value['budget_bytes'] and value['used_bytes'] is None:
+        budget = " Storage use isn't measured yet, so the storage budget can't be checked first."
     return f'{counts}: {time}{disk}.{budget}'
+
+
+def unmeasured(value):
+    """No time or storage measurement yet for a job this big: ask first rather than guess it is short."""
+    return value['assets'] > UNMEASURED and (value['seconds'] is None or bool(value['budget_bytes'] and value['used_bytes'] is None))
 
 
 def add(config, action, scope, confirmed=False):
@@ -221,7 +229,7 @@ def add(config, action, scope, confirmed=False):
     value = estimate(config, action, found)
     verb = 'Make previews' if action == 'previews' else 'Generate descriptions'
     long = value['seconds'] is not None and value['seconds'][1] > LONG
-    if (long or value['budget_reached']) and not confirmed:
+    if (long or value['budget_reached'] or unmeasured(value)) and not confirmed:
         return {'status': 'confirm', 'estimate': value, 'title': f'{verb} for {label}?',
                 'body': describe_estimate(value) + ' It runs in the background; you can keep working or cancel it.',
                 'confirm_label': f"{verb} ({value['assets']:,} {'asset' if value['assets'] == 1 else 'assets'})"}

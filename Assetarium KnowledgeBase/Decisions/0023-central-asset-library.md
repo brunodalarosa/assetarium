@@ -30,7 +30,8 @@ plan in [ASSETRM-0002 plan](../Notebook/Roadmap/Features/ASSETRM-0002%20plan.md)
   and "Generate descriptions" act on a pack, folder or selection. They start at once or wait in
   line, and their scope is resolved when they start. Previews always go ahead of descriptions.
   Jobs estimated under 10 minutes start on a click; 10–30 minutes start with an Undo toast; over
-  30 minutes ask first. Every operation that ends starts the next waiting item. *(Updated November 4,
+  30 minutes ask first, and so does a job of more than 100 assets with no time or storage measurement yet
+  (updated November 4, 2026: it used to start on the click). Every operation that ends starts the next waiting item. *(Updated November 4,
   2026, owner co-design on the PR 21 review: the overnight hold is removed.)* While the app is open it
   owns the queue: closing it while work runs asks first ("Asset processing ongoing"), and Stop & close
   stops the running item at once. The next start shows "N items stopped when you closed Assetarium ·
