@@ -6,6 +6,7 @@ import pytest
 
 from test_sources import managed  # noqa: F401 -- fixtures
 from local_asset_library import pack_agent, quick_look, sources
+from local_asset_library.desktop import DesktopBridge
 from local_asset_library.sources import Covered
 
 
@@ -50,3 +51,5 @@ def test_a_quick_look_reads_names_live_and_its_snapshot_serves_agents_before_the
                                                              'waiting': 0, 'scanning': True}
     with pytest.raises(Covered):
         quick_look.start(config, str(Path(one['path'])))
+    covered = DesktopBridge(config, prestart_worker=False).quick_look_start(str(Path(one['path'])))
+    assert covered['status'] == 'faulty' and covered['covered_by'] == one['key']

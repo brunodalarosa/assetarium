@@ -81,6 +81,19 @@ def test_a_leftover_queue_is_paused_after_a_restart_until_resumed(fake):
     assert len(started) == started_before + 1
 
 
+def test_removing_a_cancelling_item_again_keeps_it_until_its_operation_ends(fake):
+    config, one, two, started, finish, monkeypatch = fake
+    monkeypatch.setattr(source_operations, 'cancel', lambda scoped: None)  # The batch takes a while to stop.
+    queue.add(config, 'previews', {'key': one['key']})
+    queue.add(config, 'previews', {'key': two['key']})
+    identifier = queue.load(config)['items'][0]['id']
+    queue.control(config, 'remove', identifier)
+    queue.control(config, 'remove', identifier)
+    assert [i['status'] for i in queue.load(config)['items']] == ['cancelling', 'waiting'] and len(started) == 1
+    finish(one['key'])
+    assert queue.load(config)['recent'][0]['id'] == identifier and len(started) == 2
+
+
 def test_thresholds_ask_first_for_long_work_and_offer_undo_in_between(fake):
     config, one, _, started, _, monkeypatch = fake
     for seconds, expected, undo in ((60, 'started', False), (20 * 60, 'started', True), (45 * 60, 'confirm', None)):

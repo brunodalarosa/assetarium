@@ -323,6 +323,8 @@ class Gateway:
                     try:
                         payload, error = await asyncio.to_thread(agent_practice.tool, self.config, key, name, args, self.client)
                     except Exception as exc:
+                        if isinstance(exc, agent_practice.Ended):
+                            self._practice_key = None  # Unscoped calls go to the real library again.
                         payload, error = {'status': 'refused', 'reason': str(exc)}, True
                     return CallToolResult(content=[TextContent(type='text', text=encoded(payload))], isError=error)
             started = time.perf_counter()

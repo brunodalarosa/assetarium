@@ -526,7 +526,7 @@ class DesktopBridge:
         try:
             return start(self._config, directory)
         except Covered as exc:
-            return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.source['key']}
+            return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.folder['key']}
         except Exception as exc:
             return {'status': 'faulty', 'reason': str(exc)}
 

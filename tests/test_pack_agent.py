@@ -5,7 +5,7 @@ import pytest
 
 from test_pack_profiles import kit, pack  # noqa: F401 -- fixtures
 from test_sources import managed  # noqa: F401 -- fixtures
-from local_asset_library import agent_activity, pack_agent, pack_profiles, sources
+from local_asset_library import agent_activity, library_store, pack_agent, pack_profiles, sources
 from local_asset_library.config import ConfigError
 from local_asset_library.mcp_assets import SCHEMAS, validate
 
@@ -46,6 +46,16 @@ def test_instant_proposals_apply_at_once_and_undo(kit):
     assert undone['state'] == 'undone' and pack_profiles.current(config, one, 'Kit_1.0') == []
     with pytest.raises(ConfigError, match='Only an applied proposal'):
         pack_agent.decide(config, result['proposal_id'], 'undo')
+
+
+def test_undoing_a_first_proposal_restores_the_owners_earlier_answers(kit):
+    config, one = kit
+    library_store.save_answer(config, one['id'], 'Kit_1.0', 'pack_name', 'Starter Kit')  # Saved before any profile version.
+    rules = [{'kind': 'variant_axis', 'folder': 'Rocks', 'values': ['numbers']}]
+    result = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=rules)
+    assert result['status'] == 'applied' and pack_profiles.current(config, one, 'Kit_1.0') == rules
+    pack_agent.decide(config, result['proposal_id'], 'undo')
+    assert pack_profiles.current(config, one, 'Kit_1.0') == [{'kind': 'pack_name', 'value': 'Starter Kit'}]
 
 
 def test_rescan_proposals_wait_for_the_owner_and_a_newer_one_replaces_them(kit):

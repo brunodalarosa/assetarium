@@ -9,6 +9,7 @@ never resumes by itself. Blocked work is never queued: its prerequisite and fix 
 """
 from contextlib import closing
 from datetime import datetime, time as clock, timezone
+from itertools import islice
 import json
 from pathlib import PurePosixPath
 import statistics
@@ -135,7 +136,7 @@ def _bytes_per_asset(config):
     """Median store bytes per finished inspection result (a sample of the store; None without history)."""
     sizes = []
     for root in ('results/inspection', 'inspection'):
-        for folder in list((config.library_store() / root).glob('*/*' if root == 'inspection' else '*/*'))[:200]:
+        for folder in islice((config.library_store() / root).glob('*/*'), 200):
             if folder.is_dir():
                 sizes.append(sum(f.stat().st_size for f in folder.iterdir() if f.is_file()))
     return statistics.median(sizes) if sizes else None
@@ -319,6 +320,8 @@ def control(config, action, identifier=None, value=None):
             if item['status'] == 'running':
                 cancel(bound(config, get_source(config, item['scope']['key'])))
                 item['status'] = 'cancelling'
+            elif item['status'] == 'cancelling':
+                pass  # Already stopping; it leaves through Recent when its operation ends.
             else:
                 queue['items'].remove(item)
         elif action == 'move':

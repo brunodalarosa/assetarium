@@ -21,6 +21,10 @@ KEY = re.compile(r'^agent-practice-([0-9a-f]{32})$')
 _start_lock = threading.Lock()
 
 
+class Ended(ConfigError):
+    """The practice session is gone; callers that remembered its key should forget it."""
+
+
 def is_key(key):
     return isinstance(key, str) and key.startswith(PREFIX)
 
@@ -32,14 +36,14 @@ def _parent(config):
 def _root(config, key):
     match = KEY.fullmatch(key) if isinstance(key, str) else None
     if not match:
-        raise ConfigError('This practice session has ended. Start Try your agent again.')
+        raise Ended('This practice session has ended. Start Try your agent again.')
     root = _parent(config) / match[1]
     # Never follow links, including a substituted ancestor.
     for path in (config.project_root / 'scratch', _parent(config), root):
         if path.is_symlink() or path.is_junction():
             raise ConfigError('Practice folder containment check failed')
     if not root.is_dir():
-        raise ConfigError('This practice session has ended. Start Try your agent again.')
+        raise Ended('This practice session has ended. Start Try your agent again.')
     return root
 
 
@@ -49,7 +53,7 @@ def _locked(root):
     try:
         stream = (root / 'session.lock').open('r+b')
     except OSError:
-        raise ConfigError('This practice session has ended. Start Try your agent again.') from None
+        raise Ended('This practice session has ended. Start Try your agent again.') from None
     acquired = False
     try:
         started = time.monotonic()
@@ -89,9 +93,9 @@ def _check(root, *, closing=False):
     from .gpu_queue import process_alive
     state = read_json(root / 'session.json')
     if state.get('state') == 'closing' and not closing:
-        raise ConfigError('This practice session has ended. Start Try your agent again.')
+        raise Ended('This practice session has ended. Start Try your agent again.')
     if not closing and not process_alive(state.get('pid')):
-        raise ConfigError('The practice app closed. Start Try your agent again.')
+        raise Ended('The practice app closed. Start Try your agent again.')
     return state
 
 

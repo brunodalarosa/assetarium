@@ -227,8 +227,8 @@ def decide(config, identifier, decision, approved='owner', leave_out=()):
     rejects it.
     """
     from .library_store import now
-    from .pack_profiles import apply, revert
-    key, pack, rules, origin, state, previous = _row(config, identifier)
+    from .pack_profiles import apply, history, revert
+    key, pack, rules, origin, state, _ = _row(config, identifier)
     if decision == 'apply' and leave_out:
         rules, left = _kept(rules, leave_out)
         decision = 'apply' if rules else 'reject'
@@ -236,9 +236,11 @@ def decide(config, identifier, decision, approved='owner', leave_out=()):
     if decision == 'undo':
         if state != 'applied':
             raise ConfigError('Only an applied proposal can be undone')
-        result = revert(config, key, pack, previous, {'by': 'owner', 'undid': identifier}) if previous else \
-            apply(config, key, pack, [], {'by': 'owner', 'undid': identifier})
-        state = 'undone'
+        # Back to the version just below the proposal's own (the 'earlier' v1 for a pack's first profile).
+        own = next((h['version'] for h in history(config, key, pack) if h['origin'].get('proposal') == identifier), None)
+        if own is None:
+            raise ConfigError('This proposal changed nothing, so there is nothing to undo')
+        result, state = revert(config, key, pack, own - 1, {'by': 'owner', 'undid': identifier}), 'undone'
     elif state != 'pending':
         raise ConfigError(f'This proposal is already {state}')
     elif decision == 'reject':

@@ -66,6 +66,23 @@ def test_a_duplicate_gets_its_own_id_and_an_edit_keeps_the_id(managed):
     assert record['processing']['inspection'] == 'pending'  # Edited content needs processing again.
 
 
+def test_a_missing_asset_whose_file_returns_keeps_its_id_and_a_copy_found_first_gets_another(managed, tmp_path):
+    config, _, one, _ = managed
+    sources.scan_source(config, one)
+    original = ids(config, one)['item0.obj']
+    root = Path(one['path'])
+    shutil.move(root / 'item0.obj', tmp_path / 'item0.obj')  # The drive is briefly gone.
+    assert sources.scan_source(config, one)['missing'] == 1
+    shutil.copy(tmp_path / 'item0.obj', root / 'item0.obj')
+    (root / 'a').mkdir()
+    shutil.copy(tmp_path / 'item0.obj', root / 'a/item0.obj')  # Sorts before the original.
+    status = sources.scan_source(config, one)
+    after = ids(config, one)
+    assert after['item0.obj'] == original and after['a/item0.obj'] != original and len(set(after.values())) == len(after)
+    assert status['recognized']['returned'] == 1 and status['recognized']['moved'] == 0
+    assert not library_store.missing_assets(config, one['id'])
+
+
 def test_a_folder_added_around_others_replaces_them_and_keeps_ids_overlays_and_collections(managed, tmp_path):
     config, backend, one, two = managed
     ready_source(config, backend, one)

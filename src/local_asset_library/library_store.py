@@ -123,6 +123,8 @@ def recognize(config, folder, fresh, previous=(), excluded=()):
         locators = {r['source_relative_identity'] for r in fresh}
         vanished = {row[0]: row for locator, row in known.items() if locator not in locators and row[3] == 'present'}
         missing = {r[0]: r for r in db.execute("SELECT asset_id, locator, content, state, folder_id FROM assets WHERE state='missing'")}
+        # A missing asset whose own locator is back in this scan returns as itself; a copy elsewhere can't claim it.
+        missing = {i: r for i, r in missing.items() if not (r[4] == folder['id'] and r[1] in locators)}
         missing.update(vanished)
         by_content = {}
         for row in missing.values():

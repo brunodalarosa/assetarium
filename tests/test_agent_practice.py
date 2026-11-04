@@ -146,6 +146,7 @@ def test_gateway_uses_same_connection_without_permanent_audit(owner):
         practice.action(owner, 'cancel', key)
         result = await gateway.call('say', {'message': 'A late call'})
         assert result.is_error and not list(root.iterdir())
+        assert gateway._practice_key is None  # Later unscoped calls reach the real library again.
         await gateway.close()
     asyncio.run(run())
     assert not practice._parent(owner).exists()
