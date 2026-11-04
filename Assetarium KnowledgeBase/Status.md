@@ -1,6 +1,6 @@
 ---
 tags: [hub]
-verified: 2026-10-30
+verified: 2026-11-04
 branch: feature/library-view
 ---
 # Current status
@@ -39,6 +39,24 @@ Short, current summary. Detailed dated history, test counts and evidence are in
   a pack without a preview image shows a package glyph as its cover; "+N new" resets when you
   leave a library folder; the 10- and 30-minute thresholds are constants
   (`processing_queue.QUICK`, `LONG`). Roadmap step 4 now covers material sets only.
+
+- **PR 21 review follow-ups (Cristofer, November 3–4, 2026), built on `feature/library-view`.** Six bugs
+  fixed first; then the gaps co-designed with the owner, one commit each, each with a gate:
+
+  | Step | What | Gate | State |
+  | --- | --- | --- | --- |
+  | 1 | Every operation ends by advancing the queue; overnight hold removed | a scan-blocked item starts by itself | done |
+  | 2 | Close asks first, reopen offers Continue, work stops with its app (crash: logged, Recent) | `verify-queue-close.py` | done, owner visual review pending |
+  | 3 | **Format off** state + P5 *No silent states* (decision 0025) | `verify-format-off.py` | done, owner visual review pending |
+  | 4 | A replaced folder's answers move to the folder around it | `Unity*` stays unscanned under the parent | done |
+  | 5 | A job of more than 100 assets asks first before anything is measured | pytest | done |
+  | 6 | Agent proposal Undo refused once the pack changed since | pytest | done |
+  | 7 | Log retention never removes a live session | pytest (Linux path unverified) | done |
+
+  **Later** (parked, not planned): keep running in the system tray with the window closed; "Pause until…";
+  audit every hidden or "nothing to do" state against P5; *Make previews again from the OBJ* for a Format off
+  model (the catalog re-derives the inspected file on every scan, so it needs its own design); tell agents
+  about Format off in `get_asset`; `library_store._remap` maps ID fields directly instead of replacing text.
 
 - Owner visual/copy review of the setup wizard (decision 0014) and the agent setup panel
   (decision 0016), and one run with a real agent on a throwaway project.

@@ -21,6 +21,10 @@ process of the session writes into; start reading at `logs.start`. User guide: [
   Started without a session they make their own (`…_operation.log`).
 - **Cross-process appends**: each line is one write to the file, opened per write, under an exclusive lock on the
   sidecar `.<session>.lock` (`msvcrt.locking` / `fcntl.flock`). Verified with 4 processes × 150 long lines.
+- **Retention skips live sessions**: every writer keeps `.<session>.lock` open for its life (Windows then refuses its
+  delete) and, off Windows, holds a shared `lockf` lock on byte 1; `retire` releases the lock file first
+  (`_release`) and skips the whole session when it can't. Linux path verified by design only so far.
+- **Native crashes**: the app session enables `faulthandler` into its own log (`_crash_stacks`).
 - **Repeats**: a record whose key (`extra={'repeat_key': …}`, else logger + level + message) was written within
   `REPEAT_SECONDS` is counted, not written; the count is written later as one line stamped when written
   (`… · ↻ repeated N more times, last at HH:MM:SS.mmm`), and at `stop` before "Session ended".

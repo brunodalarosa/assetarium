@@ -58,7 +58,7 @@ revealed, started = [], []
 revealed_event = threading.Event()
 
 
-def fake_start(config, operation, key=None, asset_ids=None, queue_item=None):
+def fake_start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None):
     started.append({'operation': operation, 'key': key, 'assets': len(asset_ids or [])})
     token = 'fixture-' + str(len(started))
     # What a real start records: the operation runs (in this process, so it stays alive) until the check ends.
