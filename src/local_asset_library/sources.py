@@ -10,6 +10,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from functools import lru_cache
 import json
+import logging
 import ntpath
 import os
 from pathlib import Path
@@ -389,6 +390,9 @@ def add(config, directory):
         if not known and any(s["key"] == key for s in value["sources"] + value.get("detached", [])):
             key += "-" + identifier[:8]
         source = {"id": identifier, "key": key, "name": root.name, "path": str(root), "enabled": True}
+        path = bound(config, source).output_path("data", "source.json")
+        settings = dict(read_json(path) if known and path.exists() else {}, schema_version=1, id=identifier, key=key)
+        notes = []
         with closing(library_store.connect(config)) as db, db:
             library_store.save_folder(db, source)
             for child in inner:
@@ -396,9 +400,51 @@ def add(config, directory):
                 prefix = Path(child["path"]).relative_to(root).as_posix()
                 library_store.save_folder(db, child, state="replaced", replaced_by=identifier)
                 library_store.relocate(db, child, identifier, prefix)
-        atomic_json(bound(config, source).output_path("data", "source.json"), {"schema_version": 1, "id": identifier, "key": key})
+                notes += carry_settings(settings, _source_settings(bound(config, child)), child, prefix)
+                notes += library_store.carry_answers(db, child, identifier, prefix)
+        atomic_json(path, settings)
     _registry_file.cache_clear()
-    return dict(source, replaced=[c["key"] for c in inner])
+    for note in notes:
+        logging.getLogger(__name__).info('Folder answer kept by the new library folder · %s', note)
+    return dict(source, replaced=[c["key"] for c in inner], notes=notes)
+
+
+def carry_settings(settings, child_settings, child, prefix):
+    """A replaced folder's exclusions, export decisions and texture folder, rewritten under ``prefix`` into the
+    settings of the folder added around it (decision 0023: its answers stay attached to its folders). The new
+    folder's own answer wins a conflict; each conflict is returned as a note."""
+    from .catalog import digest
+    under = lambda path: f'{prefix}/{path}' if path else prefix
+    notes = []
+    excluded = list(settings.get('excluded_folders', []))
+    for pattern in child_settings.get('excluded_folders', []):
+        # A name pattern matched any depth inside the child; as paths it must stay inside it.
+        excluded += [under(pattern)] if '/' in pattern else [under(pattern), f'{prefix}/*/{pattern}']
+    excluded = list(dict.fromkeys(excluded))
+    if len(excluded) > 50:
+        notes.append(f'{len(excluded) - 50} excluded folders from “{child["name"]}” were over the limit of 50 and not kept')
+        excluded = excluded[:50]
+    if excluded:
+        settings['excluded_folders'] = excluded
+    decisions = list(settings.get('export_decisions', []))
+    for decision in child_settings.get('export_decisions', []):
+        anchor = under(decision['anchor'])
+        plain = {'anchor': decision['anchor'], 'folders': decision['folders'], 'manifest': decision['name_manifest_sha256']}
+        near = decision['id'] != digest(plain)  # A near match hashes with "match": "near" (catalog.export_candidates).
+        moved = dict(plain, anchor=anchor, **({'match': 'near'} if near else {}))
+        if any(d['anchor'] == anchor and sorted(d['folders']) == sorted(decision['folders']) for d in decisions):
+            notes.append(f'Export folders in “{anchor}”: the new library folder’s own answer was kept')
+            continue
+        decisions.append(dict(decision, id=digest(moved), anchor=anchor))
+    if decisions:
+        settings['export_decisions'] = decisions
+    texture = child_settings.get('texture_folder')
+    if texture:
+        if settings.get('texture_folder'):
+            notes.append(f'Texture folder of “{child["name"]}”: the new library folder’s own choice was kept')
+        else:
+            settings['texture_folder'] = dict(texture, folder=None if texture['folder'] is None else under(texture['folder']))
+    return notes
 
 
 def set_enabled(config, key, enabled):

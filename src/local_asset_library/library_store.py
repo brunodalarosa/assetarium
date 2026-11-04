@@ -256,6 +256,21 @@ def relocate(db, child, parent_id, prefix):
                {'parent': parent_id, 'prefix': prefix, 'child': child['id']})
 
 
+def carry_answers(db, child, parent_id, prefix):
+    """A replaced folder's answers (packs, image kinds, variant axes…) under the folder added around it, paths prefixed.
+
+    The new folder's own answer for the same path wins; each such conflict is returned as a note. The child keeps its
+    rows, so adding it on its own again still finds them."""
+    notes = []
+    for path, kind, value, utc in db.execute('SELECT path, kind, value, utc FROM answers WHERE folder_id=?', (child['id'],)).fetchall():
+        moved = f'{prefix}/{path}' if path else prefix
+        if db.execute('SELECT 1 FROM answers WHERE folder_id=? AND path=? AND kind=?', (parent_id, moved, kind)).fetchone():
+            notes.append(f'{kind} answer for “{moved}”: the new library folder’s own answer was kept')
+            continue
+        db.execute('INSERT INTO answers VALUES (?,?,?,?,?)', (parent_id, moved, kind, value, utc))
+    return notes
+
+
 def carried(record, child, folder, prefix):
     """A record from a replaced folder as the folder around it sees it: paths gain the folder's prefix."""
     text = encoded(record).replace('"' + child['key'] + '/', '"' + folder['key'] + '/' + prefix + '/')

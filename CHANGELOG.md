@@ -8,6 +8,8 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Added
 
+- Adding a library folder around others keeps their answers (excluded folders, export folder decisions, texture
+  folder, packs, image kinds) under the new folder's path, so excluded engine copies are not scanned again.
 - **Format off**: a model shown in the Library whose previews were made from a file in a format that is off
   now says so (its descriptions and search by meaning skip it) and offers **Turn FBX on** in the inspector,
   instead of looking ready. Design principle P5, *No silent states*, records the rule.

@@ -114,6 +114,36 @@ def test_a_folder_added_around_others_replaces_them_and_keeps_ids_overlays_and_c
     assert not any(p.is_dir() for p in Path(one['path']).iterdir())  # Still nothing written into the folders.
 
 
+def test_a_folder_added_around_another_keeps_its_answers_under_the_new_path(managed):
+    config, _, one, two = managed
+    root = Path(one['path'])
+    (root / 'Kit/Unity FBX').mkdir(parents=True)
+    (root / 'Kit/Unity FBX/copy.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
+    sources.set_excluded_folders(config, one['key'], ['Unity*', 'Kit/Old'])
+    library_store.save_answer(config, one['id'], 'Kit', 'pack_name', 'Starter Kit')
+    library_store.save_answer(config, one['id'], '', 'image_kind', 'texture')
+    sources.scan_source(config, one)
+    assert not any('Unity' in k for k in ids(config, one))
+    settings = sources.bound(config, one).output_path('data', 'source.json')
+    value = json.loads(settings.read_text())
+    value['texture_folder'] = {'folder': 'Kit/Textures', 'single_copies': True, 'utc': 'x'}
+    value['export_decisions'] = [{'id': library_store.digest({'anchor': 'Kit', 'folders': ['FBX', 'OBJ'], 'manifest': 'm'}),
+                                  'anchor': 'Kit', 'folders': ['FBX', 'OBJ'], 'reference': 'FBX', 'names': 2,
+                                  'name_manifest_sha256': 'm', 'decision': 'group', 'utc': 'x'}]
+    settings.write_text(json.dumps(value))
+    parent = sources.add(config, str(root.parent))
+    scoped = sources.bound(config, parent)
+    assert sources.excluded_folders(scoped) == ['one/Unity*', 'one/*/Unity*', 'one/Kit/Old']
+    assert sources.texture_folder(scoped)['folder'] == 'one/Kit/Textures'
+    moved = sources.export_decisions(scoped)[0]
+    assert moved['anchor'] == 'one/Kit' and moved['id'] == library_store.digest({'anchor': 'one/Kit', 'folders': ['FBX', 'OBJ'], 'manifest': 'm'})
+    answers = {(a['path'], a['kind']): a['value'] for a in library_store.answers(config, parent['id'])}
+    assert answers[('one/Kit', 'pack_name')] == 'Starter Kit' and answers[('one', 'image_kind')] == 'texture'
+    assert library_store.answers(config, one['id'])  # The child keeps its own rows.
+    sources.scan_source(config, parent)
+    assert not any('Unity' in k for k in ids(config, parent))  # Still skipped: never walked, hashed or imported.
+    assert sources.excluded_folders(sources.bound(config, sources.get_source(config, parent['key'])))  # Saved, not just returned.
+
 def test_an_image_keeps_its_id_in_a_folder_added_around_it(managed):
     """Image records carry the current schema; a kept ID no longer matches its pack-and-path formula and is valid."""
     from PIL import Image
@@ -156,3 +186,12 @@ def test_an_unreachable_folder_is_offline_and_keeps_its_assets(managed):
     assert not sources.source_status(config, one)['offline']
     sources.scan_source(config, one)
     assert ids(config, one) == before
+
+
+def test_the_new_folders_own_answer_wins_a_conflict_and_says_so():
+    child = {'name': 'Castle Kit'}
+    settings = {'texture_folder': {'folder': 'Shared', 'single_copies': False}, 'excluded_folders': ['Castle Kit/Unity*']}
+    notes = sources.carry_settings(settings, {'texture_folder': {'folder': 'Tex', 'single_copies': True},
+                                              'excluded_folders': ['Unity*']}, child, 'Castle Kit')
+    assert settings['texture_folder']['folder'] == 'Shared' and notes == ['Texture folder of “Castle Kit”: the new library folder’s own choice was kept']
+    assert settings['excluded_folders'] == ['Castle Kit/Unity*', 'Castle Kit/*/Unity*']  # Merged, without duplicates.

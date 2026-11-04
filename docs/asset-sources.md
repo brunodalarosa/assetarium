@@ -51,7 +51,9 @@ is rendered or described before you ask.
 
 Adding a folder **inside** a library folder is refused as already covered, with **Show it**. Adding a folder
 **around** library folders replaces them: their assets keep their IDs, results, collection entries and
-your reviews. **Remove…** stops watching a folder; its results stay in the store, and adding the same
+your reviews, and their answers move to the new folder under its path: excluded folders (a name like `Unity*`
+still applies only inside the old folder), export folder decisions, the texture folder, packs and image kinds.
+Where the new folder already has its own answer for the same place, its answer is kept and the app log says so. **Remove…** stops watching a folder; its results stay in the store, and adding the same
 folder again restores everything. An unreachable folder (a removed drive) shows **Offline**; its results
 and collection entries are kept. A large library folder opened for the first time after a scan shows
 **Reading…** for a few seconds while Assetarium prepares a small summary of it; counts can trail running
