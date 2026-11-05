@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "revision": 1,
+  "collections": [
+    {
+      "id": "col_3dad72a937674fea",
+      "name": "Sample shapes",
+      "description": "Release fixture",
+      "created_at": "2026-11-05T13:13:08.898210+00:00",
+      "updated_at": "2026-11-05T13:13:08.898210+00:00",
+      "created_by": "app",
+      "items": [
+        {
+          "asset_id": "asset_0eb47511198b3974f582670932fe25a6",
+          "label": "",
+          "notes": "",
+          "added_at": "2026-11-05T13:13:08.898220+00:00",
+          "snapshot": {
+            "name": "Green pyramid",
+            "pack": "Sample assets",
+            "asset_type": "model_3d",
+            "source_key": "Sample assets",
+            "source_name": "Sample assets"
+          }
+        },
+        {
+          "asset_id": "asset_63ff2228dba150b19940a5dda0dab965",
+          "label": "",
+          "notes": "",
+          "added_at": "2026-11-05T13:13:08.898220+00:00",
+          "snapshot": {
+            "name": "Blue cube",
+            "pack": "Sample assets",
+            "asset_type": "model_3d",
+            "source_key": "Sample assets",
+            "source_name": "Sample assets"
+          }
+        },
+        {
+          "asset_id": "asset_d6468afecc412681c5370af4a7728c64",
+          "label": "",
+          "notes": "",
+          "added_at": "2026-11-05T13:13:08.898220+00:00",
+          "snapshot": {
+            "name": "Red sphere",
+            "pack": "Sample assets",
+            "asset_type": "model_3d",
+            "source_key": "Sample assets",
+            "source_name": "Sample assets"
+          }
+        }
+      ]
+    }
+  ]
+}

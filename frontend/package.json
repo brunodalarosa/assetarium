@@ -1,7 +1,7 @@
 {
   "name": "assetarium-desktop-ui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Assetarium desktop interface (React). Builds into src/local_asset_library/ui/build; the app never needs Node at runtime.",
   "license": "MIT",
   "type": "module",

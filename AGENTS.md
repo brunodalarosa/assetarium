@@ -148,8 +148,12 @@ the changes are listed in [CHANGELOG.md](CHANGELOG.md).
   edit to a fingerprinted worker (`blender_worker.py`, `render_math.py`, repair workers) unless
   `scripts/check-render-stability.py` proves it equivalent (decision 0022), so upgrading never turns finished work into new work.
 - Choose a new version number, release, or tag (`vX.Y.Z`) only when the owner asks. A
-  release updates every version field together: `pyproject.toml`, `runtime/*/pyproject.toml`
-  and `frontend/package.json`.
+  release updates the app's version fields together: `pyproject.toml` (and `uv lock` for the root
+  `uv.lock`), `src/local_asset_library/__init__.py`, `frontend/package.json` (`npm version`) and the
+  README version line; `tests/test_version.py` checks they agree.
+- `runtime/*/pyproject.toml` versions stay fixed. They describe internal environments, and the
+  caption and search fingerprints hash `runtime/*/uv.lock`, so bumping them would rewrite those locks
+  and send every description and search vector back to be redone.
 
 ## Branching (git flow)
 

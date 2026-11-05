@@ -6,270 +6,77 @@ All notable changes to Assetarium are listed here. The project follows
 
 ## [Unreleased]
 
-**Upgrading from 0.1.0:** start with a fresh library. 0.2.0 changes where results live (decision 0023) and doesn't
-upgrade a 0.1.0 install; add your library folders again and process them. Supported upgrades start from 0.2.0.
+## [0.2.0] — 2026-11-05
+
+**Upgrading from 0.1.0:** start with a fresh library. 0.2.0 changes where results live and doesn't upgrade a 0.1.0
+install; add your library folders again and process them. Supported upgrades start from 0.2.0.
 
 ### Added
 
-- **Newer data is left alone**: if a newer Assetarium wrote the library database, processing ledger, results index,
-  search index, processing queue, a library folder's settings or notifications, this version refuses to open it,
-  says why and changes nothing, so going back to an older version can't damage a library.
-- Adding a library folder around others keeps their answers (excluded folders, export folder decisions, texture
-  folder, packs, image kinds) under the new folder's path, so excluded engine copies are not scanned again.
-- Undoing an agent's pack proposal is refused, with the reason, once the pack changed after it; it used to
-  restore the earlier version and silently drop the later change.
-- **Format off**: a model shown in the Library whose previews were made from a file in a format that is off
-  now says so (its descriptions and search by meaning skip it) and offers **Turn FBX on** in the inspector,
-  instead of looking ready. Design principle P5, *No silent states*, records the rule.
-- **Try your agent** replaces **Check my model** in Settings and optional setup. It generates tiny practice packs
-  on demand and uses the connected agent, the Library discovery flow, real pack tools, grouped proposal review
-  and scans. Results describe the observed organization rather than rating a model. Practice files, store,
-  activity and reports are removed on finish or cancellation; results remain in memory until closed.
-  Abandoned sessions are cleaned on the next app launch. The old local-model benchmark and `model-check` CLI
-  command have been removed; no model server, download or extra runtime is needed.
-
-- **Make progress measurable** (design principle P4): long work shows a compact measured count, with phase,
-  remaining work and outcomes available on hover or keyboard focus. Scans report checked files, cached hashes,
-  faults and image classification counts; unknown totals use an indeterminate indicator. Asset processing,
-  background activity and description notifications share the same presentation.
-
-- **Setup leaves search working** (decision 0026): the one-time search check runs on two built-in sample images,
-  so it needs no library and no command. Setup runs it after Save, **Run check** in Settings → General runs it on
-  demand (`local-assets setup search-check` in a terminal), and Make previews runs it by itself when it is missing
-  instead of stopping.
-- **Built-in sample assets**: a blue cube, a green pyramid and a red sphere (a few KB of GLB in `samples/`). Setup
-  offers them with **Include sample assets** (checked by default); the agent-assisted setup asks the same question.
-- **Formats Assetarium uses** (Settings → General, setup, `settings set --formats / --image-formats`, agents): a
-  toggle for each 3D format (glTF/GLB, FBX, OBJ) and each image format (PNG, JPEG, SVG, WebP, TGA, TIFF, BMP, GIF,
-  AVIF). Assets only in formats that are off are hidden from the Library, search, agents and processing (a
-  collection keeps them with a **Format off** badge); Library's header says how many and links to the setting.
-  Textures of 3D models are always read. Changing formats never deletes results; turning one back on brings its
-  assets back. Every format off is the paused state.
-- Setup has a **Connect your agent** step with your agent's configuration and Copy, and shows when it connects.
-- **Session logs**: every app run, MCP server and command writes one readable log in `logs/`
-  (`2026-11-01_12-13-07_app.log`), and the workers it starts write into the same file. Levels (`[logging] level`,
-  `--verbose`, `--log-level`), repeated lines collapsed into counts, the newest 30 sessions kept (200 MiB at most).
-  `local-assets logs` lists, shows, filters and follows them; `Assetarium (with log).vbs` opens the app with a live
-  log console. `logs/gui.log` and `logs/gui-worker.log` are no longer written.
-
-- **Variant groups**: assets whose names differ only in a last letter, color, material or LOD (`Car_11_R`,
-  `Car_11_G`, `Car_11_B`) are one card with a variant badge and chips; hovering a chip previews it. Numbered
-  series stay separate. Variants share one description unless you turn on **Generate separate descriptions for
-  each variant** in the inspector (decision 0024).
-- **Pack profiles**: a pack's Structure section says whether it needs a structure and why, lists the rules that
-  steer it, keeps every version (Restore) and exports a profile file; `local-assets packs signals|profile|apply|
-  revert|export` do the same from a terminal.
-- **Agent activity** (the agent button in the top bar): what connected agents read, change and propose,
-  live, with Undo for changes and Apply / Reject for proposals that rescan. Agents get pack structure tools
-  (`list_packs`, `get_pack_outline`, `get_profile`, `propose_profile`, `finish_structure`, `say`) that page
-  through folders in small responses; search shows each variant group once.
-- **Add library folder** is a short wizard: a quick look reads names only and shows the tree as it is read,
-  says which packs look fine or need a structure and how it decided, then **Let my agent finish** (a prompt
-  to paste, your agent's progress and proposals, live), **Review myself** or **Later**. Your agent can start
-  before the first scan has finished.
-- **Guided agent setup**: your agent checks this computer itself (Blender, runtimes, model weights) and asks you
-  only what Assetarium needs to know: which game engines you use (several are fine), whether you want AI
-  descriptions (or, without an NVIDIA GPU, whether a local model server already runs), and how much disk space
-  it may use. When it finishes, the app shows its report: every value with where it came from, **Undo** for
-  what it changed, what still needs you, and **Looks good** to complete setup. Model weights you placed yourself
-  are verified locally instead of offered for download (`local-assets setup verify-weights`).
-- **Agent entry check**: when your agent's Assetarium entry starts a copy that was moved or deleted (the agent
-  only says "connection closed"), the agent setup panel says so, shows the fix and has **Check again**;
-  `local-assets setup agent check` and `doctor` report the same. It reads only Assetarium's own entry in the
-  Claude Code, Codex and OpenCode settings and changes nothing. The Claude Code command now replaces an older
-  entry, so running it again repairs it.
-- **Asset sources** tab (the folder icon above Settings): browse by place through library folders,
-  bundles, packs and folders, with coverage, "+N new", a card state for every asset (no previews
-  yet, queued, ready, blocked with its fix, recorded failure, missing), a pack header with its
-  cover and license, folder and pack panels, context menus, double-click to Explorer and Show in
-  pack from search results (decision 0023).
-- Packs are detected from folder structure (license, readme, preview image, versioned names), and
-  you can make a folder a pack, merge it into its parent or rename it (`local-assets packs`).
-- **Make previews** and **Generate descriptions** on a pack, folder or picked assets go to a
-  processing queue: they start at once or wait in line, previews go first, long jobs show an
-  estimate and ask first (as does a job of more than 100 assets before anything is measured), an item waiting for a busy folder starts when that work ends, closing
-  the app while work runs asks first and the next start offers Continue, and work never outlives
-  the app (after a crash it stops, is logged and shows in Recent) (`local-assets previews`, `describe`, `queue`).
-- Asset processing shows Running (with a copyable live log), Up next, Blocked (with the fix),
-  Recorded failures (by stage and reason) and Recent.
-- Every supported type is always included. Images are sorted into model textures (kept with their
-  model), material textures and 2D images, with the evidence for each; "Treat images here as
-  textures / as 2D assets" corrects a folder (`local-assets library images`).
-- 2D images show their original file before any processing.
-- Files that move or are renamed keep their ID, previews, descriptions, reviews and collection
-  entries; copies share finished previews and descriptions instead of rendering again; vanished
-  files are listed as Missing until you forget them (`local-assets forget-missing`).
-- `scripts/migrate-library.py` moves existing results into the library store once, with a dry run
-  first, without rendering or describing anything again. It prints its progress, and running it again
-  after a fault imports the folders that failed and checks unverified ones again.
-- Models that borrow textures from a sibling project folder keep them when those folders sit inside one
-  library folder, as when separately added folders are joined (decision 0010 amendment).
-- Agents get each asset's detected `pack_name` and `pack_path` from `search_assets` and `get_asset`.
-
-- **Settings → General → Blender installation** shows whether a Blender is saved (Saved, Not
-  saved, Missing, Not found), checks it on request and changes it with the same choose, check and
-  confirm steps as the setup wizard, without running setup again.
-- Faster previews: Process assets renders several assets at once in Blender processes that stay
-  open between assets, on the CPU or a graphics card (decision 0022). A short speed test on your
-  computer (about 2 minutes, synthetic shapes only) picks the faster device and how many renders at
-  a time help; it runs on the next Process assets or from **Settings → General → Speed test → Test
-  again** (`local-assets rendering test`). You can choose the device, limit renders at a time, and
-  set how much memory rendering may use (`local-assets rendering set`); limits never go past the
-  fastest tested number or the memory that is free. Finished previews stay valid and are not
-  rendered again; cancelling or closing the app finishes the running renders, and a stopped run
-  resumes where it left off.
-- Search by description and by image can run on the CPU: choose **Where search runs** in
-  Settings → General, the setup wizard, `local-assets settings set --search-device cpu` or
-  the agent's `apply_setup`. It uses the same EmbeddingGemma model and precision with a
-  CPU-only search runtime (`runtime/embedding-cpu`, about 1 GB). Indexing is slower than on an
-  NVIDIA GPU; searching feels the same (decision 0018).
-- Excluded folders per source (Settings → Asset sources, `local-assets sources exclude|include`):
-  a folder name with `*` or a path inside the source; excluded folders are not scanned.
-- Duplicate export folder suggestions: sibling folders whose model files have the same names
-  (for example `FBX/`, `OBJ/` and `Unity FBX/` copies) are suggested per source, and grouped as
-  alternate files of the same assets only when you choose **Group**. You can also keep them
-  separate or exclude the extra folders, and undo an answer (decision 0019).
-- Grouped files keep their folder as a variant label; `get_asset` lists `source_variants` and
-  accepts `source_variant` to pick, for example, the `Unity FBX` file.
-- **Textures not found** per source: when models can't find textures that the source holds under
-  the exact same name (for example once per render pipeline folder), choose the folder to use and
-  whether single copies may be used; Apply repairs every model whose textures all resolve, on the
-  next Process assets, without changing originals (decision 0021).
-- **Recheck failures** on a source's Asset processing card (and `local-assets recheck`): reruns
-  the file check and, after you confirm, retries failures that came from it and pass it now.
-- `scripts/record-embedding-capability.py`, the one-time search check on two of your own
-  processed assets. Setup lists it, and Process assets names it when it is missing.
-- **Settings → General → Search** lists what search needs on the chosen device (GPU, search
-  runtime, model weights, search check) with the command for anything missing, and **Check again**.
-  `local-assets setup status` lists search on its own, whichever description engine you use.
+- **Library**: library folders replace asset sources (`local-assets library …`; `sources …` still works). Browse
+  by folder, bundle, pack and folder, with a card state for every asset, pack headers, context menus and Show in
+  pack from search. Packs are detected from structure (license, readme, preview image, versioned names) and can
+  be made, merged or renamed (`local-assets packs`).
+- **Recognized files**: moved or renamed files keep their ID, previews, descriptions and collection entries;
+  copies share finished results; vanished files show as Missing until you forget them.
+- **Image kinds**: images are sorted into model textures, material textures and 2D images, with the evidence;
+  a folder can be corrected (`local-assets library images`).
+- **Variant groups**: `Car_11_R/G/B` become one card with variant chips and a shared description, unless you
+  ask for separate ones (decision 0024).
+- **Pack profiles**: a pack says whether it needs a structure and why, with versioned rules, Restore and export
+  (`local-assets packs signals|profile|apply|revert|export`).
+- **Add library folder wizard**: a quick look at names only, a verdict per pack, then **Let my agent finish**,
+  **Review myself** or **Later**.
+- **Agents**: guided setup (the agent checks Blender, runtimes and weights itself, the app shows a report with
+  Undo and **Looks good**), pack structure tools (`list_packs`, `get_pack_outline`, `get_profile`,
+  `propose_profile`, `finish_structure`, `say`), an Agent activity panel, grouped proposal review with one
+  **Apply decisions** (decision 0025), **Try your agent** practice packs, a **Connect your agent** setup step,
+  and an agent entry check (`setup agent check`, `doctor`).
+- **Processing queue**: Make previews and Generate descriptions on a pack, folder or selection; previews first,
+  estimates, and ask-first for long or large jobs (`local-assets previews`, `describe`, `queue`). Asset
+  processing shows Running, Up next, Blocked, Recorded failures and Recent, with measured progress.
+- **Parallel rendering** in kept-open Blender processes on the CPU or a GPU, sized by a short speed test and
+  your limits (`local-assets rendering`, decision 0022).
+- **Formats Assetarium uses**: a toggle per 3D and image format; assets in formats that are off are hidden,
+  never deleted, and a model previewed from an off format says so (decision 0026).
+- **CPU search**: the same EmbeddingGemma model on the CPU (`runtime/embedding-cpu`, about 1 GB), with a thread
+  count chosen by a speed test (decision 0018).
+- **Search works after setup**: a search check on built-in samples (a cube, a pyramid, a sphere), and a search
+  readiness panel in Settings → General with **Check again** (`local-assets setup search-check`, `setup status`).
+- Excluded folders, duplicate export folder suggestions with **Group** (decision 0019), a texture folder choice
+  for **Textures not found** (decision 0021) and **Recheck failures** (`local-assets recheck`, decision 0020).
+- **Session logs**: one readable log per app, MCP or CLI run in `logs/` (`local-assets logs`,
+  `Assetarium (with log).vbs`).
+- **Blender installation** panel in Settings → General, and **Copy** on every command the app asks you to run.
+- **Newer data is left alone**: data written by a newer Assetarium is refused and left unchanged.
 
 ### Changed
 
-- The Library navigation button uses a folder icon.
-
-- **Agent proposals are reviewed together**: a library folder's waiting proposals group the rules packs share,
-  you accept or reject rules (all at once or per pack), see a preview, and one **Apply decisions** saves them
-  with a single scan instead of one blocking rescan per pack. Several proposals arriving together raise one
-  notice. **Let my agent finish** uses the robot icon, and "new since your last visit" is a dot (decision 0025).
-
-- Agents no longer need a setup session: a connected agent may apply setup values at any time (each one
-  labeled *Set by agent* and noticed); the Blender path is still only a proposal you apply
-  (`local-assets setup agent` now just shows how to connect; decision 0024).
-- Nothing is written into asset folders any more: previews, descriptions and search data live in
-  one library store (`data/library-store/`, or `[storage].library` in `config.local.toml`), which
-  counts against the storage budget. Run `scripts/migrate-library.py` once to move existing
-  results (see Asset sources in the docs).
-- Library folders replace asset sources: `local-assets library …` replaces `sources …` (still
-  accepted). Adding a folder around library folders replaces them and keeps their assets.
-- Settings has no Asset sources section and the per-source **Include 2D images** checkbox and
-  import format restrictions are gone; the source browser page is replaced by the Asset sources tab.
-
-- Contributor documentation moved into `Assetarium KnowledgeBase/`, an Obsidian vault that also reads on
-  GitHub: decisions, current status, contracts, the roadmap and per-area notes. `docs/` keeps the
-  user guides; the October 2026 progress journal is frozen in `docs/history/`, and the one-time
-  pilot reports were removed (they remain in git history).
-- `CLAUDE.md` and `AGENTS.md` no longer describe one computer. Each contributor's hardware, tool
-  paths and Linux check setup go in an ignored `MACHINE.local.md`, which agents create when it is
-  missing.
-- Duplicate export folder suggestions also catch near misses: folders that share at least 90% of
-  their model names, such as a `Unity FBX` copy missing a few models or repeating one name in two
-  subfolders. The suggestion says which names stay as they are, and Group groups only the shared
-  names. Earlier answers and exact suggestions are unchanged.
-- Search data on the CPU builds about 25% faster: it uses more CPU threads than one per physical
-  core. The speed test picks how many (the fewest within 3% of the fastest), and **Settings →
-  General → Search → CPU threads for search data** (`local-assets settings set --search-threads`)
-  lets you choose, for example to keep threads free. Vectors are identical at any thread count, so
-  existing search data stays valid.
-- Descriptions from a local model server no longer need the description runtime
-  (`.venv-caption`); only the built-in engine does.
-- The setup wizard's descriptions step is now "Descriptions and search".
+- Nothing is written into asset folders: results live in one library store (`data/library-store/`, or
+  `[storage].library`), keyed by their inputs (decision 0023).
+- Every supported type is always included; Settings loses the Asset sources section, **Include 2D images** and
+  import format limits.
+- A connected agent may apply setup values at any time (labeled *Set by agent*); the Blender path stays a
+  proposal (decision 0024).
+- Descriptions from a local model server no longer need `.venv-caption`; setup's step is "Descriptions and search".
+- The runtime wrappers refuse project commands without `--project`.
+- Contributor docs moved to the `Assetarium KnowledgeBase/` vault; `docs/` keeps user guides; machine details
+  go in an ignored `MACHINE.local.md`.
 
 ### Fixed
 
-- Asset inspection uses its resolved data revision for 3D and image viewing in Library, Search and Collections.
-  A genuine revision change offers Refresh inspection and is not mislabeled as a recorded asset failure.
-
-- Missing entries are hidden from normal Library browsing and counts. Pack/folder inspection provides a paged
-  review, distinguishes existing but unrecognized files, and confirms scoped “Forget all missing files” with
-  Delete on the left. Forgetting keeps originals, cached results and collection entries.
-
-- Format folders show assets with source files in that folder, select that source format in the inspector, and
-  keep parent counts deduplicated. Shared thumbnails identify their source; measurements are never attributed to another format.
-
-- Show in Explorer opens inside library folders and packs, and selects original files using the Windows Shell,
-  including paths containing spaces, commas or Unicode. Unavailable locations report an error.
-
-- **Make previews no longer offers work it then refuses**: assets Assetarium won't process (for example FBX copies
-  while only glTF is processed) are counted as "not processed" instead of "without previews", so the button, the
-  tree and the queue agree.
-- Commands the app asks you to run are shown in a block with **Copy**, including inside processing faults and
-  notices (design principle P3). Identical stops in Asset processing → Recent are one line with a count.
-- **Asset sources is now Library**, at the bottom of the rail above Settings; the empty Library placeholder is gone.
-- Large libraries no longer take over the computer's memory. The Asset sources and Asset processing
-  tabs read a small per-folder summary instead of every saved record, so a 73,000-asset library
-  folder opens in about a second instead of timing out with 14 GB in use. A library folder read
-  for the first time shows "Reading…" for a few seconds, and the same request is never run twice
-  at once. Closing the window now always ends the app.
-- Descriptions are no longer rejected for wording alone. A sailing ship's "rigging" is its
-  ropes, not a character rig, and phrases such as "designed for use in games" in the
-  description are now kept with a review note instead of failing it. The 35 descriptions an
-  earlier run rejected this way were accepted from their saved output without running the
-  model again.
-- Search failed with "Query/index embedding contract mismatch; reindex explicitly" when a source's
-  search data was built on a checkout with other line endings (LF vs CRLF) and no search check had
-  been recorded on this install. The search code and runtime lock were identical, so search now
-  accepts that data without reindexing, and a later search check records the same contract. A
-  real code or lock change still requires a reindex.
-- Search no longer fails with "Embedding worker exited without result" when the search runtime is
-  incomplete. It names the missing packages and the command that installs them, starts no worker,
-  and works on the next search once the runtime is installed. A worker that exits names its exit
-  code and log file, and a kept worker fault says to restart Assetarium.
-- The runtime wrappers (`mcp-runtime`, `caption-runtime`, `embedding-runtime`, `.ps1` and `.sh`)
-  refuse `sync`, `run` and other project commands without `--project`. Without it uv installed the
-  base project into the runtime's environment and removed the runtime's own packages.
-- The setup wizard now saves the Blender it found when none was saved yet. It used to treat a
-  discovered Blender as already in use and write nothing, so a fresh install had no saved Blender
-  and the speed test stayed blocked ("Set up Blender to test render speed"). The speed test also
-  sees a Blender saved after the app started, without a restart. Run setup again (or use Blender
-  installation) to save yours.
-- One-piece objects such as rocks, pebbles and grass clumps no longer fail their description
-  because the model listed no separate parts; shape, colors and style are still required.
-  Descriptions that already failed this way stay recorded until you retry them.
-- After grouping export folders, a source could ask for **Process assets** forever: its search data
-  was all reused, or its recorded failures were kept, but the assets stayed "pending". Processing now
-  records those states again; recorded failures show as failed and are still never retried.
-- Flat card models (grass and cloud sprites with no thickness) no longer fail with "Empty or
-  off-frame preview detected": a view that sees the card edge-on is rendered again turned toward
-  its face. Finished previews are unchanged and not rendered again.
-- The interactive 3D preview now opens from asset cards inside a collection; it no longer
-  reports "Library changed; refresh the inspection card." for assets that preview fine from search.
-- After a crash or forced shutdown during processing, Settings → Asset sources showed "No asset
-  sources yet" and processing could not resume: a search index left mid-write could not be read
-  until something wrote to it. Reads now let SQLite undo the unfinished write first (finished data
-  is kept), a source whose data cannot be read shows that on its own card without hiding the
-  others, and a source list that fails to load says so instead of claiming there are no sources.
-
-- After grouping export folders, already processed assets stayed "pending" forever: Process assets
-  reused their finished previews and descriptions but never marked those stages complete again,
-  and Generate descriptions had nothing to start from. Reused results now mark their stage
-  complete, and a reuse-only pass runs without starting a model.
-
-- A broken alternate file (for example an OBJ whose texture path points at the pack author's
-  computer) no longer fails the whole asset: only that file is marked unusable, with its reason,
-  and the asset is rendered from its good file. Healthy assets keep their fingerprints (decision 0020).
-
-- Scans of large sources spent minutes matching every asset against every file (supplied
-  previews) and every other asset (name variants); both now look up names directly, with
-  identical results. A rescan of a 16,504-file source went from about 8½ minutes to 21 seconds.
-- Sources with more than about 12,000 files failed every rescan with "Managed manifest exceeds
-  its bounded size": their scan cache outgrew the 4 MiB limit for app JSON files. The scan cache
-  now has its own 256 MiB bound; every other file keeps 4 MiB.
-
-- A fresh install could not build search data: the search check only worked with the original
-  pilot assets, and the first search stage stopped with "Verified embedding contract missing".
-
-- README: the setup welcome screenshots now show the current page with the
-  "Set up with your AI agent" and "Set it up yourself" choices, and the README explains both.
+- Large libraries: a 73,000-asset folder opens in about a second, and a 16,504-file rescan takes 21 seconds
+  instead of 8½ minutes. Sources over about 12,000 files no longer fail their rescan.
+- A crash mid-write no longer hides every source.
+- Descriptions are no longer rejected for wording alone or for one-piece objects with no listed parts.
+- Flat card models no longer fail with an empty preview; a broken alternate file fails only that file.
+- Assets no longer stay "pending" after grouping export folders, and Make previews no longer offers work it
+  then refuses.
+- Search: no "contract mismatch" from LF/CRLF checkouts, a clear message for an incomplete search runtime, and
+  fresh installs can build search data.
+- 3D and image viewing use the right data revision everywhere, and the 3D preview opens from collections.
+- Show in Explorer selects files with spaces, commas or Unicode in their paths.
+- Setup saves the Blender it found, so the speed test is no longer blocked.
 
 ## [0.1.0] — 2026-10-25
 

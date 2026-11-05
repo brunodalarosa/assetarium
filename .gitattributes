@@ -11,5 +11,8 @@ src/local_asset_library/ui/vendor/manifest.json text linguist-vendored=false
 src/local_asset_library/ui/build/** -text -diff linguist-generated=true
 
 
+# Release fixtures are frozen as their release wrote them (tests/test_release_fixtures.py).
+tests/fixtures/releases/** -text -diff
+
 # Shell wrappers run on Linux: never check them out with CRLF.
 *.sh text eol=lf

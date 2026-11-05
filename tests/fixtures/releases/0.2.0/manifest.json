@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "release": "0.2.0",
+  "asset_ids": [
+    "asset_0eb47511198b3974f582670932fe25a6",
+    "asset_63ff2228dba150b19940a5dda0dab965",
+    "asset_d6468afecc412681c5370af4a7728c64"
+  ],
+  "folder_key": "Sample assets",
+  "collection": {
+    "id": "col_3dad72a937674fea",
+    "name": "Sample shapes"
+  },
+  "tag": {
+    "asset_id": "asset_0eb47511198b3974f582670932fe25a6",
+    "tag": "fixture"
+  }
+}

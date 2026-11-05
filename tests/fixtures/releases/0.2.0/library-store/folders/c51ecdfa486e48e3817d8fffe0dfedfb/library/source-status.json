@@ -1,0 +1,49 @@
+{
+  "scanned": true,
+  "scanned_utc": "2026-11-05T13:13:08.657483+00:00",
+  "inventory_hash": "58d5d1b6fe659fa0aac80b34187f50574d5ac864dd0de3c413780ccaa9522fa3",
+  "assets": 3,
+  "pending": 3,
+  "failed": 0,
+  "pending_ids": [
+    "asset_0eb47511198b3974f582670932fe25a6",
+    "asset_63ff2228dba150b19940a5dda0dab965",
+    "asset_d6468afecc412681c5370af4a7728c64"
+  ],
+  "searchable_ids": [],
+  "needs_processing": true,
+  "removed": 0,
+  "recognized": {
+    "new": 3,
+    "moved": 0,
+    "duplicate": 0,
+    "edited": 0,
+    "missing": 0,
+    "returned": 0,
+    "excluded": 0
+  },
+  "missing": 0,
+  "excluded_folders": [],
+  "export_suggestions": [],
+  "texture_suggestion": null,
+  "reason": "Assets need processing or publication",
+  "format_counts": {
+    "fbx": 0,
+    "gltf": 3,
+    "obj": 0
+  },
+  "skipped_formats": 0,
+  "eligible_assets": 3,
+  "descriptions": {
+    "complete": 0,
+    "missing": 0,
+    "failed": 0,
+    "unavailable": 3
+  },
+  "processing_paused": false,
+  "processing_formats": [
+    "fbx",
+    "gltf",
+    "obj"
+  ]
+}
