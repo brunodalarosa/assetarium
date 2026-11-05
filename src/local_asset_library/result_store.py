@@ -13,6 +13,7 @@ import posixpath
 import sqlite3
 
 from .config import ConfigError
+from .store_versions import checked
 
 # Logical data/ areas whose results belong to the whole store, not one library folder.
 RESULT_AREAS = ('inspection/', 'captions/', 'results/')
@@ -63,7 +64,7 @@ def result_path(stage, key):
 def _index(config):
     path = store_root(config) / 'results/index.sqlite'
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path)
+    db = checked(sqlite3.connect(path), 'The results index', 1)
     db.execute("""CREATE TABLE IF NOT EXISTS results(stage TEXT, key TEXT, path TEXT, asset_id TEXT, utc TEXT,
                   PRIMARY KEY(stage, key))""")
     return db

@@ -13,6 +13,7 @@ import uuid
 
 from .catalog import asset_id as formula_id, digest, encoded
 from .config import ConfigError
+from .store_versions import checked
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
@@ -42,7 +43,7 @@ def database_path(config):
 def connect(config):
     path = database_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path, timeout=30)
+    db = checked(sqlite3.connect(path, timeout=30), 'The library database', 1)
     db.executescript(SCHEMA)
     return db
 

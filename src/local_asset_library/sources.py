@@ -20,8 +20,10 @@ import uuid
 
 from .config import ConfigError, _inside, _relative
 from .publication import atomic_json, read_json, read_only
+from .store_versions import read_versioned
 from .settings import processing_formats, processing_eligible, used_formats, format_group, PROCESSING_FORMATS
 
+SOURCE_SETTINGS = "This library folder's settings (source.json)"
 SHARED_DATA = {
     "embeddings/capability.json", "embeddings/model-download.json",
     "captions/model-download.json", "captions/model-preflight.json",
@@ -161,7 +163,7 @@ def _source_settings(config):
     if config.metadata_root is None:
         return {}
     path = config.output_path('data', 'source.json')
-    return read_json(path) if path.exists() else {}
+    return read_versioned(path, SOURCE_SETTINGS, 1) if path.exists() else {}
 
 
 def validate_exclusion(pattern):
@@ -203,7 +205,7 @@ def _change_source_settings(config, key, change, busy_reason):
         raise ConfigError(busy_reason)
     with lease(config, 'source-settings', resource='sources'):
         path = scoped.output_path('data', 'source.json')
-        value = read_json(path)
+        value = read_versioned(path, SOURCE_SETTINGS, 1)
         change(value)
         atomic_json(path, value)
     return source
@@ -391,7 +393,7 @@ def add(config, directory):
             key += "-" + identifier[:8]
         source = {"id": identifier, "key": key, "name": root.name, "path": str(root), "enabled": True}
         path = bound(config, source).output_path("data", "source.json")
-        settings = dict(read_json(path) if known and path.exists() else {}, schema_version=1, id=identifier, key=key)
+        settings = dict(read_versioned(path, SOURCE_SETTINGS, 1) if known and path.exists() else {}, schema_version=1, id=identifier, key=key)
         notes = []
         with closing(library_store.connect(config)) as db, db:
             library_store.save_folder(db, source)

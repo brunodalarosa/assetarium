@@ -21,6 +21,7 @@ from .catalog import (build_inventory, detail, digest, encoded, read_database, s
 from .config import ConfigError
 from .membership import records, membership
 from .publication import atomic_json, generation, line_ending_hashes, read_only
+from .store_versions import checked
 from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
 from .inspection import choose_source, discover_blender, validate_result
@@ -99,7 +100,7 @@ def ledger(config):
     # One stage ledger for the whole store: a recognized asset keeps its history in any library folder.
     path = config.library_store() / "ledger.sqlite" if config.source_key else config.output_path("data", "library/jobs.sqlite")
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path)
+    db = checked(sqlite3.connect(path), 'The processing ledger', 1)
     db.executescript("""
         CREATE TABLE IF NOT EXISTS jobs(asset_id TEXT, stage TEXT, fingerprint TEXT,
           status TEXT, evidence TEXT, updated TEXT, PRIMARY KEY(asset_id,stage));

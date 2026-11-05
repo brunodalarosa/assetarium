@@ -6,8 +6,14 @@ All notable changes to Assetarium are listed here. The project follows
 
 ## [Unreleased]
 
+**Upgrading from 0.1.0:** start with a fresh library. 0.2.0 changes where results live (decision 0023) and doesn't
+upgrade a 0.1.0 install; add your library folders again and process them. Supported upgrades start from 0.2.0.
+
 ### Added
 
+- **Newer data is left alone**: if a newer Assetarium wrote the library database, processing ledger, results index,
+  search index, processing queue, a library folder's settings or notifications, this version refuses to open it,
+  says why and changes nothing, so going back to an older version can't damage a library.
 - Adding a library folder around others keeps their answers (excluded folders, export folder decisions, texture
   folder, packs, image kinds) under the new folder's path, so excluded engine copies are not scanned again.
 - Undoing an agent's pack proposal is refused, with the reason, once the pack changed after it; it used to

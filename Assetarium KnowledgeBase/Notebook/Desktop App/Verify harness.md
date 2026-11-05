@@ -1,7 +1,7 @@
 ---
 area: Desktop App
 tags: [system]
-code: [scripts/gui_harness.py, scripts/gui_harness.isolate_hash_cache, tests/ui_text.py, scripts/verify-source-browser.py, scripts/verify-setup-wizard.py, scripts/verify-loading-states.py]
+code: [scripts/gui_harness.py, scripts/gui_harness.isolate_hash_cache, tests/ui_text.py, scripts/verify-asset-sources.py, scripts/verify-setup-wizard.py, scripts/verify-loading-states.py]
 verified: 2026-10-28
 branch: feature/library-view
 ---
