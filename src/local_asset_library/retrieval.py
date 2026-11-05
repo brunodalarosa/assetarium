@@ -16,6 +16,7 @@ from .captions import effective_caption, file_hash, validate_overlay
 from .config import ConfigError
 from .embedding_backend import normalize
 from .publication import line_ending_hashes, pinned, pinned_config, read_only
+from .store_versions import checked
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, RRF_K, RRF_WEIGHTS, search_character_cap
 from .asset_structure import asset_type
 from .dependency_resolution import dependency_file
@@ -221,7 +222,7 @@ def index_database(config, readonly=False):
             raise ConfigError("Pilot embedding index missing")
         return read_only(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path)
+    db = checked(sqlite3.connect(path), 'The search index', 1)
     db.executescript("""
       CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS jobs (job_id TEXT PRIMARY KEY, asset_id TEXT NOT NULL,
@@ -231,7 +232,6 @@ def index_database(config, readonly=False):
         contract_fingerprint TEXT NOT NULL, source_fingerprint TEXT NOT NULL,
         modality TEXT NOT NULL, role TEXT NOT NULL, dimensions INTEGER NOT NULL,
         vector BLOB NOT NULL, vector_sha256 TEXT NOT NULL, preview TEXT);
-      PRAGMA user_version=1;
     """)
     db.execute("PRAGMA foreign_keys=ON")
     return db

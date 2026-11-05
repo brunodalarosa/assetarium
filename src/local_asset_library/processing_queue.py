@@ -18,6 +18,7 @@ import uuid
 
 from .config import ConfigError
 from .publication import atomic_json, read_json
+from .store_versions import read_versioned
 
 ACTIONS = ('previews', 'descriptions')
 OPERATION = {'previews': 'process', 'descriptions': 'describe'}
@@ -36,7 +37,7 @@ def queue_path(config):
 
 def load(config):
     path = queue_path(config)
-    value = read_json(path) if path.exists() else {}
+    value = read_versioned(path, 'The processing queue', 1) if path.exists() else {}
     value.setdefault('schema_version', 1)
     value.setdefault('items', [])
     value.setdefault('recent', [])

@@ -9,6 +9,7 @@ Notifications never start work; their actions call ordinary bridge operations.
 from .gpu_queue import lease
 from .publication import atomic_json, read_json
 from .sources import now
+from .store_versions import newer_refused
 
 LIMIT = 50
 REPORTED = {'complete', 'complete_with_failures', 'cancelled', 'stopped', 'interrupted'}
@@ -24,6 +25,7 @@ def load(config):
         value = read_json(target) if target.exists() else {}
     except (OSError, ValueError):
         value = {}
+    newer_refused(value, 'The notifications file', 1)  # Outside the try: a newer file must not be reset to {}.
     items = [item for item in value.get('items', []) if isinstance(item, dict) and item.get('id')]
     dismissed = {k: v for k, v in (value.get('dismissed') or {}).items() if isinstance(v, int)}
     return {'schema_version': 1, 'seeded_existing': bool(value.get('seeded_existing')), 'items': items,
