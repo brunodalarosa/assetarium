@@ -132,16 +132,18 @@ or let your AI agent do it (see [Use with AI agents](#use-with-ai-agents)).
 
 ### 3. Add your asset folders
 
-Go to **Settings → Asset sources** and add the folders that hold your packs. Assetarium
-scans them right away; scanning only reads file information and never runs Blender or AI
-models.
+Open **Asset sources** (the folder icon above Settings) and choose **Add library folder** for the
+folder that holds your packs. Assetarium scans it right away and finds the packs inside;
+scanning only reads file information, never writes into your folders and never runs Blender
+or AI models.
 
 ### 4. Process your assets
 
-Open **Asset processing** and click **Process assets** on a source. Assetarium renders
-previews in Blender and makes the assets searchable. Processing only starts when you ask
-for it, shows its progress, and can be cancelled. If a file can't be processed, it's
-listed with the reason and everything else keeps working.
+Pick a pack (or a whole library folder) and click **Make previews**. Assetarium renders
+previews in Blender and makes the assets searchable; 2D images show right away. Processing
+only starts when you ask for it, waits in line on **Asset processing** with its progress,
+and can be cancelled. If a file can't be processed, it's listed with the reason and
+everything else keeps working.
 
 ### 5. Optional: turn on AI descriptions and appearance search
 
@@ -155,7 +157,7 @@ command to install each piece. With the built-in engine that is:
 .\scripts\embedding-runtime.ps1 run --locked --no-sync --project runtime/embedding python scripts/prepare_embedding_model.py
 ```
 
-Then use **Generate descriptions** on a source. Descriptions are optional: names, keyword
+Then use **Generate descriptions** on a pack or folder. Descriptions are optional: names, keyword
 search, previews and the 3D viewer work without them. More on engines in
 [Description engines](docs/description-engines.md).
 
@@ -165,8 +167,8 @@ Setup, sources, processing, descriptions and collection exports also work from a
 on Windows and Linux (use `./scripts/local-assets.sh` there):
 
 ```powershell
-.\scripts\local-assets.ps1 sources add D:\Assets\Kenney
-.\scripts\local-assets.ps1 process --asset-source <key>
+.\scripts\local-assets.ps1 library add D:\Assets\Kenney
+.\scripts\local-assets.ps1 previews <key>
 .\scripts\local-assets.ps1 setup status
 ```
 
@@ -192,8 +194,9 @@ never change or delete your asset files. Details: [MCP tools](docs/mcp/README.md
 
 ## Your files are safe
 
-- Original assets are **only ever read**. Previews, descriptions and search data go to a
-  `metadata-lal` folder next to each source and to the project's `data` folder.
+- Original assets are **only ever read**, and nothing is written into your asset folders.
+  Previews, descriptions and search data go to one library store, by default inside the
+  project's `data` folder (another drive can be set in `config.local.toml`).
 - Nothing runs in the background without you: no automatic processing, no model loading
   at startup, no network access for your library.
 - Faults are recorded and shown, never hidden or silently retried.
@@ -204,12 +207,12 @@ never change or delete your asset files. Details: [MCP tools](docs/mcp/README.md
 ## Documentation
 
 - [Desktop app guide](docs/gui/README.md) · [3D viewer](docs/gui/3d-preview.md)
-- [Asset sources and processing](docs/asset-sources.md) · [Library updates](docs/library-updates.md)
+- [Asset sources and processing](docs/asset-sources.md) · [Library updates](Assetarium%20KnowledgeBase/Architecture/Processing/Library%20updates.md)
 - [Command line](docs/cli.md) · [Linux](docs/linux.md)
 - [Description engines](docs/description-engines.md) · [Model storage](docs/model-storage.md)
 - [MCP server](docs/mcp/README.md)
-- [Storage use](docs/storage.md)
-- [Current status and roadmap](docs/status.md)
+- [Storage use](Assetarium%20KnowledgeBase/Notebook/Platform%20and%20Storage/Storage%20discipline.md)
+- [Current status and roadmap](Assetarium%20KnowledgeBase/Status.md)
 
 ## Contributing
 
@@ -219,7 +222,7 @@ what you expected, what happened, the asset format and your operating system. Pl
 small test files instead of uploading paid asset packs.
 
 Before changing code, read [AGENTS.md](AGENTS.md) and the
-[design decisions](docs/decisions/README.md): they describe how the project protects
+[design decisions](Assetarium%20KnowledgeBase/Decisions/Decisions.md): they describe how the project protects
 original files, handles faults and manages disk space. Run the tests with:
 
 ```powershell

@@ -258,7 +258,9 @@ def summary(config):
     """Settings → General → Rendering: the owner's choices, what runs now and why, the last speed test."""
     from . import render_pool
     from .search_speed import summary as search_summary
+    from .config import with_saved_blender
     from .source_operations import operation_status
+    config = with_saved_blender(config)  # Blender saved since launch counts without a restart.
     plan = render_pool.plan(config)
     test = saved(config)
     gib = lambda value: None if value is None else round(value / render_pool.GIB, 1)

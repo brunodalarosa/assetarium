@@ -1,7 +1,7 @@
 schema_version = 2
 
 # Shared default. Copy to the ignored config.local.toml for machine-specific paths;
-# config.local.toml wins when it exists (docs/decisions/0001).
+# config.local.toml wins when it exists (Assetarium KnowledgeBase/Decisions/0001).
 
 [sources]
 registry = "data/library/sources.json"
@@ -17,9 +17,17 @@ cache = "cache"
 logs = "logs"
 scratch = "scratch"
 environment = ".venv"
+# Generated results (previews, descriptions, search data) live in one library store and are never
+# written into asset folders. Unset, it is the ignored data/library-store. Another drive:
+#   library = 'E:\Assetarium library'
 
 [tools]
 # Unset: Blender is discovered on PATH and in the usual install locations
 # (`local-assets doctor` lists the candidates). To pin one executable:
 #   blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 #   blender = '/opt/blender-5.2.2-linux-x64/blender'
+
+[logging]
+# Session logs (one file per app, MCP server or command run) in [storage].logs.
+# debug | info | warning | error; --verbose or --log-level on a run overrides it.
+level = "info"

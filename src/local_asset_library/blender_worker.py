@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from render_math import duplicate_faces, framing  # noqa: E402 -- same trusted source directory
 
 SOURCE_PREFIX = ""
+GENERATED_DIRS = set()  # Folder names inside a source that hold generated data, never originals.
 
 
 def sha(path):
@@ -40,7 +41,7 @@ def source_path(root, relative):
         if not relative.startswith(prefix):
             raise ValueError("File belongs to another asset source")
         relative = relative[len(prefix):]
-    if "metadata-lal" in (p.casefold() for p in Path(relative).parts):
+    if GENERATED_DIRS & {p.casefold() for p in Path(relative).parts}:
         raise ValueError("Generated metadata is not an original asset")
     if PureWindowsPath(relative).anchor or Path(relative).is_absolute() or ".." in Path(relative).parts:
         raise ValueError("Source path must be relative without parent traversal")
@@ -372,7 +373,7 @@ def render(technical, output, resolution, device=None):
 
 
 def main():
-    global SOURCE_PREFIX
+    global SOURCE_PREFIX, GENERATED_DIRS
     job_path = Path(sys.argv[sys.argv.index("--") + 1]).resolve()
     job = json.loads(job_path.read_text(encoding="utf-8"))
     project = Path(job["project_root"]).resolve()
@@ -380,14 +381,12 @@ def main():
     if project.is_relative_to(source_root) or source_root.is_relative_to(project):
         raise ValueError("Source and project overlap")
     SOURCE_PREFIX = job.get("source_prefix") or ""
-    output_root = project / "data"
-    if SOURCE_PREFIX:
-        output_root = source_root / "metadata-lal"
-        if output_root.resolve() != output_root or Path(job.get("metadata_root", "")).resolve() != output_root:
-            raise ValueError("Invalid source metadata boundary")
-        inside(output_root, job_path)
-    else:
-        inside(project, job_path)
+    GENERATED_DIRS = {name.casefold() for name in job.get("excluded_dirs", [])}
+    # The job names where results go (the library store); it never lies inside the source.
+    output_root = Path(job.get("output_root") or project / "data")
+    if output_root.resolve() != output_root or output_root.is_relative_to(source_root) or source_root.is_relative_to(output_root):
+        raise ValueError("Invalid output boundary")
+    inside(output_root, job_path)
     output = inside(output_root, job["output"])
     output.mkdir(parents=True, exist_ok=True)
     result_path = inside(output, output / "result.json")

@@ -242,13 +242,21 @@ def recorded_contract(config, contract):
 
     Search and indexing compare contracts exactly; a git checkout that swaps line
     endings changes neither inference nor vectors, so it must not force a re-embed.
+    The references are the search check's receipt, then the published index's contract:
+    a library store brings vectors built on another checkout without a receipt.
     """
     if not contract:
         return contract
+    references = []
     try:
-        recorded = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))["contract"]
+        references.append(json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))["contract"])
     except (OSError, ValueError, KeyError, TypeError):
-        return contract  # The existing capability checks report the fault.
+        pass  # The existing capability checks report the fault.
+    try:
+        published = json.loads((config.project_root / "data/library/embedding-contract.json").read_text(encoding="utf-8"))
+        references.append(json.loads(published["contract"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
     result = dict(contract)
     # A contract may name its own hashed files (the CPU embedder, decision 0018); CUDA keeps these two.
     files = contract.get("hashed_files") or {"adapter_sha256": "src/local_asset_library/embedding_backend.py",
@@ -256,13 +264,18 @@ def recorded_contract(config, contract):
     package = "src/local_asset_library/"
     for key, path in ((key, Path(__file__).with_name(relative[len(package):]) if relative.startswith(package)
                        else config.project_root / relative) for key, relative in files.items()):
-        old = recorded.get(key) if isinstance(recorded, dict) else None
-        if old and contract.get(key) and contract[key] != old:
+        for recorded in references:
+            old = recorded.get(key) if isinstance(recorded, dict) else None
+            if not old or not contract.get(key):
+                continue
+            if contract[key] == old:
+                break
             try:
                 if old in line_ending_hashes(path):
                     result[key] = old
+                    break
             except OSError:
-                pass
+                break
     return result
 
 
@@ -424,9 +437,15 @@ def scope(config, filters):
     return allowed
 
 
-def matches(record, filters, allowed=None):
+def matches(record, filters, allowed=None, formats=None):
+    """``formats`` (settings.used_formats) hides assets whose formats are all off (decision 0026); None keeps every one."""
     if allowed is not None and record["asset_id"] not in allowed:
         return False
+    if formats is not None:
+        from .library_view import kind_of
+        from .settings import uses
+        if not uses(kind_of(record), [f["format"] for f in record["files"]], formats):
+            return False
     from .asset_structure import asset_type
     if 'asset_type' in filters and filters['asset_type'] != asset_type(record):
         return False
@@ -518,8 +537,10 @@ class SearchEngine:
             raise ConfigError("Evaluation cosine floor must be finite in [-1,1]")
         records, source_fingerprints, excluded = {}, {}, []
         allowed = scope(self.config, filters)
+        from .settings import used_formats
+        formats = used_formats(self.config) if self.config.sources_registry else None
         for record in pilot_records(self.config):
-            if not matches(record, filters, allowed):
+            if not matches(record, filters, allowed, formats):
                 continue
             try:
                 source_fingerprints[record["asset_id"]] = source_check(self.config, record)
@@ -612,8 +633,9 @@ class SearchEngine:
                     break
                 except (OSError, ValueError):
                     continue
+            from .packs import fields
             results.append({"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
-                            "asset_type": asset_type(record),
+                            **fields(self.config, record), "asset_type": asset_type(record),
                             "excerpt": excerpt, "formats": sorted({f["format"] for f in record["files"]}),
                             "preview": preview, "availability": "available", "matching_channels": matching,
                             "score": candidate["score"], "match_status": "keyword_match" if "keyword" in matching else "weak_unvalidated",

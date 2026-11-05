@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 from pathlib import Path
 import sqlite3
 import os
@@ -46,6 +47,9 @@ def main() -> int:
     parser.add_argument("--min-similarity", type=float, help="Explicit evaluation cosine floor, not a confidence threshold")
     parser.add_argument("--rankings-output", help="Save complete channel rankings under data/; excluded from compact default response")
     args = parser.parse_args()
+    from .logs import kv, start
+    start(root, 'cli')
+    logging.getLogger('assetarium.cli').info('Command · %s', kv(command=' '.join(sys.argv[1:])[:300]))
     try:
         config = load_config(args.config, root)
         if config.sources_registry:
@@ -71,7 +75,7 @@ def main() -> int:
                 result={'sources':source_statuses(config)}
                 print(json.dumps(result,ensure_ascii=False));return 0
             if args.command == 'process' and source is None:
-                raise ConfigError('Choose --asset-source or use its Process assets card in LAL')
+                raise ConfigError('Choose --asset-source or use Make previews on the Asset sources tab')
             if source:
                 config=bound(config,source)
         if args.command=='embed-index' and library_mode(config):
@@ -193,6 +197,9 @@ def main() -> int:
                           numpy_finite_normalized=bool(np.isfinite(vector / np.linalg.norm(vector)).all()),
                           blender_executable_exists=bool(config.blender and config.blender.is_file()),
                           blender_candidates=[str(path) for path in blender_candidates(config)])
+            from .setup_agent import registrations  # Read only: this server's entry in each agent's settings.
+            result['mcp_registrations'] = [{key: item[key] for key in ('label', 'scope', 'folder', 'state', 'script')}
+                                           for item in registrations(root)]
         print(json.dumps(result, indent=2))
         return 0
     except (ConfigError, sqlite3.Error, OSError, ValueError, RuntimeError) as exc:

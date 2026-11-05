@@ -304,7 +304,8 @@ def publish(config, identifier, outcome, provenance):
         raise ConfigError('Published captions are immutable; review/update working membership and publish a new generation')
     record = detail(config, identifier)
     overlay, path = overlay_for(config, record)
-    overlay_reference = ('data/' + path.relative_to(config.metadata_root).as_posix() if config.metadata_root
+    from .result_store import logical
+    overlay_reference = ('data/' + logical(config, path) if config.metadata_root
                          else path.relative_to(config.project_root).as_posix())
     provenance = {**provenance, "owner_overlay_path": overlay_reference,
                   "owner_overlay_sha256": file_hash(path), "owner_caption_review": overlay["caption_review"],

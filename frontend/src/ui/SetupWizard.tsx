@@ -1,42 +1,32 @@
-import { Check, CircleAlert, Copy, Cpu, FolderOpen, HardDrive, Monitor, TriangleAlert } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import { Check, CircleAlert, Cpu, HardDrive, Monitor } from "lucide-react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { BATCH_HELP, BUDGET_HELP, DESCRIPTIONS_OFF, formatLabel, plural, SEARCH_HELP } from "../app/format";
 import {
-  cancelBlenderCheck, checkBlender, chooseBlenderExecutable, copyText, finishSetup, goToSetupStep, measureSetupStorage,
-  saveSetup, SETUP_STEPS, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
+  cancelBlenderCheck, checkBlender, getState, chooseBlenderExecutable, finishSetup, goToSetupStep, measureSetupStorage,
+  loadAgentSetup, saveSetup, searchCheck, SETUP_STEPS, setupDone, STEP_KEYS, type SetupStep, setupBack, setupNext, setupStepNeeded, skipSetup, stepChanged, updateSetupDraft, useApp,
 } from "../app/store";
-import { AgentPanel, SetByBadge, SetupPaths } from "./AgentSetup";
+import { AgentPanel, ConnectionLine, SetByBadge, SetupPaths, Snippets } from "./AgentSetup";
+import { SetupReport } from "./SetupReport";
+import { BlenderPicker } from "./BlenderPicker";
 import { EngineFields, SearchDeviceField } from "./EngineFields";
+import { TRY_AGENT_HELP, TryAgent } from "./TryAgent";
+import { Reason } from "./CommandBlock";
+import { FORMATS_HELP, FormatToggles, IMAGE_FORMATS, ImageFormatsNote, MODEL_FORMATS } from "./FormatToggles";
+import { ReadinessList } from "./Readiness";
 import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
 
 const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Batch size", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Batch size", agent: "Connect your agent", practice: "Try your agent", review: "Review and finish",
 };
-const FORMAT_NOTES: [string, string, string][] = [
-  ["fbx", "FBX", "Rigs and animation; common in Unity and Unreal."],
-  ["gltf", "glTF / GLB", "Open format with PBR materials, rigs and animation."],
-  ["obj", "OBJ", "Simple static meshes without skeletons or animation."],
-];
 const PRESETS = [25, 50, 100, 250];
 
 function Paragraph({ children }: { children: ReactNode }) {
   return <p className="max-w-[680px] text-[13.5px] leading-relaxed text-muted-foreground">{children}</p>;
-}
-
-function CopyCommand({ command }: { command: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded-xl bg-surface-2 py-1.5 pr-1.5 pl-3">
-      <code className="min-w-0 flex-1 break-all font-mono text-[11.5px] text-foreground select-text">{command}</code>
-      <Button variant="quiet" className="h-8 shrink-0 px-3 text-[12px]" onClick={() => void copyText(command, "Command copied. Run it in a terminal in the Assetarium folder.")}>
-        <Copy className="size-3.5" aria-hidden />Copy
-      </Button>
-    </div>
-  );
 }
 
 function Fact({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
@@ -63,7 +53,9 @@ function Welcome() {
   const env = useApp((s) => s.setup.env);
   const blender = useApp((s) => s.setup.blender);
   const agentMode = useApp((s) => s.setup.agentMode);
+  const done = useApp((s) => setupDone(s.setup.info));
   if (agentMode) return <AgentPanel />;
+  if (done) return <SetupReport />;
   return (
     <>
       <Paragraph>A few questions about this computer and how you’ll use Assetarium. Setup only records your choices, and checks Blender when you ask it to. It doesn’t download, install, process or start anything, and you can change every choice later in Settings → General.</Paragraph>
@@ -84,78 +76,19 @@ function Welcome() {
   );
 }
 
-function CheckList({ check }: { check: Json }) {
-  return (
-    <ul id="setup-blender-checks" className="grid gap-2" aria-label="Blender checks">
-      {check.checks.map((item: Json) => (
-        <li key={item.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2.5 text-[13px]" data-check={item.id} data-status={item.status}>
-          <span className={cn("mt-0.5 grid size-5 place-items-center rounded-full", item.status === "passed" ? "bg-success-bg text-success" : item.status === "warning" ? "bg-warning-bg text-warning" : "bg-fault-bg text-fault")}>
-            {item.status === "passed" ? <Check className="size-3" aria-hidden /> : item.status === "warning" ? <TriangleAlert className="size-3" aria-hidden /> : <CircleAlert className="size-3" aria-hidden />}
-          </span>
-          <span className="min-w-0 break-words">
-            <span className="font-medium">{item.label}</span>
-            <span className="sr"> — {item.status}</span>
-            {item.detail && <span className="text-muted-foreground"> · {item.detail}</span>}
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 function BlenderStep() {
   const blender = useApp((s) => s.setup.blender);
   const check = useApp((s) => s.setup.check);
   const checking = useApp((s) => s.setup.checking);
   const draft = useApp((s) => s.setup.draft);
-  const paths: string[] = (blender?.candidates || []).map((c: Json) => c.path);
-  const options = (blender?.candidates || []).map((c: Json) => ({ value: c.path, title: c.path, detail: c.origin }));
-  if (draft.blenderPath && !paths.includes(draft.blenderPath)) options.push({ value: draft.blenderPath, title: draft.blenderPath, detail: "chosen by you" });
-  const current = check && check.path === draft.blenderPath ? check : null;
-  const usable = current && ["passed", "warning"].includes(current.status);
   return (
     <>
       <Paragraph>Assetarium uses Blender in the background to inspect 3D files and render their previews. It starts Blender with scripts and add-ons turned off and never changes your Blender settings or your files. Without Blender you can still browse, search by name and keyword, and view previews that were already rendered; new 3D assets just can’t be processed.</Paragraph>
       <Card title="Blender executable" help={`Tested with Blender ${blender?.tested_version || "5.2"}; other versions show a warning but can be used.`}>
-        {!blender ? (
-          <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Looking for Blender (nothing is run yet)…</p>
-        ) : (
-          <>
-            {blender.configured && !blender.configured_exists && (
-              <Banner tone="warning" role="status">The configured Blender ({blender.configured}, in {blender.config_file}) no longer exists. Choose one that does, then check it.</Banner>
-            )}
-            {options.length ? (
-              <RadioCards id="setup-blender-choice" label="Blender executable" value={draft.blenderPath} onChange={(value) => updateSetupDraft({ blenderPath: value, confirmRerender: false })} options={options} />
-            ) : (
-              <Banner tone="info" role="status">
-                No Blender was found. Install Blender {blender.tested_version} from the address below, then choose its {navigator.platform.startsWith("Win") ? "blender.exe" : "blender"} here, or skip this step.
-                <span className="mt-2 block"><CopyCommand command={blender.download_url} /></span>
-              </Banner>
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" id="setup-choose-blender" disabled={checking} onClick={() => void chooseBlenderExecutable()}><FolderOpen className="size-4" aria-hidden />Choose executable…</Button>
-              {checking ? (
-                <Button variant="secondary" id="setup-cancel-blender" onClick={() => void cancelBlenderCheck()}>Cancel check</Button>
-              ) : (
-                <Button id="setup-check-blender" disabled={!draft.blenderPath} onClick={() => void checkBlender()}>Check Blender</Button>
-              )}
-              <p role="status" aria-live="polite" className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                {checking ? <><Spinner />Checking… (up to about 2 minutes)</> : current ? { passed: "Ready.", warning: "Works, with a warning.", failed: "This executable can’t be used.", cancelled: "Check cancelled." }[current.status as string] : draft.blenderPath ? "Not checked yet." : ""}
-              </p>
-            </div>
-            {current && <CheckList check={current} />}
-            {usable && current.change === "unchanged" && <p className="text-[12.5px] text-muted-foreground">This is already the Blender Assetarium uses; saving writes nothing.</p>}
-            {usable && current.change === "write" && (
-              <p className="text-[12.5px] text-muted-foreground">Saved to config.local.toml when you finish. Process assets uses it from its next run; no restart needed.</p>
-            )}
-            {usable && current.change === "write" && current.rerender > 0 && (
-              <Banner tone="warning" role="status" className="grid gap-3">
-                <span>Changing Blender marks {plural(current.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Process assets renders them again.</span>
-                <Checkbox id="setup-confirm-rerender" label="I understand; render them again with this Blender" checked={draft.confirmRerender} onCheckedChange={(checked) => updateSetupDraft({ confirmRerender: checked })} />
-              </Banner>
-            )}
-          </>
-        )}
+        <BlenderPicker idPrefix="setup" report={blender} path={draft.blenderPath} check={check} checking={checking} confirmRerender={draft.confirmRerender}
+          saveNote="Saved to config.local.toml when you finish. Make previews and the speed test use it right away; no restart needed."
+          onPath={(value) => updateSetupDraft({ blenderPath: value, confirmRerender: false })} onConfirm={(checked) => updateSetupDraft({ confirmRerender: checked })}
+          onCheck={() => void checkBlender()} onCancel={() => void cancelBlenderCheck()} onChoose={() => void chooseBlenderExecutable()} />
       </Card>
     </>
   );
@@ -165,17 +98,22 @@ function FormatsStep() {
   const info = useApp((s) => s.setup.info);
   const draft = useApp((s) => s.setup.draft);
   const hints: Json[] = info?.hints || [];
-  const hint = hints.find((item) => item.id === draft.engineHint);
+  const chosen = hints.filter((item) => draft.engineHint.includes(item.id));
+  const toggle = (id: string) => {
+    const engineHint = draft.engineHint.includes(id) ? draft.engineHint.filter((h) => h !== id) : [...draft.engineHint, id];
+    const formats = new Set(hints.filter((h) => engineHint.includes(h.id)).flatMap((h) => h.formats));
+    updateSetupDraft({ engineHint, ...(engineHint.length ? { formats: MODEL_FORMATS.map(([f]) => f).filter((f) => formats.has(f)) } : {}) });
+  };
   return (
     <>
-      <Paragraph>Processing inspects each 3D asset in Blender, renders its previews, measures geometry and builds search data. Scanning still lists every supported file, but assets that exist only in an unselected format stay unprocessed until you select it. .glb counts as glTF. 2D images are turned on per source in Settings → Asset sources. Changing formats later never deletes results or retries failures.</Paragraph>
-      <Card title="Which engine do you target?" help="A suggestion only; you can change the checkboxes below.">
-        <div role="radiogroup" aria-label="Target engine" id="setup-engine-hint" className="flex flex-wrap gap-2">
+      <Paragraph>Choose the formats you use. {FORMATS_HELP} .glb counts as glTF. You can change them any time in Settings → General.</Paragraph>
+      <Card title="Which engines do you make games with?" help="Choose every one you use. A suggestion only; you can change the checkboxes below.">
+        <div role="group" aria-label="Target engines" id="setup-engine-hint" className="flex flex-wrap gap-2">
           {hints.map((item) => {
-            const active = item.id === draft.engineHint;
+            const active = draft.engineHint.includes(item.id);
             return (
-              <button key={item.id} type="button" role="radio" aria-checked={active} data-value={item.id}
-                onClick={() => updateSetupDraft({ engineHint: item.id, formats: [...item.formats] })}
+              <button key={item.id} type="button" aria-pressed={active} data-value={item.id}
+                onClick={() => toggle(item.id)}
                 className={cn("h-9 rounded-full border px-4 text-[12.5px] font-medium transition-colors", active ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-foreground hover:bg-surface-2")}>
                 {item.label}
               </button>
@@ -183,18 +121,17 @@ function FormatsStep() {
           })}
         </div>
         <p id="setup-hint-reason" role="status" aria-live="polite" className="text-[12.5px] text-muted-foreground">
-          {hint ? `Suggested: ${hint.formats.map(formatLabel).join(", ")} — ${hint.reason}` : "Choose one to preselect formats, or set them yourself."}
+          {chosen.length === 1 ? `Suggested: ${chosen[0].formats.map(formatLabel).join(", ")} — ${chosen[0].reason}`
+            : chosen.length ? `Suggested: the formats of ${chosen.map((h) => h.label).join(" and ")} together.` : "Choose engines to preselect formats, or set them yourself."}
         </p>
       </Card>
-      <Card title="Formats to process">
-        <fieldset id="setup-formats" className="grid gap-3">
-          <legend className="sr">Formats to process</legend>
-          {FORMAT_NOTES.map(([value, label, note]) => (
-            <Checkbox key={value} id={`setup-format-${value}`} label={label} description={note} checked={draft.formats.includes(value)}
-              onCheckedChange={(checked) => updateSetupDraft({ formats: checked ? FORMAT_NOTES.map(([f]) => f).filter((f) => f === value || draft.formats.includes(f)) : draft.formats.filter((f) => f !== value) })} />
-          ))}
-        </fieldset>
-        {!draft.formats.length && <p className="text-[12.5px] text-warning">With no format selected, processing stays paused.</p>}
+      <Card title="3D models">
+        <FormatToggles id="setup-format" options={MODEL_FORMATS} value={draft.formats} onChange={(update) => updateSetupDraft({ formats: update(getState().setup.draft.formats) })} columns />
+      </Card>
+      <Card title="Images">
+        <FormatToggles id="setup-image-format" options={IMAGE_FORMATS} value={draft.imageFormats} onChange={(update) => updateSetupDraft({ imageFormats: update(getState().setup.draft.imageFormats) })} />
+        <ImageFormatsNote />
+        {!draft.formats.length && !draft.imageFormats.length && <p className="text-[12.5px] text-warning">With every format off, nothing is shown or processed.</p>}
       </Card>
     </>
   );
@@ -248,28 +185,6 @@ function StorageStep() {
 function Readiness({ engine }: { engine: string }) {
   const env = useApp((s) => s.setup.env);
   return <ReadinessList id="setup-readiness" items={env?.engines?.[engine]?.items} />;
-}
-
-/** One checklist of what is installed, with the command for anything missing. */
-function ReadinessList({ id, items }: { id: string; items?: Json[] }) {
-  if (!items) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Checking what is installed…</p>;
-  return (
-    <ul id={id} className="grid gap-3" aria-label="Readiness">
-      {items.map((item: Json) => (
-        <li key={item.id} className="grid gap-1.5" data-item={item.id} data-ready={item.ready}>
-          <span className="flex items-center gap-2 text-[13px]">
-            <span className={cn("grid size-5 place-items-center rounded-full", item.ready ? "bg-success-bg text-success" : "bg-surface-2 text-muted-foreground")}>
-              {item.ready ? <Check className="size-3" aria-hidden /> : <CircleAlert className="size-3" aria-hidden />}
-            </span>
-            <span className="font-medium">{item.label}</span>
-            <span className="text-muted-foreground">{item.ready ? "Ready" : "Missing"}</span>
-          </span>
-          {!item.ready && item.detail && <span className="pl-7 text-[12px] text-muted-foreground">{item.detail}</span>}
-          {item.command && <div className="pl-7"><CopyCommand command={item.command} /></div>}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 function DescriptionsStep() {
@@ -330,8 +245,8 @@ function BatchStep() {
 function summary(step: SetupStep, draft: Json, info: Json): string {
   if (draft.skipped.includes(step)) return "Skipped — keeps the current value";
   switch (step) {
-    case "blender": return draft.blenderPath || "Not set (found automatically when processing)";
-    case "formats": return draft.formats.length ? draft.formats.map(formatLabel).join(", ") : "None (processing paused)";
+    case "blender": return draft.blenderPath || "Not saved (the speed test needs a saved Blender)";
+    case "formats": return [draft.formats.map(formatLabel).join(", ") || "No 3D formats", draft.imageFormats.length === IMAGE_FORMATS.length ? "every image format" : `${draft.imageFormats.length} image formats`].join(" · ");
     case "storage": return draft.budget ? `${Number(draft.budget).toLocaleString()} GiB` : "Keeps the current value";
     case "descriptions": {
       const search = ` · search on the ${draft.searchDevice === "cpu" ? "CPU" : "NVIDIA GPU"}`;
@@ -340,6 +255,13 @@ function summary(step: SetupStep, draft: Json, info: Json): string {
       return (draft.engine === "local-server" ? `On · local model server ${draft.serverUrl} · model ${draft.serverModel || "not set"}` : `On · ${engine ? `${engine.label} — ${engine.name}` : draft.engine}`) + search;
     }
     case "batch": return setupStepNeeded("batch", draft) ? draft.batch : "Not used";
+    case "agent": {
+      const live = (getState().setup.agent?.connections || []).filter((c: Json) => c.mode === "normal");
+      return live.length ? `Connected: ${live.map((c: Json) => c.client?.name).filter(Boolean).join(", ") || "an agent"}` : "Not connected (you can connect one later in Settings → General)";
+    }
+    case "practice": {
+      return "Optional practice import; results are never saved";
+    }
     default: return "";
   }
 }
@@ -355,13 +277,20 @@ function Review() {
           <li className="flex items-center gap-2"><Check className="size-4 text-success" aria-hidden />Settings saved to Settings → General.</li>
           <li className="flex items-start gap-2" id="setup-blender-result">
             {result.blender.status === "faulty" ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-fault" aria-hidden /> : <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />}
-            <span>{result.blender.status === "saved" ? `Blender saved to ${result.blender.file}. Process assets uses it from its next run.`
+            <span>{result.blender.status === "saved" ? `Blender saved to ${result.blender.file}. Make previews uses it from its next run.`
               : result.blender.status === "faulty" ? `${result.blender.reason} Your other choices were saved.` : "Blender unchanged; nothing was written."}</span>
           </li>
+          {result.samples && (
+            <li className="flex items-start gap-2" id="setup-samples-result">
+              {result.samples.status === "faulty" ? <CircleAlert className="mt-0.5 size-4 shrink-0 text-fault" aria-hidden /> : <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />}
+              <span>{result.samples.status === "faulty" ? `Sample assets were not added: ${result.samples.reason}` : "Sample assets are in your Library: a blue cube, a green pyramid and a red sphere."}</span>
+            </li>
+          )}
+          <SetupSearchCheck />
         </ul>
-        <Paragraph>Next: add a folder of assets in Settings → Asset sources, then run Process assets.</Paragraph>
+        <Paragraph>{result.samples && result.samples.status !== "faulty" ? "Next: open Library and choose Make previews on Sample assets, or add your own library folder." : "Next: add a library folder in Library, then choose Make previews on a pack."}</Paragraph>
         <div className="flex flex-wrap gap-3">
-          <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Asset sources</Button>
+          <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Library</Button>
           <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>
         </div>
       </div>
@@ -388,17 +317,87 @@ function Review() {
           ))}
         </dl>
       </Card>
+      <Checkbox id="setup-include-samples" label="Include sample assets" checked={draft.includeSamples}
+        description="Adds a small library folder with a blue cube, a green pyramid and a red sphere, so you can try Assetarium right away. Remove it later like any library folder."
+        onCheckedChange={(checked) => updateSetupDraft({ includeSamples: checked })} />
     </>
+  );
+}
+
+/** Agents (MCP) are a core feature (decision 0026): the server is ready; connecting an agent is the owner's choice. */
+function AgentStep() {
+  const agent = useApp((s) => s.setup.agent);
+  const [client, setClient] = useState<string>();
+  useEffect(() => {
+    void loadAgentSetup();
+    const timer = setInterval(() => void loadAgentSetup(), 3000);  // Shows the connection as soon as the agent starts.
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <>
+      <Paragraph>Assetarium has an MCP server: AI agents such as Claude Code or Codex can search your library, read pack structures and propose fixes, which you approve here. Add the configuration for your agent, then restart it. No agent? Skip this step; you can connect one any time from Settings → General.</Paragraph>
+      {!agent ? <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Reading agent configurations…</p> : (
+        <Card title="Add Assetarium to your agent">
+          <div id="setup-agent-connect" className="grid gap-4">
+            <Snippets snippets={agent.snippets || []} client={client} setClient={setClient} />
+            <ConnectionLine connections={agent.connections || []} blocked={false} />
+          </div>
+        </Card>
+      )}
+    </>
+  );
+}
+
+/** After Save: the one-time search check runs here, so search works without an extra step (decision 0026). */
+function SetupSearchCheck() {
+  const [check, setCheck] = useState<Json>({ status: "starting" });
+  useEffect(() => {
+    let live = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async (start: boolean) => {
+      let now = await searchCheck("status");
+      if (start && now.status === "missing" && !now.fault) now = (await searchCheck("start")).status === "faulty" ? await searchCheck("status") : { status: "running" };
+      if (!live) return;
+      setCheck(now);
+      if (now.status === "running") timer = setTimeout(() => void poll(false), 1500);
+    };
+    void poll(true);
+    return () => { live = false; clearTimeout(timer); };
+  }, []);
+  const icon = check.status === "ready" ? <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+    : check.status === "running" || check.status === "starting" ? <Spinner className="mt-0.5 shrink-0" />
+    : <CircleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />;
+  return (
+    <li className="flex items-start gap-2" id="setup-search-check" data-state={check.status}>
+      {icon}
+      <div className="grid min-w-0 gap-1">
+        <span>{check.status === "ready" ? "Search check passed: search by description and image is ready."
+          : check.status === "running" || check.status === "starting" ? check.phase || "Running the search check on built-in sample images…"
+          : check.status === "failed" ? "The search check did not pass. Settings → General shows why and can run it again."
+          : "The search check runs once the search runtime and model are installed (Settings → General lists them). Make previews also runs it by itself."}</span>
+        {check.status === "failed" && <Reason text={check.reason} className="text-[12px] text-muted-foreground" />}
+      </div>
+    </li>
+  );
+}
+
+function PracticeStep() {
+  return (
+    <div className="grid gap-5">
+      <Paragraph>{TRY_AGENT_HELP} You can skip this and try it later from Settings → General.</Paragraph>
+      <TryAgent id="setup-try-agent" />
+    </div>
   );
 }
 
 const CONTENT: Record<SetupStep, () => ReactNode> = {
   welcome: Welcome, blender: BlenderStep, formats: FormatsStep, storage: StorageStep,
-  descriptions: DescriptionsStep, batch: BatchStep, review: Review,
+  descriptions: DescriptionsStep, batch: BatchStep, agent: AgentStep, practice: PracticeStep, review: Review,
 };
 const TITLES: Record<SetupStep, string> = {
   welcome: "Set up Assetarium", blender: "Blender", formats: "Formats to process", storage: "Storage budget",
-  descriptions: "Descriptions and search", batch: "Description batch size", review: "Review and finish",
+  descriptions: "Descriptions and search", batch: "Description batch size", agent: "Connect your AI agent (optional)",
+  practice: "Try your agent (optional)", review: "Review and finish",
 };
 
 export function SetupWizard() {
@@ -409,6 +408,9 @@ export function SetupWizard() {
   const Content = CONTENT[step];
   const saved = Boolean(setup.result);
   const agentWelcome = step === "welcome" && setup.agentMode;
+  const done = setupDone(setup.info);
+  const report = step === "welcome" && done && !setup.agentMode;
+  const review = setup.info?.record?.state === "review";
   // Welcome offers its two paths as cards, so it needs no footer.
   return (
     <div id="setup-wizard" role="dialog" aria-modal="true" aria-labelledby={titleId} data-step={step} className="fixed inset-0 z-[45] flex bg-background text-foreground">
@@ -428,9 +430,9 @@ export function SetupWizard() {
                   <button type="button" disabled={saved} aria-current={current ? "step" : undefined} data-step={item} onClick={() => goToSetupStep(index)}
                     className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-[13px] transition-colors disabled:pointer-events-none", current ? "bg-accent-soft font-medium text-accent-soft-foreground" : "text-foreground hover:bg-surface-2", !needed && "text-subtle")}>
                     <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[11px] tabular-nums", current ? "border-primary bg-primary text-primary-foreground" : index < setup.step ? "border-border bg-surface-2" : "border-border")}>
-                      {index < setup.step && !skipped && needed ? <Check className="size-3" aria-hidden /> : index + 1}
+                      {(done && item !== "practice" && needed) || (index < setup.step && !skipped && needed) ? <Check className="size-3" aria-hidden /> : index + 1}
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{STEP_LABELS[item]}</span>
+                    <span className="min-w-0 flex-1 truncate">{item === "welcome" && done ? (review ? "Agent's report" : "Summary") : STEP_LABELS[item]}</span>
                     {skipped && <span className="text-[11px] text-muted-foreground">Skipped</span>}
                     {!needed && <span className="text-[11px]">Not needed</span>}
                   </button>
@@ -443,11 +445,12 @@ export function SetupWizard() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 px-8 pt-6">
           <span className="text-[12px] text-muted-foreground tabular-nums md:invisible">Step {setup.step + 1} of {SETUP_STEPS.length}</span>
-          {!saved && <Button variant="quiet" id="setup-skip-all" onClick={() => void skipSetup()}>Skip setup</Button>}
+          {!saved && !done && <Button variant="quiet" id="setup-skip-all" onClick={() => void skipSetup()}>Skip setup</Button>}
+          {!saved && report && <Button variant="quiet" id="setup-close-report" onClick={() => finishSetup("close")}>{review ? "Later" : "Close"}</Button>}
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 pt-2 pb-10 scroll-thin">
           <div className="mx-auto grid max-w-[760px] gap-5">
-            <h1 id="setup-step-title" tabIndex={-1} className="text-[26px] font-semibold outline-none"><span id={titleId}>{saved ? "Setup" : agentWelcome ? "Set up with your AI agent" : TITLES[step]}</span></h1>
+            <h1 id="setup-step-title" tabIndex={-1} className="text-[26px] font-semibold outline-none"><span id={titleId}>{saved ? "Setup" : agentWelcome ? "Set up with your AI agent" : report ? (review ? "Your agent set up Assetarium" : "Setup complete") : TITLES[step]}</span></h1>
             {setup.error && <Banner className="setup-error">{setup.error}</Banner>}
             {setup.loading ? <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Loading current settings…</p> : <Content />}
           </div>

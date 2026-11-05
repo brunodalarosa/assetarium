@@ -4,21 +4,20 @@ import { getState, goBack, goForward, navigate, setInspectorOpen, useApp } from 
 import { Home } from "./pages/Home";
 import { Collection } from "./pages/Collection";
 import { Collections } from "./pages/Collections";
-import { Placeholder } from "./pages/Placeholder";
 import { Processing } from "./pages/Processing";
+import { AssetSources } from "./pages/AssetSources";
 import { Settings } from "./pages/Settings";
-import { SourceBrowser } from "./pages/SourceBrowser";
 import { Inspector } from "./ui/Inspector";
 import { AppMenus, ConfirmDialog, CreateCollectionDialog } from "./ui/Menus";
 import { NotificationsPanel, RunReport, Toasts } from "./ui/Notifications";
+import { AgentActivityPanel } from "./ui/AgentActivity";
+import { AddFolderWizard } from "./ui/AddFolderWizard";
 import { SetupWizard } from "./ui/SetupWizard";
-import { Rail, TopBar } from "./ui/Shell";
+import { Rail, StoppedBanner, TopBar } from "./ui/Shell";
 
 function Page() {
   const current = useApp((s) => s.history[s.historyIndex]);
   switch (current.page) {
-    case "library":
-      return <Placeholder page="library" />;
     case "collections":
       return <Collections />;
     case "collection":
@@ -27,8 +26,8 @@ function Page() {
       return <Processing focus={current.focus} />;
     case "settings":
       return <Settings tab={current.tab} />;
-    case "source":
-      return <SourceBrowser sourceKey={current.key!} />;
+    case "sources":
+      return <AssetSources />;
     default:
       return <Home />;
   }
@@ -38,7 +37,7 @@ function Page() {
 function PageFrame() {
   const current = useApp((s) => s.history[s.historyIndex]);
   return (
-    <div key={current.page + ":" + (current.key ?? "")} className="page-enter h-full">
+    <div key={current.page + ":" + (current.page === "sources" ? "" : current.key ?? "")} className="page-enter h-full">
       <Page />
     </div>
   );
@@ -97,6 +96,7 @@ export function App() {
         <Rail />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
+          <StoppedBanner />
           <div className="relative flex min-h-0 flex-1">
             <main className="min-w-0 flex-1">
               <PageFrame />
@@ -106,6 +106,8 @@ export function App() {
         </div>
       </div>
       <NotificationsPanel />
+      <AgentActivityPanel />
+      <AddFolderWizard />
       <SetupWizard />
       <Toasts />
       <RunReport />

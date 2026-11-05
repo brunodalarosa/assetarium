@@ -43,8 +43,10 @@ window.LALPreview = (() => {
       const heading = make('div', undefined, 'model-preview-heading'); heading.append(title, source);
       const actions = make('div', undefined, 'model-preview-actions');
       this.back = this.button('Back to image', () => this.stop());
+      this.refresh = this.button('Refresh inspection', () => { this.stop(); this.item.onRefresh?.(); });
+      this.refresh.hidden = true;
       this.full = this.button('Fullscreen', () => this.toggleFullscreen());
-      actions.append(this.back, this.full); header.append(heading, actions);
+      actions.append(this.refresh, this.back, this.full); header.append(heading, actions);
       this.viewport = make('div', undefined, 'model-viewport');
       this.overlay = make('div', undefined, 'model-loading');
       this.overlay.setAttribute('role','status'); this.overlay.setAttribute('aria-live','polite');
@@ -122,6 +124,7 @@ window.LALPreview = (() => {
         if (control.type === 'checkbox') control.checked = false;
       }
       this.summary.textContent = ''; this.loading('Preparing local files…');
+      this.refresh.hidden = true;
       if (fullscreen) await this.enterFullscreen();
       else this.back.focus();
       this.timer = setTimeout(() => this.fault('Interactive preview exceeded the 90-second loading limit.'),90000);
@@ -134,7 +137,7 @@ window.LALPreview = (() => {
         const [manifest, html] = await Promise.all([
           this.api.preview_prepare(this.item.assetId,this.item.sourceFormat,this.item.version),shellPromise]);
         if (this.serial !== serial || this.closed) { if (manifest.ticket) this.api.preview_release(manifest.ticket); return; }
-        if (manifest.status !== 'ready') { this.fail(manifest.reason || '3D preview is unavailable.',manifest.retained); return; }
+        if (manifest.status !== 'ready') { this.fail(manifest.reason || '3D preview is unavailable.',manifest.retained === true,manifest.status === 'stale'); return; }
         this.ticket = manifest.ticket; this.manifest = manifest;
         this.session = String(++sequence) + '-' + Math.random().toString(36).slice(2);
         const frame = make('iframe'); frame.title = this.item.name + ' — interactive 3D preview';
@@ -147,7 +150,7 @@ window.LALPreview = (() => {
           this.loading(`Loading local files ${i+1} / ${manifest.files.length}…`);
           const file = await this.api.preview_file(this.ticket,i); this.fileReads++;
           if (this.serial !== serial || this.closed || !this.frame) return;
-          if (file.status !== 'ready') { this.fail(file.reason || 'A source file is unavailable.',file.retained); return; }
+          if (file.status !== 'ready') { this.fail(file.reason || 'A source file is unavailable.',file.retained === true,file.status === 'stale'); return; }
           const bytes = new Uint8Array(manifest.files[i].size);
           // Yield between bounded chunks instead of freezing the library on a large decode.
           for (let offset=0;offset<file.content.length;offset+=524288) {
@@ -242,13 +245,14 @@ window.LALPreview = (() => {
       else this.full.focus();
     }
     toggleFullscreen() { if (this.fullscreen) return this.exitFullscreen(); return this.enterFullscreen(); }
-    fail(reason, retained = true) {
+    fail(reason, retained = true, stale = false) {
       ++this.serial; clearTimeout(this.timer); this.retainedFault = retained ? reason : null;
       this.ready = false; this.setControls(false); this.loading(null);
       this.warning.textContent = reason + (retained ? ' Recorded failure; no automatic retry.' : '');
       this.warning.hidden = false; this.summary.textContent = 'The existing image and source evidence remain available.';
+      this.refresh.hidden = !stale || !this.item.onRefresh;
       this.overlay.hidden = false; this.spinner.hidden = true; this.overlay.classList.add('model-load-fault');
-      this.loadingLabel.textContent = '3D preview unavailable. ' + reason + ' Use Back to image to continue.';
+      this.loadingLabel.textContent = stale ? 'The library changed. Refresh inspection to load the current asset.' : '3D preview unavailable. ' + reason + ' Use Back to image to continue.';
       this.full.disabled = !this.fullscreen;
       this.frame?.remove(); this.frame = null;
       this.resolveFrame?.(); this.resolveFrame = null;

@@ -2,6 +2,7 @@
 import asyncio
 from copy import deepcopy
 import json
+import os
 import threading
 import time
 
@@ -9,6 +10,7 @@ from PIL import Image
 import pytest
 
 from test_retrieval import indexed
+from test_sources import managed  # noqa: F401 -- fixtures
 from test_mcp_assets import update
 from local_asset_library.captions import file_hash
 from local_asset_library.desktop import DesktopBridge
@@ -244,3 +246,22 @@ def test_desktop_bridge_rendering_settings_and_speed_test(indexed):
         assert started['status'] == 'faulty' and 'Set up Blender' in started['reason']
     finally:
         bridge._close()
+
+
+def test_closing_while_processing_asks_first_and_stop_and_close_lets_it_go(managed, monkeypatch):
+    from local_asset_library import processing_queue
+    config = managed[0]
+    bridge = DesktopBridge(config, prestart_worker=False)
+    try:
+        assert processing_queue.load(config)['owner']['pid'] == os.getpid()  # The open app owns the queue.
+        assert bridge._close_question() is None  # Nothing processing: the window just closes.
+        monkeypatch.setattr(processing_queue, 'running_item', lambda config: {
+            'action': 'previews', 'label': 'Castle Kit', 'waiting': 2, 'operation': {'completed': 140, 'total': 600}})
+        question = bridge._close_question()
+        assert question['title'] == 'Asset processing ongoing'
+        assert question['body'].startswith('Make previews · Castle Kit is running (140 / 600), and 2 more wait.')
+        assert bridge.stop_and_close() == {'status': 'closing'} and bridge._close_question() is None
+        assert bridge.show_log('../config.local.toml')['status'] == 'faulty'
+    finally:
+        bridge._close()
+    assert processing_queue.load(config)['owner']['closing']

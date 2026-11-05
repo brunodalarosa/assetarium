@@ -1,5 +1,6 @@
 """App-owned source scanner/coordinator, using existing offline runtimes."""
 import argparse
+import logging
 import os
 from pathlib import Path
 import sys
@@ -9,15 +10,20 @@ root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / 'src'))
 from local_asset_library.config import load_project_config
 from local_asset_library.sources import get_source, bound
-from local_asset_library.source_operations import scan_all, process_source, describe_source, worker_stage, state, operation_lease, render_test
+from local_asset_library.source_operations import scan_all, process_source, describe_source, worker_stage, state, operation_lease, render_test, search_check
 from local_asset_library.gpu_queue import lease
 
 parser = argparse.ArgumentParser()
-parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage', 'render-test', 'search-test'])
+parser.add_argument('operation', choices=['scan', 'process', 'describe', 'stage', 'render-test', 'search-test', 'search-check'])
 parser.add_argument('--source')
 parser.add_argument('--token', required=True)
 parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'])
+parser.add_argument('--owner', type=int, help='The app that started this work; it stops when that app is gone')
 args = parser.parse_args()
+from local_asset_library.logs import kv, start
+start(root, 'operation', process=args.operation)  # Joins the session that started it (app or CLI).
+log = logging.getLogger('assetarium.operation')
+started = time.monotonic()
 config = load_project_config(root)
 source = get_source(config, args.source) if args.source else None
 scoped = bound(config, source) if source else config
@@ -30,6 +36,9 @@ else:
     # Wait for the parent to finish its short, atomic process handoff.
     with lease(config, 'source-operation-handoff', resource='sources'):
         state(scoped, pid=os.getpid())
+    if args.owner:
+        from local_asset_library.source_operations import watch_owner
+        watch_owner(config, scoped, args.owner)
     try:
         with operation_lease(config, scoped, args.token) as ready:
             if not ready:
@@ -40,8 +49,21 @@ else:
                 describe_source(config, source, args.token)
             elif args.operation == 'render-test':
                 render_test(config, args.token)
+            elif args.operation == 'search-check':
+                search_check(config, args.token)
             else:
                 process_source(config, source, args.token)
     except BaseException as exc:
         state(scoped, status='faulty', phase='Operation stopped', reason=str(exc))
+        log.error('Operation stopped · %s', kv(operation=args.operation, folder=args.source, reason=exc), exc_info=True)
         raise
+    else:
+        log.info('Operation finished · %s', kv(operation=args.operation, folder=args.source, seconds=round(time.monotonic() - started, 1)))
+    finally:
+        # Every operation ends by starting the next queued item, so one that found this folder busy (a scan,
+        # a speed test) never waits for someone to touch the queue.
+        from local_asset_library.processing_queue import advance
+        try:
+            advance(config)
+        except Exception as exc:  # The queue shows the item's outcome; a start fault is recorded there.
+            print(f'Queue: the next item did not start: {exc}', flush=True)

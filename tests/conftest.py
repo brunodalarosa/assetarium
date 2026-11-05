@@ -15,6 +15,25 @@ def isolated_hash_cache(tmp_path_factory):
     hash_cache.reset()
 
 
+@pytest.fixture(autouse=True, scope='session')
+def isolated_client_settings(tmp_path_factory):
+    # Agent registration checks read an empty home, never the developer's real agent settings.
+    os.environ['LAL_CLIENT_HOME'] = str(tmp_path_factory.mktemp('client-home'))
+
+
+@pytest.fixture(autouse=True)
+def isolated_session_logs(tmp_path_factory, monkeypatch):
+    # Entry points start session logs: they go to a test folder, never the project's logs/, and children join it.
+    from local_asset_library import logs
+    folder = tmp_path_factory.getbasetemp() / 'session-logs'
+    folder.mkdir(exist_ok=True)
+    monkeypatch.setattr(logs, 'folder', lambda root: folder)
+    monkeypatch.setenv(logs.ENV, str(folder / '2026-01-01_00-00-00_test.log'))
+    monkeypatch.delenv(logs.LEVEL_ENV, raising=False)
+    yield
+    logs.stop()
+
+
 @pytest.fixture
 def directory_link():
     """A Windows junction (no symlink privilege needed) or a POSIX symlink; skips with the reason."""

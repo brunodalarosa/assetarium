@@ -37,7 +37,11 @@ def supported_stage(record, stage):
 
 
 def description_supported(record):
-    return asset_type(record) in ('model_3d', 'image') and supported_stage(record, 'caption')
+    # Material textures are found by name in v1 (decision 0023); they are not described.
+    kind = ((record.get('type_metadata') or {}).get('image_kind') or {}).get('value')
+    return asset_type(record) in ('model_3d', 'image') and supported_stage(record, 'caption') and kind != 'material_texture'
+
+
 
 
 def file_roles(record):
@@ -94,7 +98,7 @@ def image_record(pack, identity, name, files, grouping, purpose, license_rows):
              'files': [{'path': f['path'], 'format': PurePosixPath(f['path']).suffix[1:].lower(), 'sha256': f['sha256'],
                         'availability': f['status']} for f in files],
              'grouping': {'evidence': [grouping], 'unresolved_ambiguities': []},
-             'dependencies': [], 'dependency_inspection': [], 'previews': [], 'variants': [],
+             'dependencies': [], 'dependency_inspection': [], 'previews': [],
              'technical': None, 'description': None, 'caption_provenance': None, 'embeddings': [],
              'owner_overlay': {}, 'license_evidence': license_rows, 'provenance': {'scanner': 'inventory-v1+images-v1'},
              'processing': {s: 'pending' for s in STAGES}, 'structure_version': STRUCTURE_VERSION,
@@ -121,7 +125,7 @@ def new_record(pack, path, format, sha256, kind):
     value = {'schema_version': 2, 'asset_id': asset_id(pack, identity), 'source_id': SOURCE_ID,
              'pack_id': pack, 'source_relative_identity': identity, 'display_name': relative.stem,
              'availability': 'available', 'files': [{'path': path, 'format': format, 'sha256': sha256, 'availability': 'available'}],
-             'dependencies': [], 'previews': [], 'variants': [], 'grouping': {}, 'license_evidence': [],
+             'dependencies': [], 'previews': [], 'grouping': {}, 'license_evidence': [],
              'technical': None, 'description': None, 'caption_provenance': None, 'embeddings': [],
              'owner_overlay': {}, 'provenance': {}, 'processing': {s: 'pending' for s in STAGES},
              'asset_type': kind, 'file_roles': {path: 'primary'}}
@@ -200,10 +204,9 @@ def validate_record(record):
             raise ConfigError('Sub-asset requires its parent and explicit selector')
     elif record.get('parent_asset_id') is not None:
         raise ConfigError('Parent linkage requires subasset-v1 identity')
-    else:
-        from .catalog import asset_id
-        if record['asset_id'] != asset_id(record['pack_id'], record['source_relative_identity']):
-            raise ConfigError('Asset identity does not match the preserved asset-v1 algorithm')
+    elif not re.fullmatch(ID_PATTERN, record['asset_id']):
+        # An ID is kept through moves and joined folders (decision 0023), so it need not match its formula any more.
+        raise ConfigError('Asset identity is not an asset-v1 ID')
 
 
 def validate_collection(records):

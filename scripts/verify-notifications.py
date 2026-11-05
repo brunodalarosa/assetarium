@@ -54,7 +54,7 @@ for source in (one, two):
     sources.scan_source(config, source)
 # Original synthetic asset files; generated metadata and publications may change.
 saved = {str(p): hashlib.sha256(p.read_bytes()).hexdigest()
-         for p in (fixture / 'sources').rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+         for p in (fixture / 'sources').rglob('*') if p.is_file()}
 assert saved
 
 

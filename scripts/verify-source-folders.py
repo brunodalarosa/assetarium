@@ -39,7 +39,7 @@ sources.scan_source(config, added)
 # A near miss: Unity FBX lacks prop_19 and repeats prop_0 in a second subfolder.
 near = sources.add(config, str(near_kit(fixture / 'near', copy=TWENTY[:19], repeated=('prop_0',))))
 sources.scan_source(config, near)
-originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+originals = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
 
 
 def assets():
@@ -75,7 +75,7 @@ window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 ui = Harness(window, OUT, report)
-KIT = "document.querySelector('.source-row:has([data-source=kit])')"
+KIT = "document.querySelector('#folder-panel')"  # The library folder's panel on the Asset sources tab (decision 0023).
 IDLE = "lal.state.sources.find(s=>s.key==='kit')&&!['queued','running','cancelling'].includes((lal.state.sources.find(s=>s.key==='kit').operation||{}).status)"
 
 
@@ -86,12 +86,11 @@ def wait(expression, timeout=60):
 def verify():
     try:
         ui.wait_ready(extra="lal.state.sources.length===4")  # Two fixture sources, the kit and the near miss.
-        ui.js("$('nav-processing').click()")
-        wait("document.querySelector('[data-source=kit] .source-export-suggestions')")
-        assert ui.js("document.querySelector('[data-source=kit] .source-export-suggestions').textContent.includes('1 folder set looks')")
-        ui.capture('01-processing-suggestion.png')
-        report['checks'].append('Asset processing shows one line about the suggested folder set with a link to Asset sources')
-        ui.js("document.querySelector('[data-source=kit] .source-export-suggestions button').click()")
+        ui.js("$('nav-sources').click()")
+        wait("lal.state.sourcesView.tree&&lal.state.sourcesView.tree.attention")
+        ui.capture('01-attention.png')
+        report['checks'].append('The Asset sources rail item shows that a duplicate export answer waits')
+        ui.js("lal.inspectFolder('kit','')")
         wait(f"{KIT}&&{KIT}.querySelector('.export-suggestion')")
         text = ui.js(f"{KIT}.querySelector('.export-suggestion').textContent")
         assert 'In Exports, Engine Copy, FBX, gLTF have the same 3 model names' in text and 'FBX and gLTF are already grouped' in text, text
@@ -124,8 +123,9 @@ def verify():
         wait_assets(6)
         wait(f"{IDLE}&&!{KIT}.querySelector('[aria-label=\"Excluded folder patterns\"]')&&{KIT}.querySelector('.export-suggestion')")
         report['checks'].append('Removing the chip rescans and brings the folder and its suggestion back')
-        NEAR = f"document.querySelector('.source-row:has([data-source={near['key']}])')"
-        wait(f"{NEAR}&&{NEAR}.querySelector('.export-suggestion')")
+        NEAR = "document.querySelector('#folder-panel')"
+        ui.js(f"lal.inspectFolder('{near['key']}','')")
+        wait(f"lal.state.sourcesView.key==='{near['key']}'&&{NEAR}&&{NEAR}.querySelector('.export-suggestion')")
         text = ui.js(f"{NEAR}.querySelector('.export-suggestion').textContent")
         assert 'In Pack, FBX, Unity FBX, gLTF share 18 model names' in text, text
         assert '2 in FBX and 2 in gLTF are not in every folder; 1 name repeats inside Unity FBX. Those stay as they are.' in text, text
@@ -136,12 +136,11 @@ def verify():
                                 'and what excluding would also skip')
         window.resize(680, 900)
         wait('innerWidth<761')
-        ui.js(f"{KIT}.scrollIntoView()")
-        assert ui.js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
+        wait("$('sources-view').scrollWidth<=$('sources-view').clientWidth+1", 10)  # Once the resize has settled.
         ui.capture('05-narrow.png')
         report['checks'].append('Narrow layout has no horizontal overflow')
         assert not bridge._gateway.model_requested
-        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
+        now = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in root.rglob('*') if p.is_file()}
         assert now == originals
         report['checks'].append('Original files are byte-identical; no inference worker or model was loaded')
         report.update(status='passed')

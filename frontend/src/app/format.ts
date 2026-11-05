@@ -48,17 +48,39 @@ export function hasDescription(item: Json) {
 /** Card meta line from measured facts: "GLB · 1,248 tris", or "PNG · 512 × 512" for images. */
 export function cardMeta(item: Json, card?: Json) {
   const formats: string[] = item.formats || [];
-  const format = (card?.format || (formats.length === 1 ? formats[0] : "") || "").toUpperCase();
+  const format = (item.source_format || card?.format || (formats.length === 1 ? formats[0] : "") || "").toUpperCase();
   const fact =
     item.asset_type === "image"
       ? card?.width ? `${card.width} × ${card.height}` : null
-      : typeof card?.triangles === "number" ? `${card.triangles.toLocaleString()} tris` : null;
+      : typeof card?.triangles === "number" && (!item.source_format || item.source_format === card?.format)
+        ? `${card.triangles.toLocaleString()} tris` : null;
   const extra = !card?.format && formats.length > 1 ? formats.map((f) => f.toUpperCase()).join(" / ") : null;
   return [format || extra, fact].filter(Boolean).join(" · ");
 }
 
 export function operationActive(operation: Json) {
   return ["queued", "scanning", "processing", "publishing", "cancelling", "verifying"].includes(operation?.status);
+}
+
+/** Measured work in the current phase; weighted legacy progress is never presented as a measured percentage. */
+export function progressInfo(operation: Json): { label: string; detail: string; value?: number } {
+  const metrics = operation.metrics?.phase === operation.phase ? operation.metrics : null;
+  const count = metrics?.completed ?? operation.completed;
+  const total = metrics ? metrics.total : operation.total;
+  const phase = operation.phase || "Starting";
+  const unit = metrics?.unit || "assets";
+  const known = typeof total === "number" && total > 0 && typeof count === "number";
+  const value = known ? Math.max(0, Math.min(100, count / total * 100)) : undefined;
+  const label = known ? `${count.toLocaleString()} / ${total.toLocaleString()} ${unit}`
+    : typeof count === "number" ? `${count.toLocaleString()} ${unit} checked` : phase;
+  const details = [phase, label];
+  if (metrics?.source_name) details.push(metrics.source_name);
+  if (known) details.push(`${Math.max(0, total - count).toLocaleString()} remaining · ${Math.round(value!)}% of this phase`);
+  else if (metrics && !/saving|updating|publishing/i.test(phase)) details.push("Total not yet known");
+  else if (metrics) details.push("Finalizing; checked counts are not whole-operation completion");
+  if (typeof metrics?.failed === "number") details.push(`${(count - metrics.failed).toLocaleString()} successful checks · ${metrics.failed.toLocaleString()} faults recorded`);
+  if (typeof metrics?.reused === "number") details.push(`${metrics.reused.toLocaleString()} cached hashes reused`);
+  return { label, detail: details.join(" · "), value };
 }
 export function describeActive(source: Json) {
   return source.operation?.operation === "describe" && operationActive(source.operation);
@@ -88,7 +110,7 @@ export function descriptionSummary(source: Json) {
 
 export function descriptionBlocked(source: Json) {
   const d = source.descriptions || {};
-  if (!source.enabled) return "Enable this source in Settings → Asset sources to generate descriptions.";
+  if (!source.enabled) return "Include this library folder in search in Library to generate descriptions.";
   if (source.processing_paused) return "Processing is paused. Select formats in Settings → General to generate descriptions.";
   if (operationActive(source.operation)) return "Available when the current operation for this source finishes.";
   if (!d.missing) return d.failed ? "Nothing left to generate. Failed descriptions are recorded and not retried." : "Nothing to generate right now.";
@@ -118,7 +140,8 @@ export function notificationContent(item: Json): { tone: Tone; title: string; bo
     return {
       tone: "info",
       title: item.finished ? "Your agent finished setup" : "Your agent changed setup",
-      body: `${changes.length ? "Changed: " + changes.join(", ") + "." : "No values changed."} You can review and change every value.`,
+      body: item.finished ? `${changes.length ? "Changed: " + changes.join(", ") + ". " : ""}Look over its report and confirm it, then choose your asset folders.`
+        : `${changes.length ? "Changed: " + changes.join(", ") + "." : "No values changed."} You can review and change every value.`,
     };
   }
   if (item.kind === "descriptions_ready")
@@ -146,13 +169,13 @@ export const notificationKey = (item: Json) => item.id + "@" + item.created_utc;
 
 /* Setup and Settings → General share this copy (decision 0014). */
 export const BUDGET_HELP =
-  "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus each source’s metadata-lal folder, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Process assets and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
+  "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus the library store that holds every preview, description and search result, wherever it is, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Make previews and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
 export const DESCRIPTIONS_OFF =
   "Generate descriptions is hidden and no ready-to-generate notices appear. Descriptions already written stay stored and searchable; nothing is deleted or redone. Turn it back on any time.";
 export const ENGINE_NOTE =
   "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Where search by description and by image runs is a separate choice below.";
 export const SEARCH_HELP =
-  "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Process assets to rebuild search data. Until then, names, filters and keyword search keep working.";
+  "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Make previews to rebuild search data. Until then, names, filters and keyword search keep working.";
 export const SEARCH_THREADS_HELP =
   "How many CPU threads build search data. More are faster until the processor is saturated; fewer leave the computer more responsive. Search results are identical at any number, so changing it never redoes work. Automatic uses the speed test's choice: the fewest threads within 3% of the fastest.";
 /** "Now: 24 of 32 threads (fastest in the speed test)." */
@@ -204,5 +227,6 @@ export function setupRecordText(record: Json | null | undefined) {
   if (!record?.state || record.state === "not_run") return "Setup has not been run on this computer.";
   const when = (value: string) => new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   const by = record.by === "agent" ? " by an agent" : "";
+  if (record.state === "review") return `Your agent finished setup ${when(record.review_utc)}; it waits for you to look over its report.`;
   return record.state === "completed" ? `Setup completed ${when(record.completed_utc)}${by}.` : `Setup skipped ${when(record.skipped_utc)}${by}.`;
 }

@@ -4,18 +4,20 @@
 // notifications and processing: this file only presents its answers.
 import { useSyncExternalStore } from "react";
 import { type AssetApi, type Bridge, type Json, libraryApi, sourceApi } from "./api";
-import { describeActive, notificationContent, notificationKey, operationActive, plural, type Tone } from "./format";
+import { describeActive, notificationContent, notificationKey, operationActive, plural, progressInfo, type Tone } from "./format";
 
-export type Page = "home" | "library" | "collections" | "collection" | "processing" | "settings" | "source";
-export type SettingsTab = "general" | "asset-sources";
+export type Page = "home" | "collections" | "collection" | "processing" | "settings" | "sources";
+export type SettingsTab = "general";
 export interface Route {
   page: Page;
   tab?: SettingsTab;
   key?: string;
+  /** Asset sources: the folder (inside library folder `key`) shown in the grid. */
+  path?: string;
   /** Asset processing: the source a notification pointed at. */
   focus?: string;
 }
-/** A card grid with its own selection and inspection: Home, a source browser or an open collection. */
+/** A card grid with its own selection and inspection: Home, the Asset sources tab or an open collection. */
 export type GridId = "library" | "source" | "collection";
 export type InspectorTab = "overview" | "sources" | "evidence";
 
@@ -29,6 +31,7 @@ export interface Thumb {
   presentation?: Json;
 }
 export interface Detail {
+  stale?: boolean;
   assetId: string;
   format: string | null;
   view: string;
@@ -115,7 +118,7 @@ export interface CollectionView {
 }
 export interface MenuRequest {
   id: number;
-  kind: "asset" | "collection" | "export";
+  kind: "asset" | "collection" | "export" | "folder" | "file";
   x: number;
   y: number;
   grid?: GridId;
@@ -125,27 +128,54 @@ export interface MenuRequest {
   keyboard?: boolean;
 }
 export interface ConfirmRequest {
+  deleteOnLeft?: boolean;
   title: string;
   body: string;
   confirmLabel: string;
+  /** The button that keeps things as they are (default Cancel, or Close without run). */
+  cancelLabel?: string;
+  /** "stop" for a dialog that stops running work (the default icon reads as undo or delete). */
+  icon?: "stop";
   /** Without run, the dialog only informs and offers Close. */
   run?: () => Promise<unknown>;
   /** Deletions are "danger" (the default); other confirmations are "neutral". */
   tone?: "danger" | "neutral";
+}
+/** The Asset sources tab (decision 0023): the tree, the shown folder and its filters. */
+export interface SourcesView {
+  tree: Json | null;
+  loading: boolean;
+  error: string | null;
+  key: string | null;
+  path: string;
+  expanded: Record<string, boolean>;
+  types: string[];
+  states: string[];
+  sort: "name" | "added" | "pending" | "assets";
+  showFiles: boolean;
+  list: boolean;
+  /** What inspection shows: the selected asset, or the selected folder, pack or library folder. */
+  panel: "asset" | "folder";
+  files: Json[];
+  counts: Json | null;
+  /** Ctrl- or Shift-clicked assets for queue actions, Add to collection and Exclude. */
+  picked: string[];
+  pickAnchor: string | null;
 }
 export interface CreateRequest {
   assetIds: string[];
   sourceKey: string | null;
   name?: string;
 }
-export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "review"] as const;
+export const SETUP_STEPS = ["welcome", "blender", "formats", "storage", "descriptions", "batch", "agent", "practice", "review"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 /** What the wizard will save; nothing is written until Save (or Skip setup, which saves nothing). */
 export interface SetupDraft {
   blenderPath: string;
   confirmRerender: boolean;
-  engineHint: string;
+  engineHint: string[];
   formats: string[];
+  imageFormats: string[];
   budget: string;
   descriptionsEnabled: boolean;
   engine: string;
@@ -153,6 +183,7 @@ export interface SetupDraft {
   serverModel: string;
   searchDevice: string;
   batch: string;
+  includeSamples: boolean;
   skipped: SetupStep[];
 }
 export interface SetupState {
@@ -179,6 +210,17 @@ export interface SetupState {
   /** Saved values the review starts from after an agent set them; only what the user changes is saved as theirs. */
   baseline: SetupDraft | null;
 }
+export interface BlenderState {
+  report: Json | null;
+  path: string;
+  check: Json | null;
+  checking: boolean;
+  confirmRerender: boolean;
+  /** The picker is open: always while no usable Blender is saved, else after Change Blender. */
+  editing: boolean;
+  saving: boolean;
+  message: string;
+}
 export interface AppState {
   api: Bridge | null;
   ready: boolean;
@@ -203,7 +245,11 @@ export interface AppState {
   create: CreateRequest | null;
   knownTags: Json[];
   inspector: { open: boolean; width: number; tab: InspectorTab };
+  sourcesView: SourcesView;
+  /** The processing queue (decision 0023); null until first loaded. */
+  queue: Json | null;
   sources: Json[];
+  globalScan: Json | null;
   /** False until the first sources answer (or fault), so "no sources" is never shown early. */
   sourcesLoaded: boolean;
   sourcesRevision: string | null;
@@ -212,12 +258,23 @@ export interface AppState {
   sourcesError: string | null;
   notifications: Json[];
   notificationsOpen: boolean;
+  /** What agents do (decision 0024): the live feed, who is connected and proposals waiting for the owner. */
+  agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[];
+    staged: Record<string, Record<number, RuleChoice>>; committing: string | null };
+  /** The Add library folder wizard (decision 0024). */
+  addFolder: AddFolder;
+  /** Practice results live in memory only until the results screen closes. */
+  practiceResult: Json | null;
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
   /** Rendering (decision 0022): device, renders at a time, memory and the speed test. */
   render: { loading: boolean; busy: boolean; message: string; values: Json | null };
   setup: SetupState;
+  /** Settings → General → Search: the installed-runtime checklist per search device (read only). */
+  searchCheck: { checking: boolean; devices: Json | null; error: string | null };
+  /** Settings → General → Blender installation: its own choice and check, saved on its own. */
+  blender: BlenderState;
   appearance: string;
   runReport: Json | null;
   imageBackground: string;
@@ -235,12 +292,17 @@ const emptyGrid = (id: GridId): Grid => ({
 function emptyCollectionView(): CollectionView {
   return { id: null, name: "", description: "", updatedAt: "", count: 0, unavailable: 0, loading: false, error: null, query: "", mode: "combined", phase: "all", busy: false, search: null, members: {} };
 }
+function emptySourcesView(): SourcesView {
+  return { tree: null, loading: false, error: null, key: null, path: "", expanded: {}, types: [], states: [], sort: "name",
+    showFiles: true, list: false, panel: "asset", files: [], counts: null, picked: [], pickAnchor: null };
+}
+const emptyBlender = (): BlenderState => ({ report: null, path: "", check: null, checking: false, confirmRerender: false, editing: false, saving: false, message: "" });
 function emptySetup(): SetupState {
   return {
     open: false, step: 0, loading: false, error: null, info: null, env: null, blender: null, check: null, checking: false,
     storage: null, measuring: false, server: null, testing: false, saving: false, result: null,
     agent: null, agentMode: false, agentBusy: null, baseline: null,
-    draft: { blenderPath: "", confirmRerender: false, engineHint: "", formats: [], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", skipped: [] },
+    draft: { blenderPath: "", confirmRerender: false, engineHint: [], formats: [], imageFormats: ["png", "jpeg", "svg", "webp", "tga", "tiff", "bmp", "gif", "avif"], budget: "", descriptionsEnabled: true, engine: "builtin", serverUrl: "", serverModel: "", searchDevice: "cuda", batch: "8", includeSamples: true, skipped: [] },
   };
 }
 const idleSearch: SearchState = {
@@ -258,11 +320,18 @@ let state: AppState = {
   collections: { items: [], total: 0, loading: false, loaded: false, error: null, query: "" },
   selection: { active: false, ids: [], anchor: null }, menu: null, confirm: null, create: null, knownTags: [],
   inspector: { open: false, width: boot.inspector_width, tab: "overview" },
-  sources: [], sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
+  sourcesView: emptySourcesView(),
+  queue: null,
+  sources: [], globalScan: null, sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
+  agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [], staged: {}, committing: null },
+  addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false, practice: false, practiceState: null, result: null },
+  practiceResult: null,
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
   general: { loading: false, busy: false, message: "", values: null },
   render: { loading: false, busy: false, message: "", values: null },
   setup: emptySetup(),
+  searchCheck: { checking: false, devices: null, error: null },
+  blender: emptyBlender(),
   appearance: boot.appearance, runReport: null, imageBackground: "checker", coverage: "",
   worker: "not_started", previews: 0,
 };
@@ -297,7 +366,7 @@ const api = () => {
 export const route = () => state.history[state.historyIndex];
 export const activeGridId = (s: AppState = state): GridId => {
   const page = s.history[s.historyIndex].page;
-  return page === "source" ? "source" : page === "collection" ? "collection" : "library";
+  return page === "sources" ? "source" : page === "collection" ? "collection" : "library";
 };
 /** Collection members open through the library, or through their source when the library does not hold them. */
 export function gridApi(id: GridId, assetId: string | null = null): AssetApi {
@@ -309,11 +378,12 @@ export function gridApi(id: GridId, assetId: string | null = null): AssetApi {
   return id === "source" && state.source.key ? sourceApi(api(), state.source.key) : libraryApi(api());
 }
 /** Stale checks compare one publication; collection members span several, so they skip it. */
-export const gridVersion = (s: AppState, id: GridId): string | null => (id === "collection" ? null : (s[id].version ?? s.context?.generation ?? null));
+// The Asset sources grid reads a folder's working data, which has no published version to compare.
+export const gridVersion = (s: AppState, id: GridId): string | null => (id === "collection" || id === "source" ? null : (s[id].version ?? s.context?.generation ?? null));
 
 /* ------------------------------- navigation ------------------------------ */
 
-const sameRoute = (a: Route, b: Route) => a.page === b.page && a.tab === b.tab && a.key === b.key;
+const sameRoute = (a: Route, b: Route) => a.page === b.page && a.tab === b.tab && a.key === b.key && (a.path ?? "") === (b.path ?? "");
 export function navigate(next: Route) {
   const current = route();
   if (sameRoute(current, next)) {
@@ -339,9 +409,9 @@ export function goForward() {
   enterRoute(route(), previous);
 }
 function enterRoute(next: Route, previous: Route) {
-  if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadRenderSettings(), loadSources(), loadSetupState().catch(() => undefined)]);
+  if (next.page === "settings") void Promise.all([loadGeneralSettings(), loadRenderSettings(), loadSources(), loadSetupState().catch(() => undefined), loadBlenderInstallation()]);
   if (next.page === "processing") void Promise.all([loadSources(), loadImportFailures()]);
-  if (next.page === "source" && next.key && (state.source.key !== next.key || previous.page !== "source")) void openSourceBrowser(next.key);
+  if (next.page === "sources") void enterSources(next, previous);
   if (next.page === "collections") void loadCollections();
   if (state.selection.active) cancelSelection();
   if (next.page === "collection" && next.key) {
@@ -351,7 +421,7 @@ function enterRoute(next: Route, previous: Route) {
   // Returning to a grid re-resolves its selection so a paused 3D preview remounts.
   const id = activeGridId();
   const selected = state[id].selected;
-  if (selected && state.inspector.open && (next.page !== "source" || state.source.key === next.key))
+  if (selected && state.inspector.open && next.page !== "sources")
     void selectAsset(id, selected, state[id].detail?.format ?? null, state[id].detail?.view ?? "three_quarter", false);
 }
 
@@ -537,7 +607,7 @@ async function drainThumbs() {
     if (generation !== state[id].generation) continue;
     if (result.status === "stale") {
       if (id === "library") patchSearch({ status: "Library version changed; refresh the published view." });
-      else patchGrid("source", { error: "Saved source contents changed. Return to asset sources and reopen this source.", finished: true });
+      else patchGrid("source", { error: "This folder changed while it was shown; it is loaded again.", finished: true });
       continue;
     }
     const payload = result.payload || {};
@@ -559,8 +629,13 @@ async function drainThumbs() {
 /* --------------------------------- detail -------------------------------- */
 
 let detailGeneration = { library: 0, source: 0, collection: 0 };
-export async function selectAsset(id: GridId, assetId: string, format: string | null = null, view = "three_quarter", moveFocus = true) {
+export async function selectAsset(id: GridId, assetId: string, format: string | null = null, view = "three_quarter", moveFocus = true, fresh = false) {
+  if (id === "source" && !format) {
+    const cards = state.source.items.flatMap((item: Json) => [item, ...(item.variants || [])]);
+    format = cards.find((item: Json) => item.asset_id === assetId)?.source_format ?? null;
+  }
   window.LALPreview?.dispose();
+  if (id === "source" && state.sourcesView.panel !== "asset") setState((s) => ({ sourcesView: { ...s.sourcesView, panel: "asset" } }));
   const generation = ++detailGeneration[id];
   setState((s) => ({ inspector: { ...s.inspector, open: true } }));
   const missing = id === "collection" ? state.collection.items.find((item) => item.asset_id === assetId && item.availability === "unavailable") : null;
@@ -573,8 +648,12 @@ export async function selectAsset(id: GridId, assetId: string, format: string | 
     detail: { assetId, format, view, loading: true, result: c.detail?.assetId === assetId ? c.detail.result : null, error: null, focusToken: (c.detail?.focusToken ?? 0) + (moveFocus ? 1 : 0) },
   }));
   try {
-    const result = await gridApi(id, assetId).asset(assetId, format, view, gridVersion(state, id));
+    const result = await gridApi(id, assetId).asset(assetId, format, view, fresh ? null : gridVersion(state, id));
     if (generation !== detailGeneration[id]) return;
+    if (result.status === "stale") {
+      patchGrid(id, (c) => ({ detail: c.detail && { ...c.detail, loading: false, result: null, error: result.reason, stale: true } }));
+      return;
+    }
     if (!result.payload) throw Error(result.reason || "Asset detail unavailable");
     patchGrid(id, (c) => ({ detail: c.detail && { ...c.detail, loading: false, result } }));
   } catch (error) {
@@ -618,7 +697,7 @@ export async function copyText(text: string, message: string) {
 /** Select the original file in Explorer: the format open in the inspector for this asset, else its primary file. */
 export async function revealAsset(id: GridId, assetId: string) {
   const detail = state[id].detail;
-  const format = detail?.assetId === assetId ? detail.format : null;
+  const format = detail?.assetId === assetId ? detail.format : state[id].items.find((item) => item.asset_id === assetId)?.source_format ?? null;
   try {
     const result = await gridApi(id, assetId).reveal(assetId, format);
     if (result.status !== "revealed") throw Error(result.reason);
@@ -686,7 +765,7 @@ export async function loadSources() {
     const result = await api().sources();
     if (result.status === "faulty") throw Error(result.reason);
     const changed = state.sourcesRevision !== result.revision;
-    setState({ sources: result.sources || [], sourcesLoaded: true, sourcesRevision: result.revision, sourcesError: null });
+    setState({ sources: result.sources || [], globalScan: result.scan ?? null, sourcesLoaded: true, sourcesRevision: result.revision, sourcesError: null });
     updateNotifications(result.notifications || []);
     if (route().page === "processing" && changed) await loadImportFailures();
     if (changed && state.context && result.revision !== state.context.sources_revision) await refreshContext();
@@ -745,38 +824,422 @@ export async function chooseSourceDirectory() {
   return result.status === "selected" ? (result.directory as string) : null;
 }
 
-/* ----------------------------- source browser ---------------------------- */
+/* ---------------------------- asset sources tab -------------------------- */
 
-let sourceGeneration = 0;
-export async function openSourceBrowser(key: string) {
-  ++detailGeneration.source;
-  const generation = ++sourceGeneration;
-  setState({ source: { ...emptyGrid("source"), key, generation } });
-  await browseSource(generation);
+const patchSources = (patch: Partial<SourcesView> | ((current: SourcesView) => Partial<SourcesView>)) =>
+  setState((s) => ({ sourcesView: { ...s.sourcesView, ...(typeof patch === "function" ? patch(s.sourcesView) : patch) } }));
+let treeLoading: Promise<void> | null = null;
+let treeAgain = false;
+let readingTimer: number | undefined;
+/** Library folders → bundles → packs → folders, with counts and what needs the owner (read from saved data).
+ *  One request at a time: a call while one runs asks for one more pass afterwards instead of a second request. */
+export function loadLibraryTree(): Promise<void> {
+  if (!state.api) return Promise.resolve();
+  if (treeLoading) {
+    treeAgain = true;
+    return treeLoading;
+  }
+  treeLoading = (async () => {
+    patchSources({ loading: true });
+    try {
+      do {
+        treeAgain = false;
+        try {
+          const tree = await api().library_tree();
+          if (tree.status === "faulty") throw Error(tree.reason);
+          patchSources({ tree, error: null });
+          // A library folder read for the first time shows "Reading…"; look again shortly instead of waiting on it.
+          window.clearTimeout(readingTimer);
+          if ((tree.folders || []).some((f: Json) => f.reading)) readingTimer = window.setTimeout(() => void loadLibraryTree(), 2000);
+        } catch (error) {
+          patchSources({ error: (error as Error).message });
+        }
+      } while (treeAgain);
+    } finally {
+      patchSources({ loading: false });
+      treeLoading = null;
+    }
+  })();
+  return treeLoading;
 }
-export async function browseSource(generation = state.source.generation) {
-  const c = state.source;
-  if (!c.key || c.loading || c.finished || generation !== c.generation) return;
-  patchGrid("source", { loading: true, status: c.items.length ? `Loading more assets · ${c.items.length} shown…` : "Loading saved source contents…" });
+async function enterSources(next: Route, previous: Route) {
+  if (!state.sourcesView.tree) await loadLibraryTree();
+  else void loadLibraryTree();
+  const folders: Json[] = state.sourcesView.tree?.folders || [];
+  const key = next.key ?? state.sourcesView.key ?? folders[0]?.key ?? null;
+  if (!key) return;
+  const path = next.key ? next.path ?? "" : state.sourcesView.path;
+  if (key !== state.sourcesView.key || path !== state.sourcesView.path || previous.page !== "sources" || !state.source.items.length) await showFolder(key, path, next.focus);
+  else if (next.focus) void selectAsset("source", next.focus, null, "three_quarter", true);
+}
+/** Open the Asset sources tab at a folder (and an asset in it). */
+export function openSources(key?: string, path = "", assetId?: string) {
+  navigate({ page: "sources", key, path, focus: assetId });
+}
+/** Show in pack: a search result opens the Asset sources tab with its folder expanded and the asset selected. */
+export async function showInPack(assetId: string) {
   try {
-    const result = await api().source_browse(c.key, c.items.length, 40);
+    const found = await api().library_locate(assetId);
+    if (found.status === "faulty") throw Error(found.reason);
+    openSources(found.key, found.path, assetId);
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not in a library folder", body: (error as Error).message });
+  }
+}
+const ancestors = (key: string, path: string) => {
+  const parts = path ? path.split("/") : [];
+  return [key + ":", ...parts.map((_, i) => key + ":" + parts.slice(0, i + 1).join("/"))];
+};
+let folderGeneration = 0;
+export async function showFolder(key: string, path = "", focus?: string) {
+  ++detailGeneration.source;
+  const generation = ++folderGeneration;
+  const previous = state.sourcesView.key;
+  const changedFolder = key !== previous;
+  patchSources((v) => ({ key, path, panel: focus ? "asset" : v.panel, files: [], counts: null, picked: [], pickAnchor: null,
+    expanded: { ...v.expanded, ...Object.fromEntries(ancestors(key, path).slice(0, -1).map((id) => [id, true])) } }));
+  setState({ source: { ...emptyGrid("source"), key, generation } });
+  // "+N new" counts from your last visit: leaving a library folder marks what you saw there as seen.
+  if (changedFolder && previous) void api().library_visit(previous).catch(() => undefined);
+  await loadFolderItems(generation);
+  if (focus && generation === folderGeneration) void selectAsset("source", focus, null, "three_quarter", true);
+}
+export async function loadFolderItems(generation = state.source.generation) {
+  const c = state.source, view = state.sourcesView;
+  if (!c.key || c.loading || c.finished || generation !== c.generation) return;
+  patchGrid("source", { loading: true, status: c.items.length ? `Loading more · ${c.items.length} shown…` : "Loading this folder…" });
+  try {
+    const offset = c.items.length + view.files.length;
+    const result = await api().library_items(c.key, view.path, offset, 80, { types: view.types, states: view.states }, view.showFiles);
     if (generation !== state.source.generation) return;
     if (result.status === "faulty") throw Error(result.reason);
-    if (state.source.version && state.source.version !== result.generation) throw Error("Saved source contents changed. Return to asset sources and reopen this source.");
-    const append = state.source.items.length > 0;
-    patchGrid("source", (s) => ({ items: append ? s.items.concat(result.items) : result.items, version: result.generation, total: result.total_count }));
-    const total = result.total_count;
+    if (result.status === "reading") {
+      // The folder's saved data is being read for the first time: keep the skeleton and ask again shortly.
+      patchGrid("source", { status: "Reading this library folder…" });
+      window.setTimeout(() => {
+        if (generation === state.source.generation) void loadFolderItems(generation);
+      }, 2000);
+      return;
+    }
+    const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
+    patchGrid("source", (s) => ({ items: s.items.concat(assets), total: result.total }));
+    patchSources((v) => ({ files: v.files.concat(files), counts: result.counts }));
     patchGrid("source", (s) => ({
-      finished: s.items.length >= total,
-      status: `${total} ${total === 1 ? "saved asset" : "saved assets"}${result.source?.enabled ? "" : " · Disabled in library searches"}`,
-      emptyText: result.reason || "This source has no saved assets.",
+      finished: s.items.length + state.sourcesView.files.length >= result.total,
+      status: plural(result.assets, "asset", "assets") + (result.files ? ` · ${plural(result.files, "other file", "other files")}` : ""),
+      emptyText: view.types.length || view.states.length ? "Nothing here matches these filters." : "No assets in this folder.",
     }));
   } catch (error) {
     if (generation === state.source.generation)
-      patchGrid("source", (s) => ({ finished: true, error: (error as Error).message, status: s.items.length ? `${s.items.length} assets shown · could not load the rest` : "Source contents unavailable." }));
+      patchGrid("source", (s) => ({ finished: true, error: (error as Error).message, status: s.items.length ? `${s.items.length} shown · could not load the rest` : "This folder could not be read." }));
   } finally {
     if (generation === state.source.generation) patchGrid("source", { loading: false });
   }
+}
+/** Reload the shown folder in place after a scan or a finished item: states update, nothing jumps. */
+let refreshing = false;
+async function refreshFolder() {
+  const s = state.sourcesView;
+  if (!s.key || !state.api || refreshing) return;
+  refreshing = true;
+  try {
+    const shown = Math.max(80, state.source.items.length + s.files.length);
+    const result = await api().library_items(s.key, s.path, 0, Math.min(200, shown), { types: s.types, states: s.states }, s.showFiles);
+    if (result.status !== "ready" || state.sourcesView.key !== s.key || state.sourcesView.path !== s.path) return;
+    const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
+    // Thumbnails of assets whose state changed are asked for again (a finished preview fades in).
+    const before: Record<string, string> = Object.fromEntries(state.source.items.map((item: Json) => [item.asset_id, item.state]));
+    for (const item of assets) if (before[item.asset_id] !== item.state) requested.delete(`source:${state.source.generation}:${item.asset_id}`);
+    patchGrid("source", (g) => ({ items: assets, total: result.total, finished: assets.length + files.length >= result.total,
+      thumbs: Object.fromEntries(Object.entries(g.thumbs).filter(([id]) => before[id] === assets.find((a: Json) => a.asset_id === id)?.state)) }));
+    patchSources({ files, counts: result.counts });
+  } catch {
+    /* The next change poll tries again. */
+  } finally {
+    refreshing = false;
+  }
+}
+export function setSourcesFilter(patch: Partial<Pick<SourcesView, "types" | "states" | "sort" | "showFiles" | "list">>) {
+  patchSources(patch);
+  if (state.sourcesView.key && ("types" in patch || "states" in patch || "showFiles" in patch)) void showFolder(state.sourcesView.key, state.sourcesView.path);
+}
+export function toggleFolder(id: string, open?: boolean) {
+  patchSources((v) => ({ expanded: { ...v.expanded, [id]: open ?? !v.expanded[id] } }));
+}
+export function expandAll(key: string, open: boolean) {
+  const folder = (state.sourcesView.tree?.folders || []).find((f: Json) => f.key === key);
+  patchSources((v) => ({ expanded: { ...v.expanded, ...Object.fromEntries((folder?.nodes || []).map((n: Json) => [key + ":" + n.path, open])) } }));
+}
+/** Click a folder or pack: show it in the grid and its panel in inspection. */
+export function inspectFolder(key: string, path: string) {
+  patchSources((v) => ({ panel: "folder", expanded: { ...v.expanded, [key + ":" + path]: true } }));
+  setState((s) => ({ inspector: { ...s.inspector, open: true } }));
+  if (key !== state.sourcesView.key || path !== state.sourcesView.path) navigate({ page: "sources", key, path });
+}
+export function pickAsset(assetId: string, range: boolean) {
+  const items = state.source.items.map((item: Json) => item.asset_id);
+  patchSources((v) => {
+    if (range && v.pickAnchor) {
+      const [a, b] = [items.indexOf(v.pickAnchor), items.indexOf(assetId)].sort((x, y) => x - y);
+      return { picked: [...new Set([...v.picked, ...items.slice(a, b + 1)])] };
+    }
+    return { picked: v.picked.includes(assetId) ? v.picked.filter((id) => id !== assetId) : [...v.picked, assetId], pickAnchor: assetId };
+  });
+}
+export const clearPicked = () => patchSources({ picked: [], pickAnchor: null });
+/** Folder and pack answers (Make this a pack, Merge, image kinds, exclusions, Forget missing); most rescan. */
+export async function folderAction(action: string, key: string, path = "", value: Json = null) {
+  try {
+    const result = await api().folder_action(action, key, path, value);
+    if (result.status === "faulty") throw Error(result.reason);
+    const told: Record<string, string> = {
+      make_pack: "Saved as a pack; scanning again.", merge: "Merged into its parent pack; scanning again.", clear_pack: "Pack choice removed; scanning again.",
+      image_kind: "Saved; scanning again.", exclude: "Folder excluded; scanning again. Nothing on disk is deleted.", include: "Folder included again; scanning again.",
+      rename_pack: "Pack renamed.", forget_missing: `${plural(result.forgotten || 0, "missing asset", "missing assets")} forgotten.`,
+    };
+    pushToast({ tone: "info", title: told[action] || "Saved.", body: "" });
+    await loadSources();
+    await loadLibraryTree();
+    if (state.sourcesView.key) void showFolder(state.sourcesView.key, state.sourcesView.path);
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export async function loadMissingEntries(key: string, path = "", offset = 0) {
+  const result = await api().folder_missing(key, path, offset, 30);
+  if (result.status === "faulty") throw Error(result.reason);
+  return result;
+}
+export async function confirmForgetMissing(key: string, path = "", name = "this folder") {
+  try {
+    const preview = await loadMissingEntries(key, path);
+    if (!preview.total) return pushToast({ tone: "info", title: "No missing entries here", body: "" });
+    askConfirm({ title: "Forget all missing files?", confirmLabel: "Delete", deleteOnLeft: true,
+      body: `Permanently forget ${plural(preview.total, "missing entry", "missing entries")} in “${name}”. Original files, saved processing results, and collection entries are kept. This cannot be undone.`,
+      run: () => folderAction("forget_missing", key, path, { revision: preview.revision }) });
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Could not review missing entries", body: (error as Error).message });
+  }
+}
+/** A pack's profile (decision 0024): its rules, versions and structure signals. */
+export async function loadPackProfile(key: string, pack: string) {
+  const result = await api().pack_profile(key, pack);
+  if (result.status === "faulty") throw Error(result.reason);
+  return result;
+}
+/** Apply, revert, review, export or measure a pack profile; a change that rescans says so. */
+export async function packProfileAction(action: "apply" | "revert" | "review" | "export" | "effect" | "separate_descriptions", key: string, pack: string, value: Json = null) {
+  try {
+    const result = await api().pack_profile_action(action, key, pack, value);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (action === "effect" || result.status === "cancelled") return result;
+    const told: Record<string, string> = {
+      apply: result.status === "unchanged" ? "Nothing changed." : `Saved as version ${result.version}.`,
+      revert: `Restored as version ${result.version}.`, review: "Marked as reviewed.", export: "Profile saved.",
+      separate_descriptions: value?.separate ? "Each variant gets its own description." : "Variants share one description.",
+    };
+    pushToast({ tone: "info", title: told[action], body: result.rescan ? "Scanning again; nothing is rendered or described." : action === "export" ? result.path : "" });
+    await loadLibraryTree();
+    if (state.sourcesView.key) void refreshFolder();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/** Show in Explorer, open with the default app, or copy the path of a library file or folder. */
+export async function pathAction(action: "reveal" | "open" | "copy", key: string, relative = "") {
+  try {
+    const result = await api().path_action(action, key, relative);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (action === "copy") pushToast({ tone: "info", title: "Path copied", body: "" });
+  } catch (error) {
+    pushToast({ tone: "fault", title: action === "reveal" ? "Could not show it in Explorer" : action === "open" ? "Could not open it" : "Could not copy the path", body: (error as Error).message });
+  }
+}
+/** Add a library folder; one inside a library folder is refused, with Show it. One around library folders replaces them. */
+export async function addLibraryFolder(directory: string) {
+  try {
+    const result = await api().source_action("add", null, directory, null);
+    if (result.status === "faulty") {
+      if (result.covered_by) {
+        const key = result.covered_by as string;
+        pushToast({ tone: "info", title: "Already covered", body: result.reason, actions: [{ label: "Show it", run: () => openSources(key, "") }] });
+        return result;
+      }
+      throw Error(result.reason);
+    }
+    const replaced: string[] = result.replaced || [];
+    pushToast({ tone: "success", title: "Library folder added", body: replaced.length
+      ? `It replaces ${replaced.join(", ")}; their assets keep their IDs and results. Scanning now; nothing is processed until you ask.`
+      : "Scanning now; nothing is processed until you ask." });
+    await loadSources();
+    await loadLibraryTree();
+    const added = (state.sourcesView.tree?.folders || []).find((f: Json) => f.path.toLowerCase() === directory.toLowerCase().replace(/[\\/]+$/, ""));
+    openSources(added?.key ?? state.sourcesView.key ?? undefined, "");
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Folder not added", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/* --------------------------- add library folder ---------------------------- */
+// Decision 0024: a names-only quick look first (seconds), then the owner chooses who finishes the structure.
+
+export type AddFolder = { open: boolean; step: "look" | "found" | "agent" | "done"; job: string | null; look: Json | null; key: string | null;
+  name: string; prompt: string; copiedAt: number | null; signals: Json | null; error: string | null; busy: boolean;
+  practice: boolean; practiceState: Json | null; result: Json | null };
+const closedAddFolder = (): AddFolder => ({ open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false,
+  practice: false, practiceState: null, result: null });
+export const patchAddFolder = (patch: Partial<AddFolder>) => setState((s) => ({ addFolder: { ...s.addFolder, ...patch } }));
+let lookTimer: ReturnType<typeof setTimeout> | undefined;
+/** Choose a folder and start the quick look; the wizard shows the tree as it is read. */
+export async function startAddFolder() {
+  const directory = await chooseSourceDirectory();
+  if (!directory) return;
+  const result = await api().quick_look_start(directory);
+  if (result.status === "faulty") {
+    if (result.covered_by) {
+      pushToast({ tone: "info", title: "Already covered", body: result.reason, actions: [{ label: "Show it", run: () => openSources(result.covered_by, "") }] });
+      return;
+    }
+    pushToast({ tone: "fault", title: "Folder not added", body: result.reason });
+    return;
+  }
+  setState({ addFolder: { ...closedAddFolder(), open: true, job: result.job, name: result.name } });
+  void pollQuickLook();
+}
+async function pollQuickLook() {
+  clearTimeout(lookTimer);
+  const job = state.addFolder.job;
+  if (!job || !state.addFolder.open) return;
+  const look = state.addFolder.practice ? await api().practice_action("look", state.addFolder.key) : await api().quick_look_status(job);
+  if (job !== state.addFolder.job) return;
+  if (look.status === "faulty") return patchAddFolder({ error: look.reason, look });
+  patchAddFolder({ look, ...(look.status === "done" && state.addFolder.step === "look" ? { step: "found" } : {}) });
+  if (look.status !== "done") lookTimer = setTimeout(() => void pollQuickLook(), 350);
+}
+/** Add the folder (it starts scanning) and go on: the agent takes over, the owner reviews, or it waits. */
+export async function finishAddFolder(choice: "agent" | "myself" | "later") {
+  patchAddFolder({ busy: true, error: null });
+  const result = state.addFolder.practice ? await api().practice_action("add", state.addFolder.key) : await api().quick_look_add(state.addFolder.job);
+  if (result.status === "faulty") return patchAddFolder({ busy: false, error: result.reason });
+  patchAddFolder({ busy: false, key: result.key, prompt: result.prompt });
+  if (!state.addFolder.practice) {
+    await loadSources();
+    await loadLibraryTree();
+  }
+  if (choice === "agent") {
+    patchAddFolder({ step: "agent" });
+    void pollFolderSignals();
+    return;
+  }
+  closeAddFolder();
+  openSources(result.key, "");
+  if (choice === "myself") pushToast({ tone: "info", title: "Library folder added", body: "Packs that need a structure say why in their panel. Scanning now; nothing is processed until you ask." });
+}
+let signalsTimer: ReturnType<typeof setTimeout> | undefined;
+async function pollFolderSignals() {
+  clearTimeout(signalsTimer);
+  const { key, open, step } = state.addFolder;
+  if (!key || !open || step !== "agent") return;
+  if (state.addFolder.practice) {
+    const result = await api().practice_action("status", key);
+    if (key !== state.addFolder.key || !state.addFolder.open || state.addFolder.step !== "agent") return;
+    if (result.status === "faulty") patchAddFolder({ error: result.reason });
+    else {
+      patchAddFolder({ practiceState: result, signals: result.signals });
+      if (result.complete) { await finishPractice(); return; }
+    }
+    signalsTimer = setTimeout(() => void pollFolderSignals(), 2000);
+    return;
+  }
+  const signals = await api().pack_signals(key);
+  if (signals.status !== "faulty") {
+    patchAddFolder({ signals });
+    if (signals.total && !signals.needs_structure && !signals.waiting) patchAddFolder({ step: "done" });
+  }
+  signalsTimer = setTimeout(() => void pollFolderSignals(), 3000);
+}
+export function copyAgentPrompt() {
+  patchAddFolder({ copiedAt: Date.now() });
+  void copyText(state.addFolder.prompt, "Prompt copied. Paste it into your agent.");
+}
+export function closeAddFolder() {
+  if (state.addFolder.practice && !state.addFolder.result) { void finishPractice(true); return; }
+  clearTimeout(lookTimer);
+  clearTimeout(signalsTimer);
+  setState({ addFolder: closedAddFolder() });
+  setState({ practiceResult: null });
+}
+/** Keep working elsewhere: the agent button in the top bar keeps the work visible. */
+export function minimizeAddFolder() {
+  if (state.addFolder.practice) return;
+  const key = state.addFolder.key;
+  closeAddFolder();
+  if (key) pushToast({ tone: "info", title: "Your agent keeps working", body: "Follow it with the agent button in the top bar.", actions: [{ label: "Open", run: () => setAgentOpen(true) }] });
+}
+/** A pack's cover image, read from its own preview file (a small thumbnail), or null. */
+export async function libraryCover(key: string, relative: string): Promise<string | null> {
+  try {
+    const result = await api().library_cover(key, relative);
+    return result.status === "ready" ? (result.image as string) : null;
+  } catch {
+    return null;
+  }
+}
+/** Make previews for a folder, pack or picked assets: it starts at once or waits in line (decision 0023). */
+export async function makePreviews(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
+  return queueAction("previews", scope, count);
+}
+export async function makeDescriptions(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
+  return queueAction("descriptions", scope, count);
+}
+export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false): Promise<Json> {
+  try {
+    const result = await api().queue_add(action, scope, confirmed);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (result.status === "confirm") {
+      // Over 30 minutes, or the storage budget would be reached: ask first with the estimate.
+      askConfirm({ title: result.title, body: result.body, confirmLabel: result.confirm_label, tone: "neutral",
+        run: () => queueAction(action, scope, count, true) });
+      return result;
+    }
+    const undo = result.undo ? [{ label: "Undo", run: () => void api().queue_remove(result.item.id).then(loadQueue) }] : undefined;
+    pushToast({ tone: "info", title: result.title, body: result.body, actions: undo });
+    void loadQueue();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: action === "previews" ? "Previews not started" : "Descriptions not started", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/** The processing queue (Running, Up next, Blocked, Recorded failures, Recent). */
+export async function loadQueue() {
+  if (!state.api) return;
+  try {
+    const queue = await api().queue_state();
+    if (queue.status !== "faulty") setState({ queue });
+  } catch {
+    /* The Processing tab shows its own error on its next load. */
+  }
+}
+export async function queueControl(action: string, id: string | null = null, value: Json = null) {
+  try {
+    const result = await api().queue_control(action, id, value);
+    if (result.status === "faulty") throw Error(result.reason);
+    if (result.queue) setState({ queue: result.queue });
+    else void loadQueue();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Queue not changed", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export function openFolderMenu(item: Json, x: number, y: number, returnFocus: HTMLElement | null = null, keyboard = false) {
+  setState({ menu: { id: ++menuId, kind: item.file ? "file" : "folder", x, y, item, returnFocus, keyboard } });
 }
 
 /* ------------------------- importing failures report --------------------- */
@@ -809,30 +1272,48 @@ export async function loadGeneralSettings() {
     setState((s) => ({ general: { ...s.general, loading: false, message: (error as Error).message } }));
   }
 }
+/** An asset made from a file whose format is off: turn that one format on and show the result everywhere. */
+export async function turnFormatOn(format: string) {
+  const result = await api().turn_format_on(format);
+  if (result.status === "faulty") {
+    pushToast({ tone: "fault", title: "Format not turned on", body: result.reason });
+    return;
+  }
+  const label = format === "gltf" ? "glTF" : format.toUpperCase();
+  pushToast({ tone: "info", title: `${label} is on`, body: `Assets in ${label} are shown and processed again. Nothing was deleted while it was off.` });
+  setState((s) => ({ general: { ...s.general, values: s.general.values ? { ...s.general.values, processing_formats: result.processing_formats } : s.general.values } }));
+  await Promise.all([loadSources(), loadLibraryTree()]);
+  if (state.sourcesView.key) void refreshFolder();
+  const grid = activeGridId();
+  const detail = state[grid].detail;
+  if (detail?.assetId) void selectAsset(grid, detail.assetId, detail.format, detail.view, false, true);
+}
 export interface DescriptionSettings {
   enabled: boolean;
   engine: string;
   server: { url: string; model: string };
 }
-export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string, searchThreads?: string) {
+export async function saveGeneralSettings(budget: string, formats: string[], batch: string, descriptions?: DescriptionSettings, searchDevice?: string, searchThreads?: string, imageFormats?: string[]) {
   const previousDevice = state.general.values?.search_device;
   setState((s) => ({ general: { ...s.general, busy: true, message: "Saving…" } }));
   try {
-    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null, searchThreads ?? null);
+    const result = await api().save_general_settings(budget, formats, batch, descriptions?.enabled ?? null, descriptions?.engine ?? null, descriptions?.server ?? null, searchDevice ?? null, searchThreads ?? null, imageFormats ?? null);
     if (result.status === "faulty") throw Error(result.reason);
     const described = !result.descriptions_enabled ? " Descriptions are off; existing descriptions are kept."
       : result.description_engine === "local-server" ? " Descriptions use the local model server." : ` Description batch size: ${result.caption_batch_size}.`;
     const searched = previousDevice && previousDevice !== result.search_device
-      ? ` Search now runs on the ${result.search_device === "cpu" ? "CPU" : "NVIDIA GPU"}: run the search check again, then Process assets to rebuild search data.` : "";
+      ? ` Search now runs on the ${result.search_device === "cpu" ? "CPU" : "NVIDIA GPU"}: run the search check again, then Make previews to rebuild search data.` : "";
     setState({
       general: {
         loading: false, busy: false, values: result,
-        message: result.processing_formats.length
-          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described}${searched} Selected formats apply to new processing batches.`
-          : `Saved. Processing is paused because no formats are selected. Scanning and existing results remain available.${searched}`,
+        message: result.processing_formats.length || result.image_formats.length
+          ? `Saved. Storage budget: ${result.storage_budget_gib} GiB.${described}${searched} Assets only in formats that are off are hidden; nothing was deleted.`
+          : `Saved. Every format is off, so nothing is shown or processed. Turning formats back on brings assets back with their results.${searched}`,
       },
     });
-    await Promise.all([loadSources(), loadRenderSettings()]);
+    // Formats decide what the Library shows (decision 0026): refresh it now, not on the next poll.
+    await Promise.all([loadSources(), loadRenderSettings(), loadLibraryTree()]);
+    if (state.sourcesView.key) void refreshFolder();
   } catch (error) {
     setState((s) => ({ general: { ...s.general, busy: false, message: (error as Error).message } }));
   }
@@ -901,7 +1382,9 @@ function savedDraft(info: Json): SetupDraft {
   return {
     ...emptySetup().draft,
     blenderPath: info.blender?.configured || "",
+    engineHint: [info.record?.engine_hint || []].flat(),
     formats: values.processing_formats ?? ["fbx", "gltf", "obj"],
+    imageFormats: values.image_formats ?? emptySetup().draft.imageFormats,
     budget: values.storage_budget_gib != null ? String(values.storage_budget_gib) : "",
     descriptionsEnabled: values.descriptions_enabled ?? true,
     engine: values.description_engine || "builtin",
@@ -910,6 +1393,24 @@ function savedDraft(info: Json): SetupDraft {
     searchDevice: values.search_device || "cuda",
     batch: String(values.caption_batch_size ?? 8),
   };
+}
+/** Reads what is installed for each search device; never installs or starts the model. */
+/** The search check (decision 0026): start it, or read whether it passed, runs or failed. */
+export async function searchCheck(action: "start" | "status"): Promise<Json> {
+  try {
+    return await api().search_check(action);
+  } catch (error) {
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export async function checkSearchReadiness() {
+  setState((s) => ({ searchCheck: { ...s.searchCheck, checking: true, error: null } }));
+  try {
+    const env = await api().setup_environment();
+    setState({ searchCheck: env.status === "faulty" ? { checking: false, devices: null, error: env.reason } : { checking: false, devices: env.search_devices, error: null } });
+  } catch (error) {
+    setState({ searchCheck: { checking: false, devices: null, error: (error as Error).message } });
+  }
 }
 export async function openSetup() {
   setNotificationsOpen(false);
@@ -922,8 +1423,8 @@ export async function openSetup() {
       error: info.settings_fault || info.record_fault || null,
     });
     requestAnimationFrame(() => document.getElementById("setup-step-title")?.focus());
-    // A session the user opened earlier is still running: show its panel instead of the choice.
-    void loadAgentSetup().then((agent) => agent?.session?.open && patchSetup({ agentMode: true }));
+    // A proposal from the user's agent is waiting: show the agent panel instead of the choice.
+    void loadAgentSetup().then((agent) => (agent?.proposals || []).some((p: Json) => p.state === "pending") && patchSetup({ agentMode: true }));
     const [env, storage] = await Promise.all([api().setup_environment(), api().setup_storage_use(false)]);
     patchSetup({ env: env.status === "faulty" ? null : env, storage, error: env.status === "faulty" ? env.reason : state.setup.error });
     // A first run suggests where search runs from the GPU found; a saved or agent-set choice is never replaced.
@@ -964,12 +1465,17 @@ export async function loadSetupBlender() {
   patchSetup((s) => ({ blender, draft: { ...s.draft, blenderPath: s.draft.blenderPath || blender.used || "" } }));
 }
 let checkGeneration = 0;
+/** setup_core.check_blender; a bridge fault becomes a failed check of that path. */
+async function runBlenderCheck(path: string): Promise<Json> {
+  const check = await api().setup_check_blender(path);
+  return check.status === "faulty" && !check.checks ? { status: "failed", path, checks: [{ id: "file", label: "Executable", status: "failed", detail: check.reason }] } : check;
+}
 export async function checkBlender(path = state.setup.draft.blenderPath) {
   const generation = ++checkGeneration;
   patchSetup({ checking: true, check: null });
-  const check = await api().setup_check_blender(path);
+  const check = await runBlenderCheck(path);
   if (generation !== checkGeneration) return;
-  patchSetup({ checking: false, check: check.status === "faulty" && !check.checks ? { status: "failed", path, checks: [{ id: "file", label: "Executable", status: "failed", detail: check.reason }] } : check });
+  patchSetup({ checking: false, check });
 }
 export async function cancelBlenderCheck() {
   await api().setup_cancel_blender();
@@ -981,10 +1487,89 @@ export async function chooseBlenderExecutable() {
   updateSetupDraft({ blenderPath: result.path, confirmRerender: false });
   await checkBlender(result.path);
 }
+/* ------------------------- blender installation ------------------------ */
+// Settings → General → Blender installation: the wizard's Blender step on its own (decision 0014).
+
+function patchBlender(patch: Partial<BlenderState> | ((current: BlenderState) => Partial<BlenderState>)) {
+  setState((s) => ({ blender: { ...s.blender, ...(typeof patch === "function" ? patch(s.blender) : patch) } }));
+}
+/** The saved Blender and what was found; the picker opens by itself while none usable is saved. */
+export async function loadBlenderInstallation() {
+  const report = await api().setup_blender();
+  if (report.status === "faulty") return patchBlender({ message: report.reason });
+  const saved = report.configured && report.configured_exists;
+  // A Blender saved elsewhere (wizard, agent, CLI) replaces an edit in progress here.
+  patchBlender((b) => {
+    const keep = b.editing && !!b.path && (!b.report || b.report.configured === report.configured);
+    return { report, path: keep ? b.path : report.configured_exists ? report.configured : report.used || "", editing: !saved || keep,
+      ...(keep ? {} : { check: null, confirmRerender: false }) };
+  });
+}
+export function updateBlenderInstallation(patch: Partial<Pick<BlenderState, "path" | "confirmRerender" | "editing">>) {
+  patchBlender((b) => ({ ...patch, message: "", ...(patch.editing === false ? { path: b.report?.configured || b.path, check: null, confirmRerender: false } : {}) }));
+}
+let installationGeneration = 0;
+export async function checkBlenderInstallation(path = state.blender.path) {
+  const generation = ++installationGeneration;
+  patchBlender({ checking: true, check: null, message: "" });
+  const check = await runBlenderCheck(path);
+  if (generation !== installationGeneration) return;
+  patchBlender({ checking: false, check });
+}
+export async function chooseBlenderInstallation() {
+  const result = await api().choose_blender_executable();
+  if (result.status === "faulty") return patchBlender({ message: result.reason });
+  if (result.status !== "selected") return;
+  patchBlender({ path: result.path, confirmRerender: false });
+  await checkBlenderInstallation(result.path);
+}
+export async function saveBlenderInstallation() {
+  const { path, confirmRerender } = state.blender;
+  patchBlender({ saving: true, message: "" });
+  const result = await api().save_blender(path, confirmRerender);
+  if (result.status === "faulty") return patchBlender({ saving: false, message: result.reason });
+  patchBlender({ saving: false, editing: false, check: null, confirmRerender: false });
+  pushToast({ tone: "success", title: "Blender saved", body: result.status === "saved" ? `Saved to ${result.file}. Make previews and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
+  await Promise.all([loadBlenderInstallation(), loadRenderSettings(), loadSetupState().catch(() => undefined)]);
+}
 export async function measureSetupStorage() {
   patchSetup({ measuring: true });
   const storage = await api().setup_storage_use(true);
   patchSetup({ measuring: false, storage: storage.status === "faulty" ? { status: "faulty", reason: storage.reason } : storage });
+}
+/* ------------------------------ try your agent ----------------------------- */
+export async function startAgentPractice() {
+  if (state.addFolder.open) return;
+  const result = await api().practice_action("start");
+  if (result.status === "faulty") {
+    pushToast({ tone: "fault", title: "Practice not started", body: result.reason });
+    return;
+  }
+  setState({ practiceResult: null, addFolder: { ...closedAddFolder(), open: true, practice: true, key: result.key,
+    job: result.job, name: result.name } });
+  void pollQuickLook();
+}
+export async function finishPractice(cancel = false) {
+  if (!state.addFolder.practice || state.addFolder.busy) return;
+  const key = state.addFolder.key;
+  clearTimeout(lookTimer);
+  clearTimeout(signalsTimer);
+  patchAddFolder({ busy: true, error: null });
+  const result = await api().practice_action(cancel ? "cancel" : "finish", key);
+  if (key !== state.addFolder.key) return;
+  if (!result.cleaned) return patchAddFolder({ busy: false, error: result.reason || "Practice cleanup did not finish. Try closing again." });
+  const ids = new Set([...(state.addFolder.practiceState?.proposals || []), ...(state.addFolder.practiceState?.applied || [])].map((p: Json) => p.id));
+  setState((s) => ({ agent: { ...s.agent, staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => !ids.has(id))) } }));
+  if (cancel) setState({ addFolder: closedAddFolder(), practiceResult: null });
+  else {
+    patchAddFolder({ busy: false, step: "done", result, practiceState: null, prompt: "", look: null, job: null });
+    setState({ practiceResult: result });
+  }
+}
+export async function undoPractice(id: string) {
+  const result = await api().practice_action("undo", state.addFolder.key, id);
+  patchAddFolder({ error: result.status === "faulty" ? result.reason : null });
+  await pollFolderSignals();
 }
 /** List a local model server's models (never generates text); shared by setup and Settings → General. */
 export async function checkServer(url: string, model: string): Promise<Json> {
@@ -1008,15 +1593,16 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   const skipped = new Set(draft.skipped);
   const choices: Json = { skipped_steps: [...skipped] };
   if (!skipped.has("blender") && draft.blenderPath) Object.assign(choices, { blender_path: draft.blenderPath, confirm_rerender: draft.confirmRerender });
-  if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, engine_hint: draft.engineHint || null });
+  if (!skipped.has("formats")) Object.assign(choices, { processing_formats: draft.formats, image_formats: draft.imageFormats, engine_hint: draft.engineHint.length ? draft.engineHint : null });
   if (!skipped.has("storage") && draft.budget) choices.storage_budget_gib = draft.budget;
   if (!skipped.has("descriptions"))
     Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
   if (!skipped.has("batch") && setupStepNeeded("batch", draft)) choices.caption_batch_size = draft.batch;
+  if (draft.includeSamples) choices.include_samples = true;  // Decision 0026: the built-in samples, checked by default.
   return choices;
 }
 const STEP_FIELDS: Record<string, (keyof SetupDraft)[]> = {
-  blender: ["blenderPath"], formats: ["formats", "engineHint"], storage: ["budget"],
+  blender: ["blenderPath"], formats: ["formats", "imageFormats", "engineHint"], storage: ["budget"],
   descriptions: ["descriptionsEnabled", "engine", "serverUrl", "serverModel", "searchDevice"], batch: ["batch"],
 };
 /** Which saved values a step shows, for "set by" badges. */
@@ -1037,7 +1623,7 @@ export async function saveSetup() {
   const result = await api().save_setup(baseline ? changedChoices(draft, baseline) : setupChoices());
   patchSetup({ saving: false, ...(result.status === "faulty" ? { error: result.reason } : { result }) });
   if (result.status !== "faulty") {
-    await Promise.all([loadGeneralSettings(), loadSources(), loadSetupState()]);
+    await Promise.all([loadGeneralSettings(), loadSources(), loadSetupState(), loadRenderSettings(), loadBlenderInstallation()]);
     requestAnimationFrame(() => document.getElementById("setup-saved-title")?.focus());
   }
 }
@@ -1050,12 +1636,12 @@ export async function skipSetup() {
 }
 export function finishSetup(next: "sources" | "close") {
   closeSetup();
-  if (next === "sources") navigate({ page: "settings", tab: "asset-sources" });
+  if (next === "sources") navigate({ page: "sources" });
 }
 
 /* ------------------------------- agent setup ------------------------------ */
-// Decision 0016: the backend gates agent writes behind a session only these clicks open,
-// and applies a proposed Blender only on the user's Apply. This presents its state.
+// Decisions 0016 and 0024: agents may apply setup values at any time (labeled and noticed);
+// a proposed Blender applies only on the user's Apply. This presents its state.
 
 export async function loadAgentSetup() {
   const agent = await api().agent_setup_state();
@@ -1063,19 +1649,11 @@ export async function loadAgentSetup() {
   patchSetup({ agent });
   return agent;
 }
-/** The user's gesture: opens a 60-minute session in which agents may apply setup values. */
+/** Show how to connect an agent; there is no session to open (decision 0024). */
 export async function startAgentSetup() {
-  patchSetup({ agentMode: true, agentBusy: "open", error: null });
-  const result = await api().open_agent_setup();
-  patchSetup({ agentBusy: null, ...(result.status === "faulty" ? { error: result.reason } : {}) });
+  patchSetup({ agentMode: true, error: null });
   await loadAgentSetup();
   requestAnimationFrame(() => document.getElementById("agent-setup-title")?.focus());
-}
-export async function endAgentSetup() {
-  patchSetup({ agentBusy: "end" });
-  const result = await api().end_agent_setup();
-  patchSetup({ agentBusy: null, ...(result.status === "faulty" ? { error: result.reason } : {}) });
-  await loadAgentSetup();
 }
 export function leaveAgentSetup() {
   patchSetup({ agentMode: false });
@@ -1087,10 +1665,10 @@ export async function decideProposal(proposal: Json, decision: "apply" | "reject
   patchSetup({ agentBusy: null });
   if (result.status === "faulty") pushToast({ tone: "fault", title: "Proposal not decided", body: result.reason });
   else if (result.status === "applied")
-    pushToast({ tone: "success", title: "Blender applied", body: result.blender?.status === "saved" ? `Saved to ${result.blender.file}. Process assets uses it from its next run.` : "Already the Blender Assetarium uses; nothing was written." });
+    pushToast({ tone: "success", title: "Blender applied", body: result.blender?.status === "saved" ? `Saved to ${result.blender.file}. Make previews and the speed test use it right away.` : "Already the saved Blender; nothing was written." });
   else if (result.status === "failed") pushToast({ tone: "fault", title: "Blender not applied", body: `${result.proposal.reason}. Ask your agent to check it again.` });
   else pushToast({ tone: "info", title: "Proposal rejected", body: "Nothing was saved. Your agent sees that you rejected it." });
-  await Promise.all([loadAgentSetup(), loadSetupState()]);
+  await Promise.all([loadAgentSetup(), loadSetupState(), loadRenderSettings(), loadBlenderInstallation()]);
 }
 /** The final review: the wizard's review step, filled with the values saved now. */
 export async function reviewAgentSetup() {
@@ -1103,12 +1681,44 @@ export async function openAgentSetupFromSettings() {
   await openSetup();
   await startAgentSetup();
 }
-/** Notices of agent setup lead back to the panel; a pending proposal is decided there. */
+/** Notices of agent setup lead back to the panel; a pending proposal is decided there. A finished setup shows its report. */
 export async function openAgentPanel() {
   if (!state.setup.open) await openSetup();
-  patchSetup({ agentMode: true });
   goToSetupStep(0);
-  await loadAgentSetup();
+  const agent = await loadAgentSetup();
+  const pending = (agent?.proposals || []).some((p: Json) => p.state === "pending");
+  patchSetup({ agentMode: pending || !setupDone(state.setup.info) });
+}
+export async function showSetupReport() {
+  const info = await loadSetupState();
+  patchSetup({ agentMode: false, draft: savedDraft(info) });
+  goToSetupStep(0);
+}
+/** Setup ended (an agent's waiting for review, or completed): the first page is the report. */
+export const setupDone = (info: Json | null) => ["review", "completed"].includes(info?.record?.state);
+/** Looks good: the agent's setup is confirmed, then the next step is choosing asset folders. */
+export async function confirmSetupReview() {
+  patchSetup({ saving: true, error: null });
+  const result = await api().confirm_setup_review();
+  patchSetup({ saving: false });
+  if (result.status === "faulty") return patchSetup({ error: result.reason });
+  pushToast({ tone: "success", title: "Setup complete", body: "Add the folders with your asset library to start using Assetarium." });
+  await loadSetupState();
+  finishSetup("sources");
+}
+export async function undoSetupValue(key: string) {
+  const result = await api().undo_setup_value(key);
+  if (result.status === "faulty") return pushToast({ tone: "fault", title: "Not undone", body: result.reason });
+  pushToast({ tone: "info", title: "Undone", body: "The value your agent replaced is back, recorded as yours." });
+  const [info] = await Promise.all([loadSetupState(), loadGeneralSettings()]);
+  patchSetup({ draft: savedDraft(info) });
+}
+/** Change one value from the report: that wizard step, filled with what is saved now; Save records only what changes. */
+export async function changeSetupStep(step: SetupStep) {
+  const info = await loadSetupState();
+  const draft = savedDraft(info);
+  patchSetup({ draft, baseline: draft, result: null, agentMode: false });
+  goToSetupStep(SETUP_STEPS.indexOf(step));
 }
 
 /* -------------------------------- appearance ----------------------------- */
@@ -1160,7 +1770,7 @@ export async function saveNotification(action: string, identifier: string | null
 }
 export function setNotificationsOpen(open: boolean) {
   if (open === state.notificationsOpen) return;
-  setState(open ? { notificationsOpen: true, toasts: [] } : { notificationsOpen: false });
+  setState(open ? { notificationsOpen: true, toasts: [], agent: { ...state.agent, open: false } } : { notificationsOpen: false });
   // Closing the panel marks what was shown as read.
   if (!open && state.notifications.some((item) => !item.read)) void saveNotification("read_all");
 }
@@ -1202,7 +1812,7 @@ export async function notificationAction(action: string, item: Json) {
 }
 export const runningDescriptions = (s: AppState = state) => s.sources.filter(describeActive);
 export const processingAttention = (s: AppState) =>
-  s.sources.some((source) => source.needs_processing || source.scan_fault || operationActive(source.operation));
+  operationActive(s.globalScan) || s.sources.some((source) => source.needs_processing || source.scan_fault || operationActive(source.operation));
 
 /** Work running in the background, for the top-bar activity indicator; `source` opens Asset processing. */
 export interface Activity {
@@ -1211,22 +1821,26 @@ export interface Activity {
   detail: string;
   progress?: number;
   source?: string;
+  metric?: string;
+  progressDetail?: string;
 }
 const OPERATION_VERBS: Record<string, string> = { queued: "Queued", scanning: "Scanning", publishing: "Publishing", cancelling: "Cancelling", verifying: "Verifying" };
 const WORKER_ACTIVITY: Record<string, [string, string]> = {
   loading_libraries: ["Preparing search", "Preparing the search runtime"],
   loading_model: ["Loading search model", "Loading the search model for the first ranked search"],
 };
-export function activities(ready: boolean, sources: Json[], worker: string, previews: number): Activity[] {
+export function activities(ready: boolean, sources: Json[], worker: string, previews: number, globalScan: Json = null): Activity[] {
   const list: Activity[] = [];
+  if (operationActive(globalScan)) sources = [{ key: "__scan__", name: "All library folders", operation: globalScan }, ...sources];
   if (!ready) list.push({ id: "startup", label: "Opening library", detail: "Reading the published library." });
   for (const source of sources) {
     const operation = source.operation;
     if (!operationActive(operation)) continue;
     const verb = operation.operation === "describe" && operation.status !== "cancelling" ? "Describing" : OPERATION_VERBS[operation.status] || "Processing";
-    const counted = operation.total ? ` · ${operation.completed || 0} / ${operation.total}` : "";
-    const progress = ["queued", "scanning"].includes(operation.status) || !operation.progress ? undefined : Math.min(1, operation.progress);
-    list.push({ id: "source:" + source.key, label: verb, detail: `${verb} ${source.name}${counted}`, progress, source: source.key });
+    const measured = progressInfo(operation);
+    list.push({ id: "source:" + source.key, label: verb, detail: `${operation.phase || verb} · ${source.name}`,
+      progress: measured.value === undefined ? undefined : measured.value / 100,
+      metric: measured.label, progressDetail: measured.detail, source: source.key });
   }
   if (WORKER_ACTIVITY[worker]) list.push({ id: "worker", label: WORKER_ACTIVITY[worker][0], detail: WORKER_ACTIVITY[worker][1] });
   if (previews > 0) list.push({ id: "previews", label: "Previews", detail: `Loading ${plural(previews, "preview", "previews")}`, progress: undefined });
@@ -1520,6 +2134,16 @@ export function closeMenu() {
 export function askConfirm(request: ConfirmRequest) {
   setState({ confirm: request, menu: null });
 }
+/** Closing while assets are processing asks first; the backend's closing guard calls this (decision 0023). */
+export function askClose(question: { title: string; body: string }) {
+  askConfirm({ tone: "neutral", title: question.title, body: question.body, confirmLabel: "Stop & close", cancelLabel: "Keep open", icon: "stop",
+    run: () => api().stop_and_close() });
+}
+/** Show the session log a crash's Recent entry names. */
+export async function showLog(name: string) {
+  const result = await api().show_log(name);
+  if (result.status === "faulty") pushToast({ tone: "fault", title: "Log not shown", body: result.reason });
+}
 export function closeConfirm() {
   setState({ confirm: null });
 }
@@ -1546,7 +2170,7 @@ export async function recheckFailures(source: Json) {
     askConfirm({
       tone: "neutral",
       title: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}?`,
-      body: `${count} ${found.retry === 1 ? "asset" : "assets"} in “${source.name}” failed only because a file ${found.retry === 1 ? "it is" : "they are"} not rendered from had a problem (for example ${found.examples.slice(0, 3).join(", ")}). ${found.retry === 1 ? "It" : "They"} can be processed now.${still} Retrying marks them pending; nothing runs until you click Process assets. Other recorded failures stay as they are.`,
+      body: `${count} ${found.retry === 1 ? "asset" : "assets"} in “${source.name}” failed only because a file ${found.retry === 1 ? "it is" : "they are"} not rendered from had a problem (for example ${found.examples.slice(0, 3).join(", ")}). ${found.retry === 1 ? "It" : "They"} can be processed now.${still} Retrying marks them pending; nothing runs until you click Make previews. Other recorded failures stay as they are.`,
       confirmLabel: `Retry ${count} ${found.retry === 1 ? "asset" : "assets"}`,
       run: async () => {
         const result = await api().retry_failures(source.key, found.preview_id);
@@ -1632,6 +2256,122 @@ export async function exportCollection(id: string, kind: "json" | "png" | "md" |
 /* --------------------------------- toasts -------------------------------- */
 
 let toastId = 0;
+/* ----------------------------- agent activity ----------------------------- */
+// Decision 0024: every agent call becomes a line here; rules that need no scan apply at once with Undo,
+// the others wait as proposals for the owner's Apply.
+
+let agentLoading = false;
+export async function loadAgentActivity() {
+  if (agentLoading || !state.api) return;
+  agentLoading = true;
+  try {
+    const result = await api().agent_activity(state.agent.lastUtc);
+    if (result.status === "faulty") return;
+    const known = new Set(state.agent.entries.map((e: Json) => e.utc + e.run));
+    const fresh: Json[] = result.entries.filter((e: Json) => !known.has(e.utc + e.run));
+    // The open drawer, or the wizard's take-over, already shows these lines.
+    if (state.agent.loaded && !state.agent.open && !(state.addFolder.open && state.addFolder.step === "agent")) {
+      for (const entry of fresh.filter((e) => e.kind === "change" && e.proposal_id))
+        pushToast({ tone: "info", title: "Your agent changed a pack", body: entry.text, actions: [{ label: "Undo", run: () => void decideAgentProposal(entry.proposal_id, "undo") }] });
+      // Design principle P1: several proposals arriving together make one notice, not one each.
+      const waiting = fresh.filter((e) => e.kind === "waiting" && e.proposal_id);
+      if (waiting.length)
+        pushToast({ tone: "info", title: waiting.length === 1 ? "Your agent proposes a change" : `Your agent proposes changes for ${waiting.length} packs`,
+          body: waiting.length === 1 ? waiting[0].text : "Review them together and apply them at once.", actions: [{ label: "Review", run: () => setAgentOpen(true) }] });
+    }
+    setState((s) => ({ agent: { ...s.agent, loaded: true, entries: [...s.agent.entries, ...fresh].slice(-200), connected: result.connected,
+      working: result.working, lastUtc: result.last_utc || s.agent.lastUtc, proposals: result.proposals,
+      staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => result.proposals.some((p: Json) => p.id === id)
+        || s.addFolder.practiceState?.proposals?.some((p: Json) => p.id === id))) } }));
+  } finally {
+    agentLoading = false;
+  }
+}
+export function setAgentOpen(open: boolean) {
+  setState((s) => ({ agent: { ...s.agent, open }, ...(open ? { notificationsOpen: false } : {}) }));
+  if (open) void loadAgentActivity();
+}
+/** Apply or reject a waiting proposal, or undo one that was applied. */
+export async function decideAgentProposal(id: string, decision: "apply" | "reject" | "undo") {
+  try {
+    const result = await api().agent_proposal(id, decision);
+    if (result.status === "faulty") throw Error(result.reason);
+    pushToast({ tone: "info", title: decision === "apply" ? `Applied as version ${result.version}.` : decision === "undo" ? "Undone." : "Proposal rejected.",
+      body: result.rescan ? "Scanning again; nothing is rendered or described." : "" });
+    await loadAgentActivity();
+    await loadLibraryTree();
+    if (state.sourcesView.key) void refreshFolder();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: decision === "undo" ? "Not undone" : "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+
+/* Staged review (design principle P1): the owner accepts or rejects rules, possibly across packs at once, then one
+   commit saves every decided proposal of a library folder and scans it once. */
+export type RuleChoice = "accept" | "reject";
+export function stageRules(targets: { id: string; index: number }[], choice: RuleChoice | null) {
+  setState((s) => {
+    const staged = { ...s.agent.staged };
+    for (const { id, index } of targets) {
+      const rules = { ...(staged[id] || {}) };
+      if (choice) rules[index] = choice;
+      else delete rules[index];
+      staged[id] = rules;
+    }
+    return { agent: { ...s.agent, staged } };
+  });
+}
+/** Proposals whose every rule has a choice, as bridge decisions: all rejected → reject, else apply without the rejected ones. */
+export function stagedDecisions(proposals: Json[], staged: Record<string, Record<number, RuleChoice>>) {
+  return proposals.flatMap((p) => {
+    const choices = staged[p.id] || {};
+    const count = (p.rules || []).length;
+    if (!count || Object.keys(choices).length < count) return [];
+    const leaveOut = Object.entries(choices).filter(([, c]) => c === "reject").map(([i]) => Number(i));
+    return [leaveOut.length === count ? { id: p.id, decision: "reject" } : { id: p.id, decision: "apply", ...(leaveOut.length ? { leave_out: leaveOut } : {}) }];
+  });
+}
+export async function previewStaged(decisions: Json[]) {
+  try {
+    if (state.addFolder.practice && decisions.every((d) => state.addFolder.practiceState?.proposals?.some((p: Json) => p.id === d.id)))
+      return await api().practice_action("preview", state.addFolder.key, decisions);
+    return await api().agent_proposals_preview(decisions);
+  } catch (error) {
+    return { status: "faulty", reason: (error as Error).message };
+  }
+}
+export async function commitStaged(folder: string, decisions: Json[]) {
+  setState((s) => ({ agent: { ...s.agent, committing: folder } }));
+  try {
+    if (state.addFolder.practice && folder === state.addFolder.key) {
+      const result = await api().practice_action("commit", folder, decisions);
+      if (result.status === "faulty" && !result.faults) throw Error(result.reason);
+      patchAddFolder({ error: result.faults?.map((f: Json) => f.reason).join(" · ") || null });
+      await pollFolderSignals();
+      return result;
+    }
+    const result = await api().agent_proposals_commit(decisions);
+    if (result.status === "faulty" && !result.faults) throw Error(result.reason);
+    const applied = result.decided.filter((d: Json) => d.state === "applied").length;
+    const rejected = result.decided.length - applied;
+    if (result.decided.length)
+      pushToast({ tone: "success", title: [applied && `Applied to ${plural(applied, "pack", "packs")}`, rejected && `${plural(rejected, "pack", "packs")} rejected`].filter(Boolean).join(" · "),
+        body: result.rescan.length ? "Scanning the library folder once; nothing is rendered or described." : "" });
+    for (const fault of result.faults)
+      pushToast({ tone: "fault", title: "Not saved", body: `${state.agent.proposals.find((p: Json) => p.id === fault.id)?.pack || "A proposal"}: ${fault.reason}. It still waits for you.` });
+    await loadAgentActivity();
+    await loadLibraryTree();
+    if (state.sourcesView.key) void refreshFolder();
+    return result;
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not saved", body: (error as Error).message });
+    return { status: "faulty", reason: (error as Error).message };
+  } finally {
+    setState((s) => ({ agent: { ...s.agent, committing: null } }));
+  }
+}
 export function pushToast(toast: Omit<Toast, "id">) {
   const id = ++toastId;
   setState((s) => ({ toasts: [...s.toasts, { ...toast, id }].slice(-3) }));
@@ -1655,6 +2395,7 @@ async function watchChanges() {
     Object.assign(tokens, { library: first.library, sources: first.sources, collections: first.collections, agent: first.agent });
     setState({ worker: first.worker });
   }
+  void loadAgentActivity();
   // One cheap stat-only poll; library and source data reload only when their token changes.
   setInterval(async () => {
     if (checking) return;
@@ -1670,7 +2411,8 @@ async function watchChanges() {
       const agentChanged = next.agent !== tokens.agent;
       Object.assign(tokens, { library: next.library, sources: next.sources, collections: next.collections, agent: next.agent });
       // Agent setup steps, proposals and connections appear live while the panel is open.
-      if (agentChanged && state.setup.open && state.setup.agentMode) void loadAgentSetup();
+      if (agentChanged && state.setup.open) void followAgentSetup();
+      if (agentChanged || state.agent.working || state.agent.open) void loadAgentActivity();
       if (libraryChanged) await refreshContext();
       // Agent edits (and this window's own saves) reach the collection views here.
       if (collectionsChanged || (libraryChanged && route().page === "collection")) {
@@ -1678,12 +2420,29 @@ async function watchChanges() {
         await refreshCollections();
       }
       // Running operations also report worker liveness, which is not a file change.
-      if (sourcesChanged || state.sources.some((source) => operationActive(source.operation))) await loadSources();
+      if (sourcesChanged || operationActive(state.globalScan) || state.sources.some((source) => operationActive(source.operation))) await loadSources();
+      // The tree and the shown folder follow scans and processing; the rail's folder dot follows the tree.
+      if (sourcesChanged) {
+        await loadLibraryTree();
+        const s = state.sourcesView;
+        if (route().page === "sources" && s.key && !state.source.loading) void refreshFolder();
+      }
       if (route().page === "settings" && (sourcesChanged || operationActive(state.render.values?.operation))) void loadRenderSettings();
     } finally {
       checking = false;
     }
   }, 1500);
+}
+
+/** While setup is open, the agent's values, proposals and its finish appear live; finishing shows the report. */
+async function followAgentSetup() {
+  const before = state.setup.info?.record?.state;
+  const [info] = await Promise.all([loadSetupState(), state.setup.agentMode ? loadAgentSetup() : null]);
+  const pending = (state.setup.agent?.proposals || []).some((p: Json) => p.state === "pending");
+  if (info.record?.state === "review" && before !== "review" && !pending) {
+    patchSetup({ agentMode: false, draft: savedDraft(info), baseline: null, result: null });
+    goToSetupStep(0);
+  }
 }
 
 /* --------------------------------- startup ------------------------------- */
@@ -1697,9 +2456,11 @@ export async function start(bridge: Bridge) {
     patchGrid("library", { version: context.generation });
     renderCoverage(context);
     await loadSources();
+    void loadLibraryTree();
     void watchChanges();
-    // Setup opens by itself only on a genuinely fresh install (setup_core.first_run).
-    void loadSetupState().then((info) => info.auto_open && openSetup()).catch(() => undefined);
+    void loadQueue();  // Work stopped when the app last closed shows its Continue banner at once.
+    // Setup opens by itself only on a genuinely fresh install (setup_core.first_run), or to show an agent's setup for review.
+    void loadSetupState().then((info) => (info.auto_open || info.record?.state === "review") && openSetup()).catch(() => undefined);
     if (context.managed_sources) await sourceAction("scan");
   } catch (error) {
     setState({ startupError: (error as Error).message, ready: true });

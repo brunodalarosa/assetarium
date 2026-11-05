@@ -1,14 +1,15 @@
-import { ArrowLeft, ArrowRight, Bell, House, LayoutGrid, PanelRight, Pencil, Settings, Workflow } from "lucide-react";
-import { motion } from "motion/react";
+import { ArrowLeft, ArrowRight, Bell, Folder, House, LayoutGrid, PanelRight, Pause, Pencil, Play, Settings, Workflow } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/beui/tooltip";
 import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import { plural } from "../app/format";
-import { goBack, goForward, navigate, type Page, processingAttention, setInspectorOpen, setNotificationsOpen, updateCollection, useApp } from "../app/store";
+import { goBack, goForward, navigate, type Page, processingAttention, queueControl, setInspectorOpen, setNotificationsOpen, updateCollection, useApp } from "../app/store";
 import { ActivityIndicator } from "./Activity";
+import { AgentButton } from "./AgentActivity";
 import { Skeleton } from "./Loading";
-import { IconButton } from "./primitives";
+import { Button, IconButton } from "./primitives";
 
 const NAV: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "home", label: "Home", icon: <House className="size-5" strokeWidth={1.75} /> },
@@ -18,7 +19,7 @@ const NAV: { page: Page; label: string; icon: ReactNode }[] = [
 
 function RailItem({ page, label, icon, dot }: { page: Page; label: string; icon: ReactNode; dot?: boolean }) {
   const current = useApp((s) => s.history[s.historyIndex].page);
-  const active = current === page || (page === "settings" && current === "source") || (page === "collections" && current === "collection");
+  const active = current === page || (page === "collections" && current === "collection");
   return (
     <Tooltip content={label} side="right" delay={250}>
       <button
@@ -41,6 +42,8 @@ export function Rail() {
   const canBack = useApp((s) => s.historyIndex > 0);
   const canForward = useApp((s) => s.historyIndex < s.history.length - 1);
   const attention = useApp(processingAttention);
+  // The folder dot means the owner must act (offline, an answer to give, files missing, a migration); work has its own dot.
+  const owner = useApp((s) => Boolean(s.sourcesView.tree?.attention));
   return (
     <nav aria-label="Main" className="flex w-24 shrink-0 flex-col items-center bg-rail pt-4 pb-5">
       <div className="flex gap-1">
@@ -54,7 +57,8 @@ export function Rail() {
       <div className="mt-8 flex flex-col items-center gap-4">
         {NAV.map((item) => <RailItem key={item.page} {...item} dot={item.page === "processing" && attention} />)}
       </div>
-      <div className="mt-auto">
+      <div className="mt-auto flex flex-col items-center gap-4">
+        <RailItem page="sources" label="Library" icon={<Folder className="size-5" strokeWidth={1.75} />} dot={owner} />
         <RailItem page="settings" label="Settings" icon={<Settings className="size-5" strokeWidth={1.75} />} />
       </div>
     </nav>
@@ -140,6 +144,7 @@ export function TopBar() {
       <TopTitle />
       <div className="flex items-center gap-3">
         <ActivityIndicator />
+        <AgentButton />
         <IconButton
           id="open-notifications"
           label={label}
@@ -158,5 +163,25 @@ export function TopBar() {
         </IconButton>
       </div>
     </header>
+  );
+}
+
+/** Work stopped when the app last closed: one quiet line on every page until Continue (decision 0023). */
+export function StoppedBanner() {
+  const count = useApp((s) => (s.queue?.paused && s.queue?.stopped_on_close) || 0);
+  const page = useApp((s) => s.history[s.historyIndex].page);
+  const reduce = useReducedMotion();
+  return (
+    <AnimatePresence initial={false}>
+      {count > 0 && page !== "processing" && (
+        <motion.div id="stopped-banner" role="status" initial={reduce ? false : { opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+          className="mx-8 mb-2 flex flex-wrap items-center gap-3 rounded-xl bg-accent-soft px-4 py-2 text-[13px] text-accent-soft-foreground">
+          <Pause className="size-3.5 shrink-0" aria-hidden />
+          <span className="mr-auto">{plural(count, "item", "items")} stopped when you closed Assetarium</span>
+          <Button variant="quiet" className="h-7 px-2" onClick={() => navigate({ page: "processing" })}>Show</Button>
+          <Button id="continue-stopped" className="h-7 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />Continue</Button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

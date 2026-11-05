@@ -1,7 +1,7 @@
 # Assetarium desktop interface (`frontend/`)
 
 The desktop app's UI: React 19, TypeScript, Vite, Tailwind v4, `motion`, Lucide
-icons and the Geist font ([decision 0011](../docs/decisions/0011-react-desktop-ui.md)).
+icons and the Geist font ([decision 0011](../Assetarium%20KnowledgeBase/Decisions/0011-react-desktop-ui.md)).
 `npm run build` type-checks and writes one script and one stylesheet to
 `src/local_asset_library/ui/build/`. That bundle is committed: the app
 (`desktop.create_window`) inlines it into `ui/index.html` together with
@@ -30,8 +30,8 @@ Commit `src/local_asset_library/ui/build/` with every source change; the encodin
 - `src/app/api.ts`, `src/app/format.ts`: bridge types and presentation helpers.
 - `src/ui/`: shell (rail, top bar), search and filters, asset grid, inspection
   sidebar, image viewer, notifications, toasts and run reports.
-- `src/pages/`: Home, Collections and a collection, Asset processing, Settings,
-  source browser, the Library placeholder. `src/ui/Menus.tsx` holds the shared
+- `src/pages/`: Home, Collections and a collection, Asset sources (`FolderTree`, `FolderPanel`
+  in `src/ui/`), Asset processing (the queue), Settings, the Library placeholder. `src/ui/Menus.tsx` holds the shared
   right-click menu (beUI context menu) with its collection flyout, the red
   deletion confirmation, the new-collection dialog and the batch-selection bar.
 - `src/components/beui/`, `src/lib/`: [beUI](https://beui.dev) components and

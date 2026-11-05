@@ -2,7 +2,8 @@
 
 Phase "fresh": an empty project with the shipped example config opens setup by itself; every step,
 Back/Next/Skip, arrow keys and focus, a failing and a passing Blender check, a fake local model
-server, Save and Skip. Phase "existing" (a child process): an install with sources is not
+server, Save (which writes the discovered Blender, so the speed test can start without a restart)
+and Skip; Settings → Blender installation shows it saved. Phase "existing" (a child process): an install with sources is not
 interrupted; Run setup pre-fills; changing Blender asks to confirm re-rendering; descriptions off
 removes Generate descriptions. Writes data/gui/<run-name>/report.json and screenshots.
 """
@@ -35,13 +36,14 @@ OUT = ROOT / 'data/gui' / args.run_name
 FIXTURE = ROOT / 'scratch' / args.run_name / args.phase
 OUT.mkdir(parents=True, exist_ok=args.phase == 'existing')
 FIXTURE.mkdir(parents=True, exist_ok=False)
+shutil.copytree(ROOT / 'samples', FIXTURE / 'samples')  # The built-in samples, as a fresh clone has them (decision 0026).
 os.environ.update(PYTHONNET_RUNTIME='netfx', TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
 report = {'status': 'running', 'phase': args.phase, 'checks': {}, 'screenshots': [], 'synthetic_only': True,
           'owner_visual_review': 'pending', 'real_model_load': False}
 probes = []
 real_probe = setup_core._probe
 setup_core._probe = lambda *a: probes.append(a[0][0]) or real_probe(*a)  # Counts every program setup runs.
-STEPS = ['welcome', 'blender', 'formats', 'storage', 'descriptions', 'batch', 'review']
+STEPS = ['welcome', 'blender', 'formats', 'storage', 'descriptions', 'batch', 'agent', 'practice', 'review']
 BLENDER = setup_core.blender_report  # noqa: F841 (discovery is the app's own)
 
 if args.phase == 'fresh':
@@ -123,8 +125,8 @@ def fresh():
     if found:
         ui.js(f"(async()=>{{lal.updateSetupDraft({{blenderPath:{json.dumps(found[0])}}});await frame();$('setup-check-blender').click();return true}})()")
         wait("lal.state.setup.check&&!lal.state.setup.checking&&lal.state.setup.check.path===lal.state.setup.draft.blenderPath", 180)
-        ui.check('installed_blender_passes_and_writes_nothing', """(async()=>({passed:['passed','warning'].includes(lal.state.setup.check.status),
-          checks:lal.state.setup.check.checks.length===4, unchanged:lal.state.setup.check.change==='unchanged'}))()""")
+        ui.check('discovered_blender_passes_and_will_be_saved', """(async()=>({passed:['passed','warning'].includes(lal.state.setup.check.status),
+          checks:lal.state.setup.check.checks.length===4, write:lal.state.setup.check.change==='write'}))()""")
         shoot('01-blender-ready')
     # Arrow keys move within a radio-card group, like native radios.
     ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='formats');await frame();"
@@ -171,7 +173,13 @@ def fresh():
               "await until(()=>$('setup-server-result').classList.contains('text-fault'));return true})()")
         ui.check('other_computers_are_refused', "$('setup-server-result').textContent.includes('this computer')")
         ui.js(f"(async()=>{{type('setup-server-url',{json.dumps(url)});await frame();lal.setupNext();"
-              "await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
+              "await until(()=>$('setup-wizard').dataset.step==='agent');await until(()=>$('setup-agent-connect'));await frame();return true})()")
+        ui.check('connect_agent_step_offers_configurations_and_is_skippable', """(async()=>({snippet:!!$('agent-snippet'),
+          copy:!!$('agent-copy-snippet'), skip:!!$('setup-skip-step')}))()""")
+        shoot('04b-connect-agent')
+        ui.js("(async()=>{lal.setupNext(true);await until(()=>$('setup-wizard').dataset.step==='practice');await frame();return true})()")
+        ui.check('agent_practice_step_is_offered_and_skippable', "!!$('setup-try-agent')&&!!$('setup-skip-step')")
+        ui.js("(async()=>{lal.setupNext(true);await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
         ui.check('batch_step_not_needed_for_a_server', """(async()=>({skippedOver:$('setup-wizard').dataset.step==='review',
           listed:document.querySelector('nav [data-step=batch]').textContent.includes('Not needed')}))()""")
         shoot('06-review-server')
@@ -181,7 +189,10 @@ def fresh():
       measured:document.body.innerText.includes('RTX 5070 (12 GiB)')}))()""")
     ui.js("(async()=>{$('setup-batch').querySelector('[data-value=\"4\"]').click();await frame();return true})()")
     shoot('05-batch')
-    ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
+    ui.js("(async()=>{lal.setupNext();await until(()=>$('setup-wizard').dataset.step==='agent');lal.setupNext(true);"
+            "await until(()=>$('setup-wizard').dataset.step==='practice');lal.setupNext(true);"
+          "await until(()=>$('setup-wizard').dataset.step==='review');await frame();return true})()")
+    ui.check('samples_are_offered_and_checked_by_default', "$('setup-include-samples').getAttribute('aria-checked')==='true'||$('setup-include-samples').checked===true")
     shoot('06-review')
     assert not (FIXTURE / 'data/library/settings.json').exists()  # Nothing is saved before Save.
     ui.js("$('setup-save').click()")
@@ -191,13 +202,42 @@ def fresh():
     assert settings['processing_formats'] == ['fbx', 'gltf', 'obj'] and settings['caption_batch_size'] == 4
     assert settings['description_engine'] == 'builtin' and settings['descriptions_enabled'] is True
     assert record['state'] == 'completed' and record['by'] == 'user' and record['values']['caption_batch_size']['set_by'] == 'user'
-    assert not (FIXTURE / 'config.local.toml').exists()  # The discovered Blender needs no configuration write.
-    report['checks']['save_writes_settings_and_setup_record_only'] = True
+    if found:  # A discovered Blender is saved: the speed test and render pool use the saved one only.
+        assert setup_core.configured_blender(config)[1] == found[0] and record['values']['blender']['set_by'] == 'user'
+        ui.check('saved_blender_is_reported', "$('setup-blender-result').textContent.includes('saved to config.local.toml')")
+    else:
+        assert not (FIXTURE / 'config.local.toml').exists()
+    report['checks']['save_writes_settings_setup_record_and_blender'] = True
+    from local_asset_library.sources import registry, samples_folder
+    assert any(Path(s['path']) == samples_folder(config) for s in registry(config)['sources'])
+    ui.check('saved_samples_are_reported', "$('setup-samples-result').textContent.includes('blue cube')")
+    wait("$('setup-search-check')&&$('setup-search-check').dataset.state!=='starting'", 30)
+    ui.check('search_check_says_what_it_needs_without_a_command', """(async()=>({state:$('setup-search-check').dataset.state,
+      noCommand:!$('setup-search-check').querySelector('code')}))()""")
     shoot('07-saved')
-    ui.js("(async()=>{$('setup-go-sources').click();await until(()=>!$('setup-wizard')&&$('asset-sources-panel')&&!$('asset-sources-panel').hidden);return true})()")
-    ui.check('next_step_opens_asset_sources', "$('nav-settings').closest('[inert]')===null")
+    ui.js("(async()=>{$('setup-go-sources').click();await until(()=>!$('setup-wizard')&&$('sources-view'));return true})()")
+    ui.check('next_step_opens_asset_sources', "$('nav-sources').closest('[inert]')===null&&$('nav-sources').getAttribute('aria-current')==='page'")
+    if found:  # The app was launched without a saved Blender; no restart is needed for the speed test.
+        ui.js("(async()=>{lal.navigate({page:'settings',tab:'general'});await until(()=>$('blender-status')&&$('render-test-start')"
+              "&&lal.state.render.values&&lal.state.render.values.blender);await frame();return true})()")
+        ui.check('settings_shows_saved_blender_and_speed_test_is_available', """(async()=>({saved:$('blender-status').dataset.status==='Saved',
+          path:$('blender-status').textContent.includes(%s), closed:!$('settings-blender-choice'),
+          test:!$('render-test-start').disabled}))()""" % json.dumps(found[0]))
+        ui.js("(async()=>{$('blender-card').scrollIntoView({block:'start'});await frame();return true})()")
+        shoot('07b-settings-blender-saved')
+        ui.js("(async()=>{$('change-blender').click();await until(()=>$('settings-blender-choice'));await frame();return true})()")
+        ui.check('change_blender_opens_the_picker_with_a_way_back', "!!$('keep-blender')&&!$('change-blender')")
+        ui.js("(async()=>{$('keep-blender').click();await until(()=>!$('settings-blender-choice'));return true})()")
     ui.js("(async()=>{await lal.loadSetupState();return true})()")
     ui.check('does_not_reopen_after_saving', "lal.state.setup.info.auto_open===false")
+    # A completed setup reopens on its summary (every value with its source), not on the two paths.
+    ui.js("(async()=>{await lal.openSetup();await until(()=>$('setup-report'));await frame();return true})()")
+    ui.check('completed_setup_reopens_on_its_summary', """(async()=>({state:$('setup-report').dataset.state==='completed',
+      title:$('setup-step-title').textContent.includes('Setup complete'), source:$('setup-report-rows').textContent.includes('Set by you'),
+      noSkip:!$('setup-skip-all'), startOver:!!$('setup-report-manual')&&!!$('setup-report-agent')}))()""")
+    shoot('07c-summary')
+    ui.js("(async()=>{lal.closeSetup();return true})()")
+    (FIXTURE / 'data/library/setup.json').unlink()  # As on a computer whose setup was never recorded: Skip setup is offered.
     ui.js("(async()=>{await lal.openSetup();await until(()=>$('setup-skip-all'));$('setup-skip-all').click();await until(()=>!$('setup-wizard'));return true})()")
     assert json.loads((FIXTURE / 'data/library/setup.json').read_text(encoding='utf-8'))['state'] == 'skipped'
     assert json.loads((FIXTURE / 'data/library/settings.json').read_text(encoding='utf-8')) == settings
@@ -213,8 +253,13 @@ def existing():
     ui.wait_ready(extra='lal.state.sources.length===2')
     ui.js("(async()=>{await lal.loadSetupState();await frame();return true})()")
     ui.check('existing_install_is_not_interrupted', "!$('setup-wizard')&&lal.state.setup.info.auto_open===false")
-    ui.js("(async()=>{$('nav-settings').click();await until(()=>$('setup-card')&&$('descriptions-card')&&lal.state.general.values);await frame();return true})()")
+    ui.js("(async()=>{$('nav-settings').click();await until(()=>$('setup-card')&&$('descriptions-card')&&lal.state.general.values&&$('blender-status'));await frame();return true})()")
+    ui.check('settings_explains_missing_blender_with_the_picker_open', """(async()=>({missing:$('blender-status').dataset.status==='Missing',
+      explained:$('blender-card').textContent.includes('no longer exists'), picker:!!$('settings-blender-choice')&&!!$('settings-check-blender'),
+      noKeep:!$('keep-blender')}))()""")
     shoot('10-settings-general')
+    ui.js("(async()=>{$('blender-card').scrollIntoView({block:'start'});await frame();return true})()")
+    shoot('10b-settings-blender-missing')
     ui.js("(async()=>{$('run-setup').click();await until(()=>$('setup-wizard')&&!lal.state.setup.loading);return true})()")
     ui.check('run_setup_prefills_current_values', """(async()=>({budget:lal.state.setup.draft.budget==='40',
       formats:lal.state.setup.draft.formats.join()==='gltf,obj', batch:lal.state.setup.draft.batch==='4'}))()""")
@@ -244,16 +289,18 @@ def existing():
     if found:
         assert setup_core.configured_blender(config)[1] == found[0]
         report['checks']['confirmed_blender_saved_to_config_local'] = True
+        wait("lal.state.blender.report&&lal.state.blender.report.configured===%s" % json.dumps(found[0]))
+        ui.check('settings_card_follows_the_wizard_save', "!lal.state.blender.editing&&lal.state.blender.path===%s" % json.dumps(found[0]))
     ui.js("(async()=>{$('setup-close').click();await until(()=>!$('setup-wizard'));$('nav-processing').click();"
-          "await until(()=>document.querySelector('.source-descriptions-off'));await frame();return true})()")
-    ui.check('descriptions_off_removes_generate_descriptions', """(async()=>({noButton:!document.querySelector('[data-action=describe]'),
-      link:!!document.querySelector('[data-action=description-settings]'), backend:bridge_refuses}))()""".replace(
-        'bridge_refuses', 'true'))
+          "await until(()=>$('processing-view')&&lal.state.queue);await frame();return true})()")
     one = ui.js("lal.state.sources[0].key")
+    # Descriptions off (decision 0008): nothing offers Generate descriptions, and the queue refuses it with the reason.
+    queued = ui.js(f"lal.state.api.queue_add('descriptions',{{key:{json.dumps(one)}}},false)")
+    assert queued['status'] == 'faulty' and 'turned off' in queued['reason'], queued
+    ui.check('descriptions_off_removes_generate_descriptions', "!document.querySelector('[data-action=describe]')")
     refused = bridge.source_action('describe', one)
     assert refused['status'] == 'faulty' and 'turned off' in refused['reason'], refused
     report['checks']['backend_refuses_describe_when_off'] = True
-    ui.js("(async()=>{document.querySelector('.source-descriptions-off').scrollIntoView({block:'center'});await frame();return true})()")
     shoot('13-processing-descriptions-off')
 
 

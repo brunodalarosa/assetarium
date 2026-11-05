@@ -1,21 +1,12 @@
 import { Bot, Check, CircleAlert, Copy, PlugZap, Wrench } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { formatLabel, plural } from "../app/format";
-import { copyText, decideProposal, endAgentSetup, leaveAgentSetup, reviewAgentSetup, startAgentSetup, useApp } from "../app/store";
+import { copyText, decideProposal, leaveAgentSetup, loadAgentSetup, reviewAgentSetup, setupDone, showSetupReport, startAgentSetup, useApp } from "../app/store";
+import { CommandBlock } from "./CommandBlock";
 import { Badge, Banner, Button, Card, Spinner } from "./primitives";
-
-/** Re-renders on an interval so the session countdown stays current without polling the backend. */
-function useNow(ms: number) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), ms);
-    return () => clearInterval(timer);
-  }, [ms]);
-  return now;
-}
 
 export function SetByBadge({ entry }: { entry: Json | undefined }) {
   if (!entry) return null;
@@ -38,7 +29,7 @@ function PathCard({ icon, title, body, action }: { icon: ReactNode; title: strin
   );
 }
 
-/** Two equal ways to set up; choosing the agent opens the session (the user gesture the backend requires). */
+/** Two equal ways to set up; a connected agent may set things up at any time (decision 0024), so nothing opens here. */
 export function SetupPaths() {
   const busy = useApp((s) => s.setup.agentBusy);
   return (
@@ -53,8 +44,7 @@ export function SetupPaths() {
   );
 }
 
-function Snippets({ snippets }: { snippets: Json[] }) {
-  const [client, setClient] = useState(snippets[0]?.id);
+export function Snippets({ snippets, client, setClient }: { snippets: Json[]; client: string | undefined; setClient: (id: string) => void }) {
   const current = snippets.find((item) => item.id === client) || snippets[0];
   return (
     <div className="grid gap-3">
@@ -75,7 +65,73 @@ function Snippets({ snippets }: { snippets: Json[] }) {
   );
 }
 
-function ConnectionLine({ connections }: { connections: Json[] }) {
+const PROBLEM: Record<string, string> = {
+  missing: "starts a copy of Assetarium that no longer exists, so it cannot connect:",
+  other_checkout: "starts a different copy of Assetarium, so setup would change that copy:",
+};
+
+/** The connected agent's own entry (by the name it sent when connecting), so other agents' problems can stay secondary. */
+const connectedClients = (agent: Json): string[] =>
+  (agent.connections || []).filter((item: Json) => item.mode === "normal").map((item: Json) => String(item.client?.name || "").toLowerCase()).filter(Boolean);
+const isConnected = (client: string, names: string[]) => names.some((name) => name.includes(client.split("-")[0]));
+
+function Problem({ item, onShow }: { item: Json; onShow: (client: string) => void }) {
+  return (
+    <div className="agent-registration" data-client={item.client} data-state={item.state}>
+      <Banner tone="warning" role="status" className="grid gap-2">
+        <span>
+          <span className="font-medium">{item.label}{item.scope === "project" ? ` (for ${item.folder})` : ""}</span> {PROBLEM[item.state]}{" "}
+          <span className="break-all font-mono text-[11.5px]">{item.script}</span>
+        </span>
+        {item.scope === "project"
+          ? <CommandBlock command={item.fix} />
+          : <span className="flex flex-wrap items-center gap-3">
+              <span>Replace it with the {item.label} configuration below, then restart {item.label}.</span>
+              <Button variant="secondary" className="agent-registration-show h-8 px-3 text-[12px]" onClick={() => onShow(item.client)}>Show the {item.label} fix</Button>
+            </span>}
+      </Banner>
+    </div>
+  );
+}
+
+/** Agents only report "connection closed" when their entry points at a moved or deleted copy; this says which and how to fix it. */
+function Registrations({ agent, onShow }: { agent: Json; onShow: (client: string) => void }) {
+  const [checking, setChecking] = useState(false);
+  const found: Json[] = agent.registrations || [];
+  const names = connectedClients(agent);
+  const all = found.filter((item) => PROBLEM[item.state]);
+  // While an agent is connected, problems of the other agents are kept apart so they do not compete with it.
+  const problems = names.length ? all.filter((item) => isConnected(item.client, names)) : all;
+  const others = names.length ? all.filter((item) => !isConnected(item.client, names)) : [];
+  const ok = [...new Set(found.filter((item) => item.state === "ok").map((item) => item.label))];
+  const again = async () => {
+    setChecking(true);
+    try { await loadAgentSetup(); } finally { setChecking(false); }
+  };
+  return (
+    <div id="agent-registrations" className="grid gap-3" data-problems={all.length}>
+      {problems.map((item) => <Problem key={item.client + (item.folder || "")} item={item} onShow={onShow} />)}
+      {others.length > 0 && (
+        <details id="agent-registrations-other" className="group rounded-xl bg-surface-2 px-4 py-2.5 text-[12.5px]">
+          <summary className="cursor-pointer text-muted-foreground">Other agents: {plural(others.length, "entry needs", "entries need")} a fix ({[...new Set(others.map((item) => item.label))].join(", ")})</summary>
+          <div className="mt-3 grid gap-3">{others.map((item) => <Problem key={item.client + (item.folder || "")} item={item} onShow={onShow} />)}</div>
+        </details>
+      )}
+      {!problems.length && ok.length > 0 && (
+        <p id="agent-registrations-ok" className="flex items-center gap-2 text-[12.5px] text-success"><Check className="size-3.5" aria-hidden />{ok.join(", ")} {ok.length > 1 ? "start" : "starts"} this copy of Assetarium.</p>
+      )}
+      <p id="agent-registration-note" className="flex flex-wrap items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
+        <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span className="min-w-0 flex-1">{agent.registration_note}</span>
+        <button type="button" id="agent-registrations-check" disabled={checking} className="font-medium text-foreground underline underline-offset-2 disabled:opacity-60" onClick={() => void again()}>
+          {checking ? "Checking…" : "Check again"}
+        </button>
+      </p>
+    </div>
+  );
+}
+
+export function ConnectionLine({ connections, blocked }: { connections: Json[]; blocked: boolean }) {
   const live = connections.filter((item) => item.mode === "normal");
   const degraded = connections.some((item) => item.mode === "setup_only");
   const name = live.map((item) => item.client?.name).find(Boolean);
@@ -87,7 +143,9 @@ function ConnectionLine({ connections }: { connections: Json[] }) {
     );
   return (
     <p id="agent-connection" data-state={degraded ? "setup_only" : "waiting"} role="status" aria-live="polite" className="flex items-center gap-2 text-[13px] text-muted-foreground">
-      <Spinner />{degraded ? "An agent is connected, but Assetarium’s configuration does not load; it can read the fault and the fix." : "Waiting for an agent to connect… Agents start Assetarium’s server themselves when they connect, so restart your agent after adding the configuration."}
+      <Spinner />{degraded ? "An agent is connected, but Assetarium’s configuration does not load; it can read the fault and the fix."
+        : blocked ? "Waiting for an agent to connect… Fix the agent entry shown in step 1 first, then restart your agent."
+        : "Waiting for an agent to connect… Agents start Assetarium’s server themselves when they connect, so restart your agent after adding the configuration."}
     </p>
   );
 }
@@ -103,10 +161,10 @@ function ProposalCard({ proposal }: { proposal: Json }) {
         <span className="break-all font-mono text-[12px]">{proposal.path}</span>
         <span className="text-muted-foreground">, checked as Blender {proposal.version}{proposal.check === "warning" ? " (works; not the tested version)" : ""} with glTF · FBX · OBJ importers.</span>
       </p>
-      <p className="text-[12.5px] text-muted-foreground">Apply checks it again on this computer, then saves it to config.local.toml. Process assets uses it from its next run.</p>
+      <p className="text-[12.5px] text-muted-foreground">Apply checks it again on this computer, then saves it to config.local.toml. Make previews uses it from its next run.</p>
       {proposal.rerender > 0 && (
         <Banner tone="warning" role="status" className="grid gap-3">
-          <span>Changing Blender marks {plural(proposal.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Process assets renders them again.</span>
+          <span>Changing Blender marks {plural(proposal.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Make previews renders them again.</span>
           <Checkbox id={"agent-confirm-" + proposal.id} label="I understand; render them again with this Blender" checked={confirmed} onCheckedChange={setConfirmed} />
         </Banner>
       )}
@@ -161,40 +219,37 @@ function Values({ agent }: { agent: Json }) {
 
 export function AgentPanel() {
   const agent = useApp((s) => s.setup.agent);
-  const busy = useApp((s) => s.setup.agentBusy);
-  const now = useNow(15000);
+  const [client, setClient] = useState<string | undefined>(undefined);
   if (!agent) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Opening agent setup…</p>;
-  const expires = agent.session.expires_utc ? Date.parse(agent.session.expires_utc) : 0;
-  const open = agent.session.open && expires > now;
-  const minutes = Math.max(0, Math.floor((expires - now) / 60000));
   const pending = (agent.proposals || []).filter((item: Json) => item.state === "pending");
-  const finished = agent.record?.state === "completed" && agent.record?.by === "agent";
+  const finished = agent.record?.state === "review" && agent.record?.by === "agent";
+  const done = setupDone({ record: agent.record });
   const anySet = Object.values(agent.set_by || {}).some((entry: Json) => entry.set_by === "agent");
   return (
-    <div id="agent-panel" className="grid gap-5" data-session={open ? "open" : "closed"}>
+    <div id="agent-panel" className="grid gap-5">
       <h2 id="agent-setup-title" tabIndex={-1} className="sr">Set up with your AI agent</h2>
-      <div id="agent-session" role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-surface-2 px-4 py-2.5 text-[12.5px]">
-        {open ? <span><span className="font-medium">Agent setup access is open</span> · {minutes < 1 ? "less than a minute" : plural(minutes, "minute", "minutes")} left</span>
-          : <span><span className="font-medium">Agent setup access has ended.</span> Your agent can still read the setup status but can’t change anything.</span>}
-        {open ? <Button variant="quiet" id="agent-end" className="h-8 px-3 text-[12px]" disabled={busy === "end"} onClick={() => void endAgentSetup()}>End access</Button>
-          : <Button variant="secondary" id="agent-reopen" className="h-8 px-3 text-[12px]" disabled={busy === "open"} onClick={() => void startAgentSetup()}>Open for 60 minutes</Button>}
-      </div>
+      <p id="agent-access" role="status" className="rounded-xl bg-surface-2 px-4 py-2.5 text-[12.5px] leading-relaxed">
+        <span className="font-medium">Your agent can set Assetarium up whenever it is connected.</span> It checks this computer, asks you a few questions and applies the settings, each labeled “Set by agent” and undoable. Which Blender to run is only proposed: you apply it here.
+      </p>
       {pending.map((proposal: Json) => <ProposalCard key={proposal.id} proposal={proposal} />)}
       {finished && (
         <Banner tone="info" role="status" className="flex flex-wrap items-center justify-between gap-3">
-          <span className="flex items-center gap-2"><Check className="size-4 text-success" aria-hidden />Your agent finished setup. Review the choices; you can change any of them.</span>
-          <Button id="agent-review" onClick={() => void reviewAgentSetup()}>Review choices</Button>
+          <span className="flex items-center gap-2"><Check className="size-4 text-success" aria-hidden />Your agent finished setup. Look over its report and confirm it.</span>
+          <Button id="agent-review" onClick={() => void showSetupReport()}>See the report</Button>
         </Banner>
       )}
       <Card title="1 · Add Assetarium to your agent" help="Generated for this computer’s folders. Assetarium’s server runs only while your agent is connected.">
-        <Snippets snippets={agent.snippets} />
+        <Registrations agent={agent} onShow={(id) => { setClient(id); requestAnimationFrame(() => document.getElementById("agent-snippet")?.scrollIntoView({ behavior: "smooth", block: "nearest" })); }} />
+        <Snippets snippets={agent.snippets} client={client} setClient={setClient} />
       </Card>
       <Card title="2 · Ask it to set up Assetarium">
         <p id="agent-prompt" className="rounded-xl bg-surface-2 p-3 text-[12.5px] leading-relaxed select-text">{agent.prompt}</p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary" id="agent-copy-prompt" onClick={() => void copyText(agent.prompt, "Setup prompt copied. Paste it into your agent.")}><Copy className="size-3.5" aria-hidden />Copy setup prompt</Button>
-        </div>
-        <ConnectionLine connections={agent.connections || []} />
+        {!done && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="secondary" id="agent-copy-prompt" onClick={() => void copyText(agent.prompt, "Setup prompt copied. Paste it into your agent.")}><Copy className="size-3.5" aria-hidden />Copy setup prompt</Button>
+          </div>
+        )}
+        <ConnectionLine connections={agent.connections || []} blocked={(agent.registrations || []).some((item: Json) => PROBLEM[item.state])} />
         <p id="agent-privacy" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />Your agent’s model receives this computer’s OS, GPU, free space and Blender paths. If that model runs in the cloud, they leave this computer. Your agent runs install commands only with your permission.
         </p>

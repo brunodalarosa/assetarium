@@ -6,6 +6,7 @@ Blender for the next one, which is not a retry. Texture-repair workers patch the
 at import, so they keep one Blender per job inside the same slots.
 """
 from contextlib import contextmanager
+import logging
 import os
 from pathlib import Path
 import queue
@@ -17,6 +18,8 @@ import time
 from .config import ConfigError
 from .description_engines import EngineStop
 from .publication import atomic_json, read_json
+
+log = logging.getLogger(__name__)
 
 GIB = 1024**3
 MAX_PROCESSES = 8
@@ -211,6 +214,7 @@ class Slot:
                                         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                                         preexec_fn=child_setup if os.name != "nt" else None)
         bind_lifetime(self.process)
+        log.debug('Blender started · pid=%s', self.process.pid)
         self.jobs, self.lines = 0, queue.Queue()
         threading.Thread(target=self.read, args=(self.process.stdout, self.lines), daemon=True).start()
 
@@ -254,12 +258,14 @@ class Slot:
             try:
                 line = self.lines.get(timeout=max(0, deadline - time.monotonic()))
             except queue.Empty:
+                log.warning('Blender job timed out and was stopped · task=%s seconds=%s', Path(str(task)).name, timeout)
                 self.stop(kill=True)
                 return {"returncode": None, "timed_out": True, "output": "".join(output),
                         "elapsed_seconds": round(time.perf_counter() - started, 3)}
             if line is None:
                 process = self.process
                 self.stop()
+                log.warning('Blender exited during a job · task=%s returncode=%s', Path(str(task)).name, process.returncode if process else None)
                 return {"returncode": process.returncode if process else None, "timed_out": False,
                         "output": "".join(output) + "\nBlender exited during this job.\n",
                         "elapsed_seconds": round(time.perf_counter() - started, 3)}

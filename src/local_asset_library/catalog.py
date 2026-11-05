@@ -70,7 +70,7 @@ def parse_record(identifier,pack,name,payload):
             'description':None,'caption_provenance':None,'owner_overlay':{},'license_evidence':[],
             'processing':{'inventory':'failed','inspection':'unknown','previews':'unknown','caption':'unknown','embeddings':'unknown'},
             'metadata_fault':fault,'stage_faults':{'inventory':fault},'inspection_run':{'source_faults':[fault]},
-            'provenance':{},'grouping':{},'variants':[]}
+            'provenance':{},'grouping':{}}
 
 
 def asset_id(pack, identity):
@@ -102,7 +102,7 @@ def excluded_folder(folder, pattern):
     return fnmatchcase(target.casefold(), pattern.casefold())
 
 
-def walk_source(config):
+def walk_source(config, progress=None, phase='Checking files'):
     """Sorted inventory; directory links are visible exclusions, never traversed."""
     if config.sources_registry and not config.source_key:
         from .sources import registry, bound
@@ -111,6 +111,9 @@ def walk_source(config):
     if config.sources_registry and not config.source_root.is_dir():
         raise ConfigError("Asset source directory is unavailable")
     rows = []
+    checked, rejected, reused = 0, 0, 0
+    if progress:
+        progress(dict(phase=phase, completed=0, total=None, unit='files', failed=0, reused=0))
     prefix = config.source_key + "/" if config.source_key else ""
     cached = {}
     cache_path = None
@@ -122,6 +125,7 @@ def walk_source(config):
             cached = read_json(cache_path, SCAN_CACHE_LIMIT).get("files", {})
     next_cache = {}
     from .sources import excluded_folders
+    from .library_migration import LEGACY_METADATA_DIR
     patterns = excluded_folders(config) if config.source_key else []
     def walk_error(exc):
         raise ConfigError("Source directory cannot be scanned: " + str(exc))
@@ -129,14 +133,18 @@ def walk_source(config):
         dirs.sort()
         for name in list(dirs):
             path = Path(directory) / name
-            if name.casefold() == "metadata-lal":
+            if name.casefold() == LEGACY_METADATA_DIR:  # An old generated folder awaiting migration, never originals.
                 dirs.remove(name)
                 continue
             folder = path.relative_to(config.source_root).as_posix()
             if any(excluded_folder(folder, pattern) for pattern in patterns):
                 # Owner-excluded (decision 0019): listed with a file count, never walked further or hashed.
                 dirs.remove(name)
-                count = sum(len(names) for _, _, names in os.walk(path, followlinks=False))
+                count = 0
+                for _, _, names in os.walk(path, followlinks=False):
+                    count += len(names)
+                    if progress:
+                        progress(dict(phase='Counting excluded files', completed=count, total=None, unit='files'))
                 rows.append({"path": prefix + folder, "role": "boundary_exclusion", "status": "excluded_folder",
                              "sha256": None, "size": None, "mtime_ns": None, "excluded_files": count})
                 continue
@@ -156,8 +164,10 @@ def walk_source(config):
                 shared = hash_cache.file_identity(source)
                 if cache_path and previous.get("identity") == identity:
                     row["sha256"] = previous["sha256"]
+                    reused += 1
                 elif known := hash_cache.lookup(source, shared):
                     row["sha256"] = known
+                    reused += 1
                 else:
                     with config.open_source(relative) as stream:
                         row["sha256"] = file_hash(stream)
@@ -171,7 +181,11 @@ def walk_source(config):
                 next_cache[relative] = {"identity": identity, "sha256": row["sha256"]}
             except (ConfigError, OSError) as exc:
                 row.update(status="rejected", error=str(exc), sha256=None, size=None, mtime_ns=None)
+                rejected += 1
             rows.append(row)
+            checked += 1
+            if progress:
+                progress(dict(phase=phase, completed=checked, total=None, unit='files', failed=rejected, reused=reused))
     if cache_path and next_cache != cached:
         from .publication import atomic_json
         atomic_json(cache_path, {"files": next_cache})
@@ -562,9 +576,12 @@ def relevant_license_evidence(record):
              and any(PurePosixPath(entry['path']).parent in model.parents for model in models))]
 
 
-def build_inventory(config, suggestions=None):
-    """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``."""
-    rows = walk_source(config)
+def build_inventory(config, suggestions=None, previous=(), progress=None):
+    """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``.
+
+    ``previous`` are the folder's last records, whose Blender texture lists and pixel evidence classify images.
+    """
+    rows = walk_source(config, progress) if progress else walk_source(config)
     from .sources import export_decisions
     decisions = export_decisions(config) if config.source_key else []
     from .dependency_resolution import SharedDependencies
@@ -573,13 +590,6 @@ def build_inventory(config, suggestions=None):
     for row in rows:
         if row["role"] != "boundary_exclusion":
             row["role"] = classify(row["path"])
-    from .sources import import_formats
-    allowed = import_formats(config)
-    from .settings import format_group
-    if allowed is not None:
-        for row in rows:
-            if row['role'] in {'model', 'unsupported_candidate'} and format_group(PurePosixPath(row['path']).suffix[1:].lower()) not in allowed:
-                row['role'] = 'excluded_import_format'
     packs = sorted({row["path"].split("/")[0] for row in rows
                     if "/" in row["path"] and row["role"] in {"model", "unsupported_candidate"}})
     assets, ambiguities = [], []
@@ -590,6 +600,10 @@ def build_inventory(config, suggestions=None):
         if row["role"] == "individual_preview" and row["status"] == "available":
             p = PurePosixPath(row["path"])
             previews_by_name[(p.parts[0], p.stem)].append((position, row))
+    model_total = sum(row['role'] in {'model', 'unsupported_candidate'} for row in rows)
+    model_done = 0
+    if progress:
+        progress(dict(phase='Recognizing 3D assets', completed=0, total=model_total, unit='files'))
     for pack in packs:
         candidates = [row for row in rows if row["path"].startswith(pack + "/") and row["role"] in {"model", "unsupported_candidate"}]
         license_rows = license_evidence(config, pack, inventory)
@@ -601,7 +615,7 @@ def build_inventory(config, suggestions=None):
                      "files": [{"path": f["path"], "format": PurePosixPath(f["path"]).suffix[1:].lower(),
                                 "sha256": f["sha256"], "availability": f["status"]} for f in files],
                      "grouping": {"evidence": [grouping], "unresolved_ambiguities": [], "geometry_equivalence": "unverified"},
-                     "dependencies": [], "dependency_inspection": [], "previews": [], "variants": [],
+                     "dependencies": [], "dependency_inspection": [], "previews": [],
                      "technical": None, "description": None, "caption_provenance": None, "embeddings": [],
                      "owner_overlay": {}, "license_evidence": license_rows,
                      "processing": {"inventory": "complete", "inspection": "pending", "previews": "pending",
@@ -649,12 +663,15 @@ def build_inventory(config, suggestions=None):
                                               "origin": "supplied", "association": "exact stem with directional suffix in Isometric layout" if directional else "exact stem under pack preview layout"})
             asset["provenance"]["inventory_fingerprint"] = digest(asset["files"])
             assets.append(asset)
-    from .sources import import_types
-    if 'image' in import_types(config):
-        from .image_catalog import image_assets
-        licenses = {}
-        assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
-            pack, license_evidence(config, pack, inventory))))
+            model_done += len(files)
+            if progress:
+                progress(dict(phase='Recognizing 3D assets', completed=model_done, total=model_total, unit='files'))
+    from .image_catalog import image_assets
+    from .sources import folder_answers
+    licenses = {}
+    assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
+        pack, license_evidence(config, pack, inventory)), previous, folder_answers(config),
+        **({'progress': progress} if progress else {})))
     # Never merge remaining same names; report within-pack collisions and cross-pack repeated names.
     by_name = defaultdict(list)
     for asset in assets:
@@ -666,21 +683,6 @@ def build_inventory(config, suggestions=None):
             ambiguities.append(case)
             for asset in matching:
                 asset["grouping"]["unresolved_ambiguities"].append(case)
-    # Variants are filename suggestions, not verified visual relationships, and never merged.
-    # Models by (pack, export anchor, name prefix), so each asset reads its own group instead of all assets.
-    variant_key = lambda a: (a["pack_id"], a["grouping"]["evidence"][0].get("anchor"), re.split(r"[-_]", a["display_name"])[0].casefold())
-    by_prefix = defaultdict(list)
-    for asset in assets:
-        if asset.get("asset_type") != "image":
-            by_prefix[variant_key(asset)].append(asset)
-    for asset in assets:
-        if asset.get("asset_type") == "image":
-            continue  # Filename prefixes are not image variant evidence; identical bytes are recorded instead.
-        parts = re.split(r"[-_]", asset["display_name"])
-        if len(parts) > 1:
-            related = [a for a in by_prefix[variant_key(asset)] if a["asset_id"] != asset["asset_id"]]
-            asset["variants"] = [{"asset_id": a["asset_id"], "relationship": "filename_variant_candidate",
-                                  "evidence": f"Shared filename prefix {parts[0]!r}; unreviewed"} for a in sorted(related, key=lambda a: a["asset_id"])]
     archives = []
     for row in rows:
         if row["role"] == "archive" and row["status"] == "available":

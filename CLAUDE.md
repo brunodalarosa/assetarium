@@ -49,7 +49,7 @@ without covering it at the approval checkpoint; never edit installed packages.
 Prefer `--locked --no-sync --offline` for runs.
 
 ```powershell
-# Full suite (721 tests, includes real Blender fixtures; takes minutes)
+# Full suite (includes real Blender fixtures; takes minutes)
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest
 # Targeted
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_desktop.py tests/test_sources.py --basetemp scratch/pytest
@@ -69,62 +69,12 @@ create Windows junctions and may need sandbox permission. Launch the app with
 `Local Asset Library.vbs` (it runs `.venv-mcp\Scripts\pythonw.exe
 scripts\asset-desktop.pyw`; startup never installs or runs models).
 
-## Code map (`src/local_asset_library/`)
+## Code map and knowledge base
 
-- **Config and boundaries:** `config.py` (validated storage roots; the only
-  path-boundary API, rejects traversal/links escaping roots), `settings.py`
-  (app-owned `data/library/settings.json`: processing formats, storage budget),
-  `publication.py` (atomic JSON, pinned immutable catalog/index generations).
-- **Sources and catalog:** `sources.py` (registry `data/library/sources.json`,
-  per-source `metadata-lal/` output, combined read-only catalog, scans),
-  `source_operations.py` (durable, cancellable Process-assets operations),
-  `source_storage.py`, `source_migration.py`, `source_browser.py`,
-  `catalog.py` (inventory, logical-asset grouping, keyword/FTS5 baseline),
-  `membership.py` (published membership, no full-catalog fallback), `library_policy.py`
-  (neutral membership/budget defaults; the old pack contract is history in `docs/history/`).
-- **Processing pipeline:** `incremental.py` (stage ledger, bounded processing,
-  publication; driven by `scripts/library-batch.py scan|process|refresh|status`),
-  `inspection.py` + `blender_worker.py` + `render_math.py` (Blender in background,
-  scripts disabled), `render_pool.py` + `blender_batch_worker.py` (parallel kept-open renders)
-  + `render_devices.py` (render device and speed test; decision 0022), `texture_repair.py` + `blender_repair_worker.py`,
-  `captions.py` + `caption_backend.py` + `caption_quality.py` + `caption_review.py`,
-  `overnight.py` (owner-started caption runs), `library_index.py` +
-  `embedding_backend.py` (vectors), `gpu_queue.py` (cross-process GPU lease),
-  `maintenance_files.py` (manifest-driven removal of retired generated files).
-- **Retrieval and agents:** `library_cache.py` (per-publication slim records and digests; shared, read-only), `retrieval.py` + `search_policy.py` (keyword /
-  description / image / combined RRF, bounded shortlists), `mcp_assets.py`
-  (`search_assets`, `get_asset` schemas and response caps; no client-supplied
-  paths), `mcp_server.py` (STDIO server + isolated `scripts/asset-worker.py`
-  embedding worker; stdout is protocol-only), `evaluation.py`.
-- **Desktop:** `desktop.py` (`DesktopBridge` = pywebview `js_api`; methods run on
-  threads and go through one asyncio gateway loop; `create_window`/`page_html` inline
-  the built `ui/build/app.css` + `app.js` and `ui/interactive-preview.js` into
-  `ui/index.html` and apply the saved theme before first paint),
-  `desktop_service.py` (read-only presentation), `interactive_preview.py` +
-  `ui/viewer.html`/`viewer.js` (sandboxed offline Online3DViewer frame).
-- **Setup (decision 0014):** `setup_core.py` holds every setup rule (environment report,
-  Blender discovery/checks and the minimal `config.local.toml` writer, first-run rule,
-  `data/library/setup.json` with who set each value) as GUI-free functions; the desktop
-  wizard (`frontend/src/ui/SetupWizard.tsx`), `local-assets setup` and the MCP setup tools wrap it.
-- **Agent setup (decision 0016):** `setup_agent.py` wraps `setup_core` for agents: the setup
-  session only a user gesture opens (app button or interactive `local-assets setup agent`),
-  Blender proposals the user applies, `data/mcp/connections/<pid>.json` liveness records, the
-  bounded status, and a setup-only server when the config does not load. Panel:
-  `frontend/src/ui/AgentSetup.tsx`; skill `skills/assetarium-setup/`; checks
-  `scripts/verify-agent-setup-mcp.py` (STDIO) and `scripts/verify-agent-setup.py` (WebView2).
-- **Inference ports (decision 0015):** `description_engines.py` (ports), `engines.py` (the
-  only composition root; engine table and static readiness), `engine_transformers.py`
-  (Qwen wrapper) and `engine_server.py` (experimental loopback OpenAI-compatible server).
-  Never construct `QwenBackend`/`EmbeddingBackend` in core code; prove refactors keep
-  fingerprints with `scripts/check-engine-stability.py --compare`. See `docs/description-engines.md`.
-- **Collections and tags (decision 0012):** `asset_collections.py` (owner bundles,
-  per-collection labels/notes, availability resolved on read), `asset_tags.py`
-  (app-wide asset tags), `collection_export.py` (JSON/PNG/Markdown/printable report);
-  both stores sit in `data/library/` under the `collections` lease.
-- `cli.py` is the `local-assets` entry point; `owner_commands.py` adds the owner commands
-  (thin wrappers over the desktop's backend calls; deletions need an interactive
-  terminal, no bypass). Many workflows live in `scripts/`.
-- `skills/local-asset-library/SKILL.md` is the agent-facing usage skill for the MCP tools.
+The module map lives in `Assetarium KnowledgeBase/Notebook/Codebase.md`; each area hub
+(`Assetarium KnowledgeBase/Notebook/<Area>/<Area>.md`) lists its systems, rules and gotchas. Read the
+hub and the notes for the systems a task touches first (see Knowledge base in AGENTS.md).
+Path-scoped rules in `.claude/rules/` name the notes to read for the files you open.
 
 ## How features are usually built
 
@@ -141,9 +91,11 @@ Recent commits (`git log`) follow this shape; mirror it:
 4. A real WebView2 check in `scripts/verify-<feature>.py --run-name` when UI
    behavior changes (shared helpers in `scripts/gui_harness.py`; the app is driven
    through `window.lal`); keep existing verify scripts passing.
-5. Docs: the relevant `docs/*.md` (`docs/gui/README.md`, `docs/asset-sources.md`,
-   `docs/library-updates.md`…) and a dated entry at the top of `docs/progress.md`
-   with test counts, evidence paths and storage receipts.
+5. Docs: the user guide in `docs/` when behavior users see changes (`docs/gui/README.md`,
+   `docs/asset-sources.md`, `docs/cli.md`…), the knowledge base notes for the systems
+   touched, and an `Unreleased` line in `CHANGELOG.md` for user-visible changes. Test
+   counts, evidence paths and storage receipts go in the pull request description (the
+   dated `docs/history/progress-2026-10.md` journal is frozen).
 
 ## Non-obvious rules
 
@@ -151,24 +103,28 @@ Recent commits (`git log`) follow this shape; mirror it:
   enforces it. Write real characters (`…`, `·`, `→`), not escaped garbage.
 - `src/local_asset_library/ui/vendor/**` is upstream, byte-for-byte (`-text`);
   never reformat it. `ui/build/**` is generated by `npm run build`; never edit it by hand. `docs/mcp/*.json` are hash-bound evidence; do not rewrite.
-- Generated results belong in each source's `metadata-lal/`; settings, combined
-  indexes and evidence stay central under ignored `data/`. Ignored roots:
+- Nothing is ever written into asset folders (decision 0023). Generated results live in the
+  library store (`[storage].library`, default the ignored `data/library-store/`), keyed by their
+  inputs; settings, combined indexes and evidence stay central under ignored `data/`. Ignored roots:
   `data/ cache/ logs/ scratch/ .venv*/`.
 - Inference is offline with no fallbacks; a model/worker failure is a visible fault,
   never a silent substitute. Never start rendering or models at app startup (the
   embedding worker may pre-load its libraries only; decision 0005).
 - Processing never starts automatically; scans never run models. Changing format
   settings never deletes results or retries faults.
-- Shared models live in the directory set as `[storage].models` in `config.local.toml` (not owned by this project).
-  Blender: `C:\Program Files\Blender Foundation\Blender 5.2\blender.exe`.
+- This file and `AGENTS.md` describe no particular computer. This machine's hardware, tool
+  paths and Linux check setup live in the ignored `MACHINE.local.md` (AGENTS.md → Local machine).
+- Shared models live in the directory set as `[storage].models` in `config.local.toml` (not owned
+  by this project; `docs/model-storage.md`). Blender comes from `[tools].blender` or discovery
+  (`local-assets doctor` lists the candidates).
 - Local overrides go in ignored `config.local.toml` (copy `config.example.toml`).
-  The tracked example is neutral (project `models/`, Blender discovered); the owner's
-  machine paths live in their `config.local.toml`. Scripts use `load_project_config`.
-- Hardware: RTX 5070 (~12 GB VRAM) in the original setup; the current owner machine is a
-  Ryzen 9 9950X3D with a Radeon RX 6800 (HIP; no CUDA). One GPU job at a time via `gpu_queue`.
-- Linux check environment: WSL2 `Ubuntu-24.04`, clone in `~/lal` (ext4), Blender in
-  `~/blender-5.2.2-linux-x64/`. Run Linux suites with `LAL_REQUIRE_BLENDER=1` and
-  report the `Real-Blender tests:` line; a skipped Blender fixture is unverified.
+  The tracked example is neutral (project `models/`, Blender discovered); your machine paths
+  live in your `config.local.toml`. Scripts use `load_project_config`.
+- GPU work runs on CUDA (NVIDIA) or HIP (AMD), or not at all where neither is supported
+  (search embeds on CPU, decision 0018). One GPU job at a time via `gpu_queue`.
+- Linux checks (`docs/linux.md`): use a clone on a Linux filesystem (under WSL2, not `/mnt/…`)
+  and a Linux Blender. Run Linux suites with `LAL_REQUIRE_BLENDER=1` and report the
+  `Real-Blender tests:` line; a skipped Blender fixture is unverified.
 - Do not edit `blender_worker.py` / `render_math.py` / repair workers for portability:
   their hashes are inspection fingerprints (editing re-queues every inspection). A worker edit
   that keeps CPU renders identical can keep them only through `incremental.EQUIVALENT_WORKERS`,
@@ -181,10 +137,9 @@ Recent commits (`git log`) follow this shape; mirror it:
 
 ## Source-of-truth docs
 
-`docs/decisions/` (binding owner decisions, read first) ·
-`docs/progress.md` (current state, newest first) · `docs/asset-sources.md` ·
-`docs/library-updates.md` · `docs/gui/README.md` · `docs/gui/3d-preview.md` ·
-`docs/storage.md` · `docs/caption-quality.md` · `docs/caption-contract.md` ·
-`docs/embedding-contract.md` · `docs/catalog-contract.md` · `docs/mcp/README.md` ·
-`docs/overnight-descriptions.md` · `docs/status.md` (current status and open work) ·
-`docs/next version plan/README.md` (roadmap and historical prompts).
+`Assetarium KnowledgeBase/Decisions/` (binding owner decisions, read first) ·
+`Assetarium KnowledgeBase/Status.md` (current status and open work) · `Assetarium KnowledgeBase/Home.md`
+(vault conventions and the list of user guides in `docs/`) · `Assetarium KnowledgeBase/Notebook/`
+(area hubs and system notes) · `Assetarium KnowledgeBase/Architecture/` (contracts, library updates,
+caption severity, the expansion roadmap) · `docs/caption-contract.md` (stays in `docs/`;
+a check script hashes its path) · `docs/history/` (frozen October 2026 journal).

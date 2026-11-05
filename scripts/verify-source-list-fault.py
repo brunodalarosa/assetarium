@@ -1,8 +1,8 @@
 """Verify the source list after a crash in the real WebView2 shell with synthetic sources.
 
-One source whose saved data cannot be read shows its fault on its own card while the other stays
-listed (Settings → Asset sources and Asset processing), and a source list that fails to load says
-so instead of "No asset sources yet". Writes data/gui/<run-name>/verification.json.
+One library folder whose saved data cannot be read shows its fault on its own tree row and panel while the
+other stays listed (Asset sources), and a folder list that fails to load says so instead of an empty
+library. Writes data/gui/<run-name>/verification.json.
 """
 import argparse
 import json
@@ -56,6 +56,11 @@ class FixtureBridge(DesktopBridge):
             return {'status': 'faulty', 'reason': 'synthetic list failure'}
         return super().sources()
 
+    def library_tree(self):
+        if fail['list']:
+            return {'status': 'faulty', 'reason': 'synthetic list failure'}
+        return super().library_tree()
+
 
 os.environ.update(PYTHONNET_RUNTIME='netfx', TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
 import webview  # noqa: E402
@@ -73,34 +78,26 @@ def wait(expression, timeout=30):
 def verify():
     try:
         ui.wait_ready()
-        ui.js("(async()=>{$('nav-settings').click();await until(()=>document.querySelector('[role=tab]'));"
-              "[...document.querySelectorAll('[role=tab]')].find(t=>t.textContent.includes('Asset sources')).click();return true})()")
-        wait(f"$('source-list')&&$('source-list').textContent.includes({json.dumps(one['name'])})"
-             f"&&$('source-list').textContent.includes({json.dumps(two['name'])})")
-        assert ui.js("$('source-list').textContent.includes('could not be read (attempt to write a readonly database)')")
+        ROWS = "[...document.querySelectorAll('#folder-tree [role=treeitem][aria-level=\"1\"]')]"
+        ui.js("$('nav-sources').click()")
+        wait(f"{ROWS}.length===2&&{ROWS}.some(r=>r.querySelector('.unreadable'))")
+        assert ui.js(f"{ROWS}.filter(r=>r.querySelector('.unreadable')).map(r=>r.dataset.key).join()") == one['key']
+        ui.js(f"lal.inspectFolder({json.dumps(one['key'])},'')")
+        wait("$('folder-fault')&&$('folder-fault').textContent.includes('attempt to write a readonly database')")
         assert not ui.js("!!$('sources-empty')")
-        ui.capture('01-settings-one-source-unreadable.png')
-        report['checks'].append('Settings → Asset sources lists both sources; only the unreadable one shows its fault')
-        ui.js("$('nav-processing').click()")
-        wait(f"$('source-warnings')&&$('source-warnings').textContent.includes({json.dumps(two['name'])})"
-             "&&$('source-warnings').textContent.includes('Scan fault')")
-        ui.capture('02-processing-one-source-unreadable.png')
-        report['checks'].append('Asset processing shows the fault on that source card and keeps the other card')
+        ui.capture('01-one-folder-unreadable.png')
+        report['checks'].append('Asset sources lists both library folders; only the unreadable one says it can’t be read, with the reason')
         fail.update(source=False, list=True)
         atomic_json(config.output_path('data', 'library/source-cancel.json'), {'token': 'touch'})  # Changes the sources token.
-        wait("$('sources-error')&&$('sources-error').textContent.includes('synthetic list failure')")
-        assert ui.js("!$('processing-view').textContent.includes('No asset sources yet')")
-        ui.capture('03-processing-list-failed.png')
-        ui.js("(async()=>{$('nav-settings').click();await until(()=>document.querySelector('[role=tab]'));"
-              "[...document.querySelectorAll('[role=tab]')].find(t=>t.textContent.includes('Asset sources')).click();return true})()")
-        wait("$('sources-error')&&!$('sources-empty')")
-        ui.capture('04-settings-list-failed.png')
-        report['checks'].append('A source list that fails to load says so and that sources and results are kept; '
-                                'neither page claims "No asset sources yet"')
+        wait("$('sources-error')&&$('sources-error').textContent.includes('synthetic list failure')&&!$('sources-empty')")
+        assert ui.js(f"{ROWS}.length===2")  # The folders shown before stay listed.
+        ui.capture('02-list-failed.png')
+        report['checks'].append('A folder list that fails to load says so and that folders and results are kept; '
+                                'the page never claims the library is empty')
         fail['list'] = False
         atomic_json(config.output_path('data', 'library/source-cancel.json'), {'token': 'touch-again'})
-        wait(f"!$('sources-error')&&$('source-list').textContent.includes({json.dumps(one['name'])})")
-        report['checks'].append('The error clears and the sources return as soon as the list loads again')
+        wait("!$('sources-error')")
+        report['checks'].append('The error clears as soon as the list loads again')
         report.update(status='passed')
     except BaseException as exc:
         report.update(status='faulty', reason=str(exc), traceback=traceback.format_exc())

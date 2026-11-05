@@ -120,6 +120,9 @@ def _database():
 
 
 def lookup(path, ident):
+    from .transient import active
+    if active.get():
+        return None
     key = str(path)
     with _lock:
         cached = _memory.get(key)
@@ -147,6 +150,9 @@ def lookup(path, ident):
 
 
 def store(path, ident, sha256):
+    from .transient import active
+    if active.get():
+        return
     key = str(path)
     with _lock:
         if _memory.get(key) == (tuple(ident), sha256):

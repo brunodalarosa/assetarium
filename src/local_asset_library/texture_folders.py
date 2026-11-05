@@ -152,7 +152,7 @@ def apply(records, rows, choice):
                       'bindings': fixed[record['asset_id']]}
             if current.get('bindings') != recipe['bindings'] or current.get('choice') != recipe['choice']:
                 record['texture_repair'] = recipe
-                # Applied by the owner: the model waits for Process assets; its earlier evidence stays.
+                # Applied by the owner: the model waits for Make previews; its earlier evidence stays.
                 for stage in ('inspection', 'previews'):
                     if record['processing'].get(stage) == 'failed':
                         record['processing'][stage] = 'pending'

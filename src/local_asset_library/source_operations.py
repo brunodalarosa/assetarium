@@ -1,16 +1,19 @@
-"""Durable, cancellable source operations. Cancellation never kills a worker."""
+"""Durable, cancellable source operations. Cancellation never kills a worker; only its owning app going away does."""
 from contextlib import closing, contextmanager
 from dataclasses import replace
 import json
+import logging
 import os
 from pathlib import Path
 import sqlite3
+import signal
 import subprocess
 import sys
+import threading
 import time
 import uuid
 
-from .config import ConfigError, load_config, runtime_command, venv_python
+from .config import ConfigError, load_config, runtime_command, venv_python, with_saved_blender
 from .publication import atomic_json, read_json, read_only
 from .sources import (registry, get_source, bound, now, source_status, scan_source,
                       aggregate, read_records, write_membership)
@@ -60,6 +63,10 @@ def active_operation(config):
 def state(config, **updates):
     path = config.output_path("data", "library/source-operation.json")
     value = read_json(path) if path.exists() else {}
+    if 'phase' in updates and 'metrics' not in updates:
+        updates['metrics'] = None
+    if 'stage' in updates and updates['stage'] != value.get('stage') and 'completed' not in updates:
+        updates.update(completed=None, total=None)
     if ('progress' in updates and updates.get('token', value.get('token')) == value.get('token')
             and updates.get('status') in RUNNING):
         updates['progress'] = max(value.get('progress', 0), updates['progress'])
@@ -106,10 +113,18 @@ def operation_lease(config, scoped, token):
         acquired.__exit__(None,None,None)
 
 
-def start(config, operation, key=None):
-    if operation not in {"scan", "process", "describe", "render-test"}:
+def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None):
+    """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope.
+
+    ``owner`` is the open app's process ID: the operation stops with that app (``watch_owner``).
+    """
+    if operation not in {"scan", "process", "describe", "render-test", "search-check"}:
         raise ConfigError("Unknown asset source operation")
-    if operation == "render-test" and (key or not config.blender or not config.blender.exists()):
+    if operation == "search-check":
+        from .engines import search_runtime_fault
+        if key or (fault := search_runtime_fault(config)):
+            raise ConfigError(fault if not key else "The search check is not tied to a library folder")
+    if operation == "render-test" and (key or not (blender := with_saved_blender(config).blender) or not blender.exists()):
         raise ConfigError("Set up Blender first (Settings → General → Setup), then test render speed")
     if operation == "describe" and not key:
         raise ConfigError("Choose an asset source to generate descriptions for")
@@ -120,14 +135,14 @@ def start(config, operation, key=None):
     if operation in {"process", "describe"} and not get_source(config, key)["enabled"]:
         raise ConfigError("Enable this asset source before processing it")
     if operation in {'process', 'describe'}:
-        from .settings import processing_formats
-        if not processing_formats(config):
+        from .settings import used_formats
+        if not used_formats(config):
             raise ConfigError('Processing is paused. Select formats in Settings → General before processing assets')
     if operation == 'describe':
         from .settings import descriptions_enabled
         if not descriptions_enabled(config):
             raise ConfigError(DESCRIPTIONS_OFF)
-    if operation == 'describe' and not (source_status(config, get_source(config, key)).get('descriptions') or {}).get('missing'):
+    if operation == 'describe' and asset_ids is None and not (source_status(config, get_source(config, key)).get('descriptions') or {}).get('missing'):
         raise ConfigError('Every asset that can be described already has a description or a recorded failure')
     if operation == 'scan' and not key and not any(s['enabled'] for s in registry(config)['sources']):
         return {'status': 'idle', 'reason': None}  # Nothing to scan (a fresh install); no worker is started.
@@ -140,10 +155,13 @@ def start(config, operation, key=None):
                     if operation == "render-test" else "This operation is already running"}
         token = uuid.uuid4().hex
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
-              operation=operation, key=key, reason=None, current_asset=None)
+              operation=operation, key=key, reason=None, current_asset=None, completed=None, total=None, stage=None,
+              asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item, owner=owner)
         command = [str(python), str(config.project_root / "scripts/source-operation.py"), operation, "--token", token]
         if key:
             command.extend(["--source", key])
+        if owner:
+            command.extend(["--owner", str(owner)])
         log = scoped.output_path("data", "library/operations/" + token + ".log")
         log.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -153,6 +171,9 @@ def start(config, operation, key=None):
                     creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0, start_new_session=os.name != "nt")
             # The child waits for this handoff before updating the same state.
             state(scoped, pid=process.pid)
+            from .logs import kv
+            logging.getLogger(__name__).info('Operation started · %s', kv(operation=operation, folder=key, pid=process.pid,
+                                                                           token=token[:8], output=log))
         except OSError as exc:
             if not python.is_file():
                 command = r'.\scripts\uv.ps1 sync --locked' if os.name == 'nt' else './scripts/uv.sh sync --locked'
@@ -166,6 +187,41 @@ def start(config, operation, key=None):
     return {"status": "started", "token": token}
 
 
+def watch_owner(config, scoped, owner, poll=1.0, end=None):
+    """Work the app started never outlives it: once that app is gone, closed or crashed, this operation and its
+    child processes stop at once. A crash is logged with its reason and its queue items go to Recent."""
+    def run():
+        while process_alive(owner):
+            time.sleep(poll)
+        from .logs import kv
+        from .processing_queue import owner_gone
+        try:
+            closed = owner_gone(config, owner)
+        except Exception:
+            closed = False
+        reason = ('Stopped when you closed Assetarium' if closed
+                  else 'Assetarium closed unexpectedly; this run stopped with it. Finished assets are saved.')
+        state(scoped, status='cancelled' if closed else 'faulty', phase='Stopped', reason=reason)
+        logging.getLogger(__name__).log(logging.INFO if closed else logging.ERROR, 'Operation stopped with its app · %s',
+                                        kv(app=owner, reason=reason))
+        (end or end_tree)()
+    thread = threading.Thread(target=run, name='owner-watch', daemon=True)
+    thread.start()
+    return thread
+
+
+def end_tree():
+    """End this operation process and every process it started (renders, description and search runtimes)."""
+    try:
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/T', '/F', '/PID', str(os.getpid())], capture_output=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW)
+        else:
+            os.killpg(os.getpgrp(), signal.SIGKILL)  # Started in its own session: the group is this operation.
+    finally:
+        os._exit(1)
+
+
 def scan_all(config, token, key=None):
     scoped = bound(config, get_source(config, key)) if key else config
     sources = [get_source(config, key)] if key else [s for s in registry(config)["sources"] if s["enabled"]]
@@ -176,7 +232,7 @@ def scan_all(config, token, key=None):
             return
         state(scoped, status="scanning", phase="Scanning " + source["name"], progress=i / max(1, len(sources)))
         try:
-            scan_source(config, source)
+            scan_source(config, source, progress=scan_reporter(scoped, source['name']))
         except (OSError, ValueError, sqlite3.Error) as exc:
             fault = {"key": source["key"], "reason": str(exc), "status": "faulty", "utc": now()}
             faults.append(fault)
@@ -187,8 +243,23 @@ def scan_all(config, token, key=None):
             fault_root = config.project_root / 'data/library/source-faults'
             atomic_json(fault_root / 'history' / (source['id'] + '-' + uuid.uuid4().hex + '.json'),diagnostic)
             atomic_json(fault_root / (source['id'] + '.json'),diagnostic)
+    state(scoped, phase='Publishing library', metrics=dict(phase='Publishing library', completed=len(sources), total=None, unit='library folders'))
     aggregate(config)
-    state(scoped, status="complete_with_faults" if faults else "complete", phase="Scan complete", progress=1, faults=faults)
+    state(scoped, status="complete_with_faults" if faults else "complete", phase="Scan complete", progress=1, faults=faults, metrics=None)
+
+
+def scan_reporter(config, source_name=None):
+    """Persist measured scan progress at most twice per second, plus phase boundaries."""
+    previous = [None, 0.0, None]
+    def report(metrics):
+        if source_name:
+            metrics = dict(metrics, source_name=source_name)
+        phase, tick = metrics['phase'], time.monotonic()
+        finished = metrics.get('total') is not None and metrics['completed'] == metrics['total']
+        if phase != previous[0] or tick - previous[1] >= .5 or (finished and metrics != previous[2]):
+            state(config, phase=phase, metrics=metrics)
+            previous[:] = [phase, tick, dict(metrics)]
+    return report
 
 
 def ensure_index(config, scoped):
@@ -243,8 +314,6 @@ def publish_source(scoped):
     return target.catalog_generation
 
 
-SEARCH_CHECK = ("Search data is waiting for the one-time search check. Run it in a terminal in the Assetarium folder: "
-                "{command} Then process this source again; previews and other finished work are kept.")
 BUDGET_REACHED = ("Storage budget reached. Increase it in Settings → General, then process this source again; "
                   "completed work is preserved")
 
@@ -314,17 +383,17 @@ def publish_and_verify(config, source, scoped, phase):
     state(scoped, status="publishing", phase="Updating searches", progress=.95)
     aggregate(config)
     state(scoped, status="verifying", phase="Scanning to verify publication", progress=.98)
-    return scan_source(config, source)
+    return scan_source(config, source, progress=scan_reporter(scoped))
 
 
 def process_source(config, source, token):
     scoped = bound(config, source)
-    from .settings import processing_formats
-    if not processing_formats(config):
+    from .settings import used_formats
+    if not used_formats(config):
         state(scoped, status='complete', phase='Processing paused: no formats selected', progress=1, current_asset=None)
         return
     state(scoped, status="scanning", phase="Checking source", progress=.01)
-    scan_source(config, source)
+    scan_source(config, source, progress=scan_reporter(scoped))
     ensure_index(config, scoped)
     state(scoped, status='processing', phase='Preparing processing', progress=.02)
     base = storage_base(config, token)
@@ -338,6 +407,25 @@ def process_source(config, source, token):
           progress=1, current_asset=None)
     from .notifications import notify_ready
     notify_ready(config, source, (status.get("descriptions") or {}).get("missing", 0))
+
+
+def search_check(config, token):
+    """Run Run check (decision 0026) in the search runtime: two built-in sample images, never library assets."""
+    from .search_check import IMAGES
+    runtime, project = stage_runtime(config, "embeddings")
+    state(config, status="processing", phase="Loading the search model for the one-time search check", progress=.1)
+    command = [*runtime_command(config.project_root, runtime), "run", "--locked", "--no-sync", "--offline", "--project",
+               str(config.project_root / "runtime" / project), "python", "-m", "local_asset_library.search_check"]
+    env = os.environ.copy()
+    env.update(PYTHONPATH=str(config.project_root / "src"), HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1")
+    completed = subprocess.run(command, cwd=config.project_root, env=env, capture_output=True, text=True, errors="replace",
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+    if completed.returncode:
+        lines = [line for line in (completed.stderr or completed.stdout).splitlines() if line.strip()]
+        reason = "The search check did not pass: " + (lines[-1][:400] if lines else f"exit code {completed.returncode}")
+        state(config, status="faulty", phase="Search check failed", reason=reason, progress=1)
+        raise ConfigError(reason)
+    state(config, status="complete", phase=f"Search check passed on {len(list(IMAGES.glob('*.png')))} built-in images", progress=1)
 
 
 def render_test(config, token):
@@ -387,9 +475,9 @@ def search_test(config, token):
 def description_counts(scoped):
     from collections import Counter
     from .incremental import working
-    from .settings import processing_formats, processing_eligible
+    from .settings import processing_eligible, used_formats
     from .sources import description_state
-    formats = processing_formats(scoped)
+    formats = used_formats(scoped)
     return Counter(description_state(r) for r in read_records(working(scoped)) if processing_eligible(r, formats))
 
 
@@ -410,7 +498,7 @@ def describe_source(config, source, token):
     scoped = bound(config, source)
     started = time.monotonic()
     state(scoped, status="scanning", phase="Checking source", progress=.01)
-    scan_source(config, source)
+    scan_source(config, source, progress=scan_reporter(scoped))
     ensure_index(config, scoped)
     before = description_counts(scoped)
     state(scoped, status='processing', phase='Preparing descriptions', progress=.02)
@@ -433,19 +521,28 @@ def describe_source(config, source, token):
     state(scoped, status=status, phase=phase, progress=1, current_asset=None, reason=reason)
 
 
-def require_search_check(config, scoped, token):
-    """Stop the search stage with the search check's command while its receipt is missing or for the other device.
-
-    Setup, not an asset fault: assets stay pending and finished stages are kept.
+def ensure_search_check(config, scoped, token, backend=None):
+    """A missing search check never stops processing (decision 0026): the search stage runs it first, on the
+    built-in sample images, and keeps the loaded model. A failed check stops the stage with its reason; assets stay
+    pending and finished stages are kept.
     """
     from . import engines
-    device = engines.search_device(config)
-    if engines.capability_ready(config, device)["ready"]:
-        return
-    check = next(i for i in engines.search_readiness(config, device=device) if i["id"] == "embedding_capability")
-    reason = SEARCH_CHECK.format(command=check["command"])
-    atomic_json(stage_fault_path(scoped, token), {"reason": reason, "utc": now()})
-    raise ConfigError(reason)
+    from .search_check import record
+    if engines.capability_ready(config, engines.search_device(config))["ready"]:
+        return backend
+    state(scoped, status="processing", phase="Running the one-time search check", stage="embeddings")
+    try:
+        if backend is None:
+            from .search_speed import ensure
+            backend = engines.embedder(scoped)
+            ensure(scoped, backend, progress=lambda phase: state(scoped, status="processing", phase=phase, stage="embeddings"),
+                   cancelled=lambda: cancelled(scoped, token))  # CPU threads, as when the stage loads the model itself.
+        record(config, backend)
+    except (ConfigError, OSError, RuntimeError) as exc:
+        reason = f"The search check did not pass, so search data was not built: {exc}"
+        atomic_json(stage_fault_path(scoped, token), {"reason": reason, "utc": now()})
+        raise ConfigError(reason) from exc
+    return backend
 
 
 def worker_stage(config, source, stage, token):
@@ -453,15 +550,18 @@ def worker_stage(config, source, stage, token):
     from .library_index import index_library
     from .incremental import working
     scoped = bound(config, source)
-    from .settings import processing_formats
+    from .settings import used_formats
     backend = None
     operation = operation_status(scoped).get("operation", "process")
     # Description runs only describe assets whose renders are ready, so unfinished
     # imports never gain recorded description faults.
-    only = None
+    # A queue item's scope, resolved when it started (decision 0023); None is the whole folder.
+    scope = operation_status(scoped).get("asset_ids")
+    only = set(scope) if scope is not None else None
     if stage == "caption":
         from .sources import description_state
-        only = {r["asset_id"] for r in read_records(working(scoped)) if description_state(r) == "missing"}
+        missing = {r["asset_id"] for r in read_records(working(scoped)) if description_state(r) == "missing"}
+        only = missing if only is None else missing & only
     def on_progress(identifier, completed, total):
         state(scoped, status="cancelling" if cancelled(scoped, token) else "processing",
               phase=(finishing(stage) if cancelled(scoped, token) else STAGE_LABELS[stage]),
@@ -470,7 +570,7 @@ def worker_stage(config, source, stage, token):
     for _ in range(10000):
         if cancelled(scoped, token):
             return
-        if not processing_formats(config):
+        if not used_formats(config):
             return
         from .settings import descriptions_enabled
         if stage == "caption" and not descriptions_enabled(config):
@@ -480,9 +580,12 @@ def worker_stage(config, source, stage, token):
         try:
             preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
         except (ConfigError, OSError, ValueError):
-            if stage == "embeddings":
-                require_search_check(config, scoped, token)
-            raise
+            if stage != "embeddings":
+                raise
+            backend = ensure_search_check(config, scoped, token, backend)  # The missing receipt is why; then measure again.
+            preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
+        if stage == "embeddings" and preview.get("pending"):
+            backend = ensure_search_check(config, scoped, token, backend)  # Only when there is search data to build.
         if not preview.get("pending") and not preview.get("restored"):
             return  # Reused results whose stage a rescan reset still need the real pass to mark them complete.
         from . import engines

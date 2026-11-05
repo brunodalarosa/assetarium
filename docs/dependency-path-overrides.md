@@ -13,6 +13,11 @@ in one source can supply that exact missing path in a separately registered mode
 source. The source folder names do not matter. Texture-only sources work without
 model imports or prior processing. No unrelated disk directories are searched.
 
+The fragments can also sit side by side in **one library folder**, for example a pack's add-on folders next
+to its core folder: `Pack/Buildings/Town/Textures/map.png`, missing, is found as `Pack/Core/Town/Textures/map.png`.
+Only a sibling of a folder on the model's own path is tried, with the rest of the path identical. Joining
+separately added folders under one library folder keeps these textures and their finished previews.
+
 Healthy local files and explicit mappings win. Conflicting contents at the same
 relative path stay ambiguous faults; byte-identical duplicates retain all candidate
 evidence. Records retain the original reference/location, model hash, provider ID,
@@ -26,13 +31,14 @@ bytes and material/alpha settings stay intact. External consumers must apply the
 returned bindings. Additional resource kinds need a processing adapter; this
 feature currently handles external glTF/GLB image references.
 
-See [general capability policy](decisions/0009-general-capabilities.md) and
-[shared dependency decision](decisions/0010-shared-project-dependencies.md).
+See [general capability policy](../Assetarium%20KnowledgeBase/Decisions/0009-general-capabilities.md) and
+[shared dependency decision](../Assetarium%20KnowledgeBase/Decisions/0010-shared-project-dependencies.md).
 
 ## Explicit mappings within a source
 
-After owner authorization, a source can have
-`metadata-lal/library/dependency-overrides.json`:
+After owner authorization, a library folder can have
+`library/dependency-overrides.json` in its working data in the library store
+(`library-store/folders/<folder id>/`):
 
 ```json
 {
@@ -67,17 +73,3 @@ through the normal processing ledger; unchanged failures are still retained.
 Successful stages clear their current stage fault while append-only ledger
 history preserves earlier failures. Source-owned caption retries retain their
 raw evidence under that source's metadata directory.
-
-## Cartoon City repair, October 18, 2026
-
-The owner approved mapping the four separate model add-ons to the supplied Core
-textures, retaining all successful processing, and producing only missing results.
-The audit identified 3,467 blocked models, 5,266 missing references, 28 distinct
-missing locations and 16 shared texture files. The 310 previously rendered models,
-930 previews, 308 usable descriptions and 1,238 vectors are protected.
-
-Receipts, original hashes, prior catalog and ledger, per-asset sample results,
-resumable processing logs and final verification belong under
-`data/repairs/cartoon-city-20261018/`. The approved growth ceiling is 4 GiB within
-the existing 24 GiB library budget; unique allocation receipts also include each
-source's generated metadata. Owner appearance and caption approval remain pending.

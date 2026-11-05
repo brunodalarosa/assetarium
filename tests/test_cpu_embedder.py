@@ -91,9 +91,30 @@ def test_line_ending_tolerance_follows_the_contracts_own_hashed_files(config):
     assert recorded_contract(config, changed) == changed
 
 
+def test_published_index_contract_reconciles_line_endings_without_a_receipt(config):
+    # Vectors from a library store built on an LF checkout, searched from a CRLF one with no search check yet.
+    lock = config.project_root / 'runtime/embedding-cpu/uv.lock'
+    lock.parent.mkdir(parents=True)
+    lock.write_bytes(b'version = 1\r\n')
+    lf = hashlib.sha256(b'version = 1\n').hexdigest()
+    crlf = hashlib.sha256(b'version = 1\r\n').hexdigest()
+    files = {'runtime_lock_sha256': 'runtime/embedding-cpu/uv.lock'}
+    published = config.project_root / 'data/library/embedding-contract.json'
+    atomic_json(published, {'contract': json.dumps({'device': 'cpu', 'runtime_lock_sha256': lf, 'hashed_files': files})})
+    current = {'device': 'cpu', 'runtime_lock_sha256': crlf, 'hashed_files': files}
+    assert recorded_contract(config, current)['runtime_lock_sha256'] == lf
+    changed = dict(current, runtime_lock_sha256=hashlib.sha256(b'version = 2\r\n').hexdigest())
+    lock.write_bytes(b'version = 2\r\n')
+    assert recorded_contract(config, changed) == changed  # A real change still needs a reindex.
+    lock.write_bytes(b'version = 1\r\n')
+    # A search check recorded with the current bytes decides first.
+    atomic_json(config.output_path('data', 'embeddings/capability.json'), {'contract': current})
+    assert recorded_contract(config, current) == current
+
+
 def fake_runtime(config, torch_version):
     python = venv_python(config.project_root, '.venv-embedding')
-    python.parent.mkdir(parents=True)
+    python.parent.mkdir(parents=True, exist_ok=True)
     python.write_bytes(b'')
     site = config.project_root / '.venv-embedding/Lib/site-packages'
     for name, version in (('torch', torch_version), ('sentence_transformers', '6.1.0')):
@@ -110,11 +131,45 @@ def test_search_readiness_follows_the_device(config):
     cpu = {item['id']: item for item in engines.search_readiness(config, no_gpu, 'cpu')}
     assert 'search_gpu' not in cpu and 'runtime/embedding-cpu' in cpu['embedding_runtime']['command']
     assert cpu['embedding_weights']['command'].endswith('prepare_embedding_model.py --device cpu')
-    assert not cpu['embedding_capability']['ready'] and 'record-embedding-capability.py' in cpu['embedding_capability']['command']
+    assert not cpu['embedding_capability']['ready'] and cpu['embedding_capability']['command'] is None  # Never a command (P3).
+    assert cpu['embedding_capability']['action'] is None and 'Runs once the search runtime' in cpu['embedding_capability']['detail']
     fake_runtime(config, '2.10.0+cpu')
     assert {i['id']: i for i in engines.search_readiness(config, no_gpu, 'cpu')}['embedding_runtime']['ready']
     mismatch = {i['id']: i for i in engines.search_readiness(config, no_gpu, 'cuda')}['embedding_runtime']
     assert not mismatch['ready'] and 'CPU-only' in mismatch['detail'] and 'runtime/embedding ' in mismatch['command'] + ' '
+
+
+def test_incomplete_search_runtime_names_its_fix_and_is_not_retained(config):
+    import asyncio
+    from local_asset_library.mcp_assets import TransientFault
+    from local_asset_library.mcp_server import Gateway
+    python = venv_python(config.project_root, '.venv-embedding')
+    python.parent.mkdir(parents=True)
+    python.write_bytes(b'')
+    # What a wrapper sync without --project leaves behind: the base project, no torch or sentence-transformers.
+    info = config.project_root / '.venv-embedding/Lib/site-packages/numpy-2.3.4.dist-info'
+    info.mkdir(parents=True)
+    (info / 'METADATA').write_text('Metadata-Version: 2.1\nName: numpy\nVersion: 2.3.4\n', encoding='utf-8')
+    gateway = Gateway(config)
+    async def search():
+        with pytest.raises(TransientFault, match='sync --locked --project runtime/embedding$') as fault:
+            await gateway.embed({'op': 'text', 'text': 'x', 'role': 'query'})
+        assert 'missing torch, sentence-transformers' in str(fault.value)
+        assert gateway.worker is None and gateway.worker_fault is None  # The next search tries again.
+        await gateway.close()
+    asyncio.run(search())
+    save_general_settings(config, 8, None, None, None, None, None, 'cpu')
+    assert engines.search_runtime_fault(config).endswith('--project runtime/embedding-cpu')  # The saved device's lock.
+    fake_runtime(config, '2.10.0+cpu')
+    assert engines.search_runtime_fault(config) is None
+
+
+def test_runtime_wrappers_refuse_project_commands_without_a_project():
+    import subprocess
+    from local_asset_library.config import runtime_command
+    for runtime in ('mcp', 'caption', 'embedding'):
+        result = subprocess.run([*runtime_command(ROOT, runtime), 'sync', '--locked'], capture_output=True, text=True, timeout=60)
+        assert result.returncode == 2 and '--project runtime/' + runtime in result.stderr
 
 
 def test_capability_receipt_must_match_the_device(config):
@@ -150,27 +205,48 @@ def test_stages_run_in_the_environment_their_engine_needs(config):
     assert stage_runtime(config, 'embeddings') == ('embedding', 'embedding-cpu')
 
 
-def test_search_stage_names_the_search_check_while_it_is_missing(managed, monkeypatch):
-    from local_asset_library import sources, source_operations as operations
+def test_the_search_stage_runs_a_missing_search_check_itself(managed, monkeypatch):
+    from local_asset_library import search_check, search_speed, sources, source_operations as operations
+    monkeypatch.setattr(search_speed, 'ensure', lambda *a, **k: None)
     import local_asset_library.incremental as incremental
     config, backend, one, _ = managed
     ready_source(config, backend, one)
     scoped = sources.bound(config, one)
     operations.state(scoped, operation='process', status='processing', token='w2')
-    def no_receipt(*args, **kwargs):
-        raise FileNotFoundError('capability.json')
-    monkeypatch.setattr(incremental, 'process', no_receipt)
     save_general_settings(config, 8, None, None, None, None, None, 'cpu')
-    with pytest.raises(ConfigError, match='one-time search check') as stopped:
-        operations.worker_stage(config, one, 'embeddings', 'w2')
-    assert 'record-embedding-capability.py' in str(stopped.value) and 'runtime/embedding-cpu' in str(stopped.value)
-    fault = json.loads(operations.stage_fault_path(scoped, 'w2').read_text(encoding='utf-8'))
-    assert fault['reason'] == str(stopped.value)
-    # With a receipt for this device, the original fault is reported unchanged.
-    atomic_json(config.output_path('data', 'embeddings/capability.json'),
-                {'contract': {'device': 'cpu'}, 'actual_text_and_image_inference': True})
-    with pytest.raises(FileNotFoundError):
-        operations.worker_stage(config, one, 'embeddings', 'w2')
+    loaded, checked = object(), []
+    monkeypatch.setattr(engines, 'embedder', lambda config: loaded)
+    def record(config, model):
+        checked.append(model)
+        atomic_json(config.output_path('data', 'embeddings/capability.json'),
+                    {'contract': {'device': 'cpu'}, 'actual_text_and_image_inference': True})
+    monkeypatch.setattr(search_check, 'record', record)
+    runs = []
+    def process(scoped, stage, dry_run=False, **k):
+        runs.append(dry_run)
+        return {'pending': 1} if dry_run and len(runs) == 1 else {'pending': 0, 'processed': 1}
+    monkeypatch.setattr(incremental, 'process', process)
+    operations.worker_stage(config, one, 'embeddings', 'w2')
+    assert checked == [loaded] and engines.capability_ready(config, 'cpu')['ready']
+    operations.worker_stage(config, one, 'embeddings', 'w2')
+    assert checked == [loaded]  # Recorded once; later runs go straight to search data.
+
+
+def test_a_failed_search_check_stops_the_stage_with_its_reason(managed, monkeypatch):
+    from local_asset_library import search_check, search_speed, sources, source_operations as operations
+    monkeypatch.setattr(search_speed, 'ensure', lambda *a, **k: None)
+    config, backend, one, _ = managed
+    ready_source(config, backend, one)
+    scoped = sources.bound(config, one)
+    operations.state(scoped, operation='process', status='processing', token='w3')
+    monkeypatch.setattr(engines, 'embedder', lambda config: object())
+    monkeypatch.setattr(search_check, 'record', lambda config, model: (_ for _ in ()).throw(ConfigError('model mixed the shapes up')))
+    import local_asset_library.incremental as incremental
+    monkeypatch.setattr(incremental, 'process', lambda *a, **k: {'pending': 2})
+    with pytest.raises(ConfigError, match='search check did not pass') as stopped:
+        operations.worker_stage(config, one, 'embeddings', 'w3')
+    fault = json.loads(operations.stage_fault_path(scoped, 'w3').read_text(encoding='utf-8'))
+    assert fault['reason'] == str(stopped.value) and 'mixed the shapes up' in fault['reason']
 
 
 def test_agents_and_the_cli_can_set_the_device(config):
