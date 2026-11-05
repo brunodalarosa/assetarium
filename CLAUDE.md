@@ -54,7 +54,7 @@ Prefer `--locked --no-sync --offline` for runs.
 # Targeted
 .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest tests/test_desktop.py tests/test_sources.py --basetemp scratch/pytest
 # Real WebView2 verification with isolated synthetic assets (writes data/gui/<run-name>/report.json)
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/verify-source-browser.py --run-name <unique-name>
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/verify-asset-sources.py --run-name <unique-name>
 # Config/health (read only)
 .\scripts\uv.ps1 run --locked python -m local_asset_library.cli check-config
 .\scripts\uv.ps1 run --locked python -m local_asset_library.cli doctor
