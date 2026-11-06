@@ -2,8 +2,8 @@
 area: Platform and Storage
 tags: [system]
 code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/uv.sh, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, runtime/mcp, runtime/caption, runtime/embedding, runtime/embedding-cpu, tests/conftest.py, scripts/scratch_links.py]
-verified: 2026-10-28
-branch: feature/library-view
+verified: 2026-11-06
+branch: feature/release-0.2.0-notes
 ---
 # Runtimes
 
@@ -45,6 +45,12 @@ environments that share one hard-linked cache. Always go through the wrappers in
   packages with the base project's. So the runtime wrappers refuse `sync`/`run`/`lock`/`add`/`remove`/
   `tree`/`export` without it (exit 2). `uv.ps1`/`uv.sh` are for the base project and have no guard.
   The search gateway checks `engines.search_runtime_fault` before it starts the worker.
+- **Never bump a `runtime/*/pyproject.toml` version.** A version-only change makes uv rewrite that
+  runtime's `uv.lock` (`uv lock --check` fails), and the bytes of `runtime/caption/uv.lock`,
+  `runtime/embedding/uv.lock` and `runtime/embedding-cpu/uv.lock` feed the caption fingerprint
+  (`incremental.caption_input`) and the search contract (`retrieval.recorded_contract`). A release that
+  bumped them would re-queue every description and reindex every search vector. Only the app's own
+  version fields move at a release (AGENTS.md → Versioning; `tests/test_version.py`).
 
 ## Related
 

@@ -20,6 +20,12 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
   differences, and `EQUIVALENT_WORKERS` lists both forms, but any new fingerprinted file needs the
   same care. A `.gitattributes` `eol` rule for fingerprinted files would remove the trap (the owner
   chose not to add one in October 2026). Seen: 2026-10-18, 2026-10-28, 2026-10-30
+- **The release fixture records the path of the checkout that built it**: `scripts/build-release-fixture.py`
+  scans `samples/Sample assets` in place, so the frozen SQLite files in `tests/fixtures/releases/0.2.0/`
+  contain this checkout's absolute path (drive and folder, no user name), against "tracked files describe no
+  computer". Building from a neutral path (for example a copy of the samples under the throwaway project in
+  `scratch/`) would remove it; frozen fixtures are never replaced, so it can only change from 0.3.0.
+  Seen: 2026-11-05
 - **The full test suite takes minutes and needs real Blender**: a skipped Blender fixture counts as
   unverified. Targeted runs (`tests/test_<area>.py`) are the everyday path. Seen: 2026-10-28
 - **`scripts/verify-loading-states.py` is stale**: it waits for `#source-warnings-loading`, which the
