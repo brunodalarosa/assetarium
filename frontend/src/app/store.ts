@@ -758,6 +758,14 @@ function renderCoverage(context: Json) {
 /* --------------------------------- sources ------------------------------- */
 
 let loadingSources = false;
+/** The launch check speaks only when it found something: one quiet line, never a toast for an unchanged library. */
+function announceCheck(before: Json | null, after: Json | null) {
+  if (!before?.quiet || !operationActive(before) || operationActive(after) || after?.token !== before.token) return;
+  const c = after?.changes;
+  if (!c || after.status !== "complete" || !(c.new || c.changed || c.removed)) return;
+  const parts = [c.new && `${c.new} new`, c.changed && `${c.changed} changed`, c.removed && `${c.removed} removed`].filter(Boolean);
+  pushToast({ tone: "info", title: "Library updated", body: parts.join(" · ") });
+}
 export async function loadSources() {
   if (!state.api || loadingSources) return;
   loadingSources = true;
@@ -765,6 +773,7 @@ export async function loadSources() {
     const result = await api().sources();
     if (result.status === "faulty") throw Error(result.reason);
     const changed = state.sourcesRevision !== result.revision;
+    announceCheck(state.globalScan, result.scan ?? null);
     setState({ sources: result.sources || [], globalScan: result.scan ?? null, sourcesLoaded: true, sourcesRevision: result.revision, sourcesError: null });
     updateNotifications(result.notifications || []);
     if (route().page === "processing" && changed) await loadImportFailures();
@@ -847,7 +856,7 @@ export function loadLibraryTree(): Promise<void> {
         try {
           const tree = await api().library_tree();
           if (tree.status === "faulty") throw Error(tree.reason);
-          patchSources({ tree, error: null });
+          patchSources(same(tree, state.sourcesView.tree) ? { error: null } : { tree, error: null });
           // A library folder read for the first time shows "Reading…"; look again shortly instead of waiting on it.
           window.clearTimeout(readingTimer);
           if ((tree.folders || []).some((f: Json) => f.reading)) readingTimer = window.setTimeout(() => void loadLibraryTree(), 2000);
@@ -938,6 +947,12 @@ export async function loadFolderItems(generation = state.source.generation) {
 }
 /** Reload the shown folder in place after a scan or a finished item: states update, nothing jumps. */
 let refreshing = false;
+const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+/** Some operation runs and every running one is a scan. */
+const onlyScans = () => {
+  const running = [state.globalScan, ...state.sources.map((source) => source.operation)].filter(operationActive);
+  return running.length > 0 && running.every((operation) => operation.operation === "scan");
+};
 async function refreshFolder() {
   const s = state.sourcesView;
   if (!s.key || !state.api || refreshing) return;
@@ -947,6 +962,7 @@ async function refreshFolder() {
     const result = await api().library_items(s.key, s.path, 0, Math.min(200, shown), { types: s.types, states: s.states }, s.showFiles);
     if (result.status !== "ready" || state.sourcesView.key !== s.key || state.sourcesView.path !== s.path) return;
     const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
+    if (result.total === state.source.total && same(assets, state.source.items) && same(files, s.files) && same(result.counts, s.counts)) return;
     // Thumbnails of assets whose state changed are asked for again (a finished preview fades in).
     const before: Record<string, string> = Object.fromEntries(state.source.items.map((item: Json) => [item.asset_id, item.state]));
     for (const item of assets) if (before[item.asset_id] !== item.state) requested.delete(`source:${state.source.generation}:${item.asset_id}`);
@@ -1836,6 +1852,10 @@ export function activities(ready: boolean, sources: Json[], worker: string, prev
   for (const source of sources) {
     const operation = source.operation;
     if (!operationActive(operation)) continue;
+    if (operation.quiet && operation.status !== "cancelling") {
+      list.push({ id: "source:" + source.key, label: "Checking for changes", detail: "Looking for new, changed or removed files" });
+      continue;
+    }
     const verb = operation.operation === "describe" && operation.status !== "cancelling" ? "Describing" : OPERATION_VERBS[operation.status] || "Processing";
     const measured = progressInfo(operation);
     list.push({ id: "source:" + source.key, label: verb, detail: `${operation.phase || verb} · ${source.name}`,
@@ -2420,9 +2440,11 @@ async function watchChanges() {
         await refreshCollections();
       }
       // Running operations also report worker liveness, which is not a file change.
+      const revision = state.sourcesRevision, scanning = onlyScans();
       if (sourcesChanged || operationActive(state.globalScan) || state.sources.some((source) => operationActive(source.operation))) await loadSources();
       // The tree and the shown folder follow scans and processing; the rail's folder dot follows the tree.
-      if (sourcesChanged) {
+      // While only scans run, their progress writes change nothing shown: wait for the revision (decision 0027).
+      if (sourcesChanged && !(scanning && onlyScans() && state.sourcesRevision === revision)) {
         await loadLibraryTree();
         const s = state.sourcesView;
         if (route().page === "sources" && s.key && !state.source.loading) void refreshFolder();
@@ -2461,7 +2483,7 @@ export async function start(bridge: Bridge) {
     void loadQueue();  // Work stopped when the app last closed shows its Continue banner at once.
     // Setup opens by itself only on a genuinely fresh install (setup_core.first_run), or to show an agent's setup for review.
     void loadSetupState().then((info) => (info.auto_open || info.record?.state === "review") && openSetup()).catch(() => undefined);
-    if (context.managed_sources) await sourceAction("scan");
+    if (context.managed_sources) await sourceAction("check");  // The quiet launch check (decision 0027).
   } catch (error) {
     setState({ startupError: (error as Error).message, ready: true });
   }

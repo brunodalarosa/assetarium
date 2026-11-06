@@ -88,7 +88,7 @@ def model_references(config, rows, models, previous=()):
     referenced.update({p['source_path']: 'Supplied preview of a model' for a in models for p in a.get('previews', []) if p.get('source_path')})
     referenced.update({d['path']: 'Blender texture of ' + PurePosixPath(d['from']).name for r in previous
                        for d in r.get('dependencies', []) if d.get('inspection_version') and d.get('path') and d.get('from')})
-    images, sizes = {}, {r['path']: r.get('size') for r in rows}
+    images, sizes, times = {}, {r['path']: r.get('size') for r in rows}, {r['path']: r.get('mtime_ns') for r in rows}
     for row in rows:
         if image_format(row['path']) and row.get('status') == 'available':
             images.setdefault(PurePosixPath(row['path']).name.casefold(), []).append(row['path'])
@@ -97,7 +97,7 @@ def model_references(config, rows, models, previous=()):
             if file['format'] != 'fbx' or file['availability'] != 'available':
                 continue
             folder = PurePosixPath(file['path']).parent
-            for name in fbx_references(config, file['path'], sizes.get(file['path'])):
+            for name in fbx_references(config, file['path'], sizes.get(file['path']), file.get('sha256'), times.get(file['path'])):
                 # The nearest image with that name inside the same top folders as the model.
                 found = sorted(images.get(name, []), key=lambda p: -_shared(PurePosixPath(p).parent, folder))
                 if found and _shared(PurePosixPath(found[0]).parent, folder) >= 2:

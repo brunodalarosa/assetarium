@@ -113,8 +113,10 @@ def operation_lease(config, scoped, token):
         acquired.__exit__(None,None,None)
 
 
-def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None):
+def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None, quiet=False):
     """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope.
+
+    ``quiet`` marks the app's launch check of every folder (decision 0027): the app shows it as a hint, not a scan.
 
     ``owner`` is the open app's process ID: the operation stops with that app (``watch_owner``).
     """
@@ -156,7 +158,8 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=No
         token = uuid.uuid4().hex
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
               operation=operation, key=key, reason=None, current_asset=None, completed=None, total=None, stage=None,
-              asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item, owner=owner)
+              asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item, owner=owner,
+              quiet=bool(quiet and operation == 'scan' and not key), changes=None)
         command = [str(python), str(config.project_root / "scripts/source-operation.py"), operation, "--token", token]
         if key:
             command.extend(["--source", key])
@@ -225,14 +228,16 @@ def end_tree():
 def scan_all(config, token, key=None):
     scoped = bound(config, get_source(config, key)) if key else config
     sources = [get_source(config, key)] if key else [s for s in registry(config)["sources"] if s["enabled"]]
-    faults = []
+    faults, changes = [], {'new': 0, 'changed': 0, 'removed': 0}
     for i, source in enumerate(sources):
         if cancelled(scoped, token):
             state(scoped, status="cancelled", phase="Scan cancelled")
             return
         state(scoped, status="scanning", phase="Scanning " + source["name"], progress=i / max(1, len(sources)))
         try:
-            scan_source(config, source, progress=scan_reporter(scoped, source['name']))
+            found = scan_source(config, source, progress=scan_reporter(scoped, source['name'])).get('changes') or {}
+            for name in changes:
+                changes[name] += found.get(name, 0)
         except (OSError, ValueError, sqlite3.Error) as exc:
             fault = {"key": source["key"], "reason": str(exc), "status": "faulty", "utc": now()}
             faults.append(fault)
@@ -245,7 +250,8 @@ def scan_all(config, token, key=None):
             atomic_json(fault_root / (source['id'] + '.json'),diagnostic)
     state(scoped, phase='Publishing library', metrics=dict(phase='Publishing library', completed=len(sources), total=None, unit='library folders'))
     aggregate(config)
-    state(scoped, status="complete_with_faults" if faults else "complete", phase="Scan complete", progress=1, faults=faults, metrics=None)
+    state(scoped, status="complete_with_faults" if faults else "complete", phase="Scan complete", progress=1, faults=faults, metrics=None,
+          changes=changes)
 
 
 def scan_reporter(config, source_name=None):

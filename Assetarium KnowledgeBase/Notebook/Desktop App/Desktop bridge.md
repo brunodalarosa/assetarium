@@ -41,6 +41,11 @@ method is callable from the page as `window.pywebview.api.<name>`. Types for the
 - `DesktopService` is read-only presentation; ranking, filtering and availability stay in the shared
   search code ([Retrieval](../Search/Retrieval.md)).
 - **Startup never renders or loads a model**; the embedding worker may pre-load its libraries only (decision 0005).
+- **The launch scan is the quiet check** (decision 0027): `store.start` calls `source_action('check')`, which starts
+  the all-folder scan with `quiet` in `source-operation.json`; `scan_all` adds `changes` (new/changed/removed).
+  The activity indicator shows "Checking for changes" for it, `announceCheck` toasts only when something changed,
+  and `watchChanges` reloads the tree and the shown folder during scans only when the sources revision moves
+  (`onlyScans`); identical answers keep their state, so cards don't re-render. Proof: `scripts/verify-quiet-startup.py`.
 
 ## Related
 

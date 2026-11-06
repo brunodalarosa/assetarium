@@ -20,16 +20,23 @@ FBX_NAMES = re.compile(rb'([\w\- .]{1,200}\.(?:png|jpe?g|tga|bmp|tiff?|webp|dds|
 FBX_LIMIT = 64 * 1024 * 1024
 
 
-def fbx_references(config, path, size):
+def fbx_references(config, path, size, sha256=None, mtime_ns=None):
     """Image file names an FBX file mentions (ASCII ``RelativeFilename`` and strings in binary FBX); never parsed further."""
+    from .parse_cache import remember, unchanged
+    return set(remember('fbx-names', sha256, lambda: fbx_names(config, path, size), unchanged(config, path, size, mtime_ns)))
+
+
+def fbx_names(config, path, size):
+    """``(sorted names, cacheable)``: a file that could not be read gives no names and is not remembered."""
     if (size or 0) > FBX_LIMIT:
-        return set()
+        return [], True
     try:
         with config.open_source(path) as stream:
             data = stream.read(FBX_LIMIT)
     except (OSError, ValueError):
-        return set()
-    return {PurePosixPath(m.decode('utf-8', 'replace').replace('\\', '/').strip()).name.casefold() for m in FBX_NAMES.findall(data)}
+        return [], False
+    return sorted({PurePosixPath(m.decode('utf-8', 'replace').replace('\\', '/').strip()).name.casefold()
+                   for m in FBX_NAMES.findall(data)}), True
 
 
 def words(folders):
