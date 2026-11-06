@@ -14,7 +14,8 @@ branch:
 > shared backend (`Gateway.call` / `AssetService` / `SearchEngine`), never in the window.
 
 Up: [Architecture](../Architecture.md) · Where in code: [Desktop App](../../Notebook/Desktop%20App/Desktop%20App.md) ·
-User guide: [docs/gui/README.md](../../../docs/gui/README.md) · Interactive preview: [3D preview](../../Notebook/Desktop%20App/3D%20preview.md)
+User guide: [docs/gui/README.md](../../../docs/gui/README.md) · Interactive preview: [3D preview](../../Notebook/Desktop%20App/3D%20preview.md) ·
+Down: [Design language](Design%20language.md) (design principles)
 
 Moved from `docs/gui/README.md` on 2026-10-28; not yet re-verified against the code line by line.
 

@@ -22,6 +22,8 @@ say: `Home.md` (conventions), `Status.md`, `Notebook/` (working notes per area, 
   and 0-3 friction items for `Notebook/Improvements.md`. Write them only after the owner
   approves. Learnings are what cost real effort to find or what the owner explained that
   exists nowhere else, not a log of the work.
+- The design principles live only in `Architecture/Desktop App/Design language.md` (alias "Design principles").
+  No agent edits it without the owner's approval: propose the exact change, wait for a yes, then write it.
 - Architecture docs and decisions are human-owned: agent edits to Architecture stay
   `status: draft`; decisions change only as described under "Recorded decisions".
 

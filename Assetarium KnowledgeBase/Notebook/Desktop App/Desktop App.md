@@ -14,7 +14,8 @@ committed bundle. Linux has no desktop app yet (decision 0013). Up: [Notebook](.
 - [Frontend build](Frontend%20build.md): React source, the committed `ui/build/` bundle, UTF-8 rules.
 - [Verify harness](Verify%20harness.md): real WebView2 checks driven through `window.lal`.
 - [3D preview](3D%20preview.md): the sandboxed Online 3D Viewer frame.
-- [Design system](Design%20system.md): design principles, tokens, components and icon meanings.
+- [Design system](Design%20system.md): tokens, components, icon meanings and UI rules. The design principles are in the
+  [Design language](../../Architecture/Desktop%20App/Design%20language.md).
 - [Collections and tags](../../Architecture/Desktop%20App/Collections%20and%20tags.md) *(gap)*:
   `asset_collections.py`, `asset_tags.py`, `collection_export.py`.
 
@@ -23,6 +24,6 @@ committed bundle. Linux has no desktop app yet (decision 0013). Up: [Notebook](.
 - [Desktop app design](../../Architecture/Desktop%20App/Desktop%20app%20design.md) (Architecture) and the user guide
   [docs/gui/README.md](../../../docs/gui/README.md).
 - Decisions: [0011](../../Decisions/0011-react-desktop-ui.md), [0012](../../Decisions/0012-collections-and-tags.md),
-  [0014](../../Decisions/0014-setup-wizard.md), [0025](../../Decisions/0025-design-principles.md) (design principles).
+  [0014](../../Decisions/0014-setup-wizard.md), [0025](../../Decisions/0025-design-principles.md) (superseded by the [Design language](../../Architecture/Desktop%20App/Design%20language.md)).
 - `AGENTS.md` → User experience: keep actions clear, never offer an action that can't resolve the
   displayed state, keep pending work and recorded failures apart.
