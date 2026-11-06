@@ -8,7 +8,7 @@ bundles, itch.io downloads, your own exports — and it builds a searchable cata
 previews, a 3D viewer and AI-written descriptions. Everything runs on your computer, and
 your original files are never changed.
 
-Version **0.1.0** · Windows desktop app · Linux command line · [AGPL-3.0](LICENSE)
+Version **0.2.0** · Windows desktop app · Linux command line · [AGPL-3.0](LICENSE)
 
 ## Why Assetarium
 

@@ -25,11 +25,12 @@ from test_incremental import library  # noqa: F401 -- shared synthetic library f
 GIB = render_pool.GIB
 
 
-def test_plan_follows_cores_and_limits_only_lower_it(library):
+def test_plan_follows_cores_and_limits_only_lower_it(library, monkeypatch):
     config, _ = library
     auto = render_pool.plan(config, available=64 * GIB, count=32)
     assert (auto['processes'], auto['threads'], auto['reason']) == (4, 8, 'automatic for this processor')
     assert render_pool.plan(config, available=64 * GIB, count=8)['processes'] == 1
+    monkeypatch.setattr(render_pool, 'available_memory', lambda: 64 * GIB)  # This computer's free memory varies.
     assert render_pool.plan(config, available=None, count=32)['processes'] == 4
     render_pool.save(config, 2, None)
     assert render_pool.plan(config, available=64 * GIB, count=32)['processes'] == 2

@@ -430,7 +430,8 @@ async def serve(config, root=None, config_fault=None):
             raise ValueError('Unknown prompt')
         return GetPromptResult(description=prompt.description,
                                messages=[PromptMessage(role='user', content=TextContent(type='text', text=PROCEDURE + ' How to talk to me: ' + GUIDE))])
-    server = Server('local_asset_library',version='0.1.0',
+    from . import __version__
+    server = Server('local_asset_library',version=__version__,
                     instructions=instructions(config) if config is not None else DEGRADED_INSTRUCTIONS,
                     on_list_tools=list_tools,on_call_tool=call_tool,on_list_prompts=list_prompts,on_get_prompt=get_prompt)
     write_connection(gateway.root, gateway.run_id, 'normal' if config is not None else 'setup_only')

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "asset_ids": [
+    "asset_0eb47511198b3974f582670932fe25a6",
+    "asset_63ff2228dba150b19940a5dda0dab965",
+    "asset_d6468afecc412681c5370af4a7728c64"
+  ],
+  "fingerprint": "052dd33544c6dc6fb6f13dbd047377585b2337b42195d1d1e261c7277e194f4b",
+  "scope": "library",
+  "packs": [
+    "Sample assets"
+  ],
+  "approval": "Configured asset sources; manual processing"
+}
