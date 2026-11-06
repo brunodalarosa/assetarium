@@ -134,15 +134,16 @@ try:
     cli('refresh', '--asset-source', key, owner=False)  # Publish usable partial results (the app's Refresh published view).
     status = cli('sources', 'list')['sources'][0]
     report['source_status'] = {k: status.get(k) for k in ('pending', 'failed', 'reason', 'descriptions')}
-    previews = sorted((assets / 'metadata-lal').rglob('*.png'))
+    previews = sorted((project / 'data/library-store/results').rglob('*.png'))
     assert len(previews) >= 6 and all(p.read_bytes()[:8] == b'\x89PNG\r\n\x1a\n' for p in previews), previews
-    report['checks'].append(f'{len(previews)} preview PNGs rendered into the source metadata; published with refresh')
+    report['checks'].append(f'{len(previews)} preview PNGs rendered into the library store; published with refresh')
     failures = cli('failures')
     report['failures'] = {'assets': failures['assets'], 'paths': len(failures['paths'])}
     for word in ('disable', 'enable'):
         cli('sources', word, key)
-    cli('sources', 'images', key, 'on')
-    report['checks'].append('sources disable / enable / images on, and failures, through the CLI')
+    cli('packs', 'list', key)
+    cli('queue', 'list')
+    report['checks'].append('sources disable / enable, packs list, queue list and failures, through the CLI')
     wire = Wire(out / 'mcp-stderr.log')
     try:
         found = wire.call('search_assets', {'query': 'lantern', 'mode': 'keyword', 'limit': 5})

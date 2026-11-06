@@ -48,17 +48,39 @@ export function hasDescription(item: Json) {
 /** Card meta line from measured facts: "GLB · 1,248 tris", or "PNG · 512 × 512" for images. */
 export function cardMeta(item: Json, card?: Json) {
   const formats: string[] = item.formats || [];
-  const format = (card?.format || (formats.length === 1 ? formats[0] : "") || "").toUpperCase();
+  const format = (item.source_format || card?.format || (formats.length === 1 ? formats[0] : "") || "").toUpperCase();
   const fact =
     item.asset_type === "image"
       ? card?.width ? `${card.width} × ${card.height}` : null
-      : typeof card?.triangles === "number" ? `${card.triangles.toLocaleString()} tris` : null;
+      : typeof card?.triangles === "number" && (!item.source_format || item.source_format === card?.format)
+        ? `${card.triangles.toLocaleString()} tris` : null;
   const extra = !card?.format && formats.length > 1 ? formats.map((f) => f.toUpperCase()).join(" / ") : null;
   return [format || extra, fact].filter(Boolean).join(" · ");
 }
 
 export function operationActive(operation: Json) {
   return ["queued", "scanning", "processing", "publishing", "cancelling", "verifying"].includes(operation?.status);
+}
+
+/** Measured work in the current phase; weighted legacy progress is never presented as a measured percentage. */
+export function progressInfo(operation: Json): { label: string; detail: string; value?: number } {
+  const metrics = operation.metrics?.phase === operation.phase ? operation.metrics : null;
+  const count = metrics?.completed ?? operation.completed;
+  const total = metrics ? metrics.total : operation.total;
+  const phase = operation.phase || "Starting";
+  const unit = metrics?.unit || "assets";
+  const known = typeof total === "number" && total > 0 && typeof count === "number";
+  const value = known ? Math.max(0, Math.min(100, count / total * 100)) : undefined;
+  const label = known ? `${count.toLocaleString()} / ${total.toLocaleString()} ${unit}`
+    : typeof count === "number" ? `${count.toLocaleString()} ${unit} checked` : phase;
+  const details = [phase, label];
+  if (metrics?.source_name) details.push(metrics.source_name);
+  if (known) details.push(`${Math.max(0, total - count).toLocaleString()} remaining · ${Math.round(value!)}% of this phase`);
+  else if (metrics && !/saving|updating|publishing/i.test(phase)) details.push("Total not yet known");
+  else if (metrics) details.push("Finalizing; checked counts are not whole-operation completion");
+  if (typeof metrics?.failed === "number") details.push(`${(count - metrics.failed).toLocaleString()} successful checks · ${metrics.failed.toLocaleString()} faults recorded`);
+  if (typeof metrics?.reused === "number") details.push(`${metrics.reused.toLocaleString()} cached hashes reused`);
+  return { label, detail: details.join(" · "), value };
 }
 export function describeActive(source: Json) {
   return source.operation?.operation === "describe" && operationActive(source.operation);
@@ -88,7 +110,7 @@ export function descriptionSummary(source: Json) {
 
 export function descriptionBlocked(source: Json) {
   const d = source.descriptions || {};
-  if (!source.enabled) return "Enable this source in Settings → Asset sources to generate descriptions.";
+  if (!source.enabled) return "Include this library folder in search in Library to generate descriptions.";
   if (source.processing_paused) return "Processing is paused. Select formats in Settings → General to generate descriptions.";
   if (operationActive(source.operation)) return "Available when the current operation for this source finishes.";
   if (!d.missing) return d.failed ? "Nothing left to generate. Failed descriptions are recorded and not retried." : "Nothing to generate right now.";
@@ -118,7 +140,8 @@ export function notificationContent(item: Json): { tone: Tone; title: string; bo
     return {
       tone: "info",
       title: item.finished ? "Your agent finished setup" : "Your agent changed setup",
-      body: `${changes.length ? "Changed: " + changes.join(", ") + "." : "No values changed."} You can review and change every value.`,
+      body: item.finished ? `${changes.length ? "Changed: " + changes.join(", ") + ". " : ""}Look over its report and confirm it, then choose your asset folders.`
+        : `${changes.length ? "Changed: " + changes.join(", ") + "." : "No values changed."} You can review and change every value.`,
     };
   }
   if (item.kind === "descriptions_ready")
@@ -146,16 +169,64 @@ export const notificationKey = (item: Json) => item.id + "@" + item.created_utc;
 
 /* Setup and Settings → General share this copy (decision 0014). */
 export const BUDGET_HELP =
-  "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus each source’s metadata-lal folder, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Process assets and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
+  "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus the library store that holds every preview, description and search result, wherever it is, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Make previews and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
 export const DESCRIPTIONS_OFF =
   "Generate descriptions is hidden and no ready-to-generate notices appear. Descriptions already written stay stored and searchable; nothing is deleted or redone. Turn it back on any time.";
 export const ENGINE_NOTE =
-  "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Semantic and image search still need the built-in search runtime and an NVIDIA CUDA GPU in this version.";
+  "Different engines and models word descriptions differently. Descriptions you already have stay as they are; switching never redoes them. Where search by description and by image runs is a separate choice below.";
+export const SEARCH_HELP =
+  "Search by description and by image uses the EmbeddingGemma model on this computer, on an NVIDIA GPU or on the CPU. Both use the same model and precision, so results match closely; the GPU builds search data about ten times faster. After switching, run the search check again and Make previews to rebuild search data. Until then, names, filters and keyword search keep working.";
+export const SEARCH_THREADS_HELP =
+  "How many CPU threads build search data. More are faster until the processor is saturated; fewer leave the computer more responsive. Search results are identical at any number, so changing it never redoes work. Automatic uses the speed test's choice: the fewest threads within 3% of the fastest.";
+/** "Now: 24 of 32 threads (fastest in the speed test)." */
+export function searchThreadsText(search: Json) {
+  return `Now: ${search.threads} of ${search.cpu_threads} threads (${search.reason}).`;
+}
+/** The speed test's search data line: each tested count, or why there is none. */
+export function searchTestText(search: Json) {
+  if (search.device !== "cpu") return "Search data runs on the GPU, so CPU threads are not tested.";
+  if (!search.test) return "Not tested yet.";
+  const tested = search.test.results.map((r: Json) => `${r.threads} threads ${r.seconds_per_image.toFixed(2)} s`).join(" · ");
+  return `Per test image: ${tested} · ${search.test.chosen} threads chosen (the fewest within 3% of the fastest).`;
+}
+export const SPEED_TEST_HELP =
+  "A short test on this computer with synthetic shapes and images, never your assets (about 2–3 minutes). It finds the faster render device, the CPU or a graphics card, and how many renders at a time help, and, when search runs on the CPU, how many CPU threads build search data fastest. It runs by itself when processing first needs it and again after Blender, the hardware or the search runtime changes; Automatic in Rendering and Search uses its results.";
+export const RENDER_HELP =
+  "Previews render in Blender. Automatic uses the speed test's fastest device and number of renders at a time. Your limits can lower that number or change how much memory rendering may use, for example more when the computer does nothing else overnight. Rendering never goes past the fastest tested number or the memory that is free, so a limit never makes it slower.";
+const STOPPED: Record<string, string> = {
+  "no gain": "more at a time did not help", slower: "more at a time was slower", memory: "more at a time would not fit in memory",
+  "processor cores": "limited by processor cores", "tested every step": "", cancelled: "test cancelled",
+};
+/** One line per tested device: its best speed, or why it is not used. */
+export function renderTestLine(result: Json, chosen: string) {
+  if (!result.best) {
+    if (result.stopped === "much slower than another device") return `${result.label}: much slower than another device; not used`;
+    return `${result.label}: could not render${result.stopped?.startsWith("failed: ") ? " (" + result.stopped.slice(8) + ")" : ""}; not used`;
+  }
+  const why = STOPPED[result.stopped] ?? "";
+  return `${result.label}: ${result.best.seconds_per_asset.toFixed(2)} s per test asset, ${result.best.processes} at a time${why ? ` (${why})` : ""}${result.key === chosen ? " · fastest" : ""}`;
+}
+export function renderNowText(plan: Json) {
+  const count = `${plan.processes} ${plan.processes === 1 ? "render" : "renders"} at a time`;
+  if (plan.reason === plan.best_reason) return `Now: ${plan.device}, ${count} (${plan.reason}).`;
+  return `Now: ${plan.device}, ${count}, limited by ${plan.reason} (${plan.best_reason}: ${plan.best}).`;
+}
+/** "4 in FBX and 4 in gLTF are not in every folder; 1 name repeats inside Unity FBX. Those stay as they are." */
+export function nearMissText(near: Json | undefined) {
+  if (!near) return "";
+  const list = (counts: Record<string, number>) => Object.entries(counts).map(([folder, n]) => `${n} in ${folder}`).join(" and ");
+  const parts = [];
+  if (Object.keys(near.only).length) parts.push(`${list(near.only)} ${Object.values(near.only).reduce((a: number, b) => a + (b as number), 0) === 1 ? "is" : "are"} not in every folder`);
+  if (Object.keys(near.repeated).length)
+    parts.push(Object.entries(near.repeated).map(([folder, n]) => `${n} ${n === 1 ? "name repeats" : "names repeat"} inside ${folder}`).join(" and "));
+  return parts.length ? ` ${parts.join("; ")}. Those stay as they are.` : "";
+}
 export const BATCH_HELP =
   "How many assets the model describes in one call. Larger batches finish sooner but need more GPU memory. If memory runs out, the run stops safely: nothing is marked failed and those assets stay waiting, so you can lower the size and continue. Wording can differ slightly with which assets share a batch. Changing this never redoes finished descriptions.";
 export function setupRecordText(record: Json | null | undefined) {
   if (!record?.state || record.state === "not_run") return "Setup has not been run on this computer.";
   const when = (value: string) => new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   const by = record.by === "agent" ? " by an agent" : "";
+  if (record.state === "review") return `Your agent finished setup ${when(record.review_utc)}; it waits for you to look over its report.`;
   return record.state === "completed" ? `Setup completed ${when(record.completed_utc)}${by}.` : `Setup skipped ${when(record.skipped_utc)}${by}.`;
 }

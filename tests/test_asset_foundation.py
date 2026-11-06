@@ -14,6 +14,7 @@ from PIL import Image
 from test_retrieval import SyntheticBackend
 from test_incremental import library, ready
 from local_asset_library import catalog, catalog_migration, incremental, notifications
+from local_asset_library.settings import used_formats
 from local_asset_library.asset_structure import (
     child_id, new_record, new_subasset, structure, upgrade_record, validate_collection,
 )
@@ -148,7 +149,7 @@ def test_png_dispatch_no_blender_and_audio_remains_explicitly_unsupported(media,
     item = catalog.detail(work, image['asset_id'])
     assert import_outcome(item, False)['state'] == 'complete'
     # Only bounded derived files are written; the original is never copied.
-    derived = sorted(p.name for p in config.output_path('data', 'inspection').glob('**/*.png'))
+    derived = sorted(p.name for p in config.output_path('data', 'results/inspection').glob('**/*.png'))
     assert derived == ['model-input.png', 'thumbnail.png']
 
 
@@ -172,7 +173,7 @@ def test_media_publication_reload_shared_api_and_notifications(media):
     assert delivered and detail['metadata']['asset_structure']['asset_type'] == 'image'
     unsupported, audio_bytes, faults = mcp.execute('get_asset', {'asset_id': audio['asset_id'], 'include_preview': True})
     assert unsupported['preview']['status'] == 'unsupported' and audio_bytes is None and not faults['excluded']
-    summary = processing_summary(records(work), {r['asset_id']: r for r in records(config)}, ['gltf'], set())
+    summary = processing_summary(records(work), {r['asset_id']: r for r in records(config)}, used_formats(config), set())
     assert summary['pending'] == 0 and summary['descriptions']['missing'] == 1
     status = {'id': 'synthetic', 'key': 'media', 'name': 'Media', 'enabled': True, 'scanned': True, **summary}
     # The image's optional description is ready to generate; audio stays unsupported and silent.

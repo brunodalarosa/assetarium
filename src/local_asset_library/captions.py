@@ -18,8 +18,10 @@ VERSION = "caption-adapter-v1"
 FIELDS = {"identity", "description", "shape", "colors", "parts", "style",
           "distinguishing_features", "uncertainties", "suggested_uses"}
 OBSERVATIONS = FIELDS - {"suggested_uses"}
-TECHNICAL = re.compile(r"\b(triangle count|polygon count|vertex count|\d+\s+(?:triangles|polygons|vertices)|rigging|rigged|unrigged|armature|animation clips?|UV maps?|file format|dependency completeness|meters tall|metres tall)\b", re.I)
+# A ship's rigging is its visible ropes; only the character-rig meanings are technical claims.
+TECHNICAL = re.compile(r"\b(triangle count|polygon count|vertex count|\d+\s+(?:triangles|polygons|vertices)|rigged|unrigged|armature|(?:skeletal|character|bone) rig(?:ging)?|animation clips?|UV maps?|file format|dependency completeness|meters tall|metres tall)\b", re.I)
 USES = re.compile(r"\b(suitable for|ideal for|can be used|could be used|would work|gameplay|Play Shapes|designed for)\b", re.I)
+USE_NOTE = "Use wording in visual observations; suggested uses belong in their own list. The description stays usable."
 CALIBRATION_INDICES = (0, 4, 5, 6, 10, 13, 16, 22, 28, 37)
 
 
@@ -48,15 +50,28 @@ def validate_caption(value):
         items = value[key]
         if not isinstance(items, list) or len(items) > 16 or not all(string(v, 300) for v in items):
             raise ValueError(f"Invalid string list: {key}")
-    if any(not value[key] for key in ("shape", "colors", "parts", "style")):
+    # The prompt asks for visible components only; a pebble or grass clump honestly has none.
+    if any(not value[key] for key in ("shape", "colors", "style")):
         raise ValueError("Core visual attributes must not be empty")
     if identity["certainty"] != "probable" and not value["uncertainties"]:
         raise ValueError("Uncertain identity requires an explicit uncertainty")
     if TECHNICAL.search(encoded({k: value[k] for k in OBSERVATIONS})):
         raise ValueError("Measured technical claim in visual observations")
-    if USES.search(encoded({k: value[k] for k in OBSERVATIONS})):
-        raise ValueError("Suggested use in visual observations")
     return deepcopy(value)
+
+
+def use_notes(value):
+    """Use wording in observations is a review note, never a fault (AGENTS.md caption severity)."""
+    notes = []
+    for key in sorted(OBSERVATIONS & set(value)):
+        item = value[key]
+        texts = [item["label"]] if key == "identity" else [item] if isinstance(item, str) else item
+        for text in texts:
+            for match in USES.finditer(text):
+                excerpt = text[max(0, match.start() - 80):match.end() + 80].strip()
+                notes.append({"severity": "review_note", "evidence": f'{key}: "{excerpt}"',
+                              "reason": f'{USE_NOTE} Matched "{match[0]}".'})
+    return notes[:16]
 
 
 def parse_caption(text):
@@ -289,7 +304,8 @@ def publish(config, identifier, outcome, provenance):
         raise ConfigError('Published captions are immutable; review/update working membership and publish a new generation')
     record = detail(config, identifier)
     overlay, path = overlay_for(config, record)
-    overlay_reference = ('data/' + path.relative_to(config.metadata_root).as_posix() if config.metadata_root
+    from .result_store import logical
+    overlay_reference = ('data/' + logical(config, path) if config.metadata_root
                          else path.relative_to(config.project_root).as_posix())
     provenance = {**provenance, "owner_overlay_path": overlay_reference,
                   "owner_overlay_sha256": file_hash(path), "owner_caption_review": overlay["caption_review"],

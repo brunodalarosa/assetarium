@@ -12,7 +12,8 @@ root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'src'))
 from local_asset_library.config import load_project_config
 from local_asset_library.sources import registry,bound,owners
-from local_asset_library.source_migration import _partition
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from source_migration import _partition
 from local_asset_library.publication import read_json,atomic_json,filesystem_path
 
 config=load_project_config(root)

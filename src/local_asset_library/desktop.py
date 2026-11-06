@@ -1,6 +1,6 @@
 """Windows desktop shell. All UI resources are bundled; worker inference stays offline."""
 import asyncio
-from concurrent.futures import TimeoutError as FutureTimeout
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import json
 import logging
 import os
@@ -17,14 +17,23 @@ from .config import ConfigError, load_project_config
 from .desktop_service import DesktopService
 from .mcp_assets import error_payload, validate
 from .mcp_server import Gateway
+from .logs import kv
 from .search_policy import DEFAULT_MODE
+
+log = logging.getLogger(__name__)
+SLOW_MS = 2000  # A call this slow is worth a line at the default level.
 
 
 def show_in_explorer(path):
-    """Open Explorer with ``path`` selected. Windows only (decision 0013); no shell, and Explorer's exit code is meaningless."""
+    """Open inside a directory, or select an original file using the Windows Shell."""
     if os.name != 'nt':
         raise ConfigError('Show in Explorer is only available on Windows')
-    subprocess.Popen(['explorer.exe', '/select,' + os.path.normpath(path)], creationflags=subprocess.CREATE_NO_WINDOW)
+    target = Path(path).resolve(strict=True)
+    if target.is_dir():
+        os.startfile(str(target))
+    else:
+        from .windows_shell import select_file
+        select_file(str(target))
 
 
 class DesktopBridge:
@@ -36,8 +45,17 @@ class DesktopBridge:
         self._ready = threading.Event()
         self._presentation_lock = threading.Lock()
         self._closed = False
+        self._allow_close = False  # Set by Stop & close: the closing guard lets the window go.
         self._owned_source_operations = set()
         self._pending_prints = {}
+        self._shared = {}
+        self._practice_key = None
+        self._practice_recovery_fault = None
+        from .agent_practice import recover
+        try:
+            recover(config)
+        except (OSError, ValueError, ConfigError) as exc:
+            self._practice_recovery_fault = str(exc)
         self._thread = threading.Thread(target=self._run, name='asset-gateway', daemon=True)
         self._thread.start()
         if not self._ready.wait(10):
@@ -47,8 +65,14 @@ class DesktopBridge:
 
     def _run(self):
         asyncio.set_event_loop(self._loop)
+        # A bounded pool: a slow read can hold a few threads, never the machine (identical reads share one, see _present).
+        executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix='asset-present')
+        self._loop.set_default_executor(executor)
         try:
-            log = self._config.output_path('logs', 'gui-worker.log')
+            from .logs import session
+            # The worker's raw stderr (library warnings) sits beside the session log, not in it.
+            current = session()
+            log = current.with_name(current.stem + '.worker.log') if current else self._config.output_path('logs', 'worker.log')
             log.parent.mkdir(parents=True, exist_ok=True)
             self._diagnostics = log.open('a', encoding='utf-8')
             self._gateway = Gateway(self._config, audit_namespace='gui', diagnostic_stream=self._diagnostics,
@@ -57,6 +81,14 @@ class DesktopBridge:
                 from .sources import aggregate
                 aggregate(self._config)
             self._service = DesktopService(self._config)
+            if self._config.sources_registry:
+                from .logs import session
+                from .processing_queue import claim
+                try:
+                    # The app owns the queue while it is open; what it stopped on close waits behind Continue.
+                    claim(self._config, os.getpid(), Path(session()).name if session() else None)
+                except (ConfigError, OSError, ValueError):
+                    pass  # The Asset processing tab reads the queue again and shows what it can.
             from .interactive_preview import InteractivePreviewService
             self._interactive_preview = InteractivePreviewService(self._service)
             from .source_browser import SourceBrowser
@@ -83,7 +115,8 @@ class DesktopBridge:
             task.cancel()
         if pending:
             self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        self._loop.run_until_complete(self._loop.shutdown_default_executor())
+        # A read still running in the pool is abandoned, not awaited: closing never waits on it (the process exits).
+        executor.shutdown(wait=False, cancel_futures=True)
         self._loop.close()
         self._diagnostics.close()
 
@@ -98,11 +131,20 @@ class DesktopBridge:
             if isinstance(exc, FutureTimeout):
                 future.cancel()
             payload = error_payload(exc)
+            log.error('Call failed · %s', kv(reason=payload['reason']), exc_info=not isinstance(exc, FutureTimeout))
             with (self._gateway.audit_root / 'desktop-faults.jsonl').open('a', encoding='utf-8') as stream:
                 stream.write(encoded(payload) + '\n')
             return {'status': 'faulty', 'reason': payload['reason'], 'payload': payload}
 
-    async def _present(self, operation, *args, guarded=True):
+    async def _present(self, operation, *args, guarded=True, shared=False):
+        if shared:
+            # Identical read-only calls in flight share one run: polls and a timed-out caller's retry never stack up.
+            key = (operation, repr(args))
+            task = self._shared.get(key)
+            if task is None:
+                task = self._shared[key] = asyncio.ensure_future(self._present(operation, *args, guarded=guarded))
+                task.add_done_callback(lambda _: self._shared.pop(key, None))
+            return await asyncio.shield(task)
         started = time.perf_counter()
         # Source/detail work is independent of the serialized GPU search queue. The lock
         # protects DesktopService state only; settings, sources and change polls skip it.
@@ -122,24 +164,79 @@ class DesktopBridge:
                  'faults': result.get('faults', result.get('evidence'))}
         with (self._gateway.audit_root / 'desktop.jsonl').open('a', encoding='utf-8') as stream:
             stream.write(encoded(audit) + '\n')
+        # Polls repeat every few seconds: debug only, one line per call name and repeat window.
+        ms, name = round(audit['elapsed_seconds'] * 1000), operation.__name__.lstrip('_')
+        if audit['status'] == 'faulty':
+            log.warning('%s refused · %s', name, kv(reason=audit['reason'], ms=ms), extra={'repeat_key': ('fault', name, audit['reason'])})
+        else:
+            log.log(logging.INFO if ms >= SLOW_MS else logging.DEBUG, '%s · %s', name, kv(status=audit['status'], ms=ms),
+                    extra={'repeat_key': ('call', name, ms >= SLOW_MS)})
         return result
 
     def context(self):
         return self._wait(self._present(self._service.context))
 
     def sources(self):
-        return self._wait(self._present(self._sources, guarded=False))
+        return self._wait(self._present(self._sources, guarded=False, shared=True))
 
     def general_settings(self):
         from .settings import general_settings
         return self._wait(self._present(general_settings, self._config, guarded=False))
 
     def save_general_settings(self, storage_budget_gib, processing_formats=None, caption_batch_size=None,
-                              descriptions_enabled=None, description_engine=None, description_server=None):
+                              descriptions_enabled=None, description_engine=None, description_server=None,
+                              search_device=None, search_threads=None, image_formats=None):
         from .settings import save_general_settings
         return self._wait(self._present(save_general_settings, self._config, storage_budget_gib, processing_formats,
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
-                                        guarded=False))
+                                        search_device, 'user', search_threads, image_formats, guarded=False))
+
+    # Rendering (decision 0022): device, parallel renders and memory; the speed test runs as an operation.
+    def render_settings(self):
+        from .render_devices import summary
+        return self._wait(self._present(summary, self._config, guarded=False))
+
+    def save_render_settings(self, device=None, processes=None, memory_gib=None):
+        return self._wait(self._present(self._save_render_settings, device, processes, memory_gib, guarded=False))
+
+    def _save_render_settings(self, device, processes, memory_gib):
+        from .render_devices import summary
+        from .render_pool import save
+        save(self._config, processes, memory_gib, device)
+        return dict(summary(self._config), status='saved')
+
+    def render_test(self, action='start'):
+        return self._wait(self._present(self._render_test, action, guarded=False))
+
+    def search_check(self, action='status'):
+        return self._wait(self._present(self._search_check, action, guarded=False))
+
+    def _search_check(self, action):
+        """Run check (decision 0026): start it, or read whether it passed, runs or failed (for Settings and setup)."""
+        from . import engines
+        from .source_operations import operation_status
+        if action == 'start':
+            return self._start_source_operation('search-check', None)
+        if action != 'status':
+            raise ConfigError('Unknown search check action')
+        operation = operation_status(self._config)
+        if operation.get('operation') == 'search-check' and operation.get('status') in {'queued', 'processing'}:
+            return {'status': 'running', 'phase': operation.get('phase')}
+        if engines.capability_ready(self._config, engines.search_device(self._config))['ready']:
+            return {'status': 'ready'}
+        if operation.get('operation') == 'search-check' and operation.get('status') == 'faulty':
+            return {'status': 'failed', 'reason': operation.get('reason')}
+        return {'status': 'missing', 'fault': engines.search_runtime_fault(self._config)}
+
+    def _render_test(self, action):
+        from .source_operations import cancel, operation_status
+        if action == 'cancel':
+            if operation_status(self._config).get('operation') != 'render-test':
+                return {'status': 'idle'}
+            return cancel(self._config)
+        if action != 'start':
+            raise ConfigError('Unknown render test action')
+        return self._start_source_operation('render-test', None)
 
     # Setup wizard (decision 0014): thin calls into setup_core; nothing here starts at launch.
     def setup_state(self):
@@ -170,6 +267,11 @@ class DesktopBridge:
         from .setup_core import check_server
         return self._wait(self._present(check_server, self._config, url, model or '', guarded=False))
 
+    def save_blender(self, path, confirm_rerender=False):
+        """Settings → General → Blender installation: saves a checked Blender on its own."""
+        from .setup_core import set_blender
+        return self._wait(self._present(set_blender, self._config, path, confirm_rerender is True, guarded=False))
+
     def save_setup(self, choices):
         from .setup_core import save_setup
         return self._wait(self._present(save_setup, self._config, choices, guarded=False))
@@ -178,22 +280,23 @@ class DesktopBridge:
         from .setup_core import skip_setup
         return self._wait(self._present(skip_setup, self._config, guarded=False))
 
-    # Agent setup (decision 0016): only these user-driven calls open a session or decide a proposal.
+    # Agent setup (decisions 0016, 0024): only the user decides a proposal; there is no session to open.
     def agent_setup_state(self):
         from .setup_agent import app_state
         return self._wait(self._present(app_state, self._config, guarded=False))
 
-    def open_agent_setup(self):
-        from .setup_agent import open_session
-        return self._wait(self._present(open_session, self._config, 'app', guarded=False))
-
-    def end_agent_setup(self):
-        from .setup_agent import end_session
-        return self._wait(self._present(end_session, self._config, guarded=False))
-
     def decide_setup_proposal(self, proposal_id, decision, confirm_rerender=False):
         from .setup_agent import decide
         return self._wait(self._present(decide, self._config, proposal_id, decision, confirm_rerender is True, guarded=False))
+
+    def confirm_setup_review(self):
+        """Looks good on the report of an agent's setup."""
+        from .setup_core import confirm_review
+        return self._wait(self._present(confirm_review, self._config, guarded=False))
+
+    def undo_setup_value(self, key):
+        from .setup_core import undo_value
+        return self._wait(self._present(undo_value, self._config, key, guarded=False))
 
     def choose_blender_executable(self):
         import webview
@@ -215,13 +318,13 @@ class DesktopBridge:
 
     def importing_failures(self):
         from .sources import importing_failures
-        return self._wait(self._present(importing_failures, self._config, guarded=False))
+        return self._wait(self._present(importing_failures, self._config, guarded=False, shared=True))
 
     def _sources(self):
-        from .sources import registry, source_status, revision
+        from .sources import revision, source_statuses
         from .source_operations import operation_status
         from .notifications import reconcile
-        statuses = [source_status(self._config, s) for s in registry(self._config)['sources']]
+        statuses = source_statuses(self._config)
         # Notices follow the statuses already read for this call; no extra scans.
         return {'status': 'ready', 'sources': statuses, 'revision': revision(self._config),
                 'scan': operation_status(self._config), 'notifications': reconcile(self._config, statuses)['items']}
@@ -242,11 +345,11 @@ class DesktopBridge:
         from . import sources
         from .source_operations import cancel
         if action == 'add':
-            source = sources.add(self._config, directory)
-            return self._start_source_operation('scan', source['key'])
-        if action == 'images':
-            sources.set_import_types(self._config, key, enabled)
-            return self._start_source_operation('scan', key)
+            try:
+                source = sources.add(self._config, directory)
+            except sources.Covered as exc:  # Inside a library folder: the app offers to show that folder.
+                return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.folder['key']}
+            return {**self._start_source_operation('scan', source['key']), 'replaced': source['replaced']}
         if action == 'enabled':
             source = sources.set_enabled(self._config, key, enabled)
             if enabled:
@@ -260,8 +363,350 @@ class DesktopBridge:
         if action in {'process', 'describe'}:
             return self._start_source_operation(action, key)
         if action == 'cancel':
-            return cancel(sources.bound(self._config, sources.get_source(self._config, key)))
+            return cancel(sources.bound(self._config, sources.get_source(self._config, key)) if key else self._config)
         raise ConfigError('Unknown asset source action')
+
+    # The Asset sources tab (decision 0023): library folders → bundles → packs → folders, read from saved data.
+    def library_tree(self):
+        from .library_view import tree
+        return self._wait(self._present(tree, self._config, guarded=False, shared=True))
+
+    def library_items(self, key, path='', offset=0, page_size=60, filters=None, show_files=True):
+        from .library_view import folder_items
+        return self._wait(self._present(folder_items, self._config, key, path, offset, page_size, filters, show_files,
+                                        guarded=False, shared=True))
+
+    def library_locate(self, asset_id):
+        from .library_view import locate
+        return self._wait(self._present(locate, self._config, asset_id, guarded=False, shared=True))
+
+    def library_cover(self, key, relative):
+        return self._wait(self._present(self._library_cover, key, relative, guarded=False))
+
+    def _library_cover(self, key, relative):
+        """A pack's cover: its own preview image, as a small thumbnail. Read only."""
+        import base64
+        from .config import _inside
+        from .image_media import decode, image_format, png_bytes, thumbnail
+        from .sources import bound, get_source
+        scoped = bound(self._config, get_source(self._config, key))
+        path = _inside(scoped.source_root, relative)
+        fmt = image_format(str(path))
+        if not fmt or not path.is_file() or path.stat().st_size > 64 * 1024 * 1024:
+            return {'status': 'faulty', 'reason': 'No cover image'}
+        return {'status': 'ready', 'image': base64.b64encode(png_bytes(thumbnail(decode(path, fmt)[0])[0])).decode('ascii')}
+
+    # The processing queue (decision 0023).
+    def _close_question(self):
+        """What the close dialog says while an item is processing; None lets the window close."""
+        from .processing_queue import running_item
+        if self._closed or self._allow_close or not self._config.sources_registry:
+            return None
+        item = running_item(self._config)
+        if item is None:
+            return None
+        operation = item['operation']
+        done = (f" ({operation['completed']:,} / {operation['total']:,})"
+                if operation.get('total') and operation.get('completed') is not None else '')
+        more = f", and {item['waiting']} more {'waits' if item['waiting'] == 1 else 'wait'}" if item['waiting'] else ''
+        verb = 'Make previews' if item['action'] == 'previews' else 'Generate descriptions'
+        return {'title': 'Asset processing ongoing',
+                'body': f"{verb} · {item['label']} is running{done}{more}. Stop it and close Assetarium? "
+                        'Finished assets are kept, and Continue picks up the rest next time you open it.'}
+
+    def stop_and_close(self):
+        """The close dialog's Stop & close: the window closes now and closing stops the running item."""
+        self._allow_close = True
+        window = getattr(self, '_window', None)
+        if window is not None:
+            threading.Thread(target=window.destroy, name='stop-and-close', daemon=True).start()
+        return {'status': 'closing'}
+
+    def turn_format_on(self, extension):
+        """An asset made from a file whose format is off offers to turn that format on (P5)."""
+        from .settings import turn_format_on
+        return self._wait(self._present(turn_format_on, self._config, extension, guarded=False))
+
+    def show_log(self, name):
+        """Show one session log of this project in Explorer (a crash's Recent entry links to it)."""
+        def reveal():
+            from .logs import SESSION, folder
+            root = folder(self._config.project_root)
+            path = root / str(name)
+            if not SESSION.match(path.name) or path.parent != root or not path.is_file():
+                raise ConfigError('That log is not there any more')
+            show_in_explorer(str(path))
+            return {'status': 'revealed'}
+        return self._wait(self._present(reveal, guarded=False))
+
+    def queue_state(self):
+        from .processing_queue import state
+        return self._wait(self._present(state, self._config, guarded=False, shared=True))
+
+    def queue_add(self, action, scope, confirmed=False):
+        from .processing_queue import add
+        return self._wait(self._present(add, self._config, action, scope, bool(confirmed), guarded=False))
+
+    def queue_remove(self, identifier):
+        from .processing_queue import control
+        return self._wait(self._present(control, self._config, 'remove', identifier, guarded=False))
+
+    def queue_control(self, action, identifier=None, value=None):
+        from .processing_queue import control
+        return self._wait(self._present(lambda: {'status': 'saved', 'queue': control(self._config, action, identifier, value)}, guarded=False))
+
+    def library_visit(self, key):
+        from .library_view import record_visit
+        return self._wait(self._present(record_visit, self._config, key, guarded=False))
+
+    def folder_action(self, action, key, path='', value=None):
+        return self._wait(self._present(self._folder_action, action, key, path, value, guarded=False))
+
+    def folder_missing(self, key, path='', offset=0, page_size=30):
+        from .library_view import unavailable
+        return self._wait(self._present(unavailable, self._config, key, path, offset, page_size, guarded=False, shared=True))
+
+    def _folder_action(self, action, key, path, value):
+        from . import library_store, packs, sources
+        source = sources.get_source(self._config, key)
+        if action in {'make_pack', 'merge', 'clear_pack'}:
+            packs.answer(self._config, key, path, None if action == 'clear_pack' else action)
+        elif action == 'image_kind':
+            sources.answer_folder(self._config, key, path, 'image_kind', value)
+        elif action == 'rename_pack':
+            packs.rename(self._config, key, path, value or '')
+            return {'status': 'saved'}
+        elif action in {'exclude', 'include'}:
+            current = sources.excluded_folders(sources.bound(self._config, source))
+            chosen = current + [path] if action == 'exclude' else [p for p in current if p != path]
+            sources.set_excluded_folders(self._config, key, chosen)
+        elif action == 'forget_missing':
+            if not isinstance(value, dict) or not value.get('revision'):
+                raise ConfigError('Review and confirm the missing entries before deleting.')
+            return {'status': 'saved', 'forgotten': library_store.forget_missing(self._config, source['id'], path or None, value['revision'])}
+        else:
+            raise ConfigError('Unknown folder action')
+        from .pack_profiles import record_change
+        record_change(self._config, key, path, {'by': 'owner'})
+        return self._start_source_operation('scan', key)
+
+    # Pack profiles (decision 0024): a pack's rules, versions, signals and effect; apply, revert, review, export.
+    def pack_profile(self, key, pack):
+        return self._wait(self._present(self._pack_profile, key, pack, guarded=False, shared=True))
+
+    def _pack_profile(self, key, pack):
+        from . import pack_profiles, sources
+        source = sources.get_source(self._config, key)
+        return {'status': 'ready', 'key': key, 'pack': pack, 'rules': pack_profiles.current(self._config, source, pack),
+                'history': pack_profiles.history(self._config, key, pack), 'signals': pack_profiles.signals(self._config, key).get(pack)}
+
+    def pack_profile_action(self, action, key, pack, value=None):
+        if action == 'export':
+            return self._save_profile(key, pack)
+        return self._wait(self._present(self._pack_profile_action, action, key, pack, value, guarded=False))
+
+    def _pack_profile_action(self, action, key, pack, value):
+        from . import pack_profiles, sources
+        if action == 'effect':
+            return pack_profiles.effect(self._config, key, pack, value)
+        if action == 'review':
+            return pack_profiles.review(self._config, key, pack, value)
+        if action == 'separate_descriptions':
+            # value: {group (library-folder relative), separate}; the pack holding the group is versioned.
+            source = sources.get_source(self._config, key)
+            owner = pack_profiles.pack_at(self._config, source, value['group'])
+            group = pack_profiles._relative(value['group'], owner)
+            rules = [r for r in pack_profiles.current(self._config, source, owner)
+                     if not (r['kind'] == 'separate_descriptions' and r['group'] == group)]
+            if value.get('separate'):
+                rules.append({'kind': 'separate_descriptions', 'group': group})
+            result = pack_profiles.apply(self._config, key, owner, rules, {'by': 'owner'})
+        elif action == 'apply':
+            result = pack_profiles.apply(self._config, key, pack, value, {'by': 'owner'})
+        elif action == 'revert':
+            result = pack_profiles.revert(self._config, key, pack, value)
+        else:
+            raise ConfigError('Unknown pack profile action')
+        if result['rescan']:
+            result['operation'] = self._start_source_operation('scan', key)
+        return result
+
+    # Agent activity and proposals (decision 0024): the feed from the MCP call logs; the owner decides proposals.
+    def agent_activity(self, since=None):
+        return self._wait(self._present(self._agent_activity, since, guarded=False, shared=True))
+
+    def _agent_activity(self, since):
+        from .agent_activity import recent
+        from .pack_agent import proposals
+        return {**recent(self._config, since), 'proposals': proposals(self._config, 'pending')}
+
+    def agent_proposal(self, proposal_id, decision):
+        return self._wait(self._present(self._agent_proposal, proposal_id, decision, guarded=False))
+
+    def _agent_proposal(self, proposal_id, decision):
+        from .pack_agent import decide
+        result = decide(self._config, proposal_id, decision)
+        if result.get('rescan'):
+            result['operation'] = self._start_source_operation('scan', result['library_folder'])
+        return result
+
+    # Staged review: decide many proposals, save them together, then scan each library folder once.
+    def agent_proposals_preview(self, decisions):
+        from .pack_agent import preview
+        return self._wait(self._present(preview, self._config, decisions, guarded=False))
+
+    def agent_proposals_commit(self, decisions):
+        return self._wait(self._present(self._agent_proposals_commit, decisions, guarded=False))
+
+    def _agent_proposals_commit(self, decisions):
+        from .pack_agent import commit
+        result = commit(self._config, decisions)
+        result['operations'] = [self._start_source_operation('scan', key) for key in result['rescan']]
+        return result
+
+    # Add library folder (decision 0024): a names-only quick look, then add, keep the names and scan.
+    def quick_look_start(self, directory):
+        from .quick_look import start
+        from .sources import Covered
+        try:
+            return start(self._config, directory)
+        except Covered as exc:
+            return {'status': 'faulty', 'reason': str(exc), 'covered_by': exc.folder['key']}
+        except Exception as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
+
+    def quick_look_status(self, job_id):
+        from .quick_look import status
+        return self._wait(self._present(status, job_id, guarded=False))
+
+    def quick_look_add(self, job_id):
+        return self._wait(self._present(self._quick_look_add, job_id, guarded=False))
+
+    def _quick_look_add(self, job_id):
+        from . import sources
+        from .pack_agent import prompt
+        from .quick_look import _jobs, save
+        job = _jobs.get(job_id)
+        if job is None or not job['done'] or job['error']:
+            raise ConfigError('Choose the folder again; its quick look is gone')
+        added = sources.add(self._config, job['path'])
+        save(self._config, added, job_id)
+        sources.aggregate(self._config)
+        operation = self._start_source_operation('scan', added['key'])
+        return {'status': 'added', 'key': added['key'], 'name': added['name'], 'prompt': prompt(added), 'operation': operation}
+
+    def pack_signals(self, key):
+        from .pack_agent import counts
+        return self._wait(self._present(counts, self._config, key, guarded=False, shared=True))
+
+    def practice_action(self, action, key=None, payload=None):
+        """Practice has its own disposable audit; do not put its results in the desktop call log."""
+        from . import agent_practice
+        from .setup_agent import connections
+        if action == 'available':
+            return {'status': 'ready', 'reason': self._practice_recovery_fault}
+        async def run():
+            result = await asyncio.to_thread(agent_practice.action, self._config, action, key, payload)
+            if action == 'start' and result['status'] == 'started':
+                self._practice_key = result['key']
+                self._practice_recovery_fault = None
+            if result.get('cleaned'):
+                self._practice_key = None
+            if action == 'status' and result['status'] == 'ready':
+                from datetime import datetime, timezone
+                live = connections(self._config.project_root)
+                result['connected'] = [c.get('client') or {} for c in live if c.get('mode') == 'normal']
+                last = result['entries'][-1]['utc'] if result['entries'] else None
+                result['working'] = bool(last and (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() < 120)
+            return result
+        return self._wait(run())
+
+    def _save_profile(self, key, pack):
+        import webview
+        from .pack_profiles import export
+        try:
+            body = self._wait(self._present(export, self._config, key, pack, guarded=False))
+            if body.get('status') == 'faulty':
+                return body
+            name = ''.join(c if c.isalnum() or c in ' -_.' else '_' for c in body['pack']['name']).strip() or 'pack'
+            selected = self._window.create_file_dialog(webview.FileDialog.SAVE, save_filename=name + '.assetarium-profile.json',
+                                                       file_types=('Pack profile (*.json)',))
+            if not selected:
+                return {'status': 'cancelled'}
+            path = Path(selected[0] if isinstance(selected, (list, tuple)) else selected)
+            from .sources import get_source
+            if Path(get_source(self._config, key)['path']).resolve() in (path.resolve(), *path.resolve().parents):
+                return {'status': 'faulty', 'reason': 'Nothing is written into a library folder; choose a place outside it'}
+            path.write_text(json.dumps(body, ensure_ascii=False, indent=1), encoding='utf-8')
+            return {'status': 'saved', 'path': str(path)}
+        except Exception as exc:
+            return {'status': 'faulty', 'reason': str(exc)}
+
+    def path_action(self, action, key, relative=''):
+        """Show a library file or folder in Explorer, open it with its default app, or copy its path."""
+        return self._wait(self._present(self._path_action, action, key, relative, guarded=False))
+
+    def _path_action(self, action, key, relative):
+        from .config import _inside
+        from .sources import bound, get_source
+        scoped = bound(self._config, get_source(self._config, key))
+        target = _inside(scoped.source_root, relative) if relative else scoped.source_root
+        if not target.exists():
+            raise ConfigError('That file or folder is not there any more')
+        if action == 'reveal':
+            show_in_explorer(str(target))
+            return {'status': 'revealed'}
+        if action == 'open':
+            if os.name != 'nt':
+                raise ConfigError('Opening files is only available on Windows')
+            os.startfile(str(target))  # The owner's default app for that file; nothing here writes it.
+            return {'status': 'opened'}
+        if action == 'copy':
+            return self._clipboard(str(target))
+        raise ConfigError('Unknown path action')
+
+    # Excluded folders and duplicate export folders (decision 0019): each change rescans the source.
+    def source_exclusions(self, key, patterns):
+        return self._wait(self._present(self._source_setting, 'set_excluded_folders', key, patterns, guarded=False))
+
+    def source_export(self, key, suggestion_id, decision):
+        return self._wait(self._present(self._source_setting, 'decide_export', key, suggestion_id, decision, guarded=False))
+
+    def source_export_undo(self, key, decision_id):
+        return self._wait(self._present(self._source_setting, 'forget_export', key, decision_id, guarded=False))
+
+    # Texture folder for models missing textures (decision 0021): each change rescans the source.
+    def source_textures(self, key, folder, single_copies):
+        return self._wait(self._present(self._source_setting, 'set_texture_folder', key, folder, single_copies, guarded=False))
+
+    def source_textures_undo(self, key):
+        return self._wait(self._present(self._source_setting, 'forget_texture_folder', key, guarded=False))
+
+    # Recheck of failures from the file/dependency check (decision 0020): preview reads; retry needs its preview.
+    def recheck_failures(self, key):
+        from .recheck import preview
+        return self._wait(self._present(preview, self._config, key, guarded=False))
+
+    def retry_failures(self, key, preview_id):
+        return self._wait(self._present(self._retry_failures, key, preview_id, guarded=False))
+
+    def _retry_failures(self, key, preview_id):
+        from .recheck import release
+        result = release(self._config, key, preview_id)
+        self._start_source_operation('scan', key)
+        return result
+
+    def _source_setting(self, name, key, *args):
+        from . import sources
+        if not self._config.sources_registry:
+            raise ConfigError('Configure asset sources before using source settings')
+        getattr(sources, name)(self._config, key, *args)
+        if name in {'decide_export', 'forget_export'}:  # Export answers belong to the pack holding them (decision 0024).
+            from .pack_profiles import record_change
+            anchor = next((d['anchor'] for d in sources.export_decisions(sources.bound(self._config, sources.get_source(self._config, key)))
+                           if d['id'] == args[0]), '')
+            record_change(self._config, key, anchor, {'by': 'owner'})
+        return self._start_source_operation('scan', key)
 
     def _start_source_operation(self, operation, key):
         from .source_operations import start
@@ -345,7 +790,7 @@ class DesktopBridge:
         return self._wait(self._present(self._interactive_preview.release, ticket))
 
     def changes(self):
-        return self._wait(self._present(self._changes, guarded=False))
+        return self._wait(self._present(self._changes, guarded=False, shared=True))
 
     def _changes(self):
         """Cheap stat-only tokens; views fetch heavy data only when a token changes."""
@@ -363,14 +808,16 @@ class DesktopBridge:
                    stamp(config.output_path('data', 'library/source-cancel.json'))]
         if config.sources_registry:
             from .sources import registry, bound, revision
+            from .library_store import database_path
             library.append(revision(config))
-            sources.append(stamp(config.sources_registry))
+            sources.append(stamp(database_path(config)))
             for source in registry(config)['sources']:
                 scoped = bound(config, source)
                 sources.append([stamp(scoped.output_path('data', 'library/' + name)) for name in
                                 ('source-status.json', 'source-operation.json', 'source-cancel.json', 'active.json')]
                                + [stamp(config.project_root / 'data/library/source-faults' / (source['id'] + '.json'))])
         sources.append(stamp(config.project_root / 'data/library/settings.json'))
+        sources += [stamp(config.project_root / 'data/library' / name) for name in ('rendering.json', 'render-test.json', 'search-test.json')]
         sources.append(stamp(config.project_root / 'data/library/setup.json'))
         sources.append(stamp(config.project_root / 'data/library/notifications.json'))
         from .asset_collections import path as collections_path
@@ -379,7 +826,9 @@ class DesktopBridge:
         organized = [stamp(collections_path(config)), stamp(tags_path(config))]
         from .setup_agent import connection_token, store_path
         # Connection records carry liveness, so a client that died flips the token without touching a file.
-        agent = [stamp(store_path(config)), stamp(config.project_root / 'data/library/setup.json'), connection_token(config.project_root)]
+        from .agent_activity import token as activity_token
+        agent = [stamp(store_path(config)), stamp(config.project_root / 'data/library/setup.json'), connection_token(config.project_root),
+                 activity_token(config)]
         return {'status': 'ready', 'library': digest(library)[:16], 'sources': digest(sources)[:16],
                 'collections': digest(organized)[:16], 'agent': digest(agent)[:16],
                 'worker': self._gateway.worker_phase if hasattr(self, '_gateway') else 'not_started'}
@@ -604,8 +1053,16 @@ class DesktopBridge:
     def _close(self):
         if self._closed:
             return
+        if self._practice_key:
+            from .agent_practice import action
+            action(self._config, 'cancel', self._practice_key)
         self._closed = True
         if self._config.sources_registry:
+            from .processing_queue import release
+            try:
+                release(self._config, os.getpid())  # The running item stops now; every item waits for Continue.
+            except (ConfigError, OSError, ValueError):
+                log.exception('The queue could not be released on close')
             from .sources import registry, bound
             from .source_operations import cancel, operation_status
             for source in registry(self._config)['sources']:
@@ -666,6 +1123,22 @@ def create_window(config, bridge):
     window = webview.create_window('Assetarium', html=html, js_api=bridge,
         width=1280, height=860, min_size=(640, 480), resizable=True, background_color=WINDOW_BACKGROUND[theme])
     bridge._window = window
+
+    def guard_close():
+        # Closing while assets are processing asks first; the dialog's Stop & close lets the window go.
+        try:
+            question = bridge._close_question()
+        except Exception:
+            log.exception('Close check failed; closing anyway')  # Never trap the owner in the app.
+            return None
+        if not question:
+            return None
+        # The handler runs on the UI thread: asking the page from it would wait on itself.
+        threading.Thread(target=lambda: window.evaluate_js(f'window.lal && window.lal.askClose({json.dumps(question)})'),
+                         name='ask-close', daemon=True).start()
+        return False
+    if hasattr(window, 'events'):  # Shell tests stand in a plain record for the window.
+        window.events.closing += guard_close
     return window
 
 
@@ -708,10 +1181,23 @@ def record_profile_outcome(bridge, profile):
 
 
 def main():
+    """Run the window; when it closes, end the process even if a read is still running in a worker thread."""
+    code = run()
+    from .logs import stop
+    stop()  # os._exit skips atexit: write the last repeat counts and "Session ended" now.
+    logging.shutdown()
+    for stream in (sys.stdout, sys.stderr):
+        if stream:  # None under pythonw.
+            stream.flush()
+    os._exit(code)  # Closing already cancelled owned operations and stopped the worker; nothing else may keep it alive.
+
+
+def run():
+    from .logs import start
     root = Path(__file__).resolve().parents[2]
-    log_dir = root / 'logs'
-    log_dir.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(filename=log_dir / 'gui.log', level=logging.INFO, encoding='utf-8')
+    argv = sys.argv[1:]
+    level = 'debug' if '--verbose' in argv else argv[argv.index('--log-level') + 1] if '--log-level' in argv[:-1] else None
+    session_log = start(root, 'app', level)
     bridge = None
     profile = None
     try:
@@ -744,7 +1230,7 @@ def main():
         if os.name == 'nt':
             import ctypes
             ctypes.windll.user32.MessageBoxW(None, 'Assetarium could not start.\n' + str(exc)[:400]
-                + '\nDetails: ' + str(log_dir / 'gui.log'), 'Assetarium — startup fault', 0x10)
+                + '\nDetails: ' + str(session_log), 'Assetarium — startup fault', 0x10)
         return 1
     finally:
         if bridge:

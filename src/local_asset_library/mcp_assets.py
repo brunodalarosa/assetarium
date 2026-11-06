@@ -13,6 +13,7 @@ from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detai
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, search_character_cap
 from .asset_structure import ASSET_TYPES, structure, supported_stage
 from .image_media import FORMATS as IMAGE_FORMATS
+from .settings import IMAGE_FORMATS as IMAGE_TOGGLES
 from .setup_core import ENGINE_HINTS
 
 ID_PATTERN = r"asset_[0-9a-f]{32}"
@@ -51,6 +52,9 @@ SCHEMAS = {
     "get_asset": {"type": "object", "required": ["asset_id"], "additionalProperties": False, "properties": {
         "asset_id": {"type": "string", "pattern": "^" + ID_PATTERN + "$"},
         "source_format": {"type": "string", "enum": FORMATS},
+        "source_variant": {"type": "string", "maxLength": 128,
+                           "description": "Folder label of one of this asset's files, from source_variants (for example \"Unity FBX\"); "
+                                          "chooses between files of the same format. Never a path."},
         "include_metadata": {"type": "boolean", "default": False},
         "include_preview": {"type": "boolean", "default": False},
         "preview_view": {"type": "string", "enum": VIEWS, "description": "Default: image for images, three_quarter for models."}}},
@@ -72,14 +76,32 @@ SCHEMAS = {
     "tag_assets": {"type": "object", "required": ["asset_ids"], "additionalProperties": False, "properties": {
         "asset_ids": ASSET_IDS, "add": {**TAG_LIST, "description": "Owner tags to add (shared app-wide, not per collection)."},
         "remove": {**TAG_LIST, "description": "Owner tags to remove."}}},
-    # Setup (decision 0016): writes need a setup session the user opened in the app; Blender is only proposed.
+    # Setup (decisions 0016, 0024): writes are recorded as the agent's and noticed; Blender is only proposed.
     "get_setup_status": {"type": "object", "additionalProperties": False, "properties": {}},
-    "validate_blender": {"type": "object", "required": ["path"], "additionalProperties": False, "properties": {
-        "path": {"type": "string", "maxLength": 1024, "description": "Absolute path of a file named blender.exe (Windows) or blender; nothing else is run."}}},
+    "validate_blender": {"type": "object", "additionalProperties": False, "properties": {
+        "path": {"type": "string", "maxLength": 1024, "description": "Absolute path of a file named blender.exe (Windows) or blender; "
+                 "nothing else is run. Omit it to check the Blender Assetarium is configured with."}}},
     "apply_setup": {"type": "object", "additionalProperties": False, "properties": {
+        "answers": {"type": "object", "additionalProperties": False, "description": "The user's answers to get_setup_status ask_user; "
+                    "Assetarium derives formats, description engine, batch size and search device from them.", "properties": {
+            "engines": {"type": "array", "maxItems": 5, "items": {"type": "string", "enum": [hint["id"] for hint in ENGINE_HINTS]},
+                        "description": "Every game engine the user makes games with."},
+            "descriptions": {"type": "boolean", "description": "Whether the user wants AI descriptions."},
+            "model_server": {"type": "object", "additionalProperties": False, "description": "Only with descriptions true on a "
+                             "computer that cannot run the built-in engine: a vision model server already running here.", "properties": {
+                "url": {"type": "string", "maxLength": 256, "description": "Loopback only, e.g. http://127.0.0.1:1234/v1."},
+                "model": {"type": "string", "maxLength": 256}}},
+            "storage_gib": {"type": "integer", "minimum": 1, "maximum": 1048576, "description": "Disk space for Assetarium's own data."},
+            "samples": {"type": "boolean", "description": "Whether to add the built-in sample assets (a blue cube, a green "
+                        "pyramid and a red sphere) as a library folder."}}},
+        "finish": {"type": "boolean", "description": "Also finish setup: the user then reviews it in the app."},
         "storage_budget_gib": {"type": "integer", "minimum": 1, "maximum": 1048576},
         "processing_formats": {"type": "array", "maxItems": 3, "items": {"type": "string", "enum": ["fbx", "gltf", "obj"]},
-                               "description": "Formats to process; .glb counts as gltf; [] pauses processing."},
+                               "description": "3D formats Assetarium uses; .glb counts as gltf. Assets only in formats that are "
+                                              "off are hidden (nothing is deleted)."},
+        "image_formats": {"type": "array", "maxItems": 9, "items": {"type": "string", "enum": list(IMAGE_TOGGLES)},
+                          "description": "Standalone image formats Assetarium uses (.jpg is jpeg, .tif tiff). Textures "
+                                         "of 3D models are always read."},
         "caption_batch_size": {"type": "integer", "minimum": 1, "maximum": 8, "enum": [1, 2, 4, 8]},
         "descriptions_enabled": {"type": "boolean"},
         "description_engine": {"type": "string", "enum": ["builtin", "local-server"],
@@ -87,12 +109,19 @@ SCHEMAS = {
         "description_server": {"type": "object", "additionalProperties": False, "properties": {
             "url": {"type": "string", "maxLength": 256, "description": "Loopback only, e.g. http://127.0.0.1:8080/v1."},
             "model": {"type": "string", "maxLength": 256}}},
+        "search_device": {"type": "string", "enum": ["cuda", "cpu"],
+                          "description": "Where semantic and image search run: cuda (NVIDIA GPU with BF16) or cpu (any x86-64 CPU; slower first index)."},
         "engine_hint": {"type": "string", "enum": [hint["id"] for hint in ENGINE_HINTS]}}},
+    "verify_weights": {"type": "object", "additionalProperties": False, "properties": {
+        "model": {"type": "string", "enum": ["caption", "embedding", "all"], "description": "Which weights to verify (default all "
+                  "that are present but not verified yet)."}}},
     "propose_setup": {"type": "object", "required": ["blender_path"], "additionalProperties": False, "properties": {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},
     "finish_setup": {"type": "object", "additionalProperties": False, "properties": {}}}
-WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup"}
-SETUP_TOOLS = {"get_setup_status", "validate_blender", "apply_setup", "propose_setup", "finish_setup"}
+from .pack_agent import SCHEMAS as PACK_SCHEMAS, TOOLS as PACK_TOOLS, WRITE as PACK_WRITE  # noqa: E402
+SCHEMAS.update(PACK_SCHEMAS)  # Pack structure tools (decision 0024): paged outlines, profiles, proposals.
+WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup", *PACK_WRITE}
+SETUP_TOOLS = {"get_setup_status", "validate_blender", "verify_weights", "apply_setup", "propose_setup", "finish_setup"}
 COLLECTION_MEANING = ("A collection is a named, owner-organized bundle of asset IDs, not an asset. Members keep their files "
                       "where they are; labels and notes belong to the collection. Use get_asset on a member for its files.")
 
@@ -103,6 +132,20 @@ def default_view(record):
 
 class TransientFault(ConfigError):
     """Availability faults (busy GPU queue, stopped worker) are not retained per query."""
+
+
+def source_variants(record, problems=None):
+    """The asset's files by folder label (decision 0019), so an agent can ask for one by name; empty when single.
+
+    Unusable alternate files (decision 0020) are listed with ``usable: false`` and their reason.
+    """
+    from .catalog import file_variants
+    labels, problems = file_variants(record), problems or {}
+    if not labels:
+        return {}
+    return {"source_variants": [{"variant": labels[f["path"]], "format": f["format"], "usable": f["path"] not in problems,
+                                 **({"reason": problems[f["path"]]} if f["path"] in problems else {})}
+                                for f in record["files"] if f["path"] in labels]}
 
 
 def check_string(key, value, prop, multiline=False):
@@ -134,11 +177,18 @@ def validate(name, arguments):
             if type(value) is not list or len(value) > prop["maxItems"]:
                 raise ConfigError("Invalid list: " + key)
             for item in value:
+                if prop["items"]["type"] == "object":  # Pack rules: the owning module validates their fields.
+                    if type(item) is not dict or len(encoded(item)) > 2000:
+                        raise ConfigError("Invalid list item: " + key)
+                    continue
                 check_string(key, item, prop["items"])
         if kind == "string":
             # Notes may hold line breaks; other strings stay single-line.
             check_string(key, value, prop, multiline=key == "notes" or (name == "edit_collection" and key == "description"))
-        if kind == "object" and key == "description_server":
+        if kind == "object" and key == "answers":  # setup_agent checks each answer like the wizard.
+            if type(value) is not dict or set(value) - set(prop["properties"]) or len(encoded(value)) > 2000:
+                raise ConfigError("answers takes engines, descriptions, model_server and storage_gib only")
+        elif kind == "object" and key == "description_server":
             if type(value) is not dict or set(value) - set(prop["properties"]):
                 raise ConfigError("description_server takes url and model only")
             for part, text in value.items():
@@ -352,6 +402,8 @@ class AssetService:
             raise
         # Replace internal path with an ID reference, never pretend that it is a viewed image.
         response["query"] = args.get("query", "") if mode != "reference" else args["reference_asset_id"]
+        from .variant_groups import collapse
+        response["results"], response["variants_folded"] = collapse(self.config, response["results"], self.record)
         faults = list(evidence["excluded"])
         for item in response["results"]:
             record = self.record(item["asset_id"])
@@ -370,14 +422,17 @@ class AssetService:
 
     def get(self, args):
         record = self.record(args["asset_id"])
-        result = resolved_detail(self.config, record["asset_id"], args.get("source_format"))
+        result = resolved_detail(self.config, record["asset_id"], args.get("source_format"), args.get("source_variant"))
         deps = result["dependencies"]
         if len(deps) > 64:
             raise ConfigError("Dependency count exceeds 64; cannot return an incomplete usable package")
+        from .packs import fields
         payload = {"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
+                   **fields(self.config, record),  # The detected pack inside the library folder (decision 0023).
                    'asset_type': record.get('asset_type', 'model_3d'), 'parent_asset_id': record.get('parent_asset_id'),
                    "availability": "available", "status": "available", "usable": True,
                    "selected_source": result["selected_source"], "dependencies": deps,
+                   **source_variants(record, result["unusable_files"]),
                    "dependency_completeness": "Known references verified; uninspected binary/alternate dependencies remain unknown",
                    "source_faults": (record.get("inspection_run") or {}).get("source_faults", []),
                    **caption_summary(self.config, record),
@@ -392,13 +447,26 @@ class AssetService:
                                   for item in c['items'] if item['asset_id'] == record['asset_id']][:20]
         from .publication import generation
         payload['generation'] = generation(self.config)
+        from .variant_groups import membership
+        group = membership(self.config, record)
+        shared = None
+        if group:  # One of several variants (decision 0024): every member, and whose description it shares.
+            payload['variant'] = group['value']
+            payload['variants'] = [{'asset_id': v['asset_id'], 'name': v['name'], 'variant': v['value']} for v in group['variants']]
+            if group['shared'] and record.get('description') is None and group['representative']['asset_id'] != record['asset_id']:
+                try:
+                    shared = self.record(group['representative']['asset_id']).get('description')
+                except (KeyError, ValueError, OSError):
+                    shared = None
+                if shared is not None:
+                    payload['description_shared_from'] = group['representative']['asset_id']
         if args.get("include_metadata", False):
             technical = record.get("technical") or {}
             keys = ("inspected_path", "inspected_sha256", "inspected_format") + (
                 IMAGE_FACTS if record.get('asset_type') == 'image' else ("evaluated_instance_totals", "unit_settings"))
             payload["metadata"] = {"formats": sorted({f["format"] for f in record["files"]}),
                 "technical": {k: technical.get(k) for k in keys},
-                "description": record.get("description"), "suggested_uses": record.get("suggested_uses"),
+                "description": record.get("description") or shared, "suggested_uses": record.get("suggested_uses"),
                 "processing": record["processing"], "license_evidence": relevant_license_evidence(record),
                 'stage_faults':record.get('stage_faults',{}), 'inspection_run':record.get('inspection_run'),
                 "caption_quality": caption_quality(self.config, record),
@@ -423,8 +491,8 @@ class AssetService:
                 and not (record.get('inspection_run') or {}).get('errors')
                 and not any(k in record.get('stage_faults', {}) for k in ('inspection', 'previews')))
             if pending_preview:
-                from .settings import processing_eligible, processing_formats
-                eligible = processing_eligible(record, processing_formats(self.config))
+                from .settings import processing_eligible, used_formats
+                eligible = processing_eligible(record, used_formats(self.config))
                 return (({'status': 'pending', 'reason': 'Preview has not been generated.'} if eligible else
                          {'status': 'excluded', 'reason': 'Preview has not been generated because this source format is not selected in Settings → General.'}),
                         None, [])

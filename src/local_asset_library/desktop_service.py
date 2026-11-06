@@ -70,6 +70,13 @@ class DesktopService(AssetService):
         self.item_faults[(identifier, channel)] = fault
         return fault
 
+    def _format_off(self, record):
+        from .settings import format_off, used_formats
+        try:
+            return format_off(record, used_formats(self.config))
+        except (ConfigError, OSError, ValueError):
+            return None  # A damaged settings file is reported by Settings; the asset itself still opens.
+
     @pinned
     def context(self):
         version = self.synchronize()
@@ -116,7 +123,10 @@ class DesktopService(AssetService):
         records = pilot_records(self.config)
         items = []
         allowed = scope(self.config, filters)
-        matching = [r for r in sorted(records, key=lambda r: (r['pack_id'], r['display_name'].casefold(), r['asset_id'])) if matches(r, filters, allowed)]
+        from .settings import used_formats
+        formats = used_formats(self.config) if self.config.sources_registry else None  # Off formats are hidden (decision 0026).
+        matching = [r for r in sorted(records, key=lambda r: (r['pack_id'], r['display_name'].casefold(), r['asset_id']))
+                    if matches(r, filters, allowed, formats)]
         for record in matching[offset:offset + page_size]:
             identifier = record['asset_id']
             faults = list((record.get('inspection_run') or {}).get('source_faults', []))
@@ -177,6 +187,10 @@ class DesktopService(AssetService):
     def _thumbnail(self, record):
         label=card_view(record)
         view=next((p for p in record['previews'] if p.get('view_label')==label),None)
+        if view is None and record.get('asset_type')=='image':
+            original=self._original_thumbnail(record)
+            if original:
+                return original
         key=view and (view.get('path'),view.get('source_path'),view.get('sha256'))
         if key and key in self.thumbnails:
             try:
@@ -191,6 +205,30 @@ class DesktopService(AssetService):
             while len(self.thumbnails)>THUMBNAIL_CACHE:
                 self.thumbnails.popitem(last=False)
         return preview,image
+
+    def _original_thumbnail(self, record):
+        """A 2D image is seen from its original file, before any processing (decision 0023). Read only, bounded."""
+        import base64
+        from .image_media import decode, image_format, png_bytes, thumbnail
+        source=next((f for f in record['files'] if f.get('availability')=='available' and image_format(f['path'])),None)
+        if source is None:
+            return None
+        key=('original',source['path'],source.get('sha256'))
+        if key in self.thumbnails:
+            self.thumbnails.move_to_end(key)
+            return self.thumbnails[key]
+        try:
+            path=self.config.source_file(source['path'])
+            if path.stat().st_size>64*1024*1024:
+                return None
+            image=thumbnail(decode(path,source['format'])[0])[0]
+        except Exception:  # Unsupported or damaged: the card shows its pending state; inspection records the fault.
+            return None
+        value=({'status':'original','view_label':'thumbnail','source_path':source['path']},base64.b64encode(png_bytes(image)).decode('ascii'))
+        self.thumbnails[key]=value
+        while len(self.thumbnails)>THUMBNAIL_CACHE:
+            self.thumbnails.popitem(last=False)
+        return value
 
     @pinned
     def asset(self, identifier, source_format=None, view='three_quarter', expected_version=None):
@@ -230,11 +268,20 @@ class DesktopService(AssetService):
         except (OSError, ValueError) as exc:
             effective, owner = None, {'caption_review': 'faulty'}
             self._record_fault(identifier, 'owner_correction', exc)
+        from .variant_groups import membership
+        group = membership(self.config, record)
+        shared_from = None
+        if group and group['shared'] and effective is None and group['representative']['asset_id'] != identifier:
+            try:  # A variant shows its group's description, labeled as shared (decision 0024).
+                effective = observations(self.config, self.record(group['representative']['asset_id']))
+                shared_from = group['representative']['name'] if effective else None
+            except (OSError, ValueError, KeyError):
+                effective = None
         technical = record.get('technical') or {}
         payload['presentation'] = {'name': record['display_name'], 'pack': record['pack_id'],
             'formats': sorted({f['format'] for f in record['files']}),
             'views': [v for v in VIEWS if any(p.get('view_label') == v for p in record['previews'])],
-            'observations': effective,
+            'observations': effective, 'description_shared_from': shared_from, 'variant_group': group,
             'suggested_uses': owner.get('suggested_uses') if owner.get('suggested_uses') is not None else record.get('suggested_uses'),
             'owner_review': owner.get('caption_review', 'pending'),
             'owner_artistic_approval': owner.get('artistic_suitability', 'pending'),
@@ -247,7 +294,8 @@ class DesktopService(AssetService):
             'type_metadata': record.get('type_metadata') if record.get('asset_type') == 'image' else None,
             'model_input': next(({'derivation': p.get('derivation'), 'path': p.get('path')} for p in record['previews']
                                  if p.get('role') == 'model_input'), None),
-            'processing': record['processing'], 'license_evidence': relevant_license_evidence(record),
+            'processing': record['processing'], 'format_off': self._format_off(record),
+            'license_evidence': relevant_license_evidence(record),
             'source_faults': (record.get('inspection_run') or {}).get('source_faults', []),
             'stage_faults':record.get('stage_faults',{}),
             'caption_faults': (record.get('caption_provenance') or {}).get('visual_faults', []),

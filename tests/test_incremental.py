@@ -30,7 +30,8 @@ def library(tmp_path):
     for pack in ('one', 'two'):
         (source / pack).mkdir()
         for i in range(3):
-            (source / pack / f'item{i}.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
+            # Distinct bytes: equal inputs share one result (decision 0023), which test_result_store covers.
+            (source / pack / f'item{i}.obj').write_text(f'# {pack} {i}\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
     for path in ('src/local_asset_library/blender_worker.py', 'src/local_asset_library/render_math.py',
                  'src/local_asset_library/caption_backend.py', 'src/local_asset_library/caption_batching.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt', 'prompts/caption-v4.txt'):
         target = root / path; target.parent.mkdir(parents=True, exist_ok=True); target.write_text('synthetic contract')
@@ -41,6 +42,14 @@ def library(tmp_path):
     backend = SyntheticBackend()
     save_json(config.output_path('data', 'embeddings/capability.json'), {'contract_fingerprint': digest(backend.contract), 'actual_text_and_image_inference': True})
     return config, backend
+
+
+def view_image(record, view):
+    """A red synthetic view whose bytes differ per asset and view, so descriptions are not shared."""
+    image = Image.new('RGB', (32, 32), 'red')
+    image.putpixel((0, 0), tuple(bytes.fromhex(record['asset_id'][6:12])))
+    image.putpixel((1, 0), (len(view), 0, 0))
+    return image
 
 
 def ready(config):
@@ -54,7 +63,7 @@ def ready(config):
         for view in ('front','side','three_quarter'):
             relative = f'test-views/{record["asset_id"]}-{view}.png'
             path = config.output_path('data',relative); path.parent.mkdir(parents=True,exist_ok=True)
-            Image.new('RGB',(32,32),'red').save(path)
+            view_image(record, view).save(path)
             record['previews'].append({'path':'data/'+relative,'sha256':file_hash(path),'view_label':view,'origin':'rendered','coordinate_convention':'synthetic'})
         record['caption_provenance']={'fingerprint':'synthetic','input_views':[], 'visual_faults':[]}
         update_record(work,record)
@@ -185,7 +194,8 @@ def test_atomic_publication_pins_requests_and_shared_parity(library):
 
 def test_stage_checkpoint_failure_and_resume(library,monkeypatch):
     config,_=library
-    from local_asset_library import incremental
+    from local_asset_library import incremental, render_pool
+    render_pool.save(config,1,None)  # Exact attempt order; parallel interruption is covered in test_render_pool.
     attempted=[]
     def fake(config,record,fp,resolution=640,formats=None):
         attempted.append(record['asset_id'])
@@ -199,6 +209,36 @@ def test_stage_checkpoint_failure_and_resume(library,monkeypatch):
     assert len(attempted)==7
     assert process(config,'inspection',6)['selected']==0
 
+
+def test_reused_results_mark_their_stage_complete_after_a_rescan_reset(library, monkeypatch):
+    """Grouping export folders changes an asset's file list, so a rescan resets its stages, while the
+    rendered file is unchanged: processing reuses the finished result and must mark it complete again."""
+    config, _ = library
+    from local_asset_library import incremental
+    attempted = []
+    monkeypatch.setattr(incremental, 'run_inspection', lambda c, r, fp, resolution=640, formats=None:
+                        attempted.append(r['asset_id']) or {'status': 'complete'})
+    process(config, 'inspection', 6)
+    work = working(config)
+    for record in records(work):  # What a finished inspection leaves, then the rescan's reset.
+        record.update(inspection_run={'status': 'complete'}, technical={'inspected_path': record['files'][0]['path']},
+                      previews=[{'path': 'data/fixture.png', 'view_label': 'front'}])
+        record['processing'].update(inspection='pending', previews='pending')
+        update_record(work, record)
+    count = len(attempted)
+    dry = process(config, 'inspection', 6, dry_run=True)
+    assert dry['retained'] == {'complete': 6} and dry['pending'] == 0 and dry['restored'] == 6
+    assert all(r['processing']['inspection'] == 'pending' for r in records(work))  # A dry run changes nothing.
+    result = process(config, 'inspection', 6)
+    assert result['retained'] == {'complete': 6} and result['restored'] == 6 and len(attempted) == count  # Nothing rendered.
+    assert all(r['processing']['inspection'] == r['processing']['previews'] == 'complete' for r in records(work))
+    first = records(work)[0]
+    first.update(previews=[])
+    first['processing'].update(inspection='pending', previews='pending')
+    update_record(work, first)
+    process(config, 'inspection', 6)
+    again = next(r for r in records(work) if r['asset_id'] == first['asset_id'])
+    assert again['processing']['inspection'] == 'pending'  # Without its previews nothing is claimed.
 
 def test_dependency_changes_and_dry_run(library):
     config,_=library
@@ -595,3 +635,63 @@ def test_code_line_endings_alone_never_requeue_finished_work(library):
     assert process(config, 'caption', dry_run=True)['retained'] == {'complete': 6}
     (config.project_root / 'runtime/caption/uv.lock').write_bytes(text.replace(b'\n', b'\r\n') + b'changed\r\n')
     assert process(config, 'caption', dry_run=True)['pending'] == 6
+
+
+def test_reused_vectors_record_the_search_data_state_again_after_a_rescan_reset(library):
+    """Grouping export folders resets the search data flag while every vector still matches: the dry run must
+    report it so the real pass records the state again, instead of the source asking for processing forever."""
+    config, backend = library
+    work = ready(config)
+    index_library(work, backend)
+    assert all(r['processing']['embeddings'] == 'complete' for r in records(work))
+    for record in records(work):
+        record['processing']['embeddings'] = 'pending'
+        update_record(work, record)
+    calls = len(backend.calls)
+    dry = index_library(work, None, dry_run=True)
+    assert dry['pending'] == 0 and dry['restored'] == 6
+    assert all(r['processing']['embeddings'] == 'pending' for r in records(work))  # A dry run writes nothing.
+    result = process(config, 'embeddings', 1000)  # No model is loaded: no vector is missing.
+    assert result['processed'] == 0 and result['restored'] == 6 and len(backend.calls) == calls
+    assert all(r['processing']['embeddings'] == 'complete' for r in records(work))
+    assert index_library(work, None, dry_run=True)['restored'] == 0
+
+
+def test_kept_faults_show_as_failed_again_after_a_rescan_reset(library, monkeypatch):
+    """A rescan resets a kept fault's flags to pending; processing restores the failed state without retrying."""
+    config, _ = library
+    from local_asset_library import incremental, render_pool
+    from local_asset_library.sources import import_outcome
+    render_pool.save(config, 1, None)
+    attempted = []
+
+    def inspect(work, record, fp, resolution=640, formats=None):
+        attempted.append(record['asset_id'])
+        if record['display_name'] == 'item0':
+            raise RuntimeError('synthetic geometry fault')
+        # A render that returned failed: inspection complete, previews failed, as publish records it.
+        record.update(technical={'inspected_path': record['files'][0]['path']},
+                      inspection_run={'status': 'failed', 'errors': ['Empty or off-frame preview detected'],
+                                      'result_path': 'data/fixture/result.json'})
+        record['processing'].update(inspection='complete', previews='failed')
+        incremental.update_record(work, record)
+        return {'status': 'failed', 'result_path': 'fixture/result.json', 'errors': ['Empty or off-frame preview detected']}
+    monkeypatch.setattr(incremental, 'run_inspection', inspect)
+    assert process(config, 'inspection', 6)['failed'] == 6  # Two raised, four returned a failed render.
+    work = working(config)
+    before = {r['asset_id']: (dict(r['processing']), r.get('stage_faults')) for r in records(work)}
+    for record in records(work):  # What a rescan after grouping leaves.
+        record['processing'].update(inspection='pending', previews='pending')
+        record.pop('stage_faults', None)
+        update_record(work, record)
+    assert all(import_outcome(r)['state'] == 'pending' for r in records(work))
+    dry = process(config, 'inspection', 6, dry_run=True)
+    assert dry['pending'] == 0 and dry['retained'] == {'failed': 6} and dry['restored'] == 6
+    result = process(config, 'inspection', 6)
+    assert result['restored'] == 6 and len(attempted) == 6  # Nothing was retried.
+    for record in records(work):
+        processing, faults = before[record['asset_id']]
+        assert record['processing'] == processing and import_outcome(record)['state'] == 'failed'
+        if record['display_name'] == 'item0':
+            assert record['stage_faults']['inspection']['error'] == 'synthetic geometry fault'
+    assert process(config, 'inspection', 6, dry_run=True)['restored'] == 0

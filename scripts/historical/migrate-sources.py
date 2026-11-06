@@ -6,7 +6,8 @@ import sys
 root=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(root/'src'))
 from local_asset_library.config import load_config
-from local_asset_library.source_migration import migrate
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from source_migration import migrate
 config=load_config(root/'config.example.toml',root)
 _,report=migrate(config,root/'config.example.toml')
 print(json.dumps(report,indent=2))

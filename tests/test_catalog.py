@@ -139,7 +139,22 @@ def test_ids_determinism_content_changes_and_renames(catalog_config):
     assert asset_id("first", "chair.obj") != asset_id("second", "chair.obj")
 
 
-def test_variants_previews_texture_and_missing_dependency(catalog_config):
+def test_preview_lookup_keeps_row_order_labels_and_exact_versus_directional_matches(catalog_config):
+    exports(catalog_config)
+    put(catalog_config, "pack/Models/OBJ format/chair_NE.obj", "v 0 0 0\n")
+    for name in ("chair_SW", "chair_NE", "chair"):
+        put(catalog_config, f"pack/Isometric/{name}.png")
+    put(catalog_config, "pack/Previews/chair.png")
+    by_name = {a["display_name"]: a for a in build_inventory(catalog_config)[1]}
+    # One image is a directional view of "chair" and the exact preview of "chair_NE"; rows keep path order.
+    assert [(p["source_path"], p["view_label"]) for p in by_name["chair"]["previews"]] == [
+        ("pack/Isometric/chair.png", "Isometric"), ("pack/Isometric/chair_NE.png", "Isometric_NE"),
+        ("pack/Isometric/chair_SW.png", "Isometric_SW"), ("pack/Previews/chair.png", "Previews")]
+    assert [(p["source_path"], p["view_label"]) for p in by_name["chair_NE"]["previews"]] == [
+        ("pack/Isometric/chair_NE.png", "Isometric")]
+
+
+def test_previews_texture_and_missing_dependency(catalog_config):
     exports(catalog_config)
     put(catalog_config, "pack/Previews/chair.png")
     put(catalog_config, "pack/Isometric/chair_NE.png")
@@ -149,11 +164,13 @@ def test_variants_previews_texture_and_missing_dependency(catalog_config):
     by_name = {a["display_name"]: a for a in assets}
     assert len(by_name["chair"]["previews"]) == 2
     assert not by_name["chair-round"]["previews"]
-    assert by_name["chair-round"]["variants"][0]["asset_id"] == by_name["chair"]["asset_id"]
+    # Variant groups are derived in folder views (variant_groups.py); records carry no pair lists.
+    assert all("variants" not in a for a in assets)
     assert any(d["role"] == "texture" and d["status"] == "available" for d in by_name["chair"]["dependencies"])
     assert any(d["status"] == "missing" for d in by_name["chair-round"]["dependencies"])
     assert any(r["role"] == "pack_contact_sheet" for r in rows)
-    assert any(r["role"] == "texture" for r in rows)
+    # The chair's texture is a model texture: a dependency with its evidence, not a selectable image (decision 0023).
+    assert any(r["role"] == "model_dependency_image" and "map_Kd" in r["deferred_reason"] for r in rows)
     assert all(a["description"] is None and not a["embeddings"] for a in assets)
 
 

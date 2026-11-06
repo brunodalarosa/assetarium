@@ -10,7 +10,7 @@ import json
 
 GIB = 1024 ** 3
 DEFAULT_BUDGET = {'total_allocated_bytes': 10 * GIB, 'peak_additional_allocated_bytes': 3 * GIB}
-APPROVAL = 'Sources the owner registered and enabled in Settings → Asset sources.'
+APPROVAL = 'Library folders the owner added and enabled on the Asset sources tab.'
 LEGACY = 'docs/library-membership.json'
 
 

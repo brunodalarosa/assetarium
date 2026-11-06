@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "inventory_hash": "58d5d1b6fe659fa0aac80b34187f50574d5ac864dd0de3c413780ccaa9522fa3",
+  "assets": {
+    "asset_63ff2228dba150b19940a5dda0dab965": {
+      "state": "pending",
+      "attempted": false,
+      "pending_stages": [
+        "embeddings",
+        "inspection",
+        "previews"
+      ],
+      "failed_stages": [],
+      "input_fingerprint": "bc8a31bf4547ccae3f2a85732aca89d5baca1e0d1c92df65dc289bf62aaa95e0"
+    },
+    "asset_0eb47511198b3974f582670932fe25a6": {
+      "state": "pending",
+      "attempted": false,
+      "pending_stages": [
+        "embeddings",
+        "inspection",
+        "previews"
+      ],
+      "failed_stages": [],
+      "input_fingerprint": "0d5e2852b81c6edb024251eae0958771d9a946c3fd3ce65baa76cd3ee18e9b22"
+    },
+    "asset_d6468afecc412681c5370af4a7728c64": {
+      "state": "pending",
+      "attempted": false,
+      "pending_stages": [
+        "embeddings",
+        "inspection",
+        "previews"
+      ],
+      "failed_stages": [],
+      "input_fingerprint": "26ea10180ee3f121cc098d42afaa1f76c0ac668902df35e865fc2c1e7993bf2d"
+    }
+  }
+}

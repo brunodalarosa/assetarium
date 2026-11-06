@@ -9,6 +9,12 @@ $env:TEMP = Join-Path $mcpRoot 'scratch\tmp-mcp'
 $env:TMP = $env:TEMP
 $env:PYTHONPATH = Join-Path $mcpRoot 'src'
 New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+# Without --project uv falls back to the base pyproject.toml, and an exact sync strips this runtime.
+if ($args.Count -and @('sync', 'run', 'lock', 'add', 'remove', 'tree', 'export') -contains $args[0] -and
+    -not ($args | Where-Object { "$_" -eq '--project' -or "$_".StartsWith('--project=') })) {
+    [Console]::Error.WriteLine('mcp-runtime: pass --project runtime/mcp. Without it uv would install the base project into .venv-mcp and remove this runtime.')
+    exit 2
+}
 Push-Location $mcpRoot
 try {
     & uv @args

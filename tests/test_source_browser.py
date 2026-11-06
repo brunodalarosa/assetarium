@@ -23,7 +23,7 @@ def test_disabled_source_browsing_reuses_inspection_without_enabling_search(mana
     ready_source(config, backend, one)
     ready_source(config, backend, two)
     sources.set_enabled(config, one['key'], False)
-    before = config.sources_registry.read_bytes()
+    before = sources.registry(config)
     main, _, contents = browser(config)
     assert {i['pack'] for i in main.browse()['items']} == {two['key']}
     page = contents.call('browse', one['key'], 0, 2)
@@ -34,7 +34,7 @@ def test_disabled_source_browsing_reuses_inspection_without_enabling_search(mana
     detail = contents.call('asset', one['key'], identifier, 'obj', 'front', page['generation'])
     assert detail['payload']['usable'] and detail['image']
     assert detail['payload']['presentation']['name'] == page['items'][0]['name']
-    assert config.sources_registry.read_bytes() == before
+    assert sources.registry(config) == before  # Browsing never changes which folders are enabled.
     assert main.backend is None and contents.session(one['key'])[1][0].backend is None
     with pytest.raises(ValueError, match='disabled'):
         main.asset(identifier)
@@ -63,8 +63,10 @@ def test_unprocessed_source_has_clear_read_only_state(managed):
     assert 'Scan and process' in result['reason']
     assert not sources.bound(config, one).output_path('data', 'catalog.sqlite').exists()
     sources.scan_source(config, one)
+    # Once scanned, the Asset sources tab shows the folder's assets before any processing (decision 0023).
     result = contents.call('browse', one['key'], 0, 40)
-    assert not result['available'] and 'Process this source' in result['reason']
+    assert result['available'] and result['total_count'] == 3
+    assert all(item['processing']['inspection'] == 'pending' for item in result['items'])
 
 
 def test_other_source_removed_source_and_stale_versions_cannot_be_inspected(managed):
@@ -131,15 +133,16 @@ def test_faulty_saved_assets_remain_visible_with_inspection_evidence(managed):
     _, _, contents = browser(config)
     record = sources.read_records(sources.bound(config, one))[0]
     config.source_file(record['files'][0]['path']).unlink()
-    # Discovery excludes the missing file from searches but preserves its saved evidence.
+    # Discovery makes the vanished asset Missing (decision 0023): kept with its last record until forgotten.
     sources.scan_source(config, one)
     page = contents.call('browse', one['key'], 0, 40)
-    item = next(item for item in page['items'] if item['asset_id'] == record['asset_id'])
-    assert item['source_faulty'] and item['availability'] == 'faulty'
-    detail = contents.call('asset', one['key'], record['asset_id'])
-    assert detail['payload']['status'] == 'faulty'
-    assert detail['payload']['presentation']['name'] == record['display_name']
-    assert not detail['image']
+    assert record['asset_id'] not in {item['asset_id'] for item in page['items']}
+    from local_asset_library.library_view import folder_items, unavailable
+    assert record['asset_id'] not in {i.get('asset_id') for i in folder_items(config, one['key'])['items']}
+    missing = next(i for i in unavailable(config, one['key'])['items'] if i['asset_id'] == record['asset_id'])
+    assert missing['state'] == 'missing' and missing['paths']
+    published = sources.read_records(sources.bound(config, one))
+    assert record['asset_id'] in {r['asset_id'] for r in published}  # Its published evidence is untouched.
 
 
 def test_reveal_locates_the_original_through_the_source_boundary(managed, monkeypatch):

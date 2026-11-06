@@ -331,8 +331,15 @@ def resolve(config, items, records=None, tags=None):
         record = records.get(identifier) or found.get(identifier)
         if record:
             from .asset_structure import asset_type
+            from .library_view import kind_of
+            from .settings import format_key, used_formats, uses
             entry.update(name=record['display_name'], pack=record['pack_id'], asset_type=asset_type(record),
                          formats=sorted({f['format'] for f in record['files']}), processing=record.get('processing'))
+            used = used_formats(config) if config.sources_registry else None
+            if used is not None and not uses(kind_of(record), entry['formats'], used):
+                # Kept, never dropped: the owner turned its format off (decision 0026); turning it on brings it back.
+                off = ', '.join(sorted({format_key(f).upper() for f in entry['formats']}))
+                entry['hidden_by_formats'] = f'Hidden: {off} is off in Settings → General → Formats'
         if identifier in records:
             entry['availability'] = 'available'
         elif record:

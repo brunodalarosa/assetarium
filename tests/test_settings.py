@@ -7,7 +7,7 @@ import pytest
 
 from local_asset_library.config import Config, ConfigError
 from local_asset_library.publication import atomic_json
-from local_asset_library.settings import (GIB, general_settings, save_general_settings,
+from local_asset_library.settings import (GIB, IMAGE_FORMATS, general_settings, save_general_settings,
                                           settings_path, storage_budget, caption_batch_size)
 from local_asset_library.incremental import policy
 from local_asset_library import source_operations as operations
@@ -35,8 +35,9 @@ def test_saved_total_survives_reload_and_source_binding_without_hidden_growth_ca
     result = save_general_settings(config, '24')
     assert result == {'status': 'saved', 'storage_budget_gib': 24, 'processing_formats': ['fbx', 'gltf', 'obj'],
                       'caption_batch_size': 8, 'descriptions_enabled': True, 'description_engine': 'builtin',
-                      'description_server': {'url': 'http://127.0.0.1:8080/v1', 'model': ''}}
-    rebound = replace(config, metadata_root=config.source_root / 'metadata-lal', source_key='fixture')
+                      'description_server': {'url': 'http://127.0.0.1:8080/v1', 'model': ''}, 'search_device': 'cuda',
+                      'search_threads': None, 'image_formats': list(IMAGE_FORMATS)}
+    rebound = replace(config, metadata_root=config.library_store() / 'folders/fixture', source_key='fixture')
     assert general_settings(rebound)['storage_budget_gib'] == 24
     assert settings_path(rebound) == settings_path(config)
     assert not config.source_root.exists()
@@ -56,7 +57,7 @@ def test_invalid_limit_preserves_saved_settings(config, value):
 def test_caption_batch_size_defaults_to_eight_and_saves_with_other_settings(config):
     assert general_settings(config)['caption_batch_size'] == 8 == caption_batch_size(config)
     assert save_general_settings(config, 24, ['gltf'], '4')['caption_batch_size'] == 4
-    rebound = replace(config, metadata_root=config.source_root / 'metadata-lal', source_key='fixture')
+    rebound = replace(config, metadata_root=config.library_store() / 'folders/fixture', source_key='fixture')
     assert caption_batch_size(rebound) == 4
     # Saving other settings keeps the chosen batch size.
     assert save_general_settings(config, 30)['caption_batch_size'] == 4
@@ -92,7 +93,7 @@ def coordinator(config, monkeypatch, allocations, after_stage=None):
     calls, states = [], []
     monkeypatch.setattr(operations, 'bound', lambda *args: config)
     monkeypatch.setattr(operations, 'state', lambda config, **kw: states.append(kw))
-    monkeypatch.setattr(operations, 'scan_source', lambda *args: {'failed': 0, 'needs_processing': False})
+    monkeypatch.setattr(operations, 'scan_source', lambda *args, **kwargs: {'failed': 0, 'needs_processing': False})
     monkeypatch.setattr(operations, 'ensure_index', lambda *args: None)
     monkeypatch.setattr(operations, 'cancelled', lambda *args: False)
     monkeypatch.setattr(operations, 'publish_source', lambda *args: None)

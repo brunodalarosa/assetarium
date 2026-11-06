@@ -172,15 +172,38 @@ def test_blender_write_creates_local_config_from_the_example_atomically(tmp_path
     assert local.read_bytes() == before and not list(config.project_root.glob('.config.local.*'))
 
 
-def test_choosing_what_is_already_used_writes_nothing(tmp_path, monkeypatch):
+def test_only_the_saved_blender_writes_nothing(tmp_path, monkeypatch):
     config = project_with_example(tmp_path)
     found = tmp_path / ('blender.exe' if os.name == 'nt' else 'blender')
     found.write_bytes(b'x')
     monkeypatch.setattr('local_asset_library.inspection.blender_candidates', lambda c: [found] if not c.blender else [c.blender])
-    assert setup_core.blender_change(config, str(found)) == 'unchanged'
+    # Discovered but not saved: the speed test and render pool need it saved, so choosing it writes.
+    assert setup_core.blender_change(config, str(found)) == 'write'
     assert setup_core.blender_change(config, str(tmp_path / 'other' / found.name)) == 'write'
     setup_core.write_blender(config, str(found))
     assert setup_core.blender_change(config, str(found)) == 'unchanged'
+    assert setup_core.blender_change(config, str(tmp_path / 'other' / found.name)) == 'write'
+
+
+def test_setup_saves_a_discovered_blender_and_the_speed_test_sees_it_without_a_restart(fresh, monkeypatch):
+    from local_asset_library import render_devices, source_operations
+    found = fresh.project_root / ('blender.exe' if os.name == 'nt' else 'blender')
+    found.write_bytes(b'x')
+    monkeypatch.setattr('local_asset_library.inspection.blender_candidates', lambda c: [found] if not c.blender else [c.blender])
+    assert setup_core.blender_report(fresh)['used'] == str(found) and not setup_core.blender_report(fresh)['configured']
+    with pytest.raises(ConfigError, match='Check this Blender'):  # Writing still needs a passing check.
+        setup_core.save_setup(fresh, {'blender_path': str(found)})
+    monkeypatch.setitem(setup_core._validated, setup_core._identity(found), {'status': 'passed'})
+    result = setup_core.save_setup(fresh, {'blender_path': str(found)})
+    assert result['blender']['status'] == 'saved' and result['blender']['file'] == 'config.local.toml'
+    assert load_config(fresh.project_root / 'config.local.toml', fresh.project_root).blender == found
+    assert 'blender' in json.loads(setup_core.setup_path(fresh).read_text(encoding='utf-8'))['values']
+    assert fresh.blender is None  # The app's launch Config stays frozen...
+    assert render_devices.summary(fresh)['blender']  # ...and the speed test reads what is saved now.
+    monkeypatch.setattr(source_operations, 'venv_python', lambda root: (_ for _ in ()).throw(RuntimeError('started')))
+    with pytest.raises(RuntimeError, match='started'):  # Past the "Set up Blender first" refusal.
+        source_operations.start(fresh, 'render-test')
+    assert setup_core.save_setup(fresh, {'blender_path': str(found)})['blender'] == {'status': 'unchanged'}
 
 
 def test_first_run_matrix(tmp_path):

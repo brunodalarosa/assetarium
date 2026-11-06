@@ -10,5 +10,9 @@ export TORCH_HOME="$root/cache/torch-caption" CUDA_CACHE_PATH="$root/cache/cuda-
 export XDG_CACHE_HOME="$root/cache" PYTHONPYCACHEPREFIX="$root/cache/pycache-caption"
 export PYTHONPATH="$root/src"
 mkdir -p "$TMPDIR"
+# Without --project uv falls back to the base pyproject.toml, and an exact sync strips this runtime.
+case "${1-}" in sync|run|lock|add|remove|tree|export)
+  case " $* " in *" --project "*|*" --project="*) ;;
+  *) echo "caption-runtime: pass --project runtime/caption. Without it uv would install the base project into .venv-caption and remove this runtime." >&2; exit 2 ;; esac ;; esac
 cd "$root"
 exec uv "$@"

@@ -3,6 +3,7 @@
 from collections import Counter, defaultdict
 from contextlib import closing
 from datetime import datetime, timezone
+from fnmatch import fnmatchcase
 import hashlib
 import json
 import os
@@ -18,10 +19,11 @@ import zipfile
 
 from .config import Config, ConfigError
 from . import hash_cache
-from .publication import pinned_config
+from .publication import pinned_config, read_only
 
 SOURCE_ID = "playful-lowpoly-v1"
 SCANNER_VERSION = "inventory-v1"
+SCAN_CACHE_LIMIT = 256 * 1024 * 1024
 MODELS = {".obj", ".fbx", ".glb", ".gltf", ".blend", ".dae", ".stl"}
 UNSUPPORTED = {".3ds", ".ply", ".usd", ".usda", ".usdc", ".usdz", ".max", ".ma", ".mb", ".lwo", ".vox"}
 IMAGES = {".png", ".jpg", ".jpeg", ".webp", ".tga", ".bmp", ".dds", ".exr", ".hdr"}
@@ -68,7 +70,7 @@ def parse_record(identifier,pack,name,payload):
             'description':None,'caption_provenance':None,'owner_overlay':{},'license_evidence':[],
             'processing':{'inventory':'failed','inspection':'unknown','previews':'unknown','caption':'unknown','embeddings':'unknown'},
             'metadata_fault':fault,'stage_faults':{'inventory':fault},'inspection_run':{'source_faults':[fault]},
-            'provenance':{},'grouping':{},'variants':[]}
+            'provenance':{},'grouping':{}}
 
 
 def asset_id(pack, identity):
@@ -94,7 +96,13 @@ def check_fts5(connection):
         raise ConfigError(f"Python SQLite {sqlite3.sqlite_version} cannot run FTS5: {exc}. Fix the project Python build; no fallback index is used.") from exc
 
 
-def walk_source(config):
+def excluded_folder(folder, pattern):
+    """A pattern with ``/`` matches the folder's path from the source root; otherwise its name. Case is ignored."""
+    target = folder if "/" in pattern else folder.rsplit("/", 1)[-1]
+    return fnmatchcase(target.casefold(), pattern.casefold())
+
+
+def walk_source(config, progress=None, phase='Checking files'):
     """Sorted inventory; directory links are visible exclusions, never traversed."""
     if config.sources_registry and not config.source_key:
         from .sources import registry, bound
@@ -103,6 +111,9 @@ def walk_source(config):
     if config.sources_registry and not config.source_root.is_dir():
         raise ConfigError("Asset source directory is unavailable")
     rows = []
+    checked, rejected, reused = 0, 0, 0
+    if progress:
+        progress(dict(phase=phase, completed=0, total=None, unit='files', failed=0, reused=0))
     prefix = config.source_key + "/" if config.source_key else ""
     cached = {}
     cache_path = None
@@ -110,16 +121,32 @@ def walk_source(config):
         from .publication import read_json
         cache_path = config.output_path("data", "library/scan-cache.json")
         if cache_path.exists():
-            cached = read_json(cache_path).get("files", {})
+            # About 350 bytes per file: 256 MiB bounds packs of roughly 750,000 files.
+            cached = read_json(cache_path, SCAN_CACHE_LIMIT).get("files", {})
     next_cache = {}
+    from .sources import excluded_folders
+    from .library_migration import LEGACY_METADATA_DIR
+    patterns = excluded_folders(config) if config.source_key else []
     def walk_error(exc):
         raise ConfigError("Source directory cannot be scanned: " + str(exc))
     for directory, dirs, files in os.walk(config.source_root, followlinks=False, onerror=walk_error):
         dirs.sort()
         for name in list(dirs):
             path = Path(directory) / name
-            if name.casefold() == "metadata-lal":
+            if name.casefold() == LEGACY_METADATA_DIR:  # An old generated folder awaiting migration, never originals.
                 dirs.remove(name)
+                continue
+            folder = path.relative_to(config.source_root).as_posix()
+            if any(excluded_folder(folder, pattern) for pattern in patterns):
+                # Owner-excluded (decision 0019): listed with a file count, never walked further or hashed.
+                dirs.remove(name)
+                count = 0
+                for _, _, names in os.walk(path, followlinks=False):
+                    count += len(names)
+                    if progress:
+                        progress(dict(phase='Counting excluded files', completed=count, total=None, unit='files'))
+                rows.append({"path": prefix + folder, "role": "boundary_exclusion", "status": "excluded_folder",
+                             "sha256": None, "size": None, "mtime_ns": None, "excluded_files": count})
                 continue
             if path.is_symlink() or path.is_junction():
                 dirs.remove(name)
@@ -137,8 +164,10 @@ def walk_source(config):
                 shared = hash_cache.file_identity(source)
                 if cache_path and previous.get("identity") == identity:
                     row["sha256"] = previous["sha256"]
+                    reused += 1
                 elif known := hash_cache.lookup(source, shared):
                     row["sha256"] = known
+                    reused += 1
                 else:
                     with config.open_source(relative) as stream:
                         row["sha256"] = file_hash(stream)
@@ -152,7 +181,11 @@ def walk_source(config):
                 next_cache[relative] = {"identity": identity, "sha256": row["sha256"]}
             except (ConfigError, OSError) as exc:
                 row.update(status="rejected", error=str(exc), sha256=None, size=None, mtime_ns=None)
+                rejected += 1
             rows.append(row)
+            checked += 1
+            if progress:
+                progress(dict(phase=phase, completed=checked, total=None, unit='files', failed=rejected, reused=reused))
     if cache_path and next_cache != cached:
         from .publication import atomic_json
         atomic_json(cache_path, {"files": next_cache})
@@ -212,8 +245,106 @@ def export_slot(pack_relative):
     return anchor, directory, key
 
 
-def group_models(pack, model_rows):
-    """Only equal full relative-name sets in sibling, format-specific directories."""
+SUGGESTION_MIN_NAMES = 3
+NEAR_SHARE = 0.9  # A near miss shares at least this share of every folder's model files.
+
+
+def export_candidates(model_rows):
+    """Sibling folders whose model files have the same names (decision 0019).
+
+    Names are file stems without case, ignoring extensions and subfolders, each unique in its folder.
+    Near misses are suggested too: sibling folders sharing at least 90% of each folder's files, where a
+    name repeated inside a folder is set aside rather than disqualifying it; only names found once in
+    every folder are grouped. Exact matches keep their identities, so earlier answers stay valid.
+    Returns {id: candidate}; nothing here groups anything.
+    """
+    names = defaultdict(list)
+    for row in model_rows:
+        relative = PurePosixPath(row["path"].split("/", 1)[1])
+        for depth in range(1, len(relative.parts)):
+            names[PurePosixPath(*relative.parts[:depth]).as_posix()].append((relative.stem.casefold(), row))
+    siblings = defaultdict(list)
+    for folder, entries in names.items():
+        stems = [stem for stem, _ in entries]
+        if len(stems) >= SUGGESTION_MIN_NAMES and len(stems) == len(set(stems)):
+            parent = PurePosixPath(folder).parent.as_posix()
+            siblings[("" if parent == "." else parent, tuple(sorted(stems)))].append(folder)
+    candidates = near_candidates(names)
+    for (anchor, stems), folders in siblings.items():
+        if len(folders) < 2:
+            continue
+        labels = sorted(PurePosixPath(f).name for f in folders)
+        manifest = digest(list(stems))
+        identifier = digest({"anchor": anchor, "folders": labels, "manifest": manifest})
+        candidates[identifier] = {"id": identifier, "anchor": anchor, "folders": labels, "names": len(stems),
+                                  "name_manifest_sha256": manifest, "sample_names": list(stems[:5]),
+                                  "rows": {PurePosixPath(f).name: dict(names[f]) for f in folders}}
+    return candidates
+
+
+def near_candidates(names):
+    """Sibling folder sets that share most, not all, of their model names (see export_candidates)."""
+    by_parent = defaultdict(list)
+    for folder, entries in names.items():
+        if len(entries) >= SUGGESTION_MIN_NAMES:
+            parent = PurePosixPath(folder).parent.as_posix()
+            by_parent["" if parent == "." else parent].append(folder)
+    candidates = {}
+    for anchor, folders in sorted(by_parent.items()):
+        counts = {f: Counter(stem for stem, _ in names[f]) for f in folders}
+        unique = {f: {stem for stem, n in counts[f].items() if n == 1} for f in folders}
+        near = lambda shared, members: len(shared) >= SUGGESTION_MIN_NAMES and all(
+            len(shared) >= NEAR_SHARE * len(names[f]) for f in members)
+        linked = {f: {f} for f in folders}  # Folders joined by a near pair, as connected sets.
+        for index, first in enumerate(folders):
+            for second in folders[index + 1:]:
+                if near(unique[first] & unique[second], (first, second)) and linked[first] is not linked[second]:
+                    merged = linked[first] | linked[second]
+                    for member in merged:
+                        linked[member] = merged
+        for members in {id(group): group for group in linked.values()}.values():
+            members = sorted(members)
+            shared = set.intersection(*(unique[f] for f in members))
+            exact = all(len(counts[f]) == len(names[f]) and set(counts[f]) == set(counts[members[0]]) for f in members)
+            if len(members) < 2 or exact or not near(shared, members):
+                continue
+            labels = {f: PurePosixPath(f).name for f in members}
+            only = {labels[f]: sorted(unique[f] - shared) for f in members}
+            repeated = {labels[f]: sorted(stem for stem, n in counts[f].items() if n > 1) for f in members}
+            manifest = digest({"shared": sorted(shared), "only": only, "repeated": repeated})
+            ordered = sorted(labels.values())
+            identifier = digest({"anchor": anchor, "folders": ordered, "manifest": manifest, "match": "near"})
+            candidates[identifier] = {
+                "id": identifier, "anchor": anchor, "folders": ordered, "names": len(shared),
+                "name_manifest_sha256": manifest, "sample_names": sorted(shared)[:5],
+                "near": {"files": {labels[f]: len(names[f]) for f in members},
+                         "only": {k: len(v) for k, v in only.items() if v}, "only_samples": {k: v[:3] for k, v in only.items() if v},
+                         "repeated": {k: len(v) for k, v in repeated.items() if v},
+                         "repeated_samples": {k: v[:3] for k, v in repeated.items() if v}},
+                "rows": {labels[f]: {stem: row for stem, row in names[f] if stem in shared} for f in members}}
+    return candidates
+
+
+def file_variants(record):
+    """Folder label of each file in a grouped asset (``FBX``, ``Unity FBX``…); empty for a single file."""
+    evidence = (record.get("grouping") or {}).get("evidence") or [{}]
+    anchor, directories = evidence[0].get("anchor"), set(evidence[0].get("directories") or [])
+    if anchor is None or len(record.get("files", [])) < 2:
+        return {}
+    labels = {}
+    for item in record["files"]:
+        parts = PurePosixPath(item["path"].split("/", 1)[1]).parts
+        base = PurePosixPath(anchor).parts if anchor else ()
+        if parts[:len(base)] == base and len(parts) > len(base) + 1 and parts[len(base)] in directories:
+            labels[item["path"]] = parts[len(base)]
+    return labels
+
+
+def group_models(pack, model_rows, decisions=(), suggestions=None):
+    """Equal full relative-name sets in sibling, format-specific directories, plus owner-confirmed sibling folders.
+
+    Unconfirmed sibling folders with equal name sets are appended to ``suggestions`` (decision 0019).
+    """
     slots = defaultdict(lambda: defaultdict(list))
     for row in model_rows:
         slot = export_slot(row["path"].split("/", 1)[1])
@@ -238,13 +369,46 @@ def group_models(pack, model_rows):
                     for key, row in directories[directory]:
                         identity = (PurePosixPath(anchor) / "@exports" / key).as_posix()
                         approved[row["path"]] = (identity, evidence)
+    separate = lambda row: row["path"].split("/", 1)[1]
+    answered = {d["id"]: d for d in decisions}
+    for identifier, candidate in sorted(export_candidates(model_rows).items()):
+        rows = candidate["rows"]
+        # Folders already grouped with another candidate folder by the recognized layouts.
+        grouped = sorted(label for label, entries in rows.items() if all(
+            row["path"] in approved and len(set(approved[row["path"]][1].get("directories", [])) & set(rows)) >= 2
+            for row in entries.values()))
+        if len(grouped) == len(rows):
+            continue
+        recognized = [label for label in candidate["folders"] if label.casefold() in EXPORT_DIRS]
+        reference = (grouped or recognized or candidate["folders"])[0]
+        decision = answered.get(identifier)
+        if decision is None and suggestions is not None:
+            suggestions.append({**{k: v for k, v in candidate.items() if k != "rows"},
+                                "reference": reference, "grouped_folders": grouped})
+        if not decision or decision["decision"] != "group":
+            continue
+        evidence = {"method": "confirmed-sibling-export-v1", "anchor": candidate["anchor"],
+                    "directories": candidate["folders"], "reference": reference,
+                    "matching_name_count": candidate["names"], "name_manifest_sha256": candidate["name_manifest_sha256"],
+                    "decision_utc": decision.get("utc"),
+                    "basis": "Owner-confirmed sibling folders with identical model name sets; geometry equivalence not inspected."}
+        if candidate.get("near"):
+            evidence.update(near={k: candidate["near"][k] for k in ("files", "only", "repeated")},
+                            basis="Owner-confirmed sibling folders sharing these model names; names found in only some "
+                                  "folders or repeated inside one stay separate. Geometry equivalence not inspected.")
+        for stem, row in rows[reference].items():
+            # The reference file keeps its identity, so its asset ID and finished work stay.
+            identity = approved.get(row["path"], (separate(row), None))[0]
+            for label in candidate["folders"]:
+                approved[rows[label][stem]["path"]] = (identity, evidence)
     groups = defaultdict(list)
     evidence_by_identity = {}
     for row in model_rows:
-        identity, evidence = approved.get(row["path"], (row["path"].split("/", 1)[1], {
+        identity, evidence = approved.get(row["path"], (separate(row), {
             "method": "separate-file-v1", "basis": "No sufficient export-layout evidence; retained independently."}))
         groups[identity].append(row)
-        evidence_by_identity[identity] = evidence
+        if evidence_by_identity.get(identity, {}).get("method") != "confirmed-sibling-export-v1":
+            evidence_by_identity[identity] = evidence
     return [(identity, sorted(files, key=lambda f: f["path"]), evidence_by_identity[identity])
             for identity, files in sorted(groups.items())]
 
@@ -412,28 +576,38 @@ def relevant_license_evidence(record):
              and any(PurePosixPath(entry['path']).parent in model.parents for model in models))]
 
 
-def build_inventory(config):
-    rows = walk_source(config)
+def build_inventory(config, suggestions=None, previous=(), progress=None):
+    """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``.
+
+    ``previous`` are the folder's last records, whose Blender texture lists and pixel evidence classify images.
+    """
+    rows = walk_source(config, progress) if progress else walk_source(config)
+    from .sources import export_decisions
+    decisions = export_decisions(config) if config.source_key else []
     from .dependency_resolution import SharedDependencies
     shared = SharedDependencies(config)
     inventory = {row["path"]: row for row in rows}
     for row in rows:
         if row["role"] != "boundary_exclusion":
             row["role"] = classify(row["path"])
-    from .sources import import_formats
-    allowed = import_formats(config)
-    from .settings import format_group
-    if allowed is not None:
-        for row in rows:
-            if row['role'] in {'model', 'unsupported_candidate'} and format_group(PurePosixPath(row['path']).suffix[1:].lower()) not in allowed:
-                row['role'] = 'excluded_import_format'
     packs = sorted({row["path"].split("/")[0] for row in rows
                     if "/" in row["path"] and row["role"] in {"model", "unsupported_candidate"}})
     assets, ambiguities = [], []
+    # Supplied previews by (pack, file stem), in row order: each asset looks up its own few names
+    # instead of checking every file (the same per-row checks below decide a match).
+    previews_by_name = defaultdict(list)
+    for position, row in enumerate(rows):
+        if row["role"] == "individual_preview" and row["status"] == "available":
+            p = PurePosixPath(row["path"])
+            previews_by_name[(p.parts[0], p.stem)].append((position, row))
+    model_total = sum(row['role'] in {'model', 'unsupported_candidate'} for row in rows)
+    model_done = 0
+    if progress:
+        progress(dict(phase='Recognizing 3D assets', completed=0, total=model_total, unit='files'))
     for pack in packs:
         candidates = [row for row in rows if row["path"].startswith(pack + "/") and row["role"] in {"model", "unsupported_candidate"}]
         license_rows = license_evidence(config, pack, inventory)
-        for identity, files, grouping in group_models(pack, candidates):
+        for identity, files, grouping in group_models(pack, candidates, decisions, suggestions):
             name = PurePosixPath(files[0]["path"]).stem
             asset = {"schema_version": 1, "asset_id": asset_id(pack, identity), "source_id": SOURCE_ID,
                      "pack_id": pack, "source_relative_identity": identity, "display_name": name,
@@ -441,7 +615,7 @@ def build_inventory(config):
                      "files": [{"path": f["path"], "format": PurePosixPath(f["path"]).suffix[1:].lower(),
                                 "sha256": f["sha256"], "availability": f["status"]} for f in files],
                      "grouping": {"evidence": [grouping], "unresolved_ambiguities": [], "geometry_equivalence": "unverified"},
-                     "dependencies": [], "dependency_inspection": [], "previews": [], "variants": [],
+                     "dependencies": [], "dependency_inspection": [], "previews": [],
                      "technical": None, "description": None, "caption_provenance": None, "embeddings": [],
                      "owner_overlay": {}, "license_evidence": license_rows,
                      "processing": {"inventory": "complete", "inspection": "pending", "previews": "pending",
@@ -474,7 +648,9 @@ def build_inventory(config):
                 asset['texture_repair'] = recipe
             # Match exact names only in recognized preview trees at the matching export anchor.
             anchors = {export_slot(f["path"].split("/", 1)[1])[0] for f in files if export_slot(f["path"].split("/", 1)[1])}
-            for preview in rows:
+            names = [name] + [name + "_" + direction for direction in ("NE", "NW", "SE", "SW")]
+            found = sorted({position: row for stem in names for position, row in previews_by_name.get((pack, stem), [])}.items())
+            for _, preview in found:
                 p = PurePosixPath(preview["path"])
                 exact_name = p.stem == name
                 directional = p.parent.name == "Isometric" and p.stem in {name + "_" + direction for direction in ("NE", "NW", "SE", "SW")}
@@ -487,12 +663,15 @@ def build_inventory(config):
                                               "origin": "supplied", "association": "exact stem with directional suffix in Isometric layout" if directional else "exact stem under pack preview layout"})
             asset["provenance"]["inventory_fingerprint"] = digest(asset["files"])
             assets.append(asset)
-    from .sources import import_types
-    if 'image' in import_types(config):
-        from .image_catalog import image_assets
-        licenses = {}
-        assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
-            pack, license_evidence(config, pack, inventory))))
+            model_done += len(files)
+            if progress:
+                progress(dict(phase='Recognizing 3D assets', completed=model_done, total=model_total, unit='files'))
+    from .image_catalog import image_assets
+    from .sources import folder_answers
+    licenses = {}
+    assets.extend(image_assets(config, rows, list(assets), lambda pack: licenses.setdefault(
+        pack, license_evidence(config, pack, inventory)), previous, folder_answers(config),
+        **({'progress': progress} if progress else {})))
     # Never merge remaining same names; report within-pack collisions and cross-pack repeated names.
     by_name = defaultdict(list)
     for asset in assets:
@@ -504,18 +683,6 @@ def build_inventory(config):
             ambiguities.append(case)
             for asset in matching:
                 asset["grouping"]["unresolved_ambiguities"].append(case)
-    # Variants are filename suggestions, not verified visual relationships, and never merged.
-    for asset in assets:
-        if asset.get("asset_type") == "image":
-            continue  # Filename prefixes are not image variant evidence; identical bytes are recorded instead.
-        parts = re.split(r"[-_]", asset["display_name"])
-        if len(parts) > 1:
-            base = parts[0].casefold()
-            related = [a for a in assets if a["pack_id"] == asset["pack_id"] and a["asset_id"] != asset["asset_id"] and a.get("asset_type") != "image"
-                       and a["grouping"]["evidence"][0].get("anchor") == asset["grouping"]["evidence"][0].get("anchor")
-                       and re.split(r"[-_]", a["display_name"])[0].casefold() == base]
-            asset["variants"] = [{"asset_id": a["asset_id"], "relationship": "filename_variant_candidate",
-                                  "evidence": f"Shared filename prefix {parts[0]!r}; unreviewed"} for a in sorted(related, key=lambda a: a["asset_id"])]
     archives = []
     for row in rows:
         if row["role"] == "archive" and row["status"] == "available":
@@ -589,7 +756,7 @@ def read_database(config):
     path = config.output_path("data", "catalog.sqlite")
     if not path.is_file():
         raise ConfigError("Catalog missing; run scan first")
-    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
+    db = read_only(path)
     version = db.execute('PRAGMA user_version').fetchone()[0]
     if version not in (1, 2):
         db.close()

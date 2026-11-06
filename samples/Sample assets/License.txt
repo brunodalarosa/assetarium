@@ -1,0 +1,2 @@
+Assetarium sample assets: a blue cube, a green pyramid and a red sphere.
+Made for Assetarium and dedicated to the public domain (CC0 1.0).

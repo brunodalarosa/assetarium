@@ -42,11 +42,11 @@ def test_settings_round_trip_and_validation(managed, capsys):
     assert run(config, 'settings', 'set', '--budget-gib', '0') == 2
     assert 'whole number' in capsys.readouterr().err
     assert run(config, 'settings', 'set', '--formats', 'none') == 0
-    assert 'none (processing paused)' in capsys.readouterr().out
+    assert 'none (3D assets are hidden)' in capsys.readouterr().out
     assert run(config, 'settings', 'set') == 2
 
 
-def test_sources_list_enable_disable_images_and_failures(managed, monkeypatch, capsys):
+def test_sources_list_enable_disable_and_failures(managed, monkeypatch, capsys):
     config, _, one, _ = managed
     started = []
     monkeypatch.setattr(source_operations, 'start', lambda c, op, key: started.append((op, key)) or {'status': 'started'})
@@ -54,8 +54,7 @@ def test_sources_list_enable_disable_images_and_failures(managed, monkeypatch, c
     assert one['key'] in capsys.readouterr().out
     assert run(config, 'sources', 'disable', one['key']) == 0 and not sources.get_source(config, one['key'])['enabled']
     assert run(config, 'sources', 'enable', one['key']) in {0, 1} and sources.get_source(config, one['key'])['enabled']
-    assert run(config, 'sources', 'images', one['key'], 'on') in {0, 1}
-    assert started == [('scan', one['key'])] * 2  # Like the app: enabling and image changes rescan; disabling does not.
+    assert started == [('scan', one['key'])]  # Like the app: enabling rescans; disabling does not. Images are always in.
     capsys.readouterr()
     assert run(config, '--json', 'failures') == 0
     failures = json.loads(capsys.readouterr().out)
@@ -153,3 +152,59 @@ def test_description_settings_and_setup_commands(managed, monkeypatch, capsys):
     assert run(config, 'setup', 'status') == 0
     out = capsys.readouterr().out
     assert 'This computer:' in out and 'Engine builtin:' in out and '[miss] NVIDIA GPU with BF16' in out
+
+
+def test_rendering_settings_and_speed_test_commands(managed, capsys):
+    config = managed[0]
+    from local_asset_library import render_pool
+    assert run(config, 'rendering', 'set', '--processes', '2', '--memory-gib', '12', '--device', 'cpu') == 0
+    assert render_pool.saved(config) == {'device': 'cpu', 'processes': 2, 'memory_gib': 12}
+    assert run(config, 'rendering', 'set', '--processes', 'auto') == 0
+    assert render_pool.saved(config) == {'device': 'cpu', 'processes': None, 'memory_gib': 12}
+    out = capsys.readouterr().out
+    assert 'Not speed-tested yet' in out and 'memory: 12 GiB' in out
+    assert run(config, 'rendering', 'set', '--processes', 'nine') == 2 and 'whole number' in capsys.readouterr().err
+    assert run(config, 'rendering', 'set', '--processes', '9') == 2
+    assert run(config, 'rendering', 'set') == 2
+    capsys.readouterr()
+    assert run(config, 'rendering', 'test') == 2 and 'Set up Blender' in capsys.readouterr().err
+    assert run(config, 'rendering', 'cancel') == 0 and 'No speed test is running' in capsys.readouterr().out
+
+
+def test_search_threads_setting(managed, capsys, monkeypatch):
+    config = managed[0]
+    from local_asset_library import engines
+    monkeypatch.setattr(engines, 'cpu_threads', lambda: 32)
+    assert run(config, 'settings', 'set', '--search-device', 'cpu', '--search-threads', '28') == 0
+    assert 'Search CPU threads: 28 of 32 (your setting)' in capsys.readouterr().out
+    assert run(config, 'settings', 'set', '--search-threads', 'auto') == 0
+    assert 'Search CPU threads: 32 of 32 (every logical thread (not speed-tested yet))' in capsys.readouterr().out
+    assert run(config, 'settings', 'set', '--search-threads', '40') == 2 and '1 to 32 CPU threads' in capsys.readouterr().err
+
+
+def test_library_packs_queue_and_forget_missing_from_a_terminal(managed, monkeypatch, capsys):
+    """The commands of decision 0023: the same backend calls as the Asset sources tab and the queue."""
+    from local_asset_library import library_view
+    config, _, one, _ = managed
+    monkeypatch.setattr(library_view, 'blockers', lambda config: {})
+    started = []
+    monkeypatch.setattr(source_operations, 'start', lambda config, operation, key=None, **kw: started.append((operation, key, len(kw.get('asset_ids') or [])))
+                        or {'status': 'started', 'token': 't'})
+    monkeypatch.setattr(source_operations, 'operation_status', lambda scoped: {'status': 'processing', 'token': 't'})
+    sources.scan_source(config, one)
+    assert run(config, 'library', 'list') == 0 and one['key'] in capsys.readouterr().out
+    assert run(config, '--json', 'packs', 'list', one['key']) == 0
+    assert json.loads(capsys.readouterr().out)['packs']
+    assert run(config, 'previews', one['key'], '--dry-run') == 0
+    assert 'model' in capsys.readouterr().out and not started
+    assert run(config, 'previews', one['key']) == 0 and started == [('process', one['key'], 3)]
+    capsys.readouterr()
+    assert run(config, '--json', 'queue', 'list') == 0
+    assert json.loads(capsys.readouterr().out)['running']['action'] == 'previews'
+    (Path(one['path']) / 'item0.obj').unlink()
+    sources.scan_source(config, one)
+    monkeypatch.setattr('sys.stdin', io.StringIO('yes\n'))
+    assert run(config, 'forget-missing', one['key']) == 2  # Not an interactive terminal: refused, nothing forgotten.
+    monkeypatch.setattr('sys.stdin', Terminal('yes\n'))
+    monkeypatch.setattr('sys.stdout', Terminal())
+    assert run(config, 'forget-missing', one['key']) == 0

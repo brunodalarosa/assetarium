@@ -17,6 +17,12 @@ $env:XDG_CACHE_HOME = Join-Path $embeddingRoot 'cache'
 $env:PYTHONPYCACHEPREFIX = Join-Path $embeddingRoot 'cache\pycache-embedding'
 $env:PYTHONPATH = Join-Path $embeddingRoot 'src'
 New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+# Without --project uv falls back to the base pyproject.toml, and an exact sync strips this runtime.
+if ($args.Count -and @('sync', 'run', 'lock', 'add', 'remove', 'tree', 'export') -contains $args[0] -and
+    -not ($args | Where-Object { "$_" -eq '--project' -or "$_".StartsWith('--project=') })) {
+    [Console]::Error.WriteLine('embedding-runtime: pass --project runtime/embedding (NVIDIA GPU) or --project runtime/embedding-cpu (CPU). Without it uv would install the base project into .venv-embedding and remove this runtime.')
+    exit 2
+}
 Push-Location $embeddingRoot
 try {
     & uv @args

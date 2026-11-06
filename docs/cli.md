@@ -2,7 +2,7 @@
 
 Everything except visual browsing works from a terminal, the same way on Windows
 PowerShell and a Linux shell. On Linux the CLI plus the MCP server *is* Assetarium
-v1 ([decision 0013](decisions/0013-platform-support.md)). The commands call the
+v1 ([decision 0013](../Assetarium%20KnowledgeBase/Decisions/0013-platform-support.md)). The commands call the
 same backend as the desktop app, so the rules (fault handling, budgets, what is
 processed) are identical.
 
@@ -10,11 +10,11 @@ Run them through the launcher, which uses the prepared `mcp` environment (it has
 Pillow for PNG and Markdown exports) and installs nothing:
 
 ```powershell
-.\scripts\local-assets.ps1 sources list
+.\scripts\local-assets.ps1 library list
 ```
 
 ```bash
-./scripts/local-assets.sh sources list
+./scripts/local-assets.sh library list
 ```
 
 `.\scripts\uv.ps1 run --locked --no-sync --offline local-assets …` (or `uv.sh`)
@@ -22,32 +22,81 @@ works too; only PNG and Markdown exports need the launcher. Add `--json` before
 the command for machine-readable output. Exit codes: `0` done, `1` finished with
 recorded faults or still running, `2` refused or invalid.
 
-## Sources
+## Library folders
+
+A library folder is a watched folder of assets; nothing is ever written into it. `sources …` still works
+as the old name of `library …`.
 
 | Command | Same as in the app |
 | --- | --- |
-| `sources list` | Settings → Asset sources (status, pending, failed, reason) |
-| `sources add PATH` | Add a folder; scans it (no rendering or models) |
-| `sources enable KEY` / `sources disable KEY` | Enabled switch (enabling rescans) |
-| `sources images KEY on\|off` | Include 2D images (rescans; nothing is deleted) |
-| `sources remove KEY` | Remove: stops listing the source; files and results stay on disk |
+| `library list` | Library: each library folder with pending, failed and its reason |
+| `library add PATH` | Add library folder; scans it (no rendering or models). A folder inside a library folder is refused as already covered; one around library folders replaces them and keeps their assets, IDs and results |
+| `library enable KEY` / `library disable KEY` | Included in search switch (enabling rescans) |
+| `library exclude KEY PATTERN` / `library include KEY PATTERN` | Exclude folder / Include again: a folder name with `*` or a path inside the folder (rescans; nothing is deleted) |
+| `library images KEY FOLDER textures\|2d\|auto` | Treat images here as textures / as 2D assets, or let detection decide (rescans) |
+| `library textures KEY` | Models missing textures: folder suggestions with counts; choose with `--use FOLDER` and/or `--single-copies`, undo with `--undo` (rescans; originals never change) |
+| `library exports KEY` | Duplicate export folder suggestions and saved answers; answer with `--group ID`, `--separate ID`, `--exclude ID`, undo with `--undo ID` (rescans) |
+| `library remove KEY` | Remove: stops watching the folder; its results stay in the library store and adding it again restores them |
+| `forget-missing KEY [--pack FOLDER]` | Forget missing: assets whose files vanished are forgotten (interactive `yes`; their history stays) |
+
+## Packs
+
+| Command | Same as in the app |
+| --- | --- |
+| `packs list KEY` | The packs and bundles detected in a library folder, with the evidence (license, readme, preview, versioned name) |
+| `packs rename KEY FOLDER NAME` | Rename a pack (an empty name restores the folder name) |
+| `packs merge KEY FOLDER` | Merge into parent pack (rescans) |
+| `packs split KEY FOLDER` | Make this a pack (rescans) |
+| `packs reset KEY FOLDER` | Forget a merge or split; detection decides again (rescans) |
+| `packs signals KEY` | Which packs need a structure, and why (decision 0024) |
+| `packs profile KEY PACK` | A pack's profile rules and its versions (`""` is the library folder itself) |
+| `packs export KEY PACK --output FILE` | Write a pack profile file outside the library folder |
+| `packs apply KEY PACK [FILE] [--rules JSON] [--yes]` | Show a profile's effect, then make it the pack's profile (asks first; a file must match 80% of the pack's names) |
+| `packs revert KEY PACK VERSION` | Restore an earlier profile version as a new version |
 
 ## Processing
 
 | Command | Same as in the app |
 | --- | --- |
-| `process --asset-source KEY` | Asset processing → Process assets: previews and search data, then publish |
-| `describe --asset-source KEY` | Generate descriptions (needs the caption runtime and an NVIDIA CUDA GPU) |
+| `previews KEY[/FOLDER]` | Make previews for a library folder, folder or pack: inspection, previews and search data. It starts at once or waits in the queue |
+| `previews KEY --asset ID …` | Make previews for picked assets |
+| `describe KEY[/FOLDER]` | Generate descriptions (built-in engine: the caption runtime and an NVIDIA CUDA GPU; local model server: only the running server) |
+| `previews … --dry-run` | What it would do: counts, an estimated time range and disk, and what is blocked with its fix |
+| `queue list` | Asset processing: Running, Up next, Blocked |
+| `queue move ID POSITION` / `queue remove ID` | Reorder or remove an item; removing the running one cancels it cleanly |
+| `queue pause` / `queue resume` | Work the app stopped when it closed waits paused; resume continues it |
+| `process --asset-source KEY` | Process a whole library folder now, watching its progress |
 | `cancel --asset-source KEY` | Cancel |
-| `process --asset-source KEY --follow` | Watch an operation that is already running |
 | `refresh --asset-source KEY` | Refresh published view (publishes usable partial results) |
-| `failures` | Importing failures report: original paths of assets whose import failed |
+| `failures` | Original paths of assets whose import failed |
+| `recheck --asset-source KEY` | Recheck failures: lists failures from the file/dependency check that pass it now and, after a typed `yes`, retries them on the next Make previews (decision 0020) |
 
-`process` and `describe` wait and print progress. **Ctrl+C cancels safely**: the
-current asset finishes (descriptions finish their batch) and saved work is kept;
-a second Ctrl+C only stops watching while the cancel completes. The work runs as
-its own process, so closing the terminal does not stop it; `--follow` reattaches.
-Recorded failures are never retried by these commands.
+Previews always run ahead of descriptions, one item at a time; each finished item starts the next, so
+the queue runs without the app or the terminal. The scope is resolved when an item starts ("whatever in
+this pack still lacks previews"). An item estimated over 30 minutes, or one that would reach the storage
+budget, prints its estimate and starts only with `--yes`. Blocked work (Blender not set up, the search
+runtime missing) is never queued: the command names the fix instead.
+
+`process` waits and prints progress. **Ctrl+C cancels safely**: the current asset finishes and saved work
+is kept; a second Ctrl+C only stops watching while the cancel completes. The work runs as its own process,
+so closing the terminal does not stop it; `--follow` reattaches. Recorded failures are never retried by
+these commands.
+
+## The one-time library migration
+
+Results from before the library store live in a `metadata` folder inside each old source. Move them into
+the store once, with the app and MCP servers closed (base runtime; nothing renders or is described again):
+
+```powershell
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets" --apply
+.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --remove-old
+```
+
+The first run is a dry run that writes a plan to `data/library/migration/`; `--apply` asks for a typed `yes`,
+imports, verifies and writes a receipt, printing progress; run `--apply` again after a fault to import the
+folders that failed and check unverified ones again; `--remove-old` deletes only verified old folders, asking for each.
+See [Library](asset-sources.md#moving-results-into-the-library-store).
 
 `process --stage inspection|caption|embeddings` is the existing stage-level
 maintenance command (used by `library-batch.py`) and is unchanged.
@@ -56,20 +105,71 @@ maintenance command (used by `library-batch.py`) and is unchanged.
 
 ```text
 settings show
-settings set --formats gltf,fbx        # "none" pauses processing; glb counts as gltf
+settings set --formats gltf,fbx        # 3D formats Assetarium uses; glb counts as gltf; "none" hides every 3D asset
+settings set --image-formats png,jpeg,svg   # standalone image formats; jpg is jpeg, tif is tiff; textures are always read
 settings set --budget-gib 24           # whole GiB
 settings set --batch-size 4            # 1, 2, 4 or 8 (built-in engine only)
 settings set --descriptions off        # on/off; off keeps existing descriptions
 settings set --engine local-server --server-url http://127.0.0.1:8080/v1 --server-model qwen3-vl-2b
 settings set --engine builtin
+settings set --search-device cpu       # cuda or cpu: where search by description and image runs
+settings set --search-threads 24       # auto (the speed test's choice) or CPU threads for search data
 ```
 
 Changing settings never deletes results or retries faults. Server addresses must be on
 this computer ([description engines](description-engines.md)).
 
+## Logs
+
+Every app run, MCP server and command run writes one session log in `logs/` (`[storage].logs`), named by when it
+started and what started it: `2026-11-01_12-13-07_app.log`, `…_mcp.log`, `…_cli.log`. Workers it starts (scans,
+processing, the search worker) write into the same file, so one action reads top to bottom:
+
+```text
+12:13:07.123 INFO    app[4120] source_operations: Operation started · operation=scan folder=kaykit pid=5012
+12:13:07.480 INFO    scan[5012] session: Joined the session · process=scan level=info
+12:13:08.002 INFO    scan[5012] operation: Operation finished · operation=scan folder=kaykit seconds=0.5
+```
+
+```text
+logs                          # the newest session at info and above
+logs --list                   # kept sessions, newest first, with sizes
+logs 2026-11-01_12-13-07_app  # one session
+logs --level warning          # only warnings and errors (debug | info | warning | error)
+logs --verbose                # everything, same as --level debug
+logs --follow                 # keep printing new lines until the session ends (Ctrl+C stops)
+logs --next                   # wait for the next app session, then follow it
+logs --kind mcp               # only sessions of one kind (app, mcp, cli)
+```
+
+What gets written depends on the run's level: `[logging] level` in `config.local.toml` (default `info`),
+`ASSETARIUM_LOG_LEVEL`, or `--verbose` / `--log-level` when starting the app. At `info` a session has its start and
+end, operations, settings changes, agent tool calls and decisions, slow calls (2 s or more), warnings and errors;
+`debug` adds every call the window makes. A line repeating within 10 seconds is written once and then summarized
+(`↻ repeated 37 more times`). Raw output stays out of the stream: an operation's worker output is in
+`data/library/operations/<token>.log` (its "Operation started" line names the file) and the search worker's in
+`<session>.worker.log`. Assetarium keeps the newest 30 sessions and at most 200 MiB; a session splits into
+`….2.log` after 20 MiB. Any text viewer works; [lnav](https://github.com/tstack/lnav) and
+[Toolong](https://github.com/Textualize/toolong) add search and merging.
+
+## Rendering
+
+```text
+rendering show                          # what renders now and why, the last speed test, device keys
+rendering set --device cpu              # auto (fastest tested), cpu, or a GPU key from "rendering show"
+rendering set --processes 2             # auto or 1-8: at most this many renders at a time
+rendering set --memory-gib 20           # auto (70% of free memory) or whole GiB, e.g. more overnight
+rendering test                          # run the speed test now (about 2 minutes); Ctrl+C cancels
+rendering cancel                        # cancel a running speed test; the previous result is kept
+```
+
+Limits only lower the number of renders at a time or change their memory allowance; rendering
+never goes past the fastest tested number or the memory free now
+([decision 0022](../Assetarium%20KnowledgeBase/Decisions/0022-parallel-rendering.md)).
+
 ## Setup
 
-The desktop app's setup wizard, in a terminal ([decision 0014](decisions/0014-setup-wizard.md));
+The desktop app's setup wizard, in a terminal ([decision 0014](../Assetarium%20KnowledgeBase/Decisions/0014-setup-wizard.md));
 the same backend rules decide everything.
 
 ```text
@@ -78,16 +178,29 @@ setup status                           # this computer, Blender, engines and mis
 setup blender check PATH               # executable name, version, headless start, importers
 setup blender set PATH [--confirm-rerender]   # check, then save to config.local.toml
 setup skip                             # record that setup was skipped
-setup agent                            # let your AI agent set up Assetarium for 60 minutes (interactive)
+setup verify-weights [caption|embedding|all]  # verify model weights placed by hand; reads them, downloads nothing
+setup search-check                     # the one-time search check on built-in sample images (about a minute)
+setup agent                            # how to add Assetarium to your AI agent, and what to ask it
+setup agent check                      # do your agents start this copy? reads their settings, changes nothing
 setup agent proposals                  # apply or reject the agent's Blender proposal (interactive)
-setup agent end                        # end the agent's setup access
 ```
 
+`setup agent check` reads only the `local_asset_library` entry in the Claude Code (`~/.claude.json`,
+user and per-project entries), Codex (`~/.codex/config.toml`) and OpenCode
+(`~/.config/opencode/opencode.json`) settings and says, for each one, whether it starts this copy, a
+copy that no longer exists (after moving or deleting a checkout: the agent then reports only
+"connection closed"), a different copy, or a command it cannot follow. It writes nothing and exits
+with 1 when an entry needs fixing; `setup agent` prints the fix. `doctor` includes the same check.
+
 `setup agent` is the terminal version of the app's **Set up with my agent**
-([decision 0016](decisions/0016-agent-setup.md)): it opens the setup session agents need for
-any setup change and prints the client configuration and the prompt to give them. Opening a
-session and deciding proposals need an interactive terminal and have no flag, so an agent
-running commands cannot grant itself access.
+([decisions 0016, 0024](../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)): it prints the client
+configuration and the prompt to give your agent; a connected agent can apply setup values at any time
+(each one labeled and noticed). Deciding its Blender proposal (`setup agent proposals`) needs an
+interactive terminal and has no flag, so an agent running commands cannot approve itself.
+
+`setup verify-weights` checks weights you put in `[storage].models` yourself against the pinned file
+list (`docs/caption-model-files.json`, `docs/embedding-model-files.json`) and writes the same receipt a
+verified download writes; a file that differs is named and nothing is recorded.
 
 `setup blender set` writes nothing when the path is already what Assetarium uses. A
 changed Blender marks finished 3D inspections as pending again (the path is part of
@@ -106,7 +219,7 @@ tools (`edit_collection`, `tag_assets`) and in the desktop app.
 
 ## Confirmations
 
-`sources remove` and `collections delete` ask you to type `yes`, like the app's red
+`library remove` and `collections delete` ask you to type `yes`, like the app's red
 confirmations. They refuse to run without an interactive terminal and have no
 bypass flag: agents can run commands, and only the owner deletes (decision 0012).
 Replacing an existing export file asks the same way.
@@ -115,5 +228,5 @@ Replacing an existing export file asks the same way.
 
 Agents use the STDIO MCP server for search, asset detail, collections and tags
 ([MCP setup](mcp/README.md)). The owner commands above are not MCP tools: sources and
-processing stay owner actions. Setup is available to agents only inside a session you open
-(`setup agent`), and the Blender path only as a proposal you approve.
+processing stay owner actions. Agents can apply setup values and pack rules that need no scan
+(labeled, noticed, undoable); the Blender path and pack rules that rescan are proposals you approve.

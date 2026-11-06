@@ -1,8 +1,8 @@
 # Linux (CLI + MCP)
 
 Assetarium v1 on Linux x86_64 (glibc) is **command line plus the MCP server**, with
-no desktop app ([decision 0013](decisions/0013-platform-support.md)). Every owner
-action except visual browsing runs from the [CLI](cli.md): sources, Process assets,
+no desktop app ([decision 0013](../Assetarium%20KnowledgeBase/Decisions/0013-platform-support.md)). Every owner
+action except visual browsing runs from the [CLI](cli.md): library folders, packs, Make previews,
 settings, failures and collection exports, plus scans, Blender previews, keyword
 search, the STDIO MCP server and the test suite. Windows stays the fully verified
 primary platform. GPU descriptions and semantic/image search are **not verified on
@@ -10,7 +10,7 @@ Linux yet**.
 
 Verified on October 24, 2026 in WSL2 Ubuntu 24.04 (glibc 2.39, ext4) with Blender
 5.2.2: full suite 575 passed, 1 skipped (a Windows-junction test), 4 real-Blender
-tests ran, and the CLI-only smoke check passed. See [progress](progress.md) for the
+tests ran, and the CLI-only smoke check passed. See [progress](history/progress-2026-10.md) for the
 evidence paths.
 
 ## 1. Packages
@@ -89,8 +89,8 @@ links); it reports them as `excluded_file_links`.
 See [Command line](cli.md). In short:
 
 ```bash
-./scripts/local-assets.sh sources add /path/to/assets
-./scripts/local-assets.sh process --asset-source <key>     # Ctrl+C cancels safely
+./scripts/local-assets.sh library add /path/to/assets
+./scripts/local-assets.sh previews <key>                  # queued; follow with: queue list
 ./scripts/local-assets.sh search lantern
 ```
 

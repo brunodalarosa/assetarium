@@ -251,3 +251,39 @@ def test_malformed_or_forged_resolution_is_a_visible_fault(managed, tamper):
         item['dependency_resolution'] = 'invalid evidence'
     with pytest.raises(ConfigError):
         dependency_file(scoped, item)
+
+
+def test_split_projects_joined_under_one_folder_keep_their_texture_and_render_key(managed):
+    """Sibling sub-packs that borrowed a core pack's texture as separate folders still do once a folder is added
+    around them, with the same inspection key, so a finished render is reused instead of rendered again."""
+    from pathlib import Path
+    from local_asset_library.result_store import first_sight_key
+    from local_asset_library.incremental import inspection_input
+    config, _, consumer, _ = managed
+    worker = config.project_root / 'src/local_asset_library/blender_shared_dependency_worker.py'
+    worker.write_text('synthetic worker')  # Its hash joins the inspection key.
+    parent = Path(consumer['path']).parent
+    texture = parent / 'art/ExampleProject/Textures/map.png'
+    texture.parent.mkdir(parents=True)
+    Image.new('RGBA', (4, 4), '#f07030').save(texture)
+    provider = sources.add(config, str(parent / 'art'))
+    model = Path(consumer['path']) / 'ExampleProject/Models/mesh.gltf'
+    model.parent.mkdir(parents=True)
+    model.write_text(json.dumps({'asset': {'version': '2.0'}, 'images': [{'uri': '../Textures/map.png', 'name': 'palette'}]}))
+    scoped = sources.bound(config, consumer)
+    apart = mesh(scoped)
+    assert apart['dependencies'][0]['path'] == provider['key'] + '/ExampleProject/Textures/map.png'
+    keys = inspection_input(scoped, apart)[3], first_sight_key(scoped, apart)
+    joined = sources.add(config, str(parent))
+    assert set(joined['replaced']) == {consumer['key'], provider['key'], 'two'}
+    folder = sources.bound(config, sources.get_source(config, joined['key']))
+    record = mesh(folder)
+    dep = record['dependencies'][0]
+    assert dep['status'] == 'available' and dep['path'] == joined['key'] + '/art/ExampleProject/Textures/map.png'
+    assert dependency_file(folder, dep) == texture and validate_recipe(folder, record)['kind'] == 'shared_dependency_paths'
+    assert worker_files(folder, record['texture_repair']) == []  # Inside its own folder: read like any source file.
+    assert (inspection_input(folder, record)[3], first_sight_key(folder, record)) == keys
+    # A path that differs in more than one folder, or only in the file's own folder, is not a sibling layout.
+    from local_asset_library.dependency_resolution import sibling_path
+    assert sibling_path('k/a/P/T/x.png', 'k/b/P/T/x.png') and not sibling_path('k/a/P/T/x.png', 'k/b/Q/T/x.png')
+    assert not sibling_path('k/a/P/T/x.png', 'k/a/P/U/x.png')

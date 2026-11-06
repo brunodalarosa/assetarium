@@ -9,8 +9,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import posixpath
 import shutil
 import sqlite3
+import threading
 import time
 import uuid
 
@@ -18,10 +20,11 @@ from .catalog import (build_inventory, detail, digest, encoded, read_database, s
                       snapshot, walk_source, write_database, SOURCE_ID, SCANNER_VERSION)
 from .config import ConfigError
 from .membership import records, membership
-from .publication import atomic_json, generation, line_ending_hashes
+from .publication import atomic_json, generation, line_ending_hashes, read_only
+from .store_versions import checked
 from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
-from .inspection import blender_command, choose_source, discover_blender, environment, run_process, validate_result
+from .inspection import choose_source, discover_blender, validate_result
 
 STAGES = ("inspection", "caption", "embeddings")
 COVERAGE_STAGES = ('inventory','inspection','previews','caption','embeddings')
@@ -30,6 +33,25 @@ IMAGE_CAPTION_PROMPT_VERSION = 'image-v1'
 PROMPT_VERSIONS = {'v1', 'v2', 'v3', 'v4', IMAGE_CAPTION_PROMPT_VERSION}
 WORK = "work"
 _blender_runtime = {}
+# Parallel inspections render outside it; catalog reads/writes around them take turns.
+_catalog = threading.RLock()
+GPU_WAIT = 30  # Seconds GPU renders wait for another GPU job, like the other GPU stages.
+# blender_worker.py edits whose CPU renders are proven identical (scripts/check-render-stability.py), mapped
+# to the hash finished inspections recorded, so an equivalent edit never re-queues them (decision 0022).
+EQUIVALENT_WORKERS = {
+    '69520d2225259116d055fb94d8c4948b5bb8e020773b3e9889885632dee6f690':  # Render device from the job (LF)
+        'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
+    'b9ac48c40e1c3d527f061438a98164ae3adc184c89832c52bc49ba66eadc5ab1':  # The same with CRLF endings
+        'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
+    '3f11299afb416a7e1f0067df660aa0f371966fdb422e2e1217cb655cc49d525d':  # Edge-on flat models: an empty view turns toward the face (LF)
+        'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
+    '6a2996d6d709982917b2b34dcd7535eab7c27a05799cb9313e9ced8e2df53072':  # The same with CRLF endings
+        'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
+    'e94e9d675e8b13dc97a2ed0d7a6b2e1d8afef3d9aa585a96be549dbd915a4c5a':  # Output root from the job (LF)
+        'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
+    'ce85b5325c0c83fa0e7d8712032c7edfe1b356568271b295c9f8822686740c63':  # The same with CRLF endings
+        'aada0bbcd3ddc236f0a004e219cb31e2d5f5bd5ea9d988341a57529c476da0de',
+}
 
 
 def working(config):
@@ -59,7 +81,7 @@ def policy(config):
 
 def copy_database(source, target):
     target.parent.mkdir(parents=True, exist_ok=True)
-    with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True)) as src, closing(sqlite3.connect(target)) as dst:
+    with closing(read_only(source)) as src, closing(sqlite3.connect(target)) as dst:
         src.backup(dst)
 
 
@@ -75,9 +97,10 @@ def initialize(config):
 
 
 def ledger(config):
-    path = config.output_path("data", "library/jobs.sqlite")
+    # One stage ledger for the whole store: a recognized asset keeps its history in any library folder.
+    path = config.library_store() / "ledger.sqlite" if config.source_key else config.output_path("data", "library/jobs.sqlite")
     path.parent.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path)
+    db = checked(sqlite3.connect(path), 'The processing ledger', 1)
     db.executescript("""
         CREATE TABLE IF NOT EXISTS jobs(asset_id TEXT, stage TEXT, fingerprint TEXT,
           status TEXT, evidence TEXT, updated TEXT, PRIMARY KEY(asset_id,stage));
@@ -95,6 +118,7 @@ def checkpoint(db, identifier, stage, fingerprint, status, evidence):
 
 
 def inspection_input(config, record, resolution=640, content_only=False, formats=None, recorded=None):
+    """(asset, source, reason, key): the key hashes content, relative dependency paths, settings and code (decision 0023)."""
     from .asset_structure import asset_type
     if asset_type(record) == 'image':
         from .image_inspection import inspection_input as image_input
@@ -112,42 +136,50 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
     deps = [d for d in record["dependencies"] if d.get("from") == source["path"]]
     # Inactive datablocks remain evidence but do not change rendered pixels.
     deps = [d for d in deps if d.get("required_for_render") is not False]
-    content = [{"path": source["path"], "sha256": source.get("sha256")}]
+    # Paths only relative to the inspected file: they change what Blender resolves; where the file lives does not.
+    from .result_store import location_free, relative_to
+    base, prefix = posixpath.dirname(source["path"]), source["path"].split("/", 1)[0] if config.source_key else None
+    content = [{"format": source["format"], "sha256": source.get("sha256")}]
     for item in [source] + deps:
         path = item.get("path")
+        relative = relative_to(base, path) if path else None
         try:
             from .dependency_resolution import dependency_file
             actual = file_hash(dependency_file(config, item))
-        except (OSError, ValueError, TypeError) as exc:
-            actual = {"missing": path, "reason": str(exc)}
-        content.append({"path": path, "actual": actual, "expected": item.get("sha256")})
+        except (OSError, ValueError, TypeError):
+            actual = {"missing": relative}
+        content.append({"path": relative, "actual": actual, "expected": item.get("sha256")})
     from .texture_repair import validate_recipe
     repair = validate_recipe(config, record)
     if repair:
-        content.append({'texture_repair': repair})
+        from .dependency_resolution import portable
+        content.append({'texture_repair': location_free(portable(repair, base), base, prefix)})
     if content_only:
         return asset,source,reason,digest(content)
     code = config.project_root / "src/local_asset_library"
     files = {"worker": code / "blender_worker.py", "render_math": code / "render_math.py"}
+    worker = file_hash(files["worker"])
     settings = {"source": content, "resolution": resolution,
-        "worker": file_hash(files["worker"]), "render_math": file_hash(files["render_math"]),
+        "worker": EQUIVALENT_WORKERS.get(worker, worker), "render_math": file_hash(files["render_math"]),
         "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None}
     if repair:
         files['repair_worker'] = code / ('blender_shared_dependency_worker.py' if repair.get('kind') == 'shared_dependency_paths'
                                         else 'blender_repair_worker.py')
         settings['repair_worker'] = file_hash(files['repair_worker'])
-    return asset, source, reason, recorded_fingerprint(settings, files, recorded)
+    return asset, source, reason, recorded_fingerprint(settings, files, recorded, EQUIVALENT_WORKERS)
 
 
-def recorded_fingerprint(value, files, recorded=None):
+def recorded_fingerprint(value, files, recorded=None, equivalents=None):
     """digest(value), or ``recorded`` when it differs only by LF/CRLF endings of ``files``.
 
     ``value[key]`` is the hash of ``files[key]``. Python and uv read these files as
     text, so a git checkout that swaps line endings must not re-queue finished work.
+    ``equivalents`` maps a file hash to the proven-equivalent hash recorded instead.
     """
     current = digest(value)
+    equivalents = equivalents or {}
     if recorded and recorded != current:
-        for hashes in product(*(line_ending_hashes(path) for path in files.values())):
+        for hashes in product(*([equivalents.get(h, h) for h in line_ending_hashes(path)] for path in files.values())):
             if digest({**value, **dict(zip(files, hashes))}) == recorded:
                 return recorded
     return current
@@ -173,7 +205,13 @@ def default_prompt_version(record):
     return IMAGE_CAPTION_PROMPT_VERSION if asset_type(record) == 'image' else CAPTION_PROMPT_VERSION
 
 
-def caption_input(config, record, prompt_version=None, generation=None, recorded=None):
+def caption_views(config, record):
+    """Caption inputs by view content (decision 0023): a view's path is where it is stored, not what the model sees."""
+    return [{"sha256": p.get("sha256"), "view_label": p.get("view_label"), "actual": s.get("current_sha256", "unreadable" if "error" in s else None)}
+            for s in input_state(config, record) for p in [s["preview"]]]
+
+
+def caption_input(config, record, prompt_version=None, generation=None, recorded=None, views=None):
     # Model/runtime contracts and prompt affect inference. Severity/owner review do not.
     # Completed captions retain their generation prompt and mode for cache validation;
     # adopting a new default is not a request to regenerate existing results.
@@ -200,9 +238,7 @@ def caption_input(config, record, prompt_version=None, generation=None, recorded
             from .engines import generation as configured
             identity = configured(config)[1] or {}
         files = {"engine": Path(engine_server.__file__)}
-        value = {"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
-            "view_label": p.get("view_label"), "actual": s.get("current_sha256", s.get("error"))}
-            for s in input_state(config, record) for p in [s["preview"]]],
+        value = {"views": caption_views(config, record) if views is None else views,
             "engine": identity, "adapter": file_hash(files["engine"]),
             "prompt": prompt_hash(config, prompt_version, provenance.get('prompt_sha256')
                                   if provenance.get('prompt_version') == prompt_version else None),
@@ -210,9 +246,7 @@ def caption_input(config, record, prompt_version=None, generation=None, recorded
         return recorded_fingerprint(value, files, recorded)
     files = {"backend": config.project_root / "src/local_asset_library/caption_backend.py",
              "runtime": config.project_root / "runtime/caption/uv.lock"}
-    value = {"views": [{"path": p.get("path"), "sha256": p.get("sha256"),
-        "view_label": p.get("view_label"), "actual": s.get("current_sha256", s.get("error"))}
-        for s in input_state(config, record) for p in [s["preview"]]],
+    value = {"views": caption_views(config, record) if views is None else views,
         "model": {k: v for k,v in json.loads((config.project_root / "docs/caption-model.json").read_text(encoding="utf-8")).items()
                   if k in {'model_id', 'revision'}},
         "prompt": prompt_hash(config, prompt_version, provenance.get('prompt_sha256')
@@ -232,11 +266,10 @@ def stage_content(config,record,stage):
             # Retained fault identity does not change when checkboxes change.
             return inspection_input(config,record,content_only=True,
                                     formats=('gltf', 'fbx', 'obj', 'blend', 'stl', 'dae'))[3]
-        return digest([{'path':s['preview'].get('path'),'view':s['preview'].get('view_label'),
-            'expected':s['preview'].get('sha256'),'actual':s.get('current_sha256',s.get('error'))}
-            for s in input_state(config,record)])
+        return digest(caption_views(config,record))
     except (OSError,ValueError,KeyError):
-        return digest({'files':record.get('files'),'dependencies':record.get('dependencies')})
+        return digest({'files':[f.get('sha256') for f in record.get('files',[])],
+                       'dependencies':[d.get('sha256') for d in record.get('dependencies',[])]})
 
 
 def seed(config):
@@ -298,7 +331,8 @@ def refresh(config, dry_run=False):
         if previous:
             same = previous["files"] == record["files"] and [d for d in previous["dependencies"] if not d.get("inspection_version")] == record["dependencies"]
             kept = deepcopy(previous)
-            for key in ("files", "availability", "display_name", "license_evidence", "grouping", "variants", "dependency_inspection"):
+            kept.pop("variants", None)  # Pair lists of 0.1.0; variant groups live in folder views now.
+            for key in ("files", "availability", "display_name", "license_evidence", "grouping", "dependency_inspection"):
                 kept[key] = record[key]
             from .dependency_overrides import synchronize_recipe
             synchronize_recipe(kept, record)
@@ -347,20 +381,29 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
     from .asset_structure import asset_type
     if asset_type(record) == 'image':
         from .image_inspection import run
-        return run(config, record, fingerprint)
+        with _catalog:
+            return run(config, record, fingerprint)
     from .inspection import publish
-    asset, source, reason, _ = inspection_input(config, record, resolution, formats=formats)
-    key = (str(config.blender), config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None)
-    if key not in _blender_runtime:
-        _blender_runtime[key] = discover_blender(config)
-    blender, runtime = _blender_runtime[key]
-    relative = f"inspection/{record['asset_id']}/{source['format']}/{fingerprint[:16]}"
+    with _catalog:
+        asset, source, reason, _ = inspection_input(config, record, resolution, formats=formats)
+        key = (str(config.blender), config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None)
+        if key not in _blender_runtime:
+            _blender_runtime[key] = discover_blender(config)
+        blender, runtime = _blender_runtime[key]
+    from .result_store import adopt, result_path
+    relative = result_path('inspection', fingerprint)  # Keyed by inputs: duplicates share it (decision 0023).
     output = config.output_path("data", relative)
+    root = config.library_store() if config.sources_registry else config.storage_root('data')
     job = {"schema_version": 1, "project_root": str(config.project_root), "source_root": str(config.source_root),
         "asset_id": record["asset_id"], "source_path": source["path"], "format": source["format"],
-        "source_sha256": source["sha256"], "output": str(output), "resolution": resolution}
+        "source_sha256": source["sha256"], "output": str(output), "resolution": resolution, "output_root": str(root)}
     if config.source_key:
-        job.update(source_prefix=config.source_key, metadata_root=str(config.metadata_root))
+        from .library_migration import LEGACY_METADATA_DIR
+        job.update(source_prefix=config.source_key, excluded_dirs=[LEGACY_METADATA_DIR])
+    from . import render_pool
+    device = render_pool.job_device(config)
+    if device:
+        job['render_device'] = device
     worker = 'blender_worker.py'
     if record.get('texture_repair'):
         from .texture_repair import validate_recipe
@@ -373,19 +416,36 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
     task = output / "job.json"
     result_path = output / "result.json"
     if result_path.exists():
-        result = json.loads(result_path.read_text(encoding="utf-8"))
-        validate_result(config, job, result)
-    else:
+        try:
+            result = json.loads(result_path.read_text(encoding="utf-8"))
+        except ValueError:
+            # Cut off by an interrupted run: an unfinished render, not an asset fault. Keep the partial file.
+            result_path.replace(output / f"result.interrupted-{uuid.uuid4().hex[:8]}.json")
+            result = None
+        if result is not None and result.get('asset_id') != record['asset_id']:
+            # Another file with the same inputs finished it first.
+            with _catalog:
+                adopted = adopt(config, record, 'inspection', fingerprint)
+            if adopted:
+                return adopted
+            raise RuntimeError(f"A result for the same inputs exists but could not be reused; see {result_path}")
+        if result is not None:
+            validate_result(config, job, result)
+    if not result_path.exists():
         save_json(task, job)
-        command = blender_command(blender, "--python-exit-code", "5", "--python",
-                                  str(config.project_root / 'src/local_asset_library' / worker), "--", str(task))
-        process = run_process(command, config.project_root, environment(config), timeout)
+        process = render_pool.run(config, blender, config.project_root / 'src/local_asset_library' / worker, task, timeout)
         (output / "blender.log").write_text(process["output"], encoding="utf-8")
         if process["timed_out"] or process["returncode"] != 0 or not result_path.exists():
             raise RuntimeError(f"Inspection timeout/exit {process['returncode']}; see {output / 'blender.log'}")
         result = json.loads(result_path.read_text(encoding="utf-8"))
+        unavailable = [e for e in result.get("errors", []) if e.startswith("Render device unavailable: ")]
+        if unavailable:
+            # A machine fault, not this asset's: keep the evidence aside and leave the asset pending.
+            result_path.replace(output / f"result.device-unavailable-{uuid.uuid4().hex[:8]}.json")
+            raise render_pool.DeviceUnavailable(unavailable[0] + ". Choose Automatic or CPU in Settings → General")
         validate_result(config, job, result)
-    publish(config, asset, source, reason, result, fingerprint, relative)
+    with _catalog:
+        publish(config, asset, source, reason, result, fingerprint, relative)
     return {"status": result["status"], "result_path": str(result_path), "seconds": result.get("elapsed_seconds"), "errors": result.get("errors", [])}
 
 
@@ -401,7 +461,7 @@ def run_captions(config, batch, backend, batch_size=None):
     Every asset is re-checked, saved and published on its own. EngineStop (out of memory,
     engine unavailable) propagates before anything is recorded, so the batch stays pending.
     """
-    from .captions import infer_captions, publish
+    from .captions import infer_captions, publish, use_notes
     from .caption_batching import MODE
     # A model batch never mixes prompts: 3D views and 2D images use separate versioned prompts.
     groups = {}
@@ -419,7 +479,8 @@ def run_captions(config, batch, backend, batch_size=None):
         try:
             image_inputs(config, record)
             relative = f"captions/library/{record['asset_id']}/{fingerprint}.json"
-            provenance = {"fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
+            notes = use_notes(outcome["description"]) if outcome["status"] == "complete" else []
+            provenance = {**({"validation_notes": notes} if notes else {}), "fingerprint": fingerprint, "model": backend.contract, "settings": backend.settings,
                 "prompt_version": version, "prompt_sha256": file_hash(prompt_path), "input_views": inputs,
                 "generation_mode": getattr(backend, 'generation_mode', MODE),
                 **({"engine": backend.identity} if getattr(backend, 'identity', None) else {}),
@@ -438,14 +499,54 @@ def run_caption(config, record, fingerprint, backend):
     return returned(run_captions(config, [(record, fingerprint, image_inputs(config, record))], backend)[0])
 
 
+def restore_reused(record, stage, apply=True):
+    """A reused complete result whose stage a rescan reset (for example after grouping export folders) is complete again.
+
+    Only when the record still carries that result: a complete inspection run with its previews, or its description.
+    With ``apply=False`` it only reports whether it would (dry runs write nothing).
+    """
+    states = record['processing'] if apply else dict(record['processing'])
+    if stage == 'inspection':
+        if ((record.get('inspection_run') or {}).get('status') == 'complete' and record.get('technical') and record.get('previews')
+                and (states.get('inspection'), states.get('previews')) != ('complete', 'complete')):
+            states.update(inspection='complete', previews='complete')
+            return True
+    elif stage == 'caption' and record.get('description') and record.get('caption_provenance') and states.get('caption') != 'complete':
+        states['caption'] = 'complete'
+        return True
+    return False
+
+
+def restore_fault(record, stage, evidence, status, apply=True):
+    """A kept fault whose stage a rescan reset (for example after grouping export folders) shows as failed again.
+
+    Nothing is retried: only the saved state returns, for flags the rescan reset to pending. A returned failed
+    render keeps its completed inspection and failed previews; any other fault fails the stage with its evidence.
+    With ``apply=False`` it only reports whether it would (dry runs write nothing).
+    """
+    states = record['processing'] if apply else dict(record['processing'])
+    run = record.get('inspection_run') or {}
+    if stage == 'inspection' and evidence.get('result_path') and run.get('status') == status:
+        wanted = {'inspection': 'complete' if record.get('technical') else status, 'previews': status}
+    else:
+        wanted = {stage: status}
+    if all(states.get(key) == value for key, value in wanted.items()) or any(
+            states.get(key) not in {None, 'pending', value} for key, value in wanted.items()):
+        return False
+    states.update(wanted)
+    if apply and 'previews' not in wanted:
+        record.setdefault('stage_faults', {}).setdefault(stage, {k: v for k, v in evidence.items() if k != 'fault_content'})
+    return True
+
+
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
-            cancelled=None, progress=None, asset_ids=None):
+            cancelled=None, progress=None, asset_ids=None, status=None):
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
     selected = records(work)
-    from .settings import processing_formats, processing_eligible
-    formats = processing_formats(config)
+    from .settings import processing_eligible, used_formats
+    formats = used_formats(config)
     # asset_ids narrows the caption/inspection selection; vectors cover the whole source.
     selected = [record for record in selected if processing_eligible(record, formats)
                 and (asset_ids is None or stage == "embeddings" or record["asset_id"] in asset_ids)]
@@ -460,7 +561,23 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         return {"stage": stage, "pending": 0, "selected": 0, "retained": {}, "dry_run": dry_run, "outcomes": [],
                 "pending_ids": [], "descriptions_disabled": True,
                 "reason": "Descriptions are turned off in Settings → General"}
-    pending, retained = [], Counter()
+    pending, retained, restored = [], Counter(), 0
+    from .result_store import KEY_STAGES, adopt, current_key, lookup, remember
+    from .asset_structure import asset_type
+    keyed = lambda record: stage in KEY_STAGES and (stage == 'caption' or asset_type(record) == 'model_3d')
+    leaders, followers, reused = set(), [], []
+
+    def reuse(record, fp):
+        # A finished result for the same inputs (a duplicate, a moved file, a re-enrolled asset): nothing runs.
+        if dry_run:
+            return keyed(record) and lookup(config, stage, fp) is not None
+        outcome = adopt(work, record, stage, fp) if keyed(record) else None
+        if outcome:
+            updated = detail(work, record['asset_id'])
+            outcome['fault_content'] = stage_content(work, updated, stage)
+            checkpoint(db, record['asset_id'], stage, current_key(work, updated, stage), 'complete', outcome)
+            reused.append(record['asset_id'])
+        return bool(outcome)
     with closing(ledger(config)) as db:
         for record in selected:
             old = db.execute("SELECT fingerprint,status,evidence FROM jobs WHERE asset_id=? AND stage=?", (record["asset_id"], stage)).fetchone()
@@ -477,6 +594,10 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                     checkpoint(db,record['asset_id'],stage,fp,old[1],evidence)
                     old=(old[0],old[1],encoded(evidence))
             if old and old[1] in {'failed','unsupported'} and json.loads(old[2]).get('fault_content')==stage_content(work,record,stage):
+                if restore_fault(record, stage, json.loads(old[2]), old[1], apply=not dry_run):
+                    restored += 1
+                    if not dry_run:
+                        update_record(work, record)
                 retained[old[1]]+=1
                 continue  # Changing settings alone is not authorization to retry a source/input fault.
             if (stage == 'inspection' and old and old[1] == 'complete' and record.get('asset_type') == 'image'
@@ -506,13 +627,29 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                             update_record(work,record)
                         retained['failed'] += 1
                         continue
+                    if restore_reused(record, stage, apply=not dry_run):
+                        restored += 1
+                        if not dry_run:
+                            update_record(work, record)
+                    elif keyed(record) and not record.get('technical' if stage == 'inspection' else 'description'):
+                        # The ledger knows this asset finished but its record does not carry the result (recognized
+                        # again in another folder): the shared result fills it in.
+                        reuse(record, fp)
                 retained[old[1]] += 1
                 continue
             if stage == 'caption':
                 fp = caption_input(work, record, prompt_version=default_prompt_version(record))
+            if reuse(record, fp):
+                continue
+            if keyed(record) and fp in leaders:
+                followers.append((record, fp))  # The same inputs as an earlier asset: it reuses that result.
+                continue
+            leaders.add(fp)
             pending.append((record, fp))
-        report = {"stage": stage, "pending": len(pending), "selected": min(limit, len(pending)), "retained": dict(retained), "dry_run": dry_run, "outcomes": []}
-        report['pending_ids'] = [r['asset_id'] for r, _ in pending]
+        report = {"stage": stage, "pending": len(pending) + len(followers), "selected": min(limit, len(pending)),
+                  "retained": dict(retained), "restored": restored, "dry_run": dry_run, "outcomes": [],
+                  "reused": len(reused), "shared": len(followers)}
+        report['pending_ids'] = [r['asset_id'] for r, _ in pending + followers]
         if dry_run:
             return report
         started = time.monotonic()
@@ -523,6 +660,10 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
         size = batch_size(config) if stage == 'caption' else 1
 
         def settle(record, fp, run):
+            with _catalog:
+                record_outcome(record, fp, run)
+
+        def record_outcome(record, fp, run):
             identifier = record["asset_id"]
             try:
                 outcome = run()
@@ -546,48 +687,106 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
                 update_record(work, updated)  # Prior failures remain in the append-only stage history.
             outcome['fault_content']=stage_content(work,updated,stage)
             checkpoint(db, identifier, stage, final_fp, outcome["status"], outcome)
+            if outcome['status'] == 'complete' and keyed(updated):
+                saved = (updated.get('inspection_run') or {}).get('result_path', '') if stage == 'inspection' else outcome.get('result_path')
+                saved = saved.removesuffix('/result.json') if stage == 'inspection' else saved
+                # Under the key it ran with (what a fresh duplicate has) and the key it finished with.
+                for key in {fp, final_fp}:
+                    remember(config, stage, key, saved, identifier)
             report["outcomes"].append({"asset_id": identifier, **outcome})
             atomic_json(status_path,{'status':'running','stage':stage,'selected':len(chosen),'completed':len(report['outcomes']),'pid':os.getpid(),'last_asset':identifier,'last_status':outcome['status']})
 
         from .retrieval import source_check
-        for start in range(0, len(chosen), size):
-            if cancelled and cancelled():
-                report['cancelled'] = True
-                break
-            group = chosen[start:start + size]
-            if progress:
-                progress(group[0][0]["asset_id"], len(report['outcomes']), len(chosen))
-            ready = []
-            for record, fp in group:
-                checkpoint(db, record["asset_id"], stage, fp, "running", {"resumable": True})
-                print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
-                try:
-                    checked = deepcopy(record)
-                    if stage == "inspection":
-                        checked["technical"] = None
-                    source_check(work, checked)
-                    inputs = image_inputs(work, record) if stage == "caption" else None
-                except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
-                    settle(record, fp, lambda exc=exc: returned(exc))
+        from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+        from contextlib import ExitStack
+        inflight, executor, parallel = [], None, 1
+
+        def collect(everything=False):
+            # Settle finished parallel renders on this thread; keep at most one job per render process.
+            while inflight and (everything or len(inflight) >= parallel):
+                done, _ = wait([future for _, _, future in inflight], return_when=FIRST_COMPLETED)
+                for item in [item for item in inflight if item[2] in done]:
+                    inflight.remove(item)
+                    settle(item[0], item[1], item[2].result)
+                    if progress:
+                        progress(None, len(report['outcomes']), len(chosen))
+
+        with ExitStack() as stack:
+            if stage == "inspection":
+                from . import render_devices, render_pool
+                from .asset_structure import asset_type
+                if any(asset_type(record) == 'model_3d' for record, _ in chosen):
+                    render_devices.ensure(work, progress=status, cancelled=cancelled)
+                plan = render_pool.plan(work)
+                report['render'] = {key: plan[key] for key in ('processes', 'threads', 'reason', 'device_label')}
+                if plan['device']:
+                    tested = render_devices.saved(work)
+                    if tested and plan['device_key'] not in {render_devices.key(d) for d in tested['devices']}:
+                        raise render_pool.DeviceUnavailable(f"The chosen render device ({plan['device_label']}) was not found. "
+                                                            "Choose Automatic or CPU in Settings → General")
+                    from .gpu_queue import lease
+                    try:
+                        stack.enter_context(lease(config, 'batch-source-inspection', timeout=GPU_WAIT))
+                    except ConfigError as exc:
+                        raise render_pool.DeviceUnavailable('The GPU is busy with another job (descriptions or search). '
+                            'Make previews again when it finishes, or choose CPU in Settings → General') from exc
+                stack.enter_context(render_pool.opened(work, plan['processes'], plan['threads'], plan['device']))
+                if plan['processes'] > 1:
+                    parallel = plan['processes']
+                    executor = stack.enter_context(ThreadPoolExecutor(plan['processes'], thread_name_prefix='render'))
+            for start in range(0, len(chosen), size):
+                if cancelled and cancelled():
+                    report['cancelled'] = True
+                    break
+                group = chosen[start:start + size]
+                if progress:
+                    progress(group[0][0]["asset_id"], len(report['outcomes']), len(chosen))
+                ready = []
+                for record, fp in group:
+                    checkpoint(db, record["asset_id"], stage, fp, "running", {"resumable": True})
+                    print(f"{stage}: {record['pack_id']} / {record['display_name']}", flush=True)
+                    try:
+                        checked = deepcopy(record)
+                        if stage == "inspection":
+                            checked["technical"] = None
+                        source_check(work, checked)
+                        inputs = image_inputs(work, record) if stage == "caption" else None
+                    except (OSError, ValueError, RuntimeError, KeyError, TimeoutError) as exc:
+                        settle(record, fp, lambda exc=exc: returned(exc))
+                        continue
+                    if stage == "inspection" and executor:
+                        inflight.append((record, fp, executor.submit(run_inspection, work, record, fp, resolution, formats=formats)))
+                        collect()
+                    elif stage == "inspection":
+                        settle(record, fp, lambda: run_inspection(work, record, fp, resolution, formats=formats))
+                    else:
+                        ready.append((record, fp, inputs))
+                if ready:
+                    from .description_engines import EngineStop
+                    try:
+                        results = run_captions(work, ready, backend, batch_size=size)
+                    except EngineStop as exc:
+                        # Ledger rows stay "running", which the next pass treats as pending.
+                        report.update(stopped=str(exc), elapsed_seconds=time.monotonic() - started)
+                        save_json(config.output_path("data", f"library/batches/{stage}-{uuid.uuid4().hex}.json"), report)
+                        atomic_json(status_path,{'status':'stopped','stage':stage,'completed':len(report['outcomes']),'reason':str(exc)})
+                        raise
+                    for (record, fp, _), result in zip(ready, results):
+                        settle(record, fp, lambda result=result: returned(result))
+                if progress:
+                    progress(None, len(report['outcomes']), len(chosen))
+            if executor:
+                collect(everything=True)
+            chosen_keys = {fp for _, fp in chosen}
+            for record, fp in followers:
+                if fp not in chosen_keys or (cancelled and cancelled()):
                     continue
-                if stage == "inspection":
-                    settle(record, fp, lambda: run_inspection(work, record, fp, resolution, formats=formats))
-                else:
-                    ready.append((record, fp, inputs))
-            if ready:
-                from .description_engines import EngineStop
-                try:
-                    results = run_captions(work, ready, backend, batch_size=size)
-                except EngineStop as exc:
-                    # Ledger rows stay "running", which the next pass treats as pending.
-                    report.update(stopped=str(exc), elapsed_seconds=time.monotonic() - started)
-                    save_json(config.output_path("data", f"library/batches/{stage}-{uuid.uuid4().hex}.json"), report)
-                    atomic_json(status_path,{'status':'stopped','stage':stage,'completed':len(report['outcomes']),'reason':str(exc)})
-                    raise
-                for (record, fp, _), result in zip(ready, results):
-                    settle(record, fp, lambda result=result: returned(result))
-            if progress:
-                progress(None, len(report['outcomes']), len(chosen))
+                def shared(record=record, fp=fp):
+                    outcome = adopt(work, record, stage, fp)
+                    if outcome is None:
+                        raise RuntimeError('The asset with the same inputs did not finish; process this one again')
+                    return outcome
+                settle(record, fp, shared)
         report["elapsed_seconds"] = time.monotonic() - started
         report['complete']=sum(o['status']=='complete' for o in report['outcomes'])
         report['failed']=sum(o['status']=='failed' for o in report['outcomes'])
@@ -633,7 +832,7 @@ def publish(config):
     work = working(config)
     scope = membership(work)
     index = work.output_path("data", "embeddings/index.sqlite")
-    with closing(sqlite3.connect(index.as_uri() + "?mode=ro", uri=True)) as db:
+    with closing(read_only(index)) as db:
         meta = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
         if set(meta.get("pilot_ids", [])) != set(scope["asset_ids"]):
             raise ConfigError("Cannot publish mismatched catalog/index membership")
@@ -694,7 +893,7 @@ def publish(config):
 def database_content(path, kind):
     tables = ('metadata','assets','inventory','files') if kind=='catalog' else ('meta','jobs','vectors')
     content = {}
-    with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)) as db:
+    with closing(read_only(path)) as db:
         for table in tables:
             values = db.execute('SELECT * FROM '+table+' ORDER BY 1').fetchall()
             content[table] = [[hashlib.sha256(value).hexdigest() if isinstance(value,bytes) else value for value in row] for row in values]

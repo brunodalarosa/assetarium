@@ -8,7 +8,7 @@ import sqlite3
 import pytest
 from PIL import Image
 
-from test_incremental import library
+from test_incremental import library, view_image
 from local_asset_library.config import ConfigError
 from local_asset_library import sources
 from local_asset_library.catalog import digest, detail, save_json
@@ -48,7 +48,7 @@ def ready_source(config, backend, source):
         for view in ('front','side','three_quarter'):
             relative = f'inspection/{r["asset_id"]}/obj/fixture/{view}.png'
             path = work.output_path('data',relative);path.parent.mkdir(parents=True, exist_ok=True)
-            Image.new('RGB',(32,32),'red').save(path)
+            view_image(r, view).save(path)
             r['previews'].append({'path':'data/'+relative,'sha256':file_hash(path),'view_label':view,
                                   'origin':'rendered','coordinate_convention':'synthetic'})
         r['caption_provenance']={'fingerprint':'synthetic','input_views':[],'visual_faults':[]}
@@ -74,28 +74,6 @@ def failed_previews(work, record):
     record['processing'].update(previews='failed')
     record['stage_faults'] = {'previews': {'status': 'failed', 'error': 'Synthetic retained fault'}}
     update_record(work, record)
-
-
-def test_source_import_restriction_survives_scans_without_affecting_other_sources(managed):
-    config, _, one, two = managed
-    root = Path(one['path'])
-    for folder, extension in [('gltf', 'gltf'), ('obj', 'obj'), ('fbx', 'fbx'), ('fbx(unity)', 'fbx')]:
-        target = root / 'Pack/Assets' / folder / ('arch.' + extension)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text('{"asset":{"version":"2.0"}}' if extension == 'gltf' else 'synthetic')
-    scoped = sources.bound(config, one)
-    identity_path = scoped.output_path('data', 'source.json')
-    value = json.loads(identity_path.read_text())
-    value['import_formats'] = ['gltf']
-    sources.atomic_json(identity_path, value)
-    originals = {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file() and 'metadata-lal' not in p.parts}
-    for _ in range(2):
-        assert sources.scan_source(config, one)['assets'] == 1
-        rows = records(working(scoped))
-        assert rows[0]['files'][0]['format'] == 'gltf'
-        assert rows[0]['source_relative_identity'].endswith('gltf/arch.gltf')
-    assert sources.scan_source(config, two)['assets'] == 3
-    assert all(Path(p).read_bytes() == blob for p, blob in originals.items())
 
 
 def test_published_failures_leave_pending_cards_but_keep_report_and_attempt(managed):
@@ -252,10 +230,12 @@ def test_independent_roots_and_source_owned_results(managed):
     assert len(records(config))==6
     r=records(work)[0]
     preview=config.output_path('data',r['previews'][0]['path'][5:])
-    assert preview.is_relative_to(Path(one['path'])/'metadata-lal')
+    # Results live in the central library store, never in the asset folder (decision 0023).
+    assert preview.is_relative_to(config.library_store()) and not preview.is_relative_to(Path(one['path']))
     assert config.source_file(r['files'][0]['path']).parent==Path(one['path'])
     assert not sources.source_status(config,one)['needs_processing']
-    with pytest.raises(ConfigError):config.source_file(one['key']+'/metadata-lal/source.json')
+    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    with pytest.raises(ConfigError):config.source_file(one['key']+'/'+LEGACY_METADATA_DIR+'/source.json')
 
 
 def test_live_toggle_and_agent_gui_agreement(managed):
@@ -297,7 +277,8 @@ def test_scan_add_change_remove_and_card_until_published(managed):
     new.unlink()
     sources.scan_source(config,one)
     assert len(records(config))==2
-    assert (Path(one['path'])/'metadata-lal').is_dir()
+    # Working data lives in the library store; the folder holds only its originals (decision 0023).
+    assert sources.bound(config,one).metadata_root.is_dir() and not [p for p in Path(one['path']).iterdir() if p.is_dir()]
 
 
 def test_remove_and_readd_preserves_identity_and_generated_files(managed):
@@ -337,15 +318,18 @@ def test_empty_source_and_metadata_are_excluded_from_scans(managed,tmp_path):
     config,_,_,_=managed
     root=tmp_path/'empty-source';root.mkdir()
     source=sources.add(config,str(root))
-    (root/'metadata-lal'/'invented.obj').write_text('not an original')
+    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    (root/LEGACY_METADATA_DIR).mkdir()  # An old generated folder awaiting migration is never scanned.
+    (root/LEGACY_METADATA_DIR/'invented.obj').write_text('not an original')
     result=sources.scan_source(config,source)
     assert result['assets']==0 and not result['needs_processing']
     assert not records(working(sources.bound(config,source)))
 
 
 def test_cancellation_finishes_current_inspection_and_checkpoints(managed,monkeypatch):
-    from local_asset_library import incremental
+    from local_asset_library import incremental, render_pool
     config,_,one,_=managed
+    render_pool.save(config,1,None)  # One render process: exactly the current asset finishes.
     sources.scan_source(config,one);scoped=sources.bound(config,one)
     stop=[False];finished=[]
     def inspect(work,record,*args,**kwargs):
@@ -376,37 +360,6 @@ def test_cancel_embeddings_saves_all_views_of_current_asset(managed):
         assert db.execute('SELECT count(DISTINCT asset_id) FROM vectors').fetchone()[0]==1
         assert db.execute('SELECT count(*) FROM vectors').fetchone()[0]==4
         assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
-
-
-def test_migration_preserves_identities_pixels_vectors_and_originals(tmp_path,monkeypatch):
-    from test_incremental import ready
-    from local_asset_library.incremental import publish
-    from local_asset_library.source_migration import migrate
-    import local_asset_library.source_storage as storage
-    legacy,backend=library.__wrapped__(tmp_path)
-    work=ready(legacy)
-    # Use the actual production inspection layout, rather than the legacy test
-    # suite's separate test-views fixture directory.
-    for record in records(work):
-        for preview in record['previews']:
-            old=work.output_path('data',preview['path'][5:])
-            rel='inspection/'+record['asset_id']+'/fixture/'+old.name
-            target=work.output_path('data',rel);target.parent.mkdir(parents=True,exist_ok=True);old.rename(target)
-            preview['path']='data/'+rel
-        update_record(work,record)
-    index_library(work,backend);publish(legacy)
-    before_ids={r['asset_id'] for r in records(legacy)}
-    with closing(sqlite3.connect(legacy.output_path('data','embeddings/index.sqlite'))) as db:
-        before_vectors=dict(db.execute('SELECT job_id,vector_sha256 FROM vectors'))
-    monkeypatch.setattr(storage,'receipt',lambda *args:{'totals':{'allocated_bytes':0}})
-    config,report=migrate(legacy)
-    assert report['status']=='passed' and report['originals_unchanged']
-    assert before_ids=={r['asset_id'] for r in records(config)}
-    with closing(sqlite3.connect(config.output_path('data','embeddings/index.sqlite'))) as db:
-        assert before_vectors==dict(db.execute('SELECT job_id,vector_sha256 FROM vectors'))
-    for source in sources.registry(config)['sources']:
-        assert not sources.source_status(config,source)['needs_processing']
-    with pytest.raises(ConfigError):migrate(config)
 
 
 def test_atomic_metadata_writer_supports_long_source_paths(tmp_path):
@@ -447,6 +400,84 @@ def test_caption_publication_stores_logical_owner_overlay_path(managed,monkeypat
     assert published['processing']['caption']=='complete'
     assert published['caption_provenance']['owner_overlay_path']==f'data/captions/corrections/{record["asset_id"]}.json'
     assert work.output_path('data',published['caption_provenance']['owner_overlay_path'][5:]).exists()
+
+
+def test_use_wording_is_published_as_a_validation_note(managed,monkeypatch):
+    from local_asset_library.incremental import run_caption
+    import local_asset_library.captions as captions
+    config,backend,one,_=managed;work=ready_source(config,backend,one)
+    record=records(work)[0]
+    description={**record['description'],'description':record['description']['description']+'It is suitable for games.'}
+    outcome={'status':'complete','description':description,'suggested_uses':[],'attempts':[]}
+    monkeypatch.setattr(captions,'infer_captions',lambda *args,**kwargs:[outcome])
+    backend.settings={}
+    run_caption(work,record,'a'*64,backend)
+    published=detail(work,record['asset_id'])
+    assert published['processing']['caption']=='complete'
+    assert [n['severity'] for n in published['caption_provenance']['validation_notes']]==['review_note']
+    from local_asset_library.caption_quality import caption_quality
+    assert caption_quality(work,published)['status']=='review_note'
+
+
+def load_revalidation():
+    import importlib.util
+    path=Path(__file__).parents[1]/'scripts/historical/revalidate-caption-wording.py'
+    spec=importlib.util.spec_from_file_location('revalidate_caption_wording',path)
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    return module
+
+
+def test_wording_revalidation_accepts_saved_outputs_once(managed,monkeypatch):
+    from local_asset_library.incremental import checkpoint, ledger, run_caption
+    import local_asset_library.captions as captions
+    config,backend,one,_=managed;work=ready_source(config,backend,one)
+    module=load_revalidation()
+    good,bad,other=records(work)[:3]
+    backend.settings={}
+    def fail(record,text,error='Measured technical claim in visual observations'):
+        raw=json.dumps({**record['description'],'description':text,'suggested_uses':['scenery']})
+        attempts=[{'status':'invalid_output','error':error,'raw':raw}]
+        monkeypatch.setattr(captions,'infer_captions',lambda *args,**kwargs:[{'status':'failed','description':None,'suggested_uses':[],'attempts':attempts}])
+        run_caption(work,record,'f'*64,backend)
+        failed=detail(work,record['asset_id'])
+        failed['stage_faults']={'caption':{'status':'failed','error':error}}
+        update_record(work,failed)
+        with closing(ledger(sources.bound(config,one))) as db:
+            checkpoint(db,record['asset_id'],'caption','f'*64,'failed',{'status':'failed','attempts':attempts})
+    fail(good,'A low-poly sailboat with a curved hull and rigging lines from the mast, designed for use in games.')
+    fail(bad,'A low-poly figure with an armature and a curved wooden body and a plain round head.')
+    fail(other,'A low-poly crate with plain planks and a simple square frame on every side.','Invalid string list: colors')
+    monkeypatch.setattr(module,'EXPECTED',{one['key']:2})
+    monkeypatch.setattr(module,'caption_input',lambda config,record:'f'*64)
+    out=config.output_path('data','evidence/revalidation-fixture')
+    dry=module.run(config,out,dry_run=True)
+    assert [a['asset_id'] for a in dry['sources'][one['key']]['accepted']]==[good['asset_id']]
+    assert not out.exists() and detail(work,good['asset_id'])['processing']['caption']=='failed'
+    receipt=module.run(config,out)
+    result=receipt['sources'][one['key']]
+    assert [a['asset_id'] for a in result['accepted']]==[good['asset_id']] and result['accepted'][0]['review_notes']==1
+    assert [k['asset_id'] for k in result['kept_failed']]==[bad['asset_id']]
+    assert result['kept_failed'][0]['reason'].startswith('Still rejected: Measured technical claim')
+    accepted=detail(work,good['asset_id'])
+    assert accepted['processing']['caption']=='complete' and 'caption' not in accepted['stage_faults']
+    assert 'rigging lines' in accepted['description']['description'] and accepted['suggested_uses']==['scenery']
+    provenance=accepted['caption_provenance']
+    assert provenance['revalidation']['previous_error'].startswith('Measured technical claim')
+    assert provenance['validation_notes'][0]['severity']=='review_note'
+    assert provenance['attempts'][0]['status']=='invalid_output'
+    for identifier in (bad['asset_id'],other['asset_id']):
+        assert detail(work,identifier)['processing']['caption']=='failed' and detail(work,identifier)['stage_faults']['caption']
+    with closing(ledger(sources.bound(config,one))) as db:
+        assert db.execute("SELECT status FROM jobs WHERE asset_id=? AND stage='caption'",(good['asset_id'],)).fetchone()==('complete',)
+        assert [r[0] for r in db.execute("SELECT status FROM history WHERE asset_id=? AND stage='caption' ORDER BY sequence",(good['asset_id'],))][-2:]==['failed','complete']
+    saved=json.loads((out/'before'/one['key']/good['asset_id']/('f'*64+'.json')).read_text(encoding='utf-8'))
+    assert saved['status']=='failed' and json.loads((out/'receipt.json').read_text(encoding='utf-8'))['sources']
+    assert not (out/'before'/one['key']/bad['asset_id']).exists()
+    with pytest.raises(SystemExit,match='never reruns'):
+        module.run(config,out)
+    monkeypatch.setattr(module,'EXPECTED',{one['key']:2})
+    with pytest.raises(ConfigError,match='expected 2'):
+        module.run(config,config.output_path('data','evidence/revalidation-fixture-2'))
 
 
 def test_combined_publication_is_reused_after_removing_and_readding_source(managed):

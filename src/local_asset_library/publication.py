@@ -159,11 +159,11 @@ def atomic_json(path, value):
             time.sleep(.02)  # Bounded application publication sharing race, never an asset retry.
 
 
-def read_json(path):
+def read_json(path, limit=4 * 1024 * 1024):
     """Windows readers permit atomic manifest replacement while holding an old handle."""
     # Full-library preservation receipts contain several thousand vector hashes.
-    # Four MiB covers the approved membership while retaining a strict bound.
-    limit = 4 * 1024 * 1024
+    # Four MiB covers the approved membership while retaining a strict bound;
+    # per-file caches that grow with a source's file count pass their own bound.
     if os.name!='nt':
         with path.open('rb') as stream:
             data = stream.read(limit + 1)
@@ -190,3 +190,31 @@ def read_json(path):
     if len(data)>limit:
         raise ConfigError('Managed manifest exceeds its bounded size')
     return json.loads(data.decode('utf-8'))
+
+
+def read_only(path):
+    """A read-only SQLite connection that survives an interrupted writer.
+
+    A crash or kill mid-write leaves a hot rollback journal that only a writable connection may roll
+    back; a read-only one fails with "attempt to write a readonly database" until then. That one case
+    gets a short writable open, which is SQLite's own recovery (the unfinished transaction is undone,
+    committed data stays), and then the read-only connection. A live writer holds its lock, so its
+    journal is never hot and is never touched here.
+    """
+    import sqlite3
+    from pathlib import Path
+    uri = Path(path).as_uri() + "?mode=ro"
+    db = sqlite3.connect(uri, uri=True)
+    try:
+        db.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        return db
+    except sqlite3.OperationalError as exc:
+        db.close()
+        if "readonly" not in str(exc) or not Path(str(path) + "-journal").exists():
+            raise
+    recovering = sqlite3.connect(path)
+    try:
+        recovering.execute("SELECT count(*) FROM sqlite_master").fetchone()  # Reading rolls the hot journal back.
+    finally:
+        recovering.close()
+    return sqlite3.connect(uri, uri=True)

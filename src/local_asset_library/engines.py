@@ -27,11 +27,20 @@ DESCRIPTION_ENGINES = {
 }
 EMBEDDERS = {BUILTIN: {'id': BUILTIN, 'name': 'EmbeddingGemma 2', 'kind': 'sentence-transformers', 'runtime': 'embedding',
                        'model_contract': 'docs/embedding-model.json', 'status': 'tested',
-                       'summary': 'Semantic and image search. Needs an NVIDIA GPU with CUDA and BF16, the search '
-                                  'runtime and about 1.5 GB of model weights.'}}
+                       'summary': 'Semantic and image search with EmbeddingGemma 2 (about 1.5 GB of model weights), on an '
+                                  'NVIDIA GPU or on the CPU.'}}
+# Where the embedder runs (decision 0018). Each device has its own vector identity; switching re-indexes.
+SEARCH_DEVICES = {
+    'cuda': {'id': 'cuda', 'label': 'NVIDIA GPU', 'project': 'runtime/embedding', 'status': 'tested',
+             'summary': 'Needs an NVIDIA GPU with CUDA and BF16 (RTX 30-series or newer). Fastest: about 0.1 s per image.'},
+    'cpu': {'id': 'cpu', 'label': 'CPU', 'project': 'runtime/embedding-cpu', 'status': 'tested',
+            'summary': 'Runs on any x86-64 CPU with the same model and precision, so search results match closely. '
+                       'Indexing images is slower (about 0.8 s per image on a 16-core CPU); searching feels the same.'}}
 RUNTIME_PACKAGES = {'caption': ('torch', 'transformers'), 'embedding': ('torch', 'sentence-transformers')}
 WEIGHTS = {'caption': ('captions/model-download.json', 'qwen3-vl-2b'),
            'embedding': ('embeddings/model-download.json', 'embeddinggemma-2')}
+# File lists with sizes and hashes, kept apart from the contracts (whose bytes are fingerprint inputs).
+MANIFESTS = {'caption': 'docs/caption-model-files.json', 'embedding': 'docs/embedding-model-files.json'}
 
 
 def active(config):
@@ -49,10 +58,37 @@ def description_engine(config):
     return TransformersQwenEngine(config)
 
 
+def search_device(config):
+    from .settings import search_device as saved
+    return saved(config)
+
+
+def cpu_threads():
+    """Logical threads this process may use (all of them, including simultaneous multithreading)."""
+    return (os.process_cpu_count() if hasattr(os, 'process_cpu_count') else None) or os.cpu_count() or 1
+
+
 def embedder(config):
-    """The configured Embedder adapter (EmbeddingGemma is the only one in this version)."""
+    """The configured Embedder adapter: EmbeddingGemma on the saved search device, never another one."""
+    if search_device(config) == 'cpu':
+        from .embedding_cpu import EmbeddingCpuBackend
+        backend = EmbeddingCpuBackend(config)
+        # Torch defaults to one thread per physical core; more embed faster with bit-identical vectors
+        # (October 26, 2026). The owner's setting or the speed test's choice; outside the hashed adapter.
+        from .search_speed import threads
+        backend.torch.set_num_threads(threads(config)[0])
+        return backend
     from .embedding_backend import EmbeddingBackend
     return EmbeddingBackend(config)
+
+
+def embedder_contract(config):
+    """The vector identity the configured embedder will report, without loading the model."""
+    if search_device(config) == 'cpu':
+        from .embedding_cpu import runtime_contract
+    else:
+        from .embedding_backend import runtime_contract
+    return runtime_contract(config)
 
 
 def batch_size(config):
@@ -83,29 +119,73 @@ def runtime_ready(config, runtime):
     python = venv_python(config.project_root, environment)
     root = config.project_root / environment
     sites = list(root.glob('Lib/site-packages')) + list(root.glob('lib/python3*/site-packages'))
-    found = {d.metadata['Name'].lower() for site in sites for d in importlib.metadata.distributions(path=[str(site)])
+    found = {d.metadata['Name'].lower(): d.version for site in sites for d in importlib.metadata.distributions(path=[str(site)])
              if d.metadata and d.metadata['Name']}
     missing = [name for name in RUNTIME_PACKAGES[runtime] if name not in found]
     return {'ready': python.is_file() and not missing, 'environment': environment,
-            'missing_packages': missing if python.is_file() else list(RUNTIME_PACKAGES[runtime])}
+            'missing_packages': missing if python.is_file() else list(RUNTIME_PACKAGES[runtime]),
+            'cpu_only_torch': str(found.get('torch', '')).endswith('+cpu')}
+
+
+def manifest(config, runtime):
+    """The pinned revision's file list (name, size, sha256), or None when this checkout has none."""
+    try:
+        value = json.loads((config.project_root / MANIFESTS[runtime]).read_text(encoding='utf-8'))
+        spec = DESCRIPTION_ENGINES[BUILTIN] if runtime == 'caption' else EMBEDDERS[BUILTIN]
+        contract = json.loads((config.project_root / spec['model_contract']).read_text(encoding='utf-8'))
+        return value if value['revision'] == contract['revision'] and value['files'] else None
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def weights_path(config, runtime, revision, name):
+    return config.output_path('models', WEIGHTS[runtime][1] + '/' + revision + '/' + name)
+
+
+def present(config, runtime, files, revision):
+    """The first file that is missing or has another size, or None (sizes only; no hashing)."""
+    for item in files:
+        path = weights_path(config, runtime, revision, item['name'])
+        if not path.is_file() or path.stat().st_size != item['size']:
+            return item['name']
+    return None
 
 
 def weights_ready(config, runtime):
-    """Receipt revision matches the contract and every file is present with its recorded size (no hashing)."""
-    receipt_name, folder = WEIGHTS[runtime]
+    """Receipt revision matches the contract and every file is present with its recorded size (no hashing).
+
+    Without a receipt, files that match the manifest by size are 'present': here, but not verified yet. They are
+    never reported as needing a download; verifying them locally writes the receipt.
+    """
+    receipt_name, _ = WEIGHTS[runtime]
     spec = DESCRIPTION_ENGINES[BUILTIN] if runtime == 'caption' else EMBEDDERS[BUILTIN]
     try:
         contract = json.loads((config.project_root / spec['model_contract']).read_text(encoding='utf-8'))
-        receipt = json.loads(config.output_path('data', receipt_name).read_text(encoding='utf-8'))
-        if receipt.get('revision') != contract['revision']:
-            return {'ready': False, 'reason': 'The download receipt is for another model revision'}
-        for item in receipt['files']:
-            path = config.output_path('models', folder + '/' + contract['revision'] + '/' + item['name'])
-            if not path.is_file() or path.stat().st_size != item['size']:
-                return {'ready': False, 'reason': 'Model file missing or changed: ' + item['name']}
+        receipt_path = config.output_path('data', receipt_name)
+        if receipt_path.is_file():
+            receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
+            if receipt.get('revision') == contract['revision']:
+                changed = present(config, runtime, receipt['files'], contract['revision'])
+                if changed is None:
+                    return {'ready': True, 'state': 'verified', 'bytes': sum(item['size'] for item in receipt['files'])}
+                return {'ready': False, 'state': 'changed', 'reason': 'Model file missing or changed: ' + changed}
+        listed = manifest(config, runtime)
+        if listed and present(config, runtime, listed['files'], contract['revision']) is None:
+            return {'ready': False, 'state': 'present', 'bytes': sum(item['size'] for item in listed['files']),
+                    'reason': 'The files are here but not verified yet; verifying reads them locally and downloads nothing'}
+        return {'ready': False, 'state': 'absent', 'reason': 'No verified download: receipt missing' if not receipt_path.is_file()
+                else 'The download receipt is for another model revision'}
     except (OSError, ValueError, KeyError, TypeError, ConfigError) as exc:
-        return {'ready': False, 'reason': 'No verified download: ' + (str(exc) if isinstance(exc, ConfigError) else 'receipt missing')}
-    return {'ready': True, 'bytes': sum(item['size'] for item in receipt['files'])}
+        return {'ready': False, 'state': 'absent', 'reason': 'No verified download: ' + (str(exc) if isinstance(exc, ConfigError) else 'receipt missing')}
+
+
+def weights_command(config, runtime, weights, project, extra=''):
+    """Files that are here are verified locally, never downloaded again; only absent weights get the download command."""
+    if weights.get('state') == 'present':
+        script = '.\\scripts\\local-assets.ps1' if os.name == 'nt' else './scripts/local-assets.sh'
+        return f'{script} setup verify-weights {runtime}'
+    script = 'prepare_caption_model.py' if runtime == 'caption' else 'prepare_embedding_model.py'
+    return command(config, runtime, f'run --locked --no-sync --project {project} python scripts/{script}{extra}')
 
 
 def gpu_bf16(gpu):
@@ -130,9 +210,8 @@ def readiness(config, engine_id, gpu=None):
                       'command': None if runtime['ready'] else command(config, 'caption', 'sync --locked --project runtime/caption')})
         weights = weights_ready(config, 'caption')
         items.append({'id': 'caption_weights', 'label': 'Description model weights (about 4.3 GB)', 'ready': weights['ready'],
-                      'detail': weights.get('reason'),
-                      'command': None if weights['ready'] else command(config, 'caption',
-                          'run --locked --no-sync --project runtime/caption python scripts/prepare_caption_model.py')})
+                      'detail': weights.get('reason'), 'weights': weights.get('state'),
+                      'command': None if weights['ready'] else weights_command(config, 'caption', weights, 'runtime/caption')})
     elif engine_id == SERVER:
         server = active(config)['server']
         configured = bool(server['url'] and server['model'])
@@ -140,12 +219,58 @@ def readiness(config, engine_id, gpu=None):
                       'detail': None if configured else 'Not set yet. Setup only lists the server’s models; it never generates text.'})
     else:
         raise ConfigError('Unknown description engine')
+    return {'engine': engine_id, 'items': items, 'search': search_readiness(config, gpu)}
+
+
+def search_runtime_fault(config):
+    """Why the saved search device's runtime cannot start, with the command that installs it; None when ready."""
+    item = next(i for i in search_readiness(config) if i['id'] == 'embedding_runtime')
+    if item['ready']:
+        return None
     runtime = runtime_ready(config, 'embedding')
+    reason = item['detail'] or 'missing ' + ', '.join(runtime['missing_packages'])
+    return f"The search runtime ({runtime['environment']}) is not installed correctly: {reason}. Install it with: {item['command']}"
+
+
+def capability_ready(config, device):
+    """The recorded text/image capability check matches the chosen device (static read; the contract is re-checked at use)."""
+    try:
+        value = json.loads(config.output_path('data', 'embeddings/capability.json').read_text(encoding='utf-8'))
+        recorded = value['contract']['device']
+    except (OSError, ValueError, KeyError, TypeError, ConfigError):
+        return {'ready': False, 'reason': 'Not run yet. It reads two built-in sample images (about a minute); '
+                                          'Make previews runs it by itself when needed.'}
+    if recorded != ('cpu' if device == 'cpu' else 'cuda:0'):
+        return {'ready': False, 'reason': 'Recorded for the other search device; record it again for this one.'}
+    return {'ready': bool(value.get('actual_text_and_image_inference'))}
+
+
+def search_readiness(config, gpu=None, device=None):
+    """Static checklist for the search embedder on a device (the saved one by default), with commands for what is missing."""
+    device = device or search_device(config)
+    project = SEARCH_DEVICES[device]['project']
+    items = []
+    if device == 'cuda':
+        bf16 = gpu_bf16(gpu)
+        items.append({'id': 'search_gpu', 'label': 'NVIDIA GPU with BF16 for search', 'ready': bool(bf16),
+                      'detail': None if bf16 else 'Not detected on this computer. Choose CPU for search in Settings → General.'})
+    runtime = runtime_ready(config, 'embedding')
+    mismatch = device == 'cuda' and runtime['ready'] and runtime['cpu_only_torch']
+    items.append({'id': 'embedding_runtime', 'label': 'Search runtime (.venv-embedding)', 'ready': runtime['ready'] and not mismatch,
+                  'detail': 'The installed search runtime is the CPU-only build.' if mismatch else None,
+                  'command': None if runtime['ready'] and not mismatch else command(config, 'embedding', 'sync --locked --project ' + project)})
     weights = weights_ready(config, 'embedding')
-    search = [{'id': 'embedding_runtime', 'label': 'Search runtime (.venv-embedding)', 'ready': runtime['ready'],
-               'command': None if runtime['ready'] else command(config, 'embedding', 'sync --locked --project runtime/embedding')},
-              {'id': 'embedding_weights', 'label': 'Search model weights (EmbeddingGemma, about 1.5 GB)', 'ready': weights['ready'],
-               'detail': weights.get('reason'),
-               'command': None if weights['ready'] else command(config, 'embedding',
-                   'run --locked --no-sync --project runtime/embedding python scripts/prepare_embedding_model.py')}]
-    return {'engine': engine_id, 'items': items, 'search': search}
+    items.append({'id': 'embedding_weights', 'label': 'Search model weights (EmbeddingGemma, about 1.5 GB)', 'ready': weights['ready'],
+                  'detail': weights.get('reason'), 'weights': weights.get('state'),
+                  'command': None if weights['ready'] else weights_command(config, 'embedding', weights, project,
+                                                                           ' --device cpu' if device == 'cpu' else '')})
+    capability = capability_ready(config, device)
+    # A button, not a command (design principle P3): the app runs it on built-in samples, and processing runs it
+    # by itself when it is missing (decision 0026).
+    # Offered only when it can pass: the runtime and the model above are installed.
+    runnable = not capability['ready'] and runtime['ready'] and not mismatch and weights['ready']
+    items.append({'id': 'embedding_capability', 'label': 'Search check', 'ready': capability['ready'], 'command': None,
+                  'detail': capability.get('reason') if capability['ready'] or runnable else
+                  'Runs once the search runtime and model above are installed; Make previews then runs it by itself.',
+                  'action': 'search_check' if runnable else None})
+    return items

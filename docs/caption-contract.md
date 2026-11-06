@@ -9,7 +9,9 @@ response contains exactly `identity`, `description`, `shape`, `colors`, `parts`,
 `style`, `distinguishing_features`, `uncertainties` and `suggested_uses`.
 Identity has a short label and `probable`, `uncertain` or `unknown` certainty.
 Unknown labels cannot be probable. Uncertain/unknown identity needs a stated
-uncertainty. Confidence labels are uncalibrated model heuristics.
+uncertainty. Confidence labels are uncalibrated model heuristics. `shape`, `colors`
+and `style` need at least one item; `parts` may be empty, because one-piece objects
+(a pebble, a grass clump) have no visible components.
 
 Description is bounded to **10–170 words**. The active full-library prompt is
 `prompts/caption-v4.txt`; simple assets may need only 10–30 words and must not be
@@ -27,7 +29,15 @@ explicit retry authorization.
 Changing this rule does not recover/revalidate stored failed responses or clear
 their original fault records; that requires a separate explicit operation.
 Duplicate JSON keys, wrong types, extra fields, truncated JSON and specified
-technical/use claims in observation fields are rejected. This validation cannot
+technical claims (geometry counts, character rigs and armatures, animation, UVs, file
+formats, dependencies, real dimensions) in observation fields are rejected. A ship's
+rigging is its visible ropes and is accepted. Use wording in observation fields ("designed
+for", "suitable for", "can be used"…) no longer rejects a usable description: each match is
+recorded in `caption_provenance.validation_notes` as a `review_note` with the phrase as
+evidence, shown with the other caption notes; reviews never replace these notes. The 35
+outputs the October 27 run rejected only for this wording were accepted as saved, without a
+new model run (`scripts/historical/revalidate-caption-wording.py`, provenance
+`revalidation`). This validation cannot
 prove the semantic truth of a visually plausible statement. Review can flag
 incorrect components, overconfident materials and wrong identities even when
 the schema passes.
@@ -50,7 +60,7 @@ sizes and elapsed time are saved with each attempt.
 **2D images (expansion step 2)** use the separately versioned prompt
 `prompts/caption-image-v1.txt` (`prompt_version: image-v1`) with the same JSON
 fields and validator. The single input is the image's derived `model_input`
-PNG under project data (see the [catalog contract](catalog-contract.md)); its view
+PNG under project data (see the [catalog contract](../KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md)); its view
 label tells the model which flat backdrop fills transparent pixels and that the
 backdrop is not part of the image. No filename, folder, pack or measured fact
 enters the prompt. The unchanged `caption_backend.py` preparation then applies
@@ -72,7 +82,7 @@ Qwen uses local files only, pinned revision and runtime lock, verified model fil
 hashes, BF16 CUDA/SDPA, fixed seed per call, one beam and bounded output/time.
 Library and overnight processing generate several assets per call
 (`caption_batching.py`, *Settings → General → Description batch size*, default 8;
-[decision 0007](decisions/0007-batched-description-generation.md)). Each asset is
+[decision 0007](../KnowledgeBase/Decisions/0007-batched-description-generation.md)). Each asset is
 still validated, saved and published on its own and records `generation_mode` and
 `batch` provenance. Completed results keep the fingerprint of the mode they were
 made with, so batching never regenerates them. Running out of GPU memory stops the

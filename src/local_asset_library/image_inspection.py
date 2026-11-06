@@ -33,13 +33,15 @@ def inspection_input(config, record, content_only=False, recorded=None):
     from .image_media import ACTIVE, POLICIES, PREFERENCE, image_format
     from .incremental import recorded_fingerprint
     from .publication import verified_hash
-    current = source_check(config, record)
+    source_check(config, record)  # Refuses stale or unavailable files; the key below holds content only.
     available = [f for f in record['files'] if f['availability'] == 'available' and image_format(f['path'])]
     if not available:
         raise ConfigError('No decodable image file is recorded for this asset')
     source = min(available, key=lambda f: (PREFERENCE.index(image_format(f['path'])), f['path']))
     reason = 'Preferred raster export' if source['format'] != 'svg' else 'Self-contained SVG export'
-    value = {'adapter': VERSION, 'source': current, 'path': source['path']}
+    # Content, never the path (decision 0023): a moved or duplicated image keeps its derived images.
+    value = {'adapter': VERSION, 'files': sorted(f['sha256'] for f in record['files'] if f['availability'] == 'available'),
+             'format': source['format'], 'sha256': source['sha256']}
     if content_only:
         return {'asset_id': record['asset_id'], 'files': record['files']}, source, reason, digest(value)
     files = code_files(config)
@@ -86,7 +88,8 @@ def run(config, record, fingerprint):
                                     'source_faults': [], 'errors': [str(exc)]}
         update_record(config, record)
         return {'status': 'unsupported', 'adapter': VERSION, 'reason': str(exc)}
-    relative = f"inspection/{record['asset_id']}/image/{fingerprint[:16]}"
+    from .result_store import result_path
+    relative = result_path('inspection', fingerprint)
     previews = []
     if source['format'] == 'svg':
         previews.append({**save(config, relative, 'display.png', rgba), 'view_label': 'image', 'origin': 'derived',
@@ -107,6 +110,12 @@ def run(config, record, fingerprint):
     # Recheck the source after decoding; a change during inspection is a fault, not a result.
     if inspection_input(config, record, recorded=fingerprint)[3] != fingerprint:
         raise ConfigError('Image source changed during inspection')
+    from .image_kinds import pixel_evidence, refine
+    # Pixel hints (normal map, seamless, cutout) decide the kind of an image nothing else classified (decision 0023).
+    metadata = dict(record.get('type_metadata') or {}, pixel_kind=pixel_evidence(rgba))
+    if metadata.get('image_kind'):
+        metadata['image_kind'] = refine(metadata['image_kind'], metadata['pixel_kind'])
+    record['type_metadata'] = metadata
     technical = {'version': 2, 'kind': 'image', **measured, 'inspected_path': source['path'],
                  'inspected_sha256': source['sha256'], 'inspected_format': source['format'], 'adapter': VERSION}
     record.update(technical=technical, primary_inspection_path=source['path'], primary_inspection_reason=reason,

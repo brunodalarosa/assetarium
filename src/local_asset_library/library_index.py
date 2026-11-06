@@ -15,27 +15,38 @@ from .retrieval import (index_database, checked_vector, source_check, descriptio
                         recorded_contract, VERSION)
 
 
+def shared_input(config, representative, value):
+    """A variant's description text: its group's representative's description plus its own value (``Car_11`` G)."""
+    text, _ = description_input(config, representative)
+    text = text + ' Variant: ' + value
+    return text, digest({"text": text})
+
+
 def index_library(config, backend=None, limit=1000, dry_run=False, description_only=False,
                   cancelled=None, progress=None):
     from .incremental import update_record
-    from .settings import processing_formats, processing_eligible
+    from .settings import processing_eligible, used_formats
     inventory = records(config)
     inventory_by_id = {r['asset_id']: r for r in inventory}
-    formats = processing_formats(config)
+    formats = used_formats(config)
     selected = [record for record in inventory if processing_eligible(record, formats)]
+    from .variant_groups import shared_map
+    shared = shared_map(config)  # Variants embed their group's description with their own value (decision 0024).
     with closing(index_database(config, readonly=dry_run)) as db:
         metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
-        contract = recorded_contract(config, backend.contract) if backend else metadata.get("contract")
+        capability = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))
+        # A dry run counts against the verified receipt's contract, the one the next run will use: a first run has
+        # no index contract yet, and after a device switch the old one is stale. A backend is checked against it.
+        contract = recorded_contract(config, backend.contract) if backend else (capability.get("contract") or metadata.get("contract"))
         if not contract:
             raise ConfigError("Verified embedding contract missing")
         common = digest(contract)
-        capability = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))
         if capability.get("contract_fingerprint") != common or not capability.get("actual_text_and_image_inference"):
             raise ConfigError("Actual inference capability receipt does not match contract")
         old_jobs = {r[0]: r[1:] for r in db.execute("SELECT job_id,fingerprint,status,evidence FROM jobs")}
         old_vectors = {r[0]: r for r in db.execute("SELECT * FROM vectors")}
         expected, outcomes, visited = set(), [], set()
-        pending, processed, deferred = 0, 0, 0
+        pending, processed, deferred, restored = 0, 0, 0, 0
         started = time.monotonic()
         if not dry_run:
             atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':'embeddings','completed':0,'selected':limit,'pid':os.getpid()})
@@ -54,6 +65,8 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                 # vector failure or a successful empty image index.
                 continue
             counts = {"complete": 0, "failed": 0, "pending": 0, "deferred": 0}
+            subject = inventory_by_id.get(shared[identifier][0], record) if identifier in shared else record
+            described = (lambda: shared_input(config, subject, shared[identifier][1])) if subject is not record else (lambda: description_input(config, record))
             channels = [("description", None)] + [("image", p) for p in views]
             for channel, preview in channels:
                 ref = None if preview is None else {k: preview[k] for k in ("path", "source_path", "sha256", "view_label", "origin") if k in preview}
@@ -66,19 +79,19 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                 # A description awaiting generation has no vector input yet.
                 # Keep it eligible after captioning without creating a failed job
                 # or including it in runnable pending work (which would loop).
-                if (channel == 'description' and record.get('description') is None
-                        and record['processing'].get('caption') == 'pending'
-                        and not record.get('caption_provenance') and job not in old_jobs):
+                if (channel == 'description' and subject.get('description') is None
+                        and subject['processing'].get('caption') == 'pending'
+                        and not subject.get('caption_provenance') and job not in old_jobs):
                     deferred += 1
                     counts['deferred'] += 1
                     outcomes.append({'asset_id': identifier, 'channel': channel, 'status': 'deferred',
                                      'reused': False, 'reason': 'Description generation pending'})
                     continue
                 value, error, source_fp = None, None, "unavailable"
-                input_fp = digest({"preview": ref, "description": record.get("description")})
+                input_fp = digest({"preview": ref, "description": subject.get("description")})
                 try:
                     source_fp = source_check(config, record)
-                    value, input_fp = description_input(config, record) if channel == "description" else (preview_file(config, preview), image_input(preview))
+                    value, input_fp = described() if channel == "description" else (preview_file(config, preview), image_input(preview))
                 except (ValueError, OSError, KeyError) as exc:
                     error = str(exc)
                 fp = digest({"contract": common, "source": source_fp, "input": input_fp})
@@ -120,7 +133,7 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                             vector = normalize(backend.text(value, role="document") if channel == "description" else backend.image(value), contract["dimensions"])
                             if source_check(config, record) != source_fp:
                                 raise ConfigError("Source changed during inference")
-                            if channel == "description" and description_input(config, record)[1] != input_fp:
+                            if channel == "description" and described()[1] != input_fp:
                                 raise ConfigError("Description changed during inference")
                             if channel == "image":
                                 preview_file(config, preview)
@@ -139,10 +152,15 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                 outcomes.append({"asset_id": identifier, "channel": channel, "status": status, "reused": reuse, **evidence})
                 if not dry_run and processed and processed%10==0:
                     atomic_json(config.output_path('data','library/processing-status.json'),{'status':'running','stage':'embeddings','completed':processed,'selected':limit,'pid':os.getpid()})
+            state = ("pending" if counts["pending"] else
+                     "partial" if counts["complete"] and (counts["failed"] or counts["deferred"]) else
+                     "failed" if counts["failed"] else "pending" if counts['deferred'] else "complete")
+            # A rescan (for example after grouping export folders) resets the flag while every vector is reused:
+            # report it, so the real pass runs and records the state again instead of leaving it pending.
+            if state != record["processing"].get("embeddings") and not counts["pending"]:
+                restored += 1
             if not dry_run:
-                record["processing"]["embeddings"] = ("pending" if counts["pending"] else
-                    "partial" if counts["complete"] and (counts["failed"] or counts["deferred"]) else
-                    "failed" if counts["failed"] else "pending" if counts['deferred'] else "complete")
+                record["processing"]["embeddings"] = state
                 update_record(config, record)
                 visited.add(identifier)
                 if progress:
@@ -161,7 +179,8 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                         db.execute("DELETE FROM jobs WHERE job_id=?", (job,))
                 values = {"version": VERSION, "contract": contract, "contract_fingerprint": common, "pilot_ids": [r["asset_id"] for r in inventory], "input_policy": "effective-description-content-v1",'image_input_policy':'verified-view-content-v1'}
                 db.executemany("INSERT OR REPLACE INTO meta VALUES (?,?)", [(k, encoded(v)) for k, v in values.items() if metadata.get(k) != v])
-        report = {"stage": "embeddings", "pending": pending, "processed": processed, "deferred_descriptions": deferred, "dry_run": dry_run, "outcomes": outcomes, "elapsed_seconds": time.monotonic() - started, "vectors": db.execute("SELECT COUNT(*) FROM vectors").fetchone()[0]}
+        report = {"stage": "embeddings", "pending": pending, "processed": processed, "restored": restored,
+                  "deferred_descriptions": deferred, "dry_run": dry_run, "outcomes": outcomes, "elapsed_seconds": time.monotonic() - started, "vectors": db.execute("SELECT COUNT(*) FROM vectors").fetchone()[0]}
         if backend is not None and hasattr(backend,'resources'):
             report['resources']=backend.resources()
         if not dry_run:

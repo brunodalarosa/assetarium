@@ -4,9 +4,45 @@ adds codebase orientation only.
 
 ## Recorded decisions
 
-Read `docs/decisions/` before changing behavior. Those owner-approved decisions
+Read `Assetarium KnowledgeBase/Decisions/` before changing behavior. Those owner-approved decisions
 bind future changes; if a change would contradict one, ask the owner first and
 update the decision record together with the code.
+
+## Knowledge base
+
+`Assetarium KnowledgeBase/` (an Obsidian vault, also readable on GitHub) holds what the code doesn't
+say: `Home.md` (conventions), `Status.md`, `Notebook/` (working notes per area, agents first),
+`Architecture/` (how and why, humans first), `Decisions/` (binding owner decisions) and
+`Reference/` (external docs with a trust rating). User-facing guides stay in `docs/`.
+
+- For a task in an area, read its hub (`Notebook/<Area>/<Area>.md`) and the notes for the
+  systems involved first. `Notebook/Codebase.md` maps every module to its area.
+- Notes can be stale: the code wins. Report a wrong note and fix it in the same change.
+- At the end of each task, propose 0-3 learnings (target note, exact text, `code` anchors)
+  and 0-3 friction items for `Notebook/Improvements.md`. Write them only after the owner
+  approves. Learnings are what cost real effort to find or what the owner explained that
+  exists nowhere else, not a log of the work.
+- Architecture docs and decisions are human-owned: agent edits to Architecture stay
+  `status: draft`; decisions change only as described under "Recorded decisions".
+
+## Local machine
+
+Tracked files (this one, `CLAUDE.md`, the vault, `docs/`) describe no particular computer: no
+CPU, GPU, drive, user name, distro or install path. Each developer's machine is described in
+`MACHINE.local.md` at the repository root, which git ignores.
+
+- Read `MACHINE.local.md` before any decision that depends on the machine: GPU backend and
+  device, render or batch sizes, memory limits, Blender or tool paths, which runtime to use, and
+  how to run the Linux suite.
+- If it is missing, create it before that decision by probing the machine with read-only
+  commands (never install anything to fill it). Record: OS, shell and architecture; CPU with
+  cores/threads; RAM; each GPU with VRAM, driver and compute backend (CUDA, HIP or none); free
+  space on the repository drive; Python, uv and Node versions; the Blender executable and version
+  (from `config.local.toml` `[tools].blender` or discovery); `[storage].models`; the limits in
+  `data/library/rendering.json`; and the Linux check setup if there is one (WSL distro, clone
+  path, Linux Blender). Date the probe.
+- If an entry turns out wrong (the hardware changed, a path moved), correct it and say so.
+  Never copy its contents into tracked files.
 
 ## Required checkpoint before implementation
 
@@ -30,7 +66,7 @@ Application and test-harness defects may be diagnosed, fixed and verified normal
 
 ### Caption review severity
 
-Apply `docs/caption-quality.md` when processing or reviewing new assets. Do not
+Apply `Assetarium KnowledgeBase/Architecture/Processing/Caption severity.md` when processing or reviewing new assets. Do not
 mark a usable caption or asset faulty solely because a visual detail is uncertain,
 an exact count is unsupported, a material is inferred, or owner review is pending.
 Record minor precision/appearance uncertainty as `review_note`; record meaningful
@@ -97,7 +133,7 @@ processing of other items; never edit originals to resolve them.
   partial results. Never recursively delete directories containing junctions or
   links without a reviewed containment check; never clear generic system caches.
 - Record cleanup targets, savings, verification and faults separately. The
-  one-time consolidation script refuses automatic reruns. See `docs/storage.md`.
+  one-time consolidation script refuses automatic reruns. See `Assetarium KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
 
 ## Versioning
 
@@ -107,6 +143,25 @@ the changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 - Record user-visible changes under an `Unreleased` heading in `CHANGELOG.md` as part of
   the change itself.
+- A release also freezes its library for later upgrade tests
+  (`scripts/build-release-fixture.py --release X.Y.Z`, committed under `tests/fixtures/releases/`), and ships no
+  edit to a fingerprinted worker (`blender_worker.py`, `render_math.py`, repair workers) unless
+  `scripts/check-render-stability.py` proves it equivalent (decision 0022), so upgrading never turns finished work into new work.
 - Choose a new version number, release, or tag (`vX.Y.Z`) only when the owner asks. A
-  release updates every version field together: `pyproject.toml`, `runtime/*/pyproject.toml`
-  and `frontend/package.json`.
+  release updates the app's version fields together: `pyproject.toml` (and `uv lock` for the root
+  `uv.lock`), `src/local_asset_library/__init__.py`, `frontend/package.json` (`npm version`) and the
+  README version line; `tests/test_version.py` checks they agree.
+- `runtime/*/pyproject.toml` versions stay fixed. They describe internal environments, and the
+  caption and search fingerprints hash `runtime/*/uv.lock`, so bumping them would rewrite those locks
+  and send every description and search vector back to be redone.
+
+## Branching (git flow)
+
+- `main` holds released versions only; each merge into it is tagged `vX.Y.Z`.
+- `develop` is the integration branch. Start work from it and open pull requests into it.
+- `feature/<name>` and `bugfix/<name>` branch from `develop` and merge back into it.
+- `release/X.Y.Z` branches from `develop` to prepare a release (version fields, changelog),
+  then merges into `main` (tagged) and back into `develop`.
+- `hotfix/X.Y.Z` branches from `main` for urgent fixes, then merges into `main` (tagged) and
+  `develop`.
+- Never commit directly to `main` or `develop`, and never force-push them.

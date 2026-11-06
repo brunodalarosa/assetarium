@@ -52,7 +52,7 @@ def test_packaged_shell_keeps_punctuation_icons_and_accessible_text(monkeypatch)
     assert window['title'] == 'Assetarium' and not MOJIBAKE.search(html)
     for expected in (
         'charset="utf-8"', 'Kenney · ', 'Loading preview…', 'Loading asset evidence…',
-        'You’re all caught up.', ' in the library · ', '% — ', 'Settings → General',
+        'You’re all caught up.', ' in the library · ', '% of this phase', 'Settings → General',
         'Filters & search options', '↻ Explore in 3D', 'Opening fullscreen…',
     ):
         assert expected in html, repr(expected)

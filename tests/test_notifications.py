@@ -202,7 +202,7 @@ def test_description_worker_describes_only_assets_with_ready_renders(managed, mo
 def test_processing_a_source_raises_a_ready_notice_when_descriptions_are_missing(config, monkeypatch):
     save_general_settings(config, 24)
     calls, states = coordinator(config, monkeypatch, [11 * GIB, 12 * GIB, 12 * GIB, 12 * GIB])
-    monkeypatch.setattr(operations, 'scan_source', lambda *a: {'failed': 0, 'needs_processing': False,
+    monkeypatch.setattr(operations, 'scan_source', lambda *a, **kwargs: {'failed': 0, 'needs_processing': False,
                         'descriptions': {'complete': 0, 'missing': 12, 'failed': 0, 'unavailable': 0}})
     operations.process_source(config, SOURCE, 'import-1')
     assert states[-1]['status'] == 'complete'

@@ -24,9 +24,9 @@ from .config import ConfigError
 from .incremental import (CAPTION_PROMPT_VERSION, caption_input, checkpoint, ledger,
                           policy, stage_content, update_record, working)
 from .membership import membership, records
-from .publication import atomic_json, read_json
+from .publication import atomic_json, read_json, read_only
 from .retrieval import source_check
-from .settings import processing_formats, processing_eligible
+from .settings import processing_eligible, used_formats
 
 RUN_ROOT = 'overnight-descriptions'
 TERMINAL = {'complete', 'failed', 'skipped'}
@@ -62,7 +62,7 @@ def contract(config):
 def plan(config, packs=None, pending_only=False, peak_reserve_mib=500, asset_ids=None):
     work = working(config)
     all_records = records(work)
-    formats = processing_formats(config)
+    formats = used_formats(config)
     if packs and set(packs) - {r['pack_id'] for r in all_records}:
         raise ConfigError('Description selection contains an unknown pack')
     if asset_ids is not None and set(asset_ids) - {r['asset_id'] for r in all_records}:
@@ -93,7 +93,7 @@ def plan(config, packs=None, pending_only=False, peak_reserve_mib=500, asset_ids
 
 def image_rows(config):
     path = working(config).output_path('data', 'embeddings/index.sqlite')
-    with closing(sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)) as db:
+    with closing(read_only(path)) as db:
         return {r[0]: digest([hashlib.sha256(v).hexdigest() if isinstance(v, bytes) else v for v in r])
                 for r in db.execute("SELECT * FROM vectors WHERE channel='image'")}
 
@@ -194,7 +194,8 @@ def apply_saved(config, identifier, asset_id):
     saved = read_json(raw_path)
     record = detail(work, asset_id)
     provenance = saved['provenance']
-    relative = ('data/' + raw_path.relative_to(config.metadata_root).as_posix() if config.metadata_root
+    from .result_store import logical
+    relative = ('data/' + logical(config, raw_path) if config.metadata_root
                 else raw_path.relative_to(config.project_root).as_posix())
     provenance = {**provenance, 'result_path': relative}
     status = saved['status']
@@ -297,7 +298,7 @@ def caption_batch(config, identifier, backend_factory, limit=25):
                 apply_saved(config, identifier, asset_id)
                 continue
             record = detail(work, asset_id)
-            if not processing_eligible(record, processing_formats(config)):
+            if not processing_eligible(record, used_formats(config)):
                 atomic_json(path / 'outcomes' / (asset_id + '.json'),
                             {'asset_id': asset_id, 'status': 'skipped', 'reason': 'Source format is disabled in Settings → General', 'finished_utc': utc()})
                 continue

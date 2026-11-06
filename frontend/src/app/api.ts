@@ -5,12 +5,16 @@
 export type Json = any;
 
 export interface Bridge {
+  practice_action(action: string, key?: string | null, payload?: Json): Promise<Json>;
   context(): Promise<Json>;
   sources(): Promise<Json>;
   changes(): Promise<Json>;
   general_settings(): Promise<Json>;
+  render_settings(): Promise<Json>;
+  save_render_settings(device: string | null, processes: number | null, memoryGib: number | null): Promise<Json>;
+  render_test(action: "start" | "cancel"): Promise<Json>;
   save_general_settings(budget: string | number, formats: string[], batch: string | number, descriptionsEnabled?: boolean | null,
-    engine?: string | null, server?: { url: string; model: string } | null): Promise<Json>;
+    engine?: string | null, server?: { url: string; model: string } | null, searchDevice?: string | null, searchThreads?: string | number | null, imageFormats?: string[] | null): Promise<Json>;
   setup_state(): Promise<Json>;
   setup_environment(): Promise<Json>;
   setup_blender(): Promise<Json>;
@@ -18,18 +22,26 @@ export interface Bridge {
   setup_cancel_blender(): Promise<Json>;
   setup_storage_use(measure: boolean): Promise<Json>;
   setup_check_server(url: string, model: string): Promise<Json>;
+  save_blender(path: string, confirm_rerender: boolean): Promise<Json>;
   save_setup(choices: Json): Promise<Json>;
   skip_setup(): Promise<Json>;
   choose_blender_executable(): Promise<Json>;
   agent_setup_state(): Promise<Json>;
-  open_agent_setup(): Promise<Json>;
-  end_agent_setup(): Promise<Json>;
   decide_setup_proposal(proposalId: string, decision: "apply" | "reject", confirmRerender: boolean): Promise<Json>;
+  confirm_setup_review(): Promise<Json>;
+  undo_setup_value(key: string): Promise<Json>;
   interface_settings(): Promise<Json>;
   save_interface_settings(appearance: string | null, inspectorWidth: number | null): Promise<Json>;
   importing_failures(): Promise<Json>;
   notification_action(action: string, identifier?: string | null): Promise<Json>;
   source_action(action: string, key?: string | null, directory?: string | null, enabled?: boolean | null): Promise<Json>;
+  source_exclusions(key: string, patterns: string[]): Promise<Json>;
+  source_export(key: string, suggestionId: string, decision: string): Promise<Json>;
+  source_export_undo(key: string, decisionId: string): Promise<Json>;
+  source_textures(key: string, folder: string | null, singleCopies: boolean): Promise<Json>;
+  source_textures_undo(key: string): Promise<Json>;
+  recheck_failures(key: string): Promise<Json>;
+  retry_failures(key: string, previewId: string): Promise<Json>;
   choose_source_directory(): Promise<Json>;
   browse(filters: Json, offset: number, pageSize: number): Promise<Json>;
   source_browse(key: string, offset: number, pageSize: number): Promise<Json>;

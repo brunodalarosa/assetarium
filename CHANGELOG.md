@@ -4,6 +4,80 @@ All notable changes to Assetarium are listed here. The project follows
 [Semantic Versioning](https://semver.org/); the format follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+## [0.2.0] — 2026-11-05
+
+**Upgrading from 0.1.0:** start with a fresh library. 0.2.0 changes where results live and doesn't upgrade a 0.1.0
+install; add your library folders again and process them. Supported upgrades start from 0.2.0.
+
+### Added
+
+- **Library**: library folders replace asset sources (`local-assets library …`; `sources …` still works). Browse
+  by folder, bundle, pack and folder, with a card state for every asset, pack headers, context menus and Show in
+  pack from search. Packs are detected from structure (license, readme, preview image, versioned names) and can
+  be made, merged or renamed (`local-assets packs`).
+- **Recognized files**: moved or renamed files keep their ID, previews, descriptions and collection entries;
+  copies share finished results; vanished files show as Missing until you forget them.
+- **Image kinds**: images are sorted into model textures, material textures and 2D images, with the evidence;
+  a folder can be corrected (`local-assets library images`).
+- **Variant groups**: `Car_11_R/G/B` become one card with variant chips and a shared description, unless you
+  ask for separate ones (decision 0024).
+- **Pack profiles**: a pack says whether it needs a structure and why, with versioned rules, Restore and export
+  (`local-assets packs signals|profile|apply|revert|export`).
+- **Add library folder wizard**: a quick look at names only, a verdict per pack, then **Let my agent finish**,
+  **Review myself** or **Later**.
+- **Agents**: guided setup (the agent checks Blender, runtimes and weights itself, the app shows a report with
+  Undo and **Looks good**), pack structure tools (`list_packs`, `get_pack_outline`, `get_profile`,
+  `propose_profile`, `finish_structure`, `say`), an Agent activity panel, grouped proposal review with one
+  **Apply decisions** (decision 0025), **Try your agent** practice packs, a **Connect your agent** setup step,
+  and an agent entry check (`setup agent check`, `doctor`).
+- **Processing queue**: Make previews and Generate descriptions on a pack, folder or selection; previews first,
+  estimates, and ask-first for long or large jobs (`local-assets previews`, `describe`, `queue`). Asset
+  processing shows Running, Up next, Blocked, Recorded failures and Recent, with measured progress.
+- **Parallel rendering** in kept-open Blender processes on the CPU or a GPU, sized by a short speed test and
+  your limits (`local-assets rendering`, decision 0022).
+- **Formats Assetarium uses**: a toggle per 3D and image format; assets in formats that are off are hidden,
+  never deleted, and a model previewed from an off format says so (decision 0026).
+- **CPU search**: the same EmbeddingGemma model on the CPU (`runtime/embedding-cpu`, about 1 GB), with a thread
+  count chosen by a speed test (decision 0018).
+- **Search works after setup**: a search check on built-in samples (a cube, a pyramid, a sphere), and a search
+  readiness panel in Settings → General with **Check again** (`local-assets setup search-check`, `setup status`).
+- Excluded folders, duplicate export folder suggestions with **Group** (decision 0019), a texture folder choice
+  for **Textures not found** (decision 0021) and **Recheck failures** (`local-assets recheck`, decision 0020).
+- **Session logs**: one readable log per app, MCP or CLI run in `logs/` (`local-assets logs`,
+  `Assetarium (with log).vbs`).
+- **Blender installation** panel in Settings → General, and **Copy** on every command the app asks you to run.
+- **Newer data is left alone**: data written by a newer Assetarium is refused and left unchanged.
+
+### Changed
+
+- Nothing is written into asset folders: results live in one library store (`data/library-store/`, or
+  `[storage].library`), keyed by their inputs (decision 0023).
+- Every supported type is always included; Settings loses the Asset sources section, **Include 2D images** and
+  import format limits.
+- A connected agent may apply setup values at any time (labeled *Set by agent*); the Blender path stays a
+  proposal (decision 0024).
+- Descriptions from a local model server no longer need `.venv-caption`; setup's step is "Descriptions and search".
+- The runtime wrappers refuse project commands without `--project`.
+- Contributor docs moved to the `Assetarium KnowledgeBase/` vault; `docs/` keeps user guides; machine details
+  go in an ignored `MACHINE.local.md`.
+
+### Fixed
+
+- Large libraries: a 73,000-asset folder opens in about a second, and a 16,504-file rescan takes 21 seconds
+  instead of 8½ minutes. Sources over about 12,000 files no longer fail their rescan.
+- A crash mid-write no longer hides every source.
+- Descriptions are no longer rejected for wording alone or for one-piece objects with no listed parts.
+- Flat card models no longer fail with an empty preview; a broken alternate file fails only that file.
+- Assets no longer stay "pending" after grouping export folders, and Make previews no longer offers work it
+  then refuses.
+- Search: no "contract mismatch" from LF/CRLF checkouts, a clear message for an incomplete search runtime, and
+  fresh installs can build search data.
+- 3D and image viewing use the right data revision everywhere, and the 3D preview opens from collections.
+- Show in Explorer selects files with spaces, commas or Unicode in their paths.
+- Setup saves the Blender it found, so the speed test is no longer blocked.
+
 ## [0.1.0] — 2026-10-25
 
 First public release.

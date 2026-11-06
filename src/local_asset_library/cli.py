@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 from pathlib import Path
 import sqlite3
 import os
@@ -46,14 +47,17 @@ def main() -> int:
     parser.add_argument("--min-similarity", type=float, help="Explicit evaluation cosine floor, not a confidence threshold")
     parser.add_argument("--rankings-output", help="Save complete channel rankings under data/; excluded from compact default response")
     args = parser.parse_args()
+    from .logs import kv, start
+    start(root, 'cli')
+    logging.getLogger('assetarium.cli').info('Command · %s', kv(command=' '.join(sys.argv[1:])[:300]))
     try:
         config = load_config(args.config, root)
         if config.sources_registry:
-            from .sources import registry, bound, get_source, source_status, scan_source, aggregate
+            from .sources import registry, bound, get_source, source_status, source_statuses, scan_source, aggregate
             source = get_source(config, args.asset_source) if args.asset_source else None
             if args.command in {'scan','status','refresh'}:
                 if args.dry_run:
-                    print(json.dumps({'dry_run':True,'sources':[source_status(config,s) for s in registry(config)['sources']]}));return 0
+                    print(json.dumps({'dry_run':True,'sources':source_statuses(config)}));return 0
                 if args.command == 'scan':
                     from .source_operations import scan_all
                     import uuid
@@ -68,20 +72,21 @@ def main() -> int:
                             scoped=bound(config,source);ensure_index(config,scoped);publish_source(scoped)
                             scan_source(config,source)
                         aggregate(config)
-                result={'sources':[source_status(config,s) for s in registry(config)['sources']]}
+                result={'sources':source_statuses(config)}
                 print(json.dumps(result,ensure_ascii=False));return 0
             if args.command == 'process' and source is None:
-                raise ConfigError('Choose --asset-source or use its Process assets card in LAL')
+                raise ConfigError('Choose --asset-source or use Make previews on the Asset sources tab')
             if source:
                 config=bound(config,source)
         if args.command=='embed-index' and library_mode(config):
             raise ConfigError('Use library-batch.py process for coordinated incremental indexing')
         if args.command == 'process' and not args.dry_run:
-            runtime = {'inspection':'mcp','caption':'caption','embeddings':'embedding'}[args.stage]
+            from .source_operations import stage_runtime
+            runtime, project = stage_runtime(config, args.stage)
             expected = root / ('.venv-' + runtime)
             if os.environ.get('UV_PROJECT_ENVIRONMENT') != str(expected):
                 command = [*runtime_command(root, runtime), 'run','--locked','--no-sync','--offline',
-                    '--project',str(root / 'runtime' / runtime),'python','-m','local_asset_library.cli',*sys.argv[1:]]
+                    '--project',str(root / 'runtime' / project),'python','-m','local_asset_library.cli',*sys.argv[1:]]
                 return subprocess.run(command,cwd=root,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0).returncode
         if args.command in {'scan', 'process', 'refresh', 'status'} and library_mode(config):
             from .incremental import refresh, process, coverage, publish, working
@@ -192,6 +197,9 @@ def main() -> int:
                           numpy_finite_normalized=bool(np.isfinite(vector / np.linalg.norm(vector)).all()),
                           blender_executable_exists=bool(config.blender and config.blender.is_file()),
                           blender_candidates=[str(path) for path in blender_candidates(config)])
+            from .setup_agent import registrations  # Read only: this server's entry in each agent's settings.
+            result['mcp_registrations'] = [{key: item[key] for key in ('label', 'scope', 'folder', 'state', 'script')}
+                                           for item in registrations(root)]
         print(json.dumps(result, indent=2))
         return 0
     except (ConfigError, sqlite3.Error, OSError, ValueError, RuntimeError) as exc:
