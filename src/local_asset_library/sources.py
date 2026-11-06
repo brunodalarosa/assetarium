@@ -808,12 +808,12 @@ def scan_source(config, source, progress=None):
     suggestions = []
     progress = clock = ScanClock(progress)
     from .parse_cache import session
-    with session(config) as parsed:
-        rows, fresh, _, _ = build_inventory(scoped, suggestions, previous, progress=progress)
     from .catalog import snapshot, walk_source
-    verified = walk_source(scoped, progress, 'Verifying files')
-    if snapshot(rows) != snapshot(verified):
-        raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
+    with session(config) as parsed:  # New parse results are saved only once the files are verified.
+        rows, fresh, _, _ = build_inventory(scoped, suggestions, previous, progress=progress)
+        verified = walk_source(scoped, progress, 'Verifying files')
+        if snapshot(rows) != snapshot(verified):
+            raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
     # Identity by recognition: kept IDs for known places, moves and edits; new IDs only at first sight.
     skipped = [r["path"].split("/", 1)[1] for r in rows if r.get("status") == "excluded_folder"]
     if progress:

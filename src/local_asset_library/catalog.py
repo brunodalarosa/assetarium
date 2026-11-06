@@ -490,8 +490,10 @@ def dependencies(config, row, inventory, shared=None):
     references, issues = [], []
     if extension in {".fbx", ".blend"}:
         return [], ["Binary material/dependency inspection pending step 3"], "pending"
-    from .parse_cache import remember
-    for entry in remember("references", row.get("sha256"), lambda: parsed_references(config, row)):
+    from .parse_cache import remember, unchanged
+    # The format picks the parser, so it is part of the key: the same bytes as .glb and .gltf parse differently.
+    for entry in remember("references" + extension, row.get("sha256"), lambda: parsed_references(config, row),
+                          unchanged(config, path, row.get("size"), row.get("mtime_ns"))):
         if entry[0] == "ref":
             references.append(tuple(entry[1:]))
         elif entry[0] == "issue":

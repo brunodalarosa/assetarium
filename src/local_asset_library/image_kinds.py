@@ -20,10 +20,10 @@ FBX_NAMES = re.compile(rb'([\w\- .]{1,200}\.(?:png|jpe?g|tga|bmp|tiff?|webp|dds|
 FBX_LIMIT = 64 * 1024 * 1024
 
 
-def fbx_references(config, path, size, sha256=None):
+def fbx_references(config, path, size, sha256=None, mtime_ns=None):
     """Image file names an FBX file mentions (ASCII ``RelativeFilename`` and strings in binary FBX); never parsed further."""
-    from .parse_cache import remember
-    return set(remember('fbx-names', sha256, lambda: fbx_names(config, path, size)))
+    from .parse_cache import remember, unchanged
+    return set(remember('fbx-names', sha256, lambda: fbx_names(config, path, size), unchanged(config, path, size, mtime_ns)))
 
 
 def fbx_names(config, path, size):

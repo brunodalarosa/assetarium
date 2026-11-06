@@ -2,10 +2,12 @@
 import logging
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 from test_sources import managed  # noqa: F401 -- fixture
 from local_asset_library import catalog, parse_cache, sources
+from local_asset_library.config import ConfigError
 from local_asset_library.incremental import working
 from local_asset_library.membership import records
 
@@ -81,9 +83,73 @@ def test_cached_references_match_a_fresh_parse(managed):
 def test_read_failures_are_never_remembered(managed):
     config = managed[0]
     with parse_cache.session(config) as current:
-        assert current.remember('references', 'f' * 64, lambda: (['x'], False)) == ['x']
-        assert current.remember('references', 'f' * 64, lambda: (['y'], True)) == ['y']
+        assert current.remember('references', 'f' * 64, lambda: (['x'], False), lambda: True) == ['x']
+        assert current.remember('references', 'f' * 64, lambda: (['y'], True), lambda: True) == ['y']
         assert current.misses == 2
+
+
+def rows_by_name(scoped):
+    return {r['path'].rsplit('/', 1)[-1]: r for r in catalog.walk_source(scoped)}
+
+
+def test_a_file_changed_after_hashing_is_not_remembered(managed):
+    """Bytes that changed between the hash and the parse never get saved under the old hash (review finding)."""
+    config, _, one, _ = managed
+    folder = Path(one['path']) / 'Changing'
+    folder.mkdir()
+    model = folder / 'm.gltf'
+    model.write_text('{"images":[{"uri":"red.png"}]}')
+    scoped = sources.bound(config, one)
+    row = rows_by_name(scoped)['m.gltf']  # Hashed with red.png...
+    model.write_text('{"images":[{"uri":"blue.png"}]}')  # ...then edited before the parse.
+    with parse_cache.session(scoped):
+        assert [d['reference'] for d in catalog.dependencies(scoped, row, {})[0]] == ['blue.png']
+    model.write_text('{"images":[{"uri":"red.png"}]}')  # The original bytes again: the old hash must parse afresh.
+    row = rows_by_name(scoped)['m.gltf']
+    with parse_cache.session(scoped) as current:
+        assert [d['reference'] for d in catalog.dependencies(scoped, row, {})[0]] == ['red.png'] and current.misses == 1
+
+
+def test_a_scan_that_fails_verification_saves_no_parse_results(managed, monkeypatch):
+    config, _, one, _ = managed
+    (Path(one['path']) / 'v.gltf').write_text('{"images":[{"uri":"red.png"}]}')
+    walk = catalog.walk_source
+    def changed_during_scan(scoped, progress=None, phase='Checking files'):
+        rows = walk(scoped, progress, phase)
+        return [dict(r, size=-1) for r in rows] if phase == 'Verifying files' else rows
+    monkeypatch.setattr(catalog, 'walk_source', changed_during_scan)
+    with pytest.raises(ConfigError, match='Files changed during the scan'):
+        sources.scan_source(config, one)
+    sha = rows_by_name(sources.bound(config, one))['v.gltf']['sha256']
+    assert all(s != sha for _, s in parse_cache.Session(config.library_store() / 'parse-cache.sqlite').known)
+
+
+def test_the_same_bytes_in_another_format_parse_on_their_own(managed):
+    """A misnamed .glb must not hand its header fault to a valid .gltf with identical bytes (review finding)."""
+    config, _, one, _ = managed
+    folder = Path(one['path']) / 'Twins'
+    folder.mkdir()
+    text = '{"asset":{"version":"2.0"},"images":[{"uri":"paint.png"}]}'
+    (folder / 'a.glb').write_text(text)
+    (folder / 'b.gltf').write_text(text)
+    scoped = sources.bound(config, one)
+    rows = rows_by_name(scoped)
+    with parse_cache.session(scoped):
+        glb, issues, _ = catalog.dependencies(scoped, rows['a.glb'], {})
+        assert glb == [] and issues and 'GLB' in issues[0]
+        assert [d['reference'] for d in catalog.dependencies(scoped, rows['b.gltf'], {})[0]] == ['paint.png']
+
+
+def test_a_damaged_cache_never_fails_a_scan(managed, caplog):
+    config, _, one, _ = managed
+    (Path(one['path']) / 'd.gltf').write_text('{"images":[{"uri":"red.png"}]}')
+    damaged = config.library_store() / 'parse-cache.sqlite'
+    damaged.parent.mkdir(parents=True, exist_ok=True)
+    damaged.write_bytes(b'not a database' * 100)
+    with caplog.at_level(logging.WARNING, logger='local_asset_library.parse_cache'):
+        sources.scan_source(config, one)
+    assert any('Parse cache not saved' in r.getMessage() for r in caplog.records)
+    assert 'd' in named(config, one)
 
 
 def test_license_evidence_keeps_ancestor_folders_only():

@@ -33,9 +33,13 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   `recognition` table (`library_store.history`).
 - **Fast scans** (decision 0027): the walk reuses hashes by stat identity (decision 0004); what a
   file's bytes say (FBX texture names, glTF/OBJ/MTL/DAE references) comes from
-  `parse_cache.py` (`parse-cache.sqlite` in the store), keyed by SHA-256 and the parsers' own
-  source (`parse_cache.parser_key`), so editing `catalog.parsed_references`,
-  `image_kinds.fbx_names` or `catalog.read_text` starts fresh keys. Matching references to existing
+  `parse_cache.py` (`parse-cache.sqlite` in the store), keyed by SHA-256, the parser kind (which
+  includes the file extension: the same bytes as `.glb` and `.gltf` parse differently) and the
+  parsers' own source (`parse_cache.parser_key`), so editing `catalog.parsed_references`,
+  `image_kinds.fbx_names` or `catalog.read_text` starts fresh keys. New answers are saved only when
+  the session ends without error (`scan_source` keeps it open through the "Verifying files" walk)
+  and only for files whose size and mtime still match their hash (`parse_cache.unchanged`); a
+  damaged or unwritable cache is logged and never fails a scan. Matching references to existing
   files (`catalog.dependencies`, including OBJ's existing-file `mtllib` choice) still runs every
   scan. `build_inventory` runs in `publication.request_scope`, so path checks resolve each folder
   once. Each scan logs `Scan finished · …` with files, hashed, new/changed/removed assets,
