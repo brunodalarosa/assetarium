@@ -360,6 +360,8 @@ class DesktopBridge:
             return {'status': 'saved'}
         if action == 'scan':
             return self._start_source_operation('scan', key)
+        if action == 'check':  # The launch check of every folder (decision 0027).
+            return self._start_source_operation('scan', None, quiet=True)
         if action in {'process', 'describe'}:
             return self._start_source_operation(action, key)
         if action == 'cancel':
@@ -708,9 +710,9 @@ class DesktopBridge:
             record_change(self._config, key, anchor, {'by': 'owner'})
         return self._start_source_operation('scan', key)
 
-    def _start_source_operation(self, operation, key):
+    def _start_source_operation(self, operation, key, quiet=False):
         from .source_operations import start
-        result = start(self._config, operation, key)
+        result = start(self._config, operation, key, quiet=quiet)
         if result.get('token'):
             self._owned_source_operations.add(result['token'])
         return result

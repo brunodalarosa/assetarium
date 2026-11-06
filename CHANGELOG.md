@@ -11,6 +11,9 @@ All notable changes to Assetarium are listed here. The project follows
 - **Faster startup scans**: a scan reads only files whose content changed since the last scan; an unchanged
   library scans about ten times faster. Each scan writes one summary line to the log (files, changes, seconds
   per phase).
+- **Quiet launch check**: at launch the top bar shows "Checking for changes" instead of scan phases; a check that
+  finds changes says so in one note ("Library updated · 3 new"), and the Library no longer reloads the shown
+  folder while a scan only reports progress.
 
 ## [0.2.0] — 2026-11-05
 

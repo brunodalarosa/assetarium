@@ -26,7 +26,9 @@ buttons do the same), **Home**,
 bottom; every icon has a label and a focus/hover tooltip. The Library lets you add
 folders, organize packs and review agent proposals. The top bar holds the background
 activity indicator (only while something runs), the notifications bell and the
-inspection toggle. Asset processing shows a dot while a source needs
+inspection toggle. At launch the library opens from its last scan at once and shows
+**Checking for changes** while it looks for new, changed or removed files; if it finds
+any, one small note says what changed ("Library updated · 3 new"), otherwise nothing appears. Asset processing shows a dot while a source needs
 processing or an operation runs.
 
 **Try your agent.** In Settings → General or optional setup, connect your agent and choose **Try your agent**.

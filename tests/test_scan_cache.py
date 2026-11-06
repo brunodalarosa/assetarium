@@ -93,3 +93,33 @@ def test_license_evidence_keeps_ancestor_folders_only():
         {'path': 'src/Pack/Kit/Models/a/License.txt'}]}
     assert [e['path'] for e in catalog.relevant_license_evidence(record)] == [
         'src/Pack/License.txt', 'src/Pack/Kit/License.txt', 'src/README-licenses.txt']
+
+
+def test_unchanged_scan_leaves_the_library_database_alone(managed):
+    config, _, one, _ = managed
+    from local_asset_library.source_operations import scan_all
+    scan_all(config, 'a' * 32)
+    path = config.library_store() / 'library.sqlite'
+    before = path.stat().st_mtime_ns, path.stat().st_size
+    scan_all(config, 'a' * 32)
+    assert (path.stat().st_mtime_ns, path.stat().st_size) == before
+
+
+def test_launch_check_is_quiet_and_reports_what_changed(managed, monkeypatch):
+    from local_asset_library import source_operations
+    config, _, one, _ = managed
+    spawned = []
+    class Process:
+        pid = 4242
+    monkeypatch.setattr(source_operations.subprocess, 'Popen', lambda *a, **k: spawned.append(a) or Process())
+    assert source_operations.start(config, 'scan', quiet=True)['status'] == 'started'
+    assert source_operations.operation_status(config)['quiet'] is True
+    source_operations.state(config, status='complete')
+    assert source_operations.start(config, 'scan', one['key'], quiet=True)['status'] == 'started'
+    assert source_operations.operation_status(sources.bound(config, one))['quiet'] is False  # Only the all-folder check.
+    source_operations.scan_all(config, 'b' * 32)
+    source_operations.scan_all(config, 'b' * 32)
+    assert source_operations.operation_status(config)['changes'] == {'new': 0, 'changed': 0, 'removed': 0}
+    (Path(one['path']) / 'extra.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
+    source_operations.scan_all(config, 'b' * 32)
+    assert source_operations.operation_status(config)['changes'] == {'new': 1, 'changed': 0, 'removed': 0}

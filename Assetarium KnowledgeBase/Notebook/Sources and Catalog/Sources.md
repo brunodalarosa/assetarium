@@ -102,6 +102,10 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   documentation, not license evidence.
 - Equal manifests in sibling `fbx`, `fbx(unity)`, `gltf` and `obj` export trees can group exports
   into one logical asset; that does not prove the geometry is equivalent.
+- `catalog.parsed_references` and `image_kinds.fbx_names` must stay pure functions of the file's
+  bytes: their answers are cached by SHA-256 (`parse_cache.py`). Anything that depends on which
+  files exist (OBJ's existing-file `mtllib` choice, a parse stopped by a bad `mtllib` line) is
+  decided at replay in `catalog.dependencies`. A read failure (`ConfigError`, `OSError`) is never cached.
 - The October 14, 2026 move from one combined root to sources is history:
   `scripts/historical/source_migration.py` (receipts under `data/library/source-migration/`).
 

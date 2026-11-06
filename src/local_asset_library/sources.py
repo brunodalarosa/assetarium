@@ -787,6 +787,7 @@ def log_scan(source, clock, merged, old, changed, reparsed):
         folder=source['name'], files=files, hashed=files - reused - failed, unreadable=failed or None,
         assets=len(merged), new=new, changed=len(changed & set(old)), removed=len(set(old) - present),
         reparsed=reparsed, seconds=f'{total:.1f}', phases=phases))
+    return {'new': new, 'changed': len(changed & set(old)), 'removed': len(set(old) - present)}
 
 
 def scan_source(config, source, progress=None):
@@ -931,8 +932,8 @@ def scan_source(config, source, progress=None):
     mapping = dict(owners(config))
     mapping.update({r["asset_id"]: source["key"] for r in previous + merged})
     write_changed(own_path, {"schema_version": 1, "assets": mapping})
-    log_scan(source, clock, merged, old, changed, parsed.misses)
-    return status
+    # What this scan changed, for the launch check's quiet summary; not part of the saved status.
+    return {**status, 'changes': log_scan(source, clock, merged, old, changed, parsed.misses)}
 
 
 def aggregate(config):
