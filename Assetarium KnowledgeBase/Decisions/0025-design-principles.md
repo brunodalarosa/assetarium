@@ -2,7 +2,11 @@
 tags: [decision]
 decided: 2026-11-01
 ---
-# 0025 — Design principles: decide many, commit once; the robot means agents
+# 0025 — Design principles: decide many, commit once; the robot means agents (superseded)
+
+> **Superseded on November 6, 2026 by the [Design language](../Architecture/Desktop%20App/Design%20language.md)**,
+> the one home of the design principles, which only the owner changes. This record is frozen as the history of
+> how P1–P5 were decided; read and cite the Design language instead.
 
 **Decision (owner, November 1, 2026; co-designed in a brainstorm, approved for implementation).** Assetarium's
 UI and UX follow named design principles. They are **principles, not rules**: a change may depart from one when

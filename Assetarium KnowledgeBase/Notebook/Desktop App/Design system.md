@@ -8,21 +8,18 @@ branch: feature/library-view
 # Design system
 
 Hub: [Desktop App](Desktop%20App.md). What the UI is built from, and when to use each piece. The principles
-behind it are [decision 0025](../../Decisions/0025-design-principles.md); read them before designing a flow.
+behind it are in the [Design language](../../Architecture/Desktop%20App/Design%20language.md) (design principles); read them before designing a flow.
 
 ## Rules
 
-- **P1 Decide many, commit once, see the outcome**: group alike decisions by signature, stage them, preview,
-  one Apply. Cheap and undoable → apply at once with Undo; irreversible → one at a time.
-- **P2 The robot means agents**: `Bot` only for external agents; no sparkles.
-- **P3 Run it, don't type it**: a button when the app can do it; otherwise a `CommandBlock` with Copy, never a command
-  inline in text.
-- **P4 Make progress measurable**: long work shows its phase and a compact measured count. Hover or keyboard
-  focus reveals totals, remaining work and outcomes. Unknown totals stay indeterminate; phase percentages are
-  labeled as phase progress (`OperationProgress`, `progressInfo`, `source_operations.scan_reporter`).
-- **P5 No silent states**: every asset, item and action shows its state and why; facts first, then only the
-  actions that resolve it. Nothing is skipped, hidden or "nothing to do" without a reason. A chip or one line is
-  always visible; the reason and actions live in the inspector, a tooltip or an expanded row.
+- The design principles are only in the [Design language](../../Architecture/Desktop%20App/Design%20language.md); this list names them, read them there:
+  [P1 Decide many, commit once, see the outcome](../../Architecture/Desktop%20App/Design%20language.md#p1--decide-many-commit-once-see-the-outcome) ·
+  [P2 One visual sign for agents](../../Architecture/Desktop%20App/Design%20language.md#p2--one-visual-sign-for-agents) ·
+  [P3 Run it, don't type it](../../Architecture/Desktop%20App/Design%20language.md#p3--run-it-dont-type-it) ·
+  [P4 Make progress measurable](../../Architecture/Desktop%20App/Design%20language.md#p4--make-progress-measurable) ·
+  [P5 No silent states](../../Architecture/Desktop%20App/Design%20language.md#p5--no-silent-states).
+- Applying them: P4 lives in `OperationProgress`, `progressInfo` and `source_operations.scan_reporter`; P3 in
+  `CommandBlock` / `Reason`; P1 in `ProposalReview`.
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
 
@@ -74,4 +71,4 @@ are in `lib/ease.ts` (`SPRING_LAYOUT`, `SPRING_PANEL`); honor `useReducedMotion`
 
 ## Related
 
-[Frontend build](Frontend%20build.md) · Decisions: [0011](../../Decisions/0011-react-desktop-ui.md), [0024](../../Decisions/0024-pack-profiles-and-variant-groups.md), [0025](../../Decisions/0025-design-principles.md).
+[Frontend build](Frontend%20build.md) · Decisions: [0011](../../Decisions/0011-react-desktop-ui.md), [0024](../../Decisions/0024-pack-profiles-and-variant-groups.md), [0025](../../Decisions/0025-design-principles.md) (superseded) · [Design language](../../Architecture/Desktop%20App/Design%20language.md).

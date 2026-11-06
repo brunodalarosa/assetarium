@@ -34,6 +34,7 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
 | [Embedding contract](Search/Embedding%20contract.md) | Search | system | draft |
 | [MCP server](MCP/MCP%20server.md) | MCP | system | draft |
 | [Desktop app design](Desktop%20App/Desktop%20app%20design.md) | Desktop App | system | draft |
+| [Design language](Desktop%20App/Design%20language.md) (design principles) | Desktop App | system | owner principles |
 | [Inference ports](Setup%20and%20Engines/Inference%20ports.md) | Setup and Engines | system | draft |
 | [Expansion plan](Roadmap/Expansion%20plan.md) and its [prompts](Roadmap/Prompts/01-asset-foundation.md) | Roadmap | macro | owner plan |
 

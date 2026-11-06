@@ -45,5 +45,5 @@ excluded from processing. One meaning for formats removes both the mismatch and 
 ## What future work must keep true
 
 - A new core feature comes with the setup step (or automatic later step) that makes it work.
-- Nothing the user must run is shown as inline text (design principle P3, [decision 0025](0025-design-principles.md)).
+- Nothing the user must run is shown as inline text (design principle P3, [Design language](../Architecture/Desktop%20App/Design%20language.md)).
 - Folder views, search, agent results and the queue apply the same format rule (`settings.uses`).
