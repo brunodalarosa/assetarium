@@ -97,7 +97,7 @@ def model_references(config, rows, models, previous=()):
             if file['format'] != 'fbx' or file['availability'] != 'available':
                 continue
             folder = PurePosixPath(file['path']).parent
-            for name in fbx_references(config, file['path'], sizes.get(file['path'])):
+            for name in fbx_references(config, file['path'], sizes.get(file['path']), file.get('sha256')):
                 # The nearest image with that name inside the same top folders as the model.
                 found = sorted(images.get(name, []), key=lambda p: -_shared(PurePosixPath(p).parent, folder))
                 if found and _shared(PurePosixPath(found[0]).parent, folder) >= 2:

@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 from contextlib import closing
 from datetime import datetime, timezone
 from fnmatch import fnmatchcase
+from functools import lru_cache
 import hashlib
 import json
 import os
@@ -413,13 +414,16 @@ def group_models(pack, model_rows, decisions=(), suggestions=None):
             for identity, files in sorted(groups.items())]
 
 
-def dependencies(config, row, inventory, shared=None):
-    """Measured text/GLB references only; binary FBX/Blend remain uninspected."""
+def parsed_references(config, row):
+    """``(entries, cacheable)``: what the file's bytes alone say, in file order (see ``dependencies``).
+
+    Entries are ``["ref", reference, role, evidence(, name)]``, ``["issue", text]``, ``["mtllib", value, names or
+    None, error or None]`` (the existing-file choice needs the inventory, so ``dependencies`` makes it) and a last
+    ``["failed", text]``. A file that could not be read is not cacheable.
+    """
     path = row["path"]
     extension = PurePosixPath(path).suffix.lower()
-    references, issues = [], []
-    if extension in {".fbx", ".blend"}:
-        return [], ["Binary material/dependency inspection pending step 3"], "pending"
+    entries = []
     try:
         if extension in {".obj", ".mtl"}:
             text = read_text(config, path)
@@ -429,18 +433,18 @@ def dependencies(config, row, inventory, shared=None):
                     continue
                 command, _, value = line.partition(" ")
                 if command == "mtllib":
-                    # An exact existing filename (including spaces) wins; otherwise OBJ permits several names.
-                    direct = (PurePosixPath(path).parent / value).as_posix()
-                    refs = [value] if direct in inventory else [v.strip('"') for v in shlex.split(value, posix=False)]
-                    references.extend((ref, "material", "OBJ mtllib") for ref in refs)
+                    try:
+                        entries.append(["mtllib", value, [v.strip('"') for v in shlex.split(value, posix=False)], None])
+                    except ValueError as exc:
+                        entries.append(["mtllib", value, None, str(exc)])
                 elif command.lower().startswith("map_") or command.lower() in {"bump", "disp", "decal", "refl"}:
                     refs = shlex.split(value, posix=True)
                     if refs:
                         # Options have variable arity; expose them rather than guessing filename boundaries.
                         if value.startswith("-"):
-                            issues.append(f"Unresolved MTL map options: {line}")
+                            entries.append(["issue", f"Unresolved MTL map options: {line}"])
                         else:
-                            references.append((value.strip('"'), "texture", f"MTL {command}"))
+                            entries.append(["ref", value.strip('"'), "texture", f"MTL {command}"])
         elif extension in {".gltf", ".glb"}:
             if extension == ".gltf":
                 document = json.loads(read_text(config, path))
@@ -463,7 +467,7 @@ def dependencies(config, row, inventory, shared=None):
                 for item in document.get(section, []):
                     uri = item.get("uri")
                     if uri and not uri.startswith("data:"):
-                        references.append((uri, role, f"glTF {section}.uri", item.get('name')))
+                        entries.append(["ref", uri, role, f"glTF {section}.uri", item.get('name')])
         elif extension == ".dae":
             # XML parsing resolves no external entities. No scripts or model importers run.
             document = ET.fromstring(read_text(config, path))
@@ -471,9 +475,38 @@ def dependencies(config, row, inventory, shared=None):
                 if image.tag.split("}")[-1] == "image":
                     for child in image:
                         if child.tag.split("}")[-1] == "init_from" and child.text:
-                            references.append((child.text.strip(), "texture", "DAE image/init_from"))
-    except (ValueError, OSError, ET.ParseError) as exc:
-        issues.append(f"Dependency parse failed: {exc}")
+                            entries.append(["ref", child.text.strip(), "texture", "DAE image/init_from"])
+    except (ConfigError, OSError) as exc:
+        return entries + [["failed", f"Dependency parse failed: {exc}"]], False
+    except (ValueError, ET.ParseError) as exc:
+        entries.append(["failed", f"Dependency parse failed: {exc}"])
+    return entries, True
+
+
+def dependencies(config, row, inventory, shared=None):
+    """Measured text/GLB references only; binary FBX/Blend remain uninspected."""
+    path = row["path"]
+    extension = PurePosixPath(path).suffix.lower()
+    references, issues = [], []
+    if extension in {".fbx", ".blend"}:
+        return [], ["Binary material/dependency inspection pending step 3"], "pending"
+    from .parse_cache import remember
+    for entry in remember("references", row.get("sha256"), lambda: parsed_references(config, row)):
+        if entry[0] == "ref":
+            references.append(tuple(entry[1:]))
+        elif entry[0] == "issue":
+            issues.append(entry[1])
+        elif entry[0] == "failed":
+            issues.append(entry[1])
+        else:
+            # An exact existing filename (including spaces) wins; otherwise OBJ permits several names.
+            _, value, names, error = entry
+            if (PurePosixPath(path).parent / value).as_posix() in inventory:
+                names = [value]
+            elif names is None:
+                issues.append(f"Dependency parse failed: {error}")
+                break  # The whole file's parse stopped at this line.
+            references.extend((name, "material", "OBJ mtllib") for name in names)
     result = []
     for reference, role, evidence, *extra in references:
         reference = unquote(reference).replace("\\", "/")
@@ -569,18 +602,37 @@ def relevant_license_evidence(record):
     licenses and Internet shortcuts are not evidence for this particular model.
     The original evidence files and historical processing receipts stay intact.
     """
-    models = [PurePosixPath(f['path']) for f in record.get('files', [])]
+    folders = set().union(*(_ancestors(f['path']) for f in record.get('files', [])))
     return [entry for entry in record.get('license_evidence', [])
             if entry.get('kind') == 'collection_note' or
-            (entry.get('path') and PurePosixPath(entry['path']).suffix.casefold() != '.url'
-             and any(PurePosixPath(entry['path']).parent in model.parents for model in models))]
+            (entry.get('path') and _parent(entry['path'])[1] != '.url' and _parent(entry['path'])[0] in folders)]
+
+
+@lru_cache(maxsize=1 << 17)
+def _ancestors(path):
+    """Every ancestor folder of a path as a string; strings compare like the paths and cost far less."""
+    return frozenset(str(p) for p in PurePosixPath(path).parents)
+
+
+@lru_cache(maxsize=1 << 17)
+def _parent(path):
+    p = PurePosixPath(path)
+    return str(p.parent), p.suffix.casefold()
 
 
 def build_inventory(config, suggestions=None, previous=(), progress=None):
     """Inventory rows and logical assets; duplicate export folder suggestions go to ``suggestions``.
 
     ``previous`` are the folder's last records, whose Blender texture lists and pixel evidence classify images.
+    Boundary checks are reused within the pass, and what files' bytes say comes from the parse cache (decision 0027).
     """
+    from .parse_cache import session
+    from .publication import request_scope
+    with request_scope(), session(config):
+        return _build_inventory(config, suggestions, previous, progress)
+
+
+def _build_inventory(config, suggestions, previous, progress):
     rows = walk_source(config, progress) if progress else walk_source(config)
     from .sources import export_decisions
     decisions = export_decisions(config) if config.source_key else []

@@ -10,11 +10,12 @@ decided: 2026-11-06
 - The startup scan of [decision 0002](0002-startup-scan-and-change-detection.md) stays,
   but becomes a quick change check: one walk that only stats files (size, mtime) against
   `scan-cache.json`. Unchanged files are neither hashed nor parsed.
-- Only new or changed files are hashed and parsed, plus the models that reference them.
-  An unchanged model keeps its saved dependency result. A reused result is valid only when
-  the model file **and every file it references** are unchanged; a changed texture sends
-  its model back to parsing.
-- The second full "Verifying files" walk is replaced by a re-stat of the changed files only.
+- Only new or changed files are hashed and parsed. What a parser reads from a file's bytes is
+  saved by the file's SHA-256 and the parser's own code; matching those references to the files
+  that exist still runs on every scan, so an added, renamed or removed texture is always seen.
+  (Amended 2026-11-06 after measuring: safer than reusing a model's whole dependency result.)
+- The second "Verifying files" walk stays: measured at 3–4% of a scan, it guards against files
+  changing during the scan. (Amended 2026-11-06; it was to be replaced by a re-stat.)
 - Results arrive silently: only cards that actually changed update; a quiet status note
   ("3 new assets") replaces the spinner. A check that finds nothing changed redraws nothing.
 - Every background scan logs one summary line when it finishes: files checked, files
@@ -30,6 +31,6 @@ models, so the old design would cost tens of minutes per launch. The window alre
 fast; a launcher would hide the wait, not remove it. Startup calls (`context`, `sources`,
 `tree`: ~22 s) are a separate cost handled on their own.
 
-**Keep true.** Never re-parse or re-hash a file whose stat identity is unchanged unless a
-file it references changed. Never block the view on a scan. An unchanged scan writes
+**Keep true.** Never re-hash a file whose stat identity is unchanged, and never re-parse
+bytes whose SHA-256 the current parsers have already read; never save a read failure. Never block the view on a scan. An unchanged scan writes
 nothing and redraws nothing (decision 0002). Measure before optimizing beyond this.

@@ -6,6 +6,12 @@ All notable changes to Assetarium are listed here. The project follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Faster startup scans**: a scan reads only files whose content changed since the last scan; an unchanged
+  library scans about ten times faster. Each scan writes one summary line to the log (files, changes, seconds
+  per phase).
+
 ## [0.2.0] — 2026-11-05
 
 **Upgrading from 0.1.0:** start with a fresh library. 0.2.0 changes where results live and doesn't upgrade a 0.1.0

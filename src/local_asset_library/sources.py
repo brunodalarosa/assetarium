@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import time
 import uuid
 
 from .config import ConfigError, _inside, _relative
@@ -749,6 +750,45 @@ def write_membership(config, records):
         "packs": sorted({r["pack_id"] for r in records}), "approval": "Configured asset sources; manual processing"})
 
 
+class ScanClock:
+    """Seconds per scan phase, read from the scan's own progress reports, and the last report of each phase."""
+
+    def __init__(self, forward=None):
+        self.forward, self.started, self.phases, self.last, self.current, self.since = forward, time.monotonic(), {}, {}, None, 0.0
+
+    def __call__(self, metrics):
+        tick = time.monotonic()
+        if metrics['phase'] != self.current:
+            self.stop(tick)
+            self.current, self.since = metrics['phase'], tick
+        self.last[metrics['phase']] = metrics
+        if self.forward:
+            self.forward(metrics)
+
+    def stop(self, tick=None):
+        tick = time.monotonic() if tick is None else tick
+        if self.current:
+            self.phases[self.current] = self.phases.get(self.current, 0.0) + tick - self.since
+            self.current = None
+        return tick - self.started
+
+
+def log_scan(source, clock, merged, old, changed, reparsed):
+    """One summary line per finished scan, for local startup analytics (decision 0027)."""
+    total = clock.stop()
+    walk = clock.last.get('Checking files', {})
+    files, reused, failed = walk.get('completed', 0), walk.get('reused', 0), walk.get('failed', 0)
+    present = {r['asset_id'] for r in merged}
+    new = len(present - set(old))
+    phases = ','.join(f"{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')}:{seconds:.1f}"
+                      for name, seconds in clock.phases.items())
+    from .logs import kv
+    logging.getLogger(__name__).info('Scan finished · %s', kv(
+        folder=source['name'], files=files, hashed=files - reused - failed, unreadable=failed or None,
+        assets=len(merged), new=new, changed=len(changed & set(old)), removed=len(set(old) - present),
+        reparsed=reparsed, seconds=f'{total:.1f}', phases=phases))
+
+
 def scan_source(config, source, progress=None):
     from .catalog import build_inventory, digest, encoded
     from .incremental import working
@@ -765,9 +805,12 @@ def scan_source(config, source, progress=None):
                      (read_records(working(child_scoped)) or read_records(child_scoped)) if r["asset_id"] not in mine]
     old = {r["asset_id"]: r for r in previous}
     suggestions = []
-    rows, fresh, _, _ = build_inventory(scoped, suggestions, previous, **({'progress': progress} if progress else {}))
+    progress = clock = ScanClock(progress)
+    from .parse_cache import session
+    with session(config) as parsed:
+        rows, fresh, _, _ = build_inventory(scoped, suggestions, previous, progress=progress)
     from .catalog import snapshot, walk_source
-    verified = walk_source(scoped, progress, 'Verifying files') if progress else walk_source(scoped)
+    verified = walk_source(scoped, progress, 'Verifying files')
     if snapshot(rows) != snapshot(verified):
         raise ConfigError('Files changed during the scan; prior catalog retained. Scan again when file changes finish.')
     # Identity by recognition: kept IDs for known places, moves and edits; new IDs only at first sight.
@@ -888,6 +931,7 @@ def scan_source(config, source, progress=None):
     mapping = dict(owners(config))
     mapping.update({r["asset_id"]: source["key"] for r in previous + merged})
     write_changed(own_path, {"schema_version": 1, "assets": mapping})
+    log_scan(source, clock, merged, old, changed, parsed.misses)
     return status
 
 

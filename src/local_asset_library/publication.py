@@ -58,6 +58,19 @@ def snapshot(config):
         _hashes.reset(hashes_token)
 
 
+@contextmanager
+def request_scope():
+    """One scan pass reuses boundary checks as one pinned request does; a scope inside another shares it."""
+    if _hashes.get() is not None:
+        yield
+        return
+    token = _hashes.set({})
+    try:
+        yield
+    finally:
+        _hashes.reset(token)
+
+
 def request_memo(key, compute):
     """Reuse a boundary check within one pinned request; later requests recheck."""
     cache = _hashes.get()

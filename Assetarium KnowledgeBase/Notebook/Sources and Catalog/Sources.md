@@ -31,6 +31,15 @@ Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
   content as a present asset is a duplicate with its own formula ID. Vanished assets become
   Missing with a record snapshot until `forget_missing`. Every non-trivial recognition is in the
   `recognition` table (`library_store.history`).
+- **Fast scans** (decision 0027): the walk reuses hashes by stat identity (decision 0004); what a
+  file's bytes say (FBX texture names, glTF/OBJ/MTL/DAE references) comes from
+  `parse_cache.py` (`parse-cache.sqlite` in the store), keyed by SHA-256 and the parsers' own
+  source (`parse_cache.parser_key`), so editing `catalog.parsed_references`,
+  `image_kinds.fbx_names` or `catalog.read_text` starts fresh keys. Matching references to existing
+  files (`catalog.dependencies`, including OBJ's existing-file `mtllib` choice) still runs every
+  scan. `build_inventory` runs in `publication.request_scope`, so path checks resolve each folder
+  once. Each scan logs `Scan finished · …` with files, hashed, new/changed/removed assets,
+  `reparsed` and seconds per phase (`sources.log_scan`).
 - After a scan writes the working catalog, `result_store.reattach` fills recognized, moved or
   duplicated assets from finished results with the same key. Nothing renders or runs a model.
 - Adding a folder **inside** a library folder raises `sources.Covered` (the app offers Show it).

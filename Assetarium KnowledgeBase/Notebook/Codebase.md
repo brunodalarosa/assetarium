@@ -30,7 +30,8 @@ read it first. Up: [Notebook](Notebook.md).
   `runtime_command`, `load_project_config`, `with_saved_blender`), `settings` (app-owned
   `data/library/settings.json`), `publication` (atomic JSON, pinned immutable generations,
   `verified_hash`), `store_versions` (stores refuse a newer format unchanged:
-  [ASSETRM-0004](Roadmap/Features/ASSETRM-0004.md)), `hash_cache` (shared stat-identity hash record), `library_policy` (neutral
+  [ASSETRM-0004](Roadmap/Features/ASSETRM-0004.md)), `hash_cache` (shared stat-identity hash record), `parse_cache` (what parsers read from
+  file bytes, by SHA-256; decision 0027), `library_policy` (neutral
   membership and budget defaults), `retention`, `maintenance_files`, `model_storage`,
   `notifications`, `search_check` (the search check on built-in sample images, [Core features](Platform%20and%20Storage/Core%20features.md)), `logs` (session logs: [Session logs](Platform%20and%20Storage/Session%20logs.md)).
 - **Sources and catalog:** `sources` (library folders, scans, the combined catalog), `library_store`
