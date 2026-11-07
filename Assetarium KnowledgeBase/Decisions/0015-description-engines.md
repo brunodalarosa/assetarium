@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-25
+superseded_in_part_by: "0028"
 ---
 # 0015 — Inference ports and adapters; experimental local model server engine
+
+> **Partly superseded on November 7, 2026 by [0028 Result identity](0028-result-identity.md):** the provenance and fingerprint rules (exception E3).
+> The rest of this record still binds.
 
 **Decision (owner, October 25, 2026).** Model inference sits behind two ports
 (`description_engines.py`): `DescriptionEngine` and `Embedder`, with documented contracts

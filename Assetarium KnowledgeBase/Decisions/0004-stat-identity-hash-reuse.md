@@ -1,8 +1,13 @@
 ---
 tags: [decision]
 decided: 2026-10-17
+superseded_in_part_by: "0028"
 ---
 # 0004 — Re-hash files only when their identity changes
+
+> **Partly superseded on November 7, 2026 by [0028 Result identity](0028-result-identity.md):** file identity,
+> the hash record as an accelerator and the accepted ChangeTime limitation (exception E4). Boundary checks per
+> request, thumbnails and fresh audits still bind here.
 
 **Decision.** Runtime verification (`publication.verified_hash`, used by
 `captions.file_hash`) reuses a recorded SHA-256 while the file's identity is

@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-25
+superseded_in_part_by: "0029"
 ---
 # 0016 — Agent-assisted setup through MCP: session gate, proposals, connection signal
+
+> **Partly superseded on November 7, 2026 by [0029 Agent trust](0029-agent-trust.md):** the session gate, the threat model and what agents apply directly.
+> The rest of this record still binds.
 
 **Decision (owner, October 25, 2026).** An AI agent connected through the existing STDIO MCP
 server can set Assetarium up, as a second front end over `setup_core`

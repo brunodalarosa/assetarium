@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-26
+superseded_in_part_by: "0028"
 ---
 # 0022 — Parallel kept-open renders, render device and speed test
+
+> **Partly superseded on November 7, 2026 by [0028 Result identity](0028-result-identity.md):** the render device staying outside the key and proven-equivalent worker edits (exceptions E1, E6).
+> The rest of this record still binds.
 
 **Decision (user of this checkout, October 26, 2026; for the owner's review before any merge
 upstream).** Inspection renders run in several Blender processes at once,

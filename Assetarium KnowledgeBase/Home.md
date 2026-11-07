@@ -51,7 +51,7 @@ History: [docs/history](../docs/history/README.md), including the frozen
 - **Frontmatter:**
   - `tags`: one of `hub`, `system`, `architecture`, `reference`, `decision`, `stub`.
   - Notebook notes have `area`. Architecture docs have `level` (`macro` / `system` /
-    `implementation`), `parent` and `status` (`draft` / `reviewed`). Decisions have `decided`.
+    `implementation`), `parent` and `status` (`draft` / `reviewed`). Decisions have `decided`; a retired one adds `status: retired`, `retired` and `replaced_by`; a replaced one adds `status: superseded` and `superseded_by`, or only `superseded_in_part_by` when some parts still bind.
   - `code`: the main symbols or paths the page relies on, spelled exactly as in the code
     (`module.function`, `ClassName`, `path/to/file`). These anchors let a staleness check find
     pages to re-verify.

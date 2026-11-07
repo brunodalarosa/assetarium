@@ -36,6 +36,7 @@ When decisions are alike, let people decide them together and commit them once, 
 | --- | --- |
 | Cheap and undoable (tags, labels, agent rules that need no scan) | Apply at once, offer **Undo** |
 | Costly or coupled (rescans, renders, reprocessing) | Stage, preview, commit once |
+| Anything a connected agent does (P6) | Runs at once, shown in Agent activity with **Stop** / **Undo** |
 | Irreversible (owner-only deletions) | One at a time, never batched |
 
 - **Notices group too**: several alike events arriving together make one notice, not one each.
@@ -76,17 +77,35 @@ completed / total, remaining work, the unit being counted and separate successfu
 
 ## P5 — No silent states
 
-*(Added November 4, 2026; co-designed and approved by the owner on the PR 21 review.)* Assetarium is built for
-people who want to know everything about a file, a process or an action. Every asset, queue item and action shows
-its state and why it is in it: the facts first, then only the actions that actually resolve it. Nothing is
-skipped, hidden or "nothing to do" without saying why. Explicit is not verbose: a state chip or one line is
-always visible, and the reason and actions sit in the inspector, a tooltip or an expanded row.
+*(Added November 4, 2026; co-designed and approved by the owner on the PR 21 review. Hiding rule changed by the
+owner on November 7, 2026, decision review.)* Assetarium is built for people who want to know everything about a
+file, a process or an action. Every asset, queue item and action shows its state and why it is in it: the facts
+first, then only the actions that actually resolve it. Nothing is skipped or "nothing to do" without saying why.
+Explicit is not verbose: a state chip or one line is always visible, and the reason and actions sit in the
+inspector, a tooltip or an expanded row.
 
-- First applied to a model shown in the Library whose previews were made from a file in a format that is off
-  (an FBX inspected model that also has an OBJ, with FBX off). It used to look Ready while descriptions and search
-  by meaning quietly left it out. It is now **Format off** (`settings.format_off`, the folder view's `format_off`
-  state) with the reason and **Turn FBX on** in the inspector.
+- **Hidden, counted once.** A view may leave items out (a format that is off, a description search can't use),
+  but never silently: the view says how many it left out, why, and offers **Show** and the action that resolves
+  it, in one line. The same rule holds in every view, the Library included, where each folder shows its count.
+- First applied to a model whose previews were made from a file in a format that is off (an FBX inspected model
+  that also has an OBJ, with FBX off). It used to look Ready while descriptions and search by meaning quietly
+  left it out. It became **Format off** (`settings.format_off`) with **Turn FBX on**; under the hiding rule it
+  leaves the views and is counted: *"120 hidden: FBX is off · Show · Turn FBX on"* (not built yet).
 - Closing the app while work runs says so and asks; the next start says what stopped (decision 0023).
+
+## P6 — Agents first, in the open
+
+*(Added November 7, 2026 by the owner, decision review;
+[decision 0029](../../Decisions/0029-agent-trust.md).)* Assetarium is agent-first: a connected agent may do what
+the owner can, except the owner-only actions, and does it at once instead of asking. In exchange, everything an
+agent does happens in the open.
+
+- **Say it before connecting.** Connecting an agent explains, in one plain sentence, what it may change on its
+  own and where to watch, stop, pause or undo it.
+- **Show it as it happens.** Agent actions appear in Agent activity and on what they touched, with `Bot` (P2).
+  An agent's job in the queue says who started it.
+- **Control is always one click away.** Stop, Pause agents and Undo for an agent session are never hidden
+  behind a page the user has to find.
 
 ## What future work must keep true
 
@@ -94,4 +113,6 @@ always visible, and the reason and actions sit in the inspector, a tooltip or an
 - A commit reports per item: one failing item is shown with its reason and stays pending; the others are saved.
 - New agent-related UI uses `Bot`; no sparkle icons.
 - Commands appear only in a `CommandBlock` (or through `Reason`); an action the app can run is a button.
-- A new state, skip or exclusion carries its reason and the actions that resolve it (P5).
+- A new state, skip or exclusion carries its reason and the actions that resolve it; hidden items are counted
+  with their reason and **Show** (P5).
+- A new agent capability is visible in Agent activity and can be stopped or undone; connecting says what it may do (P6).

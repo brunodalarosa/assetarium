@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-31
+superseded_in_part_by: "0029"
 ---
 # 0024 — Pack profiles, variant groups, shared variant descriptions
+
+> **Partly superseded on November 7, 2026 by [0029 Agent trust](0029-agent-trust.md):** the agent tiers; proposals that rescan no longer wait for the owner.
+> The rest of this record still binds.
 
 **Decision (owner, October 31, 2026; co-designed in a brainstorm, approved for implementation).** Packs from
 the internet differ in layout in unpredictable ways. Assetarium does not chase one master protocol: heuristics

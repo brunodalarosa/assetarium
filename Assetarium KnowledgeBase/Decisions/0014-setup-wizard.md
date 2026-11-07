@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-25
+superseded_in_part_by: "0028"
 ---
 # 0014 — Setup wizard, optional descriptions switch and Blender persistence
+
+> **Partly superseded on November 7, 2026 by [0028 Result identity](0028-result-identity.md):** "Blender change cost" (the Blender path in the key; the owner wants it keyed by version instead).
+> The rest of this record still binds.
 
 **Decision (owner, October 25, 2026).** Assetarium has a setup wizard in the desktop
 app (a full-window overlay in the app's own style and components) and the same flow in

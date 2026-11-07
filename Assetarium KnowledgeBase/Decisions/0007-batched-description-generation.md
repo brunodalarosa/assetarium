@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-18
+superseded_in_part_by: "0028"
 ---
 # 0007 — Batched description generation
+
+> **Partly superseded on November 7, 2026 by [0028 Result identity](0028-result-identity.md):** how descriptions are fingerprinted and the batched-wording trade-off (exception E2).
+> The rest of this record still binds.
 
 **Decision.**
 - **Batching:** Generate descriptions (the `incremental.process` caption stage; since

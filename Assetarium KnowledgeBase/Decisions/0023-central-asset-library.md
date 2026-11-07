@@ -1,8 +1,15 @@
 ---
 tags: [decision]
 decided: 2026-10-30
+superseded_in_part_by: ["0028", "0029"]
 ---
 # 0023 — Central library store, identity by recognition, packs, implicit processing queue
+
+> **Partly superseded on November 7, 2026 by [0029 Agent trust](0029-agent-trust.md):** "processing starts only from an owner action" now reads "from the owner or a connected agent".
+> The rest of this record still binds.
+
+> **Partly superseded on November 7, 2026 by [0028 Result identity](0028-result-identity.md):** "results are a cache keyed by their inputs" and the re-key rule.
+> The rest of this record still binds.
 
 **Decision (owner, October 30, 2026; the implementation plan lives in the owner's private task notes).**
 

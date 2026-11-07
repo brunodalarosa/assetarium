@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-24
+superseded_in_part_by: "0029"
 ---
 # 0012 — Collections, owner tags and the agents' write tools
+
+> **Partly superseded on November 7, 2026 by [0029 Agent trust](0029-agent-trust.md):** what agents may write.
+> The rest of this record still binds.
 
 **Decision (owner, October 24, 2026).** Assetarium gains **Collections**: named,
 owner-organized, virtual bundles of assets from any source and of any asset type.
