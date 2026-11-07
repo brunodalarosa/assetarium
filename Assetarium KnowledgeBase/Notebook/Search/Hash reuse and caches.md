@@ -10,7 +10,7 @@ branch: feature/library-view
 Hub: [Search](Search.md). Reads stay byte-verified without re-reading every file: a file's SHA-256 is
 reused while its stat identity is unchanged, and parsed publication records are cached per immutable
 generation. Decisions: [0003](../../Decisions/0003-per-publication-read-caches.md),
-[0004](../../Decisions/0004-stat-identity-hash-reuse.md).
+[0028](../../Decisions/0028-result-identity.md).
 
 ## How it works
 

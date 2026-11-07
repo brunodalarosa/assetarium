@@ -45,7 +45,7 @@ change (`npm run build` in `frontend/`). Verification scripts drive the app
 through `window.lal` (`frontend/src/main.tsx`) and real controls; keep that
 surface working. Notices only offer actions that can change their state.
 
-> **Later changes.** Collections became a working page under [decision 0012](0012-collections-and-tags.md),
+> **Later changes.** Collections became a working page under [decision 0036](0036-collections-and-tags.md),
 > superseding "Library and Collections are reserved pages" for Collections. On October 25, 2026 the owner
 > hid the reserved **Library** destination from the rail until a library browser is built (beta cleanup);
 > the placeholder page stays in the source for that future work.

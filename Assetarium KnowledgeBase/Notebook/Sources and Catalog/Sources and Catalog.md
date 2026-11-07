@@ -23,8 +23,8 @@ assets, and how each source's results combine into one read-only catalog. Up: [N
 - User guide: [Asset sources](../../../docs/asset-sources.md).
 - Contract: [Catalog contract](../../Architecture/Sources%20and%20Catalog/Catalog%20contract.md).
 - Decisions: [0002](../../Decisions/0002-startup-scan-and-change-detection.md) (startup scan, change
-  detection), [0004](../../Decisions/0004-stat-identity-hash-reuse.md) (hash reuse),
+  detection), [0028](../../Decisions/0028-result-identity.md) (hash reuse),
   [0019](../../Decisions/0019-source-folders-and-export-variants.md) (excluded folders, export
   variants), [0020](../../Decisions/0020-alternate-file-faults-and-recheck.md) (alternate file
   faults, recheck), [0021](../../Decisions/0021-texture-folder-choice.md) (texture folder choice),
-  [0024](../../Decisions/0024-pack-profiles-and-variant-groups.md) (pack profiles, variant groups).
+  [0035](../../Decisions/0035-packs-and-variant-groups.md) (pack profiles, variant groups).

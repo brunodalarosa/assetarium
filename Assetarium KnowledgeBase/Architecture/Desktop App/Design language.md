@@ -17,7 +17,7 @@ branch:
 Assetarium's UI and UX follow these named principles. They are **principles, not rules**: a change may depart
 from one when it says why. How the UI applies them (tokens, components, icon meanings and concrete rules) is in
 the [Design system](../../Notebook/Desktop%20App/Design%20system.md) note. They were first recorded as
-[decision 0025](../../Decisions/0025-design-principles.md) (November 1–4, 2026), which keeps the history.
+decision 0025 (November 1–4, 2026; its text is in git history).
 
 Up: [Desktop app design](Desktop%20app%20design.md) · Where in code: [Design system](../../Notebook/Desktop%20App/Design%20system.md)
 

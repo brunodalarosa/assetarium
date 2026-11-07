@@ -21,7 +21,7 @@ supported until verified on a CUDA machine.
   Windows so a closed terminal never kills them.
 - **Deletions stay with the owner.** `sources remove` and `collections delete` need an
   interactive terminal and a typed `yes`, with no bypass flag, so an agent with shell
-  access cannot delete ([decision 0012](0012-collections-and-tags.md)). Scripted
+  access cannot delete ([decision 0036](0036-collections-and-tags.md)). Scripted
   export targets stay under `data/exports`. The owner commands are not MCP tools.
 - **One helper per OS difference.** `config.venv_python` (`Scripts/python.exe` /
   `bin/python`) and `config.runtime_command` (`.ps1` through PowerShell / `.sh`
@@ -37,7 +37,7 @@ supported until verified on a CUDA machine.
   `--python-expr` mapping `os.path.isreserved` to `ntpath.isreserved`.
 - **Configuration.** The tracked `config.example.toml` is neutral (`models = "models"`,
   Blender discovered); machine paths live in the ignored `config.local.toml`
-  ([decision 0001](0001-config-local-precedence.md)). Scripts load the project config.
+  ([decision 0001](Decisions.md#replaced)). Scripts load the project config.
 - **Dependencies.** No platform markers were needed: all four lockfiles install with
   `--locked` on Linux unchanged. pywebview/pythonnet/clr-loader stay in the `mcp`
   environment until milestone 1B changes that lock.

@@ -17,7 +17,7 @@ discovery, and how model inference is plugged in. Up: [Notebook](../Notebook.md)
 
 ## Read first
 
-- Decisions: [0031](../../Decisions/0031-setup.md), [0015](../../Decisions/0015-description-engines.md),
+- Decisions: [0031](../../Decisions/0031-setup.md), [0033](../../Decisions/0033-descriptions-and-engines.md),
   [0018](../../Decisions/0018-cpu-search-embedder.md).
 - User guide: [Description engines and search device](../../../docs/description-engines.md).
 

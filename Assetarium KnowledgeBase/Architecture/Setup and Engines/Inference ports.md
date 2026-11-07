@@ -14,7 +14,7 @@ branch:
 > place that picks the adapter. Refactors must keep fingerprints, proven with
 > `scripts/check-engine-stability.py --compare`.
 
-Up: [Architecture](../Architecture.md) · Decision: [0015](../../Decisions/0015-description-engines.md),
+Up: [Architecture](../Architecture.md) · Decision: [0033](../../Decisions/0033-descriptions-and-engines.md),
 [0018](../../Decisions/0018-cpu-search-embedder.md) · Where in code: [Setup and Engines](../../Notebook/Setup%20and%20Engines/Setup%20and%20Engines.md) ·
 User guide: [docs/description-engines.md](../../../docs/description-engines.md)
 

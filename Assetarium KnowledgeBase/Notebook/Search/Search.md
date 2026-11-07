@@ -21,6 +21,6 @@ library. How agents reach it is the [MCP](../MCP/MCP.md) area. Up: [Notebook](..
 - [Embedding contract](../../Architecture/Search/Embedding%20contract.md) and the frozen
   evaluation (history: from the original pilot) in [`docs/evaluation/`](../../../docs/evaluation/README.md).
 - Decisions: [0003](../../Decisions/0003-per-publication-read-caches.md),
-  [0004](../../Decisions/0004-stat-identity-hash-reuse.md),
+  [0028](../../Decisions/0028-result-identity.md),
   [0005](../../Decisions/0005-embedding-worker-and-prestart.md),
   [0018](../../Decisions/0018-cpu-search-embedder.md).

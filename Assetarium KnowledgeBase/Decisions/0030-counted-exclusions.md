@@ -1,7 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-supersedes: [0008 ("search ignores unusable descriptions silently"), 0026 ("a format that is off does not exist"), 0028 (format turned off)]
+replaces: ["0008, 0026 (their silent exclusions)"]
 code: [settings.uses, settings.format_off, settings.inspected_path, folder_view.py, retrieval.py, incremental.inspection_input]
 ---
 # 0030 — Left-out items are hidden, counted once
@@ -58,10 +58,3 @@ asset is not hidden: only the description channel is left out for it. That is no
 - Re-inspection caused by a format change is pending work; it never starts by itself.
 - Folder views, search, agent results and the queue apply the same format rule (`settings.uses`).
 
-## What this replaces
-
-| Decision | Part superseded |
-| --- | --- |
-| [0008](0008-optional-descriptions-and-notifications.md) | "Search ignores unusable descriptions silently" (the rest stands: descriptions are optional, not import failures) |
-| [0026](0026-setup-leaves-core-features-working.md) | "A format that is off does not exist for Assetarium" and the hidden-asset rule |
-| [0028](0028-result-identity.md) | "A format is turned off: a finished inspection keeps the file it inspected": it now becomes pending from a format that is on |

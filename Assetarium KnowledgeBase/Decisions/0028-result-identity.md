@@ -1,15 +1,14 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-supersedes: [0004, 0007 (identity parts), 0015 (fingerprint part), 0022 (device and equivalent workers), 0023 ("results keyed by inputs")]
+replaces: [0004, "0007, 0014, 0015, 0022, 0023 (their result-identity parts)"]
 code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, result_store.adopt, result_store.location_free, library_migration.rekey, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
-superseded_in_part_by: "0030"
 ---
 # 0028 — Result identity: what makes finished work run again
 
 > **Approved by the owner on November 7, 2026** (decision review; direction "named exceptions": keep reuse
-> pragmatic and write every exception down). It supersedes the parts listed under
-> [What this replaces](#what-this-replaces); those records say so at the top.
+> pragmatic and write every exception down). The format-off rule was amended by
+> [decision 0030](0030-counted-exclusions.md) the same day.
 
 **Decision.** A finished result (previews, a description, a search vector) is reused for as long as its
 **key** matches. The key holds every input this project controls that can change the result. It never holds
@@ -31,6 +30,23 @@ File hashes (`cache/file-hashes.sqlite`) are not results: they are an accelerato
 mtime, NTFS ChangeTime and file ID; elsewhere size, mtime, ctime and inode). A missing or damaged record only
 means hashing the bytes again.
 
+## Verifying files
+
+- **One shared hash record** (`cache/file-hashes.sqlite`) serves the desktop app, MCP server, embedding worker and
+  scans; scans seed it, so the first search after launch reuses scan hashes. Runtime checks go through
+  `publication.verified_hash`; do not add another hash cache. Tests use an isolated record (`LAL_HASH_CACHE`).
+- **Fresh audits re-read bytes:** removal checks (`maintenance_files`, `fresh=True`) and the storage,
+  preservation and relocation verify scripts (`hash_cache.require_fresh()`). Run one when exception E4 matters.
+- **Boundary checks** (library folder validation, storage roots, registry and ownership reads, directory
+  resolution) run once per request, not per file; a leaf that is a link is still resolved and rejected if it
+  escapes.
+- **Thumbnails** show the verified preview image only (cached by preview identity, 320 px). Asset detail and agent
+  `get_asset` still verify the source files.
+- Changed, replaced or missing files are still excluded and recorded as faults.
+- Why: every search re-hashed about 8,000 source files and 11,500 preview PNGs (keyword 7 s, combined 19.5 s warm,
+  34 s cold); the scanner already trusted file identity, and NTFS ChangeTime catches an edit that restores the
+  modification time (`tests/test_hash_cache.py`).
+
 ## Named exceptions (inputs that can change a result but are not in its key)
 
 | # | Exception | What can go wrong | Why it is accepted | Detect or undo |
@@ -38,7 +54,7 @@ means hashing the bytes again.
 | E1 | **Render device.** A GPU and the CPU produce the same key. | GPU previews may differ from CPU previews by a few pixels; a library can mix both. | Re-rendering thousands of assets after switching device costs hours; previews are per asset, so a mix is harmless to search. Equivalence is proven for CPU→CPU only. | `render_settings` records the device on every preview. |
 | E2 | **Batched descriptions.** Batch mates change the wording. | Describing the same asset again can word it differently. | 4.2× faster; the owner reviewed batched output as acceptable. The key proves the inputs, not the exact words. | Provenance records `batch` (size, assets, position). |
 | E3 | **Local-server model by name.** | Swapping the model file behind the same name is not detected; old descriptions look current. | The server owns the file; Assetarium cannot hash it. Experimental engine only. | Provenance records what the server reported. |
-| E4 | **File identity instead of bytes.** | A tool that rewrites NTFS ChangeTime on purpose can hide a same-size edit. | Re-hashing ~20,000 files on every search cost 7–35 s. | Run a `require_fresh()` byte audit. |
+| E4 | **File identity instead of bytes** (see [Verifying files](#verifying-files)). | A tool that rewrites NTFS ChangeTime on purpose can hide a same-size edit. | Re-hashing ~20,000 files on every search cost 7–35 s. | Run a `require_fresh()` byte audit. |
 | E5 | **Line endings.** | None in practice: an LF/CRLF-only difference in a fingerprinted file is ignored. | A CRLF checkout nearly re-queued 11,635 results. | Any other byte change still counts. |
 | E6 | **Proven-equivalent worker edits.** | An edit to `blender_worker.py` keeps old keys. | Only when `scripts/check-render-stability.py` shows identical CPU renders. | `EQUIVALENT_WORKERS` lists each mapping. |
 
@@ -87,15 +103,3 @@ stays in the key and setup keeps asking before saving a different Blender.
   finished results.
 - Engine refactors keep fingerprints (`scripts/check-engine-stability.py --compare`).
 
-## What this replaces
-
-| Decision | Part superseded by this record | Part that stays where it is |
-| --- | --- | --- |
-| [0004](0004-stat-identity-hash-reuse.md) | All of it (file identity, accelerator, E4) | Boundary checks per request, thumbnails → Scan pillar |
-| [0007](0007-batched-description-generation.md) | Fingerprints, provenance, E2 | Batch size setting, out-of-memory stop, cancel, overnight → Engines pillar |
-| [0015](0015-description-engines.md) | Provenance and fingerprints, E3 | Ports and adapters, server rules → Engines pillar |
-| [0022](0022-parallel-rendering.md) | Device outside the key, `EQUIVALENT_WORKERS`, E1, E6 | Kept-open renders, speed test, owner limits → Rendering pillar |
-| [0023](0023-central-asset-library.md) | "Results are a cache keyed by their inputs" and the re-key rule | Store, identity by recognition, packs, queue → Store pillar |
-| [0014](0014-setup-wizard.md) | "Blender change cost" | The rest of setup → Setup pillar |
-
-Notebook detail: [Stage ledger and fingerprints](../Notebook/Processing/Stage%20ledger%20and%20fingerprints.md).

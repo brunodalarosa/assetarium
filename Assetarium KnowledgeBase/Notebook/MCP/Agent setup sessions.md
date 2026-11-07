@@ -8,9 +8,9 @@ branch: bugfix/mcp-registration-check
 # Agent setup sessions
 
 Hub: [MCP](MCP.md). An agent can set up Assetarium for the computer it runs on. There is no session
-any more ([decision 0024](../../Decisions/0024-pack-profiles-and-variant-groups.md)); the page keeps its
+any more ([decision 0035](../../Decisions/0035-packs-and-variant-groups.md)); the page keeps its
 name for links. Start at `setup_agent.py`; it wraps `setup_core`, which holds every setup rule.
-Decision: [0016](../../Decisions/0016-agent-setup.md).
+Decision: [0031](../../Decisions/0031-setup.md).
 
 ## How it works
 

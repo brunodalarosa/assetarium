@@ -17,7 +17,7 @@ or toggling a source checks changes during a session (decision 0002). **Asset
 processing** offers **Process assets** for each source with pending work
 (inspection/previews and search vectors; descriptions are optional and run
 separately with **Generate descriptions** on the same page,
-[decision 0008](../../Decisions/0008-optional-descriptions-and-notifications.md)), a
+[decision 0033](../../Decisions/0033-descriptions-and-engines.md)), a
 processing/publication progress bar, and graceful **Cancel**. The pending
 state clears after a scan verifies that no actionable work remains and current
 results are published. Retained failures appear in the **Importing failures
@@ -38,13 +38,13 @@ open between assets. A short speed test with synthetic shapes picks both; it run
 of a Process assets when Blender or the devices changed, or with **Test again**. Limits for the
 device, renders at a time and memory never make rendering slower; finished previews stay valid
 when they change. Cancel and closing the app finish the running renders; a stopped run resumes
-([decision 0022](../../Decisions/0022-parallel-rendering.md)).
+([decision 0034](../../Decisions/0034-rendering.md)).
 
 **Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets how
 many assets share one description model call. Larger is faster and uses more GPU
 memory. Changing it never re-queues finished descriptions. Running out of GPU
 memory stops the description run with that message and leaves the batch pending
-([decision 0007](../../Decisions/0007-batched-description-generation.md)).
+([decision 0033](../../Decisions/0033-descriptions-and-engines.md)).
 
 For current command-line operation, `library-batch.py scan` checks enabled sources,
 `library-batch.py status` reports their state, and

@@ -25,10 +25,9 @@ descriptions, search vectors, then publication. Up: [Notebook](../Notebook.md).
 
 - [Library updates](../../Architecture/Processing/Library%20updates.md) (operations and ownership) and
   [Caption severity](../../Architecture/Processing/Caption%20severity.md).
-- Decisions: [0007](../../Decisions/0007-batched-description-generation.md),
-  [0008](../../Decisions/0008-optional-descriptions-and-notifications.md),
+- Decisions: [0033](../../Decisions/0033-descriptions-and-engines.md),
   [0009](../../Decisions/0009-general-capabilities.md),
   [0010](../../Decisions/0010-shared-project-dependencies.md),
-  [0022](../../Decisions/0022-parallel-rendering.md).
+  [0034](../../Decisions/0034-rendering.md).
 - The fault policy in `AGENTS.md`: mark faulty, keep evidence and usable partial results, move on,
   never retry an unchanged fault automatically.

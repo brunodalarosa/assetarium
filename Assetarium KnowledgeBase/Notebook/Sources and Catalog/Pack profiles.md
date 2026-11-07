@@ -9,7 +9,7 @@ branch: feature/library-view
 
 Hub: [Sources and Catalog](Sources%20and%20Catalog.md). A pack's structure as one versioned rule set, and the
 variant groups those rules steer. Start at `pack_profiles.apply` and `variant_groups.assign`. Binding:
-[decision 0024](../../Decisions/0024-pack-profiles-and-variant-groups.md).
+[decision 0035](../../Decisions/0035-packs-and-variant-groups.md).
 
 ## How it works
 
@@ -55,5 +55,5 @@ variant groups those rules steer. Start at `pack_profiles.apply` and `variant_gr
 ## Related
 
 [Sources](Sources.md) · [Processing queue](../Processing/Processing%20queue.md) ·
-Decisions: [0019](../../Decisions/0019-source-folders-and-export-variants.md), [0023](../../Decisions/0023-central-asset-library.md),
-[0024](../../Decisions/0024-pack-profiles-and-variant-groups.md).
+Decisions: [0019](../../Decisions/0019-source-folders-and-export-variants.md), [0032](../../Decisions/0032-library-store-and-queue.md),
+[0035](../../Decisions/0035-packs-and-variant-groups.md).

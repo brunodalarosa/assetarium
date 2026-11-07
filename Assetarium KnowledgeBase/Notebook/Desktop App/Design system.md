@@ -71,4 +71,4 @@ are in `lib/ease.ts` (`SPRING_LAYOUT`, `SPRING_PANEL`); honor `useReducedMotion`
 
 ## Related
 
-[Frontend build](Frontend%20build.md) · Decisions: [0011](../../Decisions/0011-react-desktop-ui.md), [0024](../../Decisions/0024-pack-profiles-and-variant-groups.md), [0025](../../Decisions/0025-design-principles.md) (retired) · [Design language](../../Architecture/Desktop%20App/Design%20language.md).
+[Frontend build](Frontend%20build.md) · Decisions: [0011](../../Decisions/0011-react-desktop-ui.md), [0035](../../Decisions/0035-packs-and-variant-groups.md) · [Design language](../../Architecture/Desktop%20App/Design%20language.md).

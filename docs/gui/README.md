@@ -39,7 +39,7 @@ forgets them. An interrupted session is cleaned on the next app launch. This che
 review only and does not run models, render previews or change your real library. The old local-model checker
 has been removed.
 
-**Collections** ([decision 0012](../../Assetarium%20KnowledgeBase/Decisions/0012-collections-and-tags.md)). The
+**Collections** ([decision 0036](../../Assetarium%20KnowledgeBase/Decisions/0036-collections-and-tags.md)). The
 Collections tab shows every collection as a card (four member covers, name, asset
 count, a small "Updated …" date), newest first, with **New collection** and a
 search over names, descriptions and what is inside (member names, labels, notes,
@@ -152,7 +152,7 @@ also appear as a toast with the same actions for 8 s (paused while hovered or
 focused). The bell shows a dot for unread notices or a running job. Escape or a
 click outside closes the panel and marks its notices read.
 
-**Library** (the books icon above Settings, formerly Asset sources; [decision 0023](../../Assetarium%20KnowledgeBase/Decisions/0023-central-asset-library.md))
+**Library** (the books icon above Settings, formerly Asset sources; [decision 0032](../../Assetarium%20KnowledgeBase/Decisions/0032-library-store-and-queue.md))
 browses by place: a tree of library folders, bundles, packs and folders (folders only; coverage bars,
 **+N new** since your last visit, **Offline** labels, excluded folders faded with **Include again**), the
 same cards and inspection as Home for the selected folder or pack, and the folder's other files listed
@@ -192,7 +192,7 @@ reports open as a dialog; a GPU-memory stop suggests lowering **Settings → Gen
 size** (1, 2, 4 or 8; default 8) before **Continue**. When descriptions are turned off, nothing offers
 Generate descriptions (existing descriptions stay stored and searchable).
 
-**Setup** ([decision 0014](../../Assetarium%20KnowledgeBase/Decisions/0014-setup-wizard.md)). A full-window
+**Setup** ([decision 0031](../../Assetarium%20KnowledgeBase/Decisions/0031-setup.md)). A full-window
 overlay with a step list (Welcome, Blender, Formats, Storage budget, Descriptions and
 search, Batch size, Review and finish; the descriptions step also chooses **Where search
 runs**, NVIDIA GPU or CPU, with its own checklist, [decision 0018](../../Assetarium%20KnowledgeBase/Decisions/0018-cpu-search-embedder.md)), **Back** / **Skip step** / **Next**, and **Skip setup**
@@ -216,7 +216,7 @@ own result (a failed Blender write keeps the other settings) and **Go to Asset
 sources** leads to the next step. Verification: `scripts/verify-setup-wizard.py
 --run-name <unique-name>`.
 
-**Setup with an AI agent** ([decisions 0016, 0024](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)). *Welcome*
+**Setup with an AI agent** ([decisions 0031](../../Assetarium%20KnowledgeBase/Decisions/0031-setup.md) and [0029](../../Assetarium%20KnowledgeBase/Decisions/0029-agent-trust.md)). *Welcome*
 offers two equal cards, **Set up with my agent** and **Set it up yourself** (the manual
 steps above). The agent card shows the agent panel (there is no session to open: a connected agent may set
 things up at any time, and every change it makes is labeled and noticed); **1 · Add Assetarium to your

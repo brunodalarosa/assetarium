@@ -10,9 +10,7 @@ branch: feature/library-view
 Hub: [Processing](Processing.md). Optional visual descriptions of each asset, written from its
 rendered previews by Qwen3-VL (or an experimental local model server). Start at
 `incremental.run_captions` and `engines.description_engine`. Decisions:
-[0007](../../Decisions/0007-batched-description-generation.md),
-[0008](../../Decisions/0008-optional-descriptions-and-notifications.md),
-[0015](../../Decisions/0015-description-engines.md).
+[0033](../../Decisions/0033-descriptions-and-engines.md).
 
 ## How it works
 

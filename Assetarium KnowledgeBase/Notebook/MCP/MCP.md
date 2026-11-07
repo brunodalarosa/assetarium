@@ -24,4 +24,4 @@ write tools (collections, tags) and session-gated setup tools. The ranking itsel
 - Agent skills shipped to users: `skills/local-asset-library/` (using the tools) and
   `skills/assetarium-setup/` (setup procedure).
 - Decisions: [0005](../../Decisions/0005-embedding-worker-and-prestart.md),
-  [0012](../../Decisions/0012-collections-and-tags.md), [0016](../../Decisions/0016-agent-setup.md).
+  [0036](../../Decisions/0036-collections-and-tags.md), [0031](../../Decisions/0031-setup.md).

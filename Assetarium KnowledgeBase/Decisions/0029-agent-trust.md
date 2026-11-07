@@ -1,7 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-supersedes: [0012 (agent writes), 0016 (session gate, threat model, what agents apply), 0023 ("processing starts only from an owner action"), 0024 (agent tiers)]
+replaces: ["0012, 0016, 0023, 0024 (their agent parts)"]
 code: [mcp_server.py, mcp_server.DESCRIPTIONS, pack_agent.propose, pack_agent.decide, setup_agent.py, agent_activity.py, agent_activity.sentence]
 ---
 # 0029 — Agent trust: agents act freely, in the open
@@ -42,7 +42,7 @@ downloads never happen inside Assetarium; an agent with its own shell runs them 
 4. **Pause agents.** One switch refuses every agent write with "Paused by the owner"; reads and search keep
    working. Only the owner turns it back on.
 5. **Undo a session.** Activity groups changes by agent session (one connected client run) with **Undo all**.
-   Undo of a pack profile is refused once the pack changed after it, and says so ([decision 0024](0024-pack-profiles-and-variant-groups.md)).
+   Undo of a pack profile is refused once the pack changed after it, and says so ([decision 0035](0035-packs-and-variant-groups.md)).
    Processing time already spent cannot be undone; its results are simply kept.
 
 ## The risk the owner accepts
@@ -87,11 +87,3 @@ directly. Say so rather than claiming more.
 - Pause, Stop and Undo stay owner-only and stay reachable from the app (and the CLI on Linux).
 - Destructive actions stay interactive and owner-only; no flag or tool argument bypasses that.
 
-## What this replaces
-
-| Decision | Part superseded | Part that stays |
-| --- | --- | --- |
-| [0012](0012-collections-and-tags.md) | What agents may write | Collections, labels, tags themselves |
-| [0016](0016-agent-setup.md) | Session gate (already gone), the threat model, what agents apply | Setup tools, connection signal, status contents, degraded mode → Setup pillar |
-| [0023](0023-central-asset-library.md) | "Processing starts only from an owner action": now the owner **or a connected agent** | Queue rules |
-| [0024](0024-pack-profiles-and-variant-groups.md) | Agent tiers; rescanning proposals waiting for the owner | Profiles, signals, variant groups, Agent activity, Try your agent |

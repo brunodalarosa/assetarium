@@ -55,4 +55,4 @@ Start at `processing_queue.add` and `processing_queue.advance`.
 
 [Stage ledger and fingerprints](Stage%20ledger%20and%20fingerprints.md) ·
 [Sources](../Sources%20and%20Catalog/Sources.md) · [GPU lease](GPU%20lease.md) ·
-Decisions: [0022](../../Decisions/0022-parallel-rendering.md), [0023](../../Decisions/0023-central-asset-library.md).
+Decisions: [0034](../../Decisions/0034-rendering.md), [0032](../../Decisions/0032-library-store-and-queue.md).

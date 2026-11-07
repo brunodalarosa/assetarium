@@ -1,13 +1,13 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-supersedes: [0014, 0016, 0026]
+replaces: [0014, 0016, 0026]
 code: [setup_core.py, setup_core.first_run, setup_core.save_setup, setup_core.check_blender, setup_agent.py, search_check.record, source_operations.search_check, source_operations.ensure_search_check, sources.include_samples, engines.search_readiness, settings.uses, frontend/src/ui/SetupWizard.tsx]
 ---
 # 0031 — Setup: short checks that leave every core feature working
 
-> **Approved by the owner on November 7, 2026** (decision review: "short checks, no processing"). Merges [0014](0014-setup-wizard.md), [0016](0016-agent-setup.md) and
-> [0026](0026-setup-leaves-core-features-working.md), which become history. Parts already replaced live in
+> **Approved by the owner on November 7, 2026** (decision review: "short checks, no processing"). Merges decisions 0014 (setup wizard), 0016
+> (agent setup) and 0026 (setup leaves core features working). Related parts live in
 > [0028](0028-result-identity.md) (Blender in the key), [0029](0029-agent-trust.md) (what agents may do) and
 > [0030](0030-counted-exclusions.md) (formats that are off).
 
