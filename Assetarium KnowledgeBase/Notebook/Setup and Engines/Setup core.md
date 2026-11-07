@@ -11,7 +11,7 @@ Hub: [Setup and Engines](Setup%20and%20Engines.md). `setup_core.py` holds every 
 GUI-free functions: the environment report, Blender discovery and checks, the minimal
 `config.local.toml` writer, the first-run rule and `data/library/setup.json` (with who set each
 value). The desktop wizard, `local-assets setup` and the agent tools only wrap it. Decision:
-[0014](../../Decisions/0014-setup-wizard.md).
+[0031](../../Decisions/0031-setup.md).
 
 ## How it works
 

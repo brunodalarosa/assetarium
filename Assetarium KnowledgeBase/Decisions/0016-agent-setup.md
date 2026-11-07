@@ -1,9 +1,13 @@
 ---
 tags: [decision]
 decided: 2026-10-25
-superseded_in_part_by: "0029"
+status: superseded
+superseded_by: "0031"
 ---
 # 0016 — Agent-assisted setup through MCP: session gate, proposals, connection signal
+
+> **Superseded on November 7, 2026 by [0031 Setup](0031-setup.md)**, which merges what still held (some parts
+> had moved to 0028, 0029 or 0030 before). This record is frozen as history; read and cite 0031.
 
 > **Partly superseded on November 7, 2026 by [0029 Agent trust](0029-agent-trust.md):** the session gate, the threat model and what agents apply directly.
 > The rest of this record still binds.
