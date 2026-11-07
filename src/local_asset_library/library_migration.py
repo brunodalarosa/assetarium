@@ -267,7 +267,7 @@ def discover(config, search=()):
     return sorted(found, key=lambda e: e['path'].casefold())
 
 
-# ------------------------------------------------------------------ the one-time migration (ASSETRM-0002 phase 3)
+# ------------------------------------------------------------------ the one-time migration (library rework phase 3)
 
 IMAGE_SUFFIXES = {'.png', '.jpg', '.jpeg', '.webp', '.svg', '.tga', '.bmp', '.gif'}
 MODEL_SUFFIXES = {'.fbx', '.gltf', '.glb', '.obj', '.blend', '.stl', '.dae'}

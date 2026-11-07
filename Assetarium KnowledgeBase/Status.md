@@ -28,7 +28,7 @@ Short, current summary. Detailed dated history, test counts and evidence are in
   processing queue, search, 3D preview, collections and tags, setup wizard, agent-assisted setup,
   agent activity and grouped proposal review.
 - **Releases:** 0.2.0 (2026-11-05) is the first supported upgrade baseline; 0.1.0 installs start
-  fresh. Data written by a newer Assetarium is refused unchanged (ASSETRM-0004a); each release
+  fresh. Data written by a newer Assetarium is refused unchanged (safe upgrades, first part); each release
   freezes a fixture in `tests/fixtures/releases/`.
 - **Linux:** CLI + MCP only, no desktop app ([`linux.md`](../docs/linux.md), decision 0013).
 - **License:** AGPL-3.0-only with a CLA (decision 0017). The CLA text is revised and published
@@ -37,11 +37,11 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 
 ## Open work and pending reviews
 
-- **ASSETRM-0004b** (store coordinator, backups, recovery UI, skipped-release tests) gates the
+- **Safe upgrades, second part** (store coordinator, backups, recovery UI, skipped-release tests) gates the
   first release that changes a store format, likely 0.3.0 with audio. That release raises the
   format number and ships the migration. `scripts/migrate-library.py` (0.1.0 → store) is not a
   supported path.
-- **ASSETRM-0002 (decision 0023), provisional choices:** a pack without a preview image shows a
+- **Asset library rework (decision 0023), provisional choices:** a pack without a preview image shows a
   package glyph as its cover; "+N new" resets when you leave a library folder; the 10- and
   30-minute thresholds are constants (`processing_queue.QUICK`, `LONG`). Roadmap step 4 now covers
   material sets only.

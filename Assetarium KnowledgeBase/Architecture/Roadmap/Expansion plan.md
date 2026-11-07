@@ -161,7 +161,7 @@ Done when: a user can select a sheet, inspect known frames, play a defined seque
 
 ### Step 4 - Textures and material sets
 
-> **Draft change for owner review (ASSETRM-0002, decision 0023, D15):** individual texture records exist
+> **Draft change for owner review (asset library rework, decision 0023, D15):** individual texture records exist
 > now: images are classified as model textures, **material textures** (browsable, found by name) or 2D
 > images. This step covers only linked **material sets** on top of them ([prompt](Prompts/04-textures-and-materials.md)).
 

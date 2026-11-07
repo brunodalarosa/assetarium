@@ -7,7 +7,7 @@ parent: "[Expansion plan](../Expansion%20plan.md)"
 
 Up: [Expansion plan](../Expansion%20plan.md).
 
-**Rewritten after ASSETRM-0002 (decision 0023, D15; draft for the owner's review).** Texture recognition is done:
+**Rewritten after the asset library rework (decision 0023, D15; draft for the owner's review).** Texture recognition is done:
 every image is classified with evidence as a model texture (a dependency of its model), a **material
 texture** (its own browsable kind, found by name, not described) or a 2D image (`image_kinds.py`,
 `image_catalog.py`), with owner folder answers. This step now covers only **material sets** built on top

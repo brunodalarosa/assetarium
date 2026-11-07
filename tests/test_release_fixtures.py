@@ -1,4 +1,4 @@
-"""Libraries frozen by earlier releases still read: asset IDs, collections and tags (ASSETRM-0004).
+"""Libraries frozen by earlier releases still read: asset IDs, collections and tags (safe upgrades).
 
 ``scripts/build-release-fixture.py`` freezes one per release in tests/fixtures/releases/. A fresh build runs the
 same checks, so the script and the checks are proven before the first fixture is frozen.
