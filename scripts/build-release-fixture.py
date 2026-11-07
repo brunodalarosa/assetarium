@@ -1,4 +1,4 @@
-"""Freeze a small library written by this release, for later releases' upgrade tests (ASSETRM-0004).
+"""Freeze a small library written by this release, for later releases' upgrade tests (safe upgrades).
 
 Run once when a release is tagged: ``build-release-fixture.py --release 0.2.0``. A throwaway project in scratch/
 adds the built-in sample assets as a library folder, scans them (no Blender, no models), puts them in a

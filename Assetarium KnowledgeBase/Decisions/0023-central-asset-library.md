@@ -4,8 +4,7 @@ decided: 2026-10-30
 ---
 # 0023 — Central library store, identity by recognition, packs, implicit processing queue
 
-**Decision (owner, October 30, 2026; [ASSETRM-0002](../Notebook/Roadmap/Features/ASSETRM-0002.md),
-plan in [ASSETRM-0002 plan](../Notebook/Roadmap/Features/ASSETRM-0002%20plan.md)).**
+**Decision (owner, October 30, 2026; the implementation plan lives in the owner's private task notes).**
 
 - **Nothing is written into asset folders.** Generated results move from each source's
   `metadata-lal/` into one central library store (`[storage].library`, default under the

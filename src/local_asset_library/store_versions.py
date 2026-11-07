@@ -1,4 +1,4 @@
-"""Every store records its format version, and a newer one is refused before anything changes (ASSETRM-0004).
+"""Every store records its format version, and a newer one is refused before anything changes (safe upgrades).
 
 A release reads only the formats it knows. A store written by a newer release stays exactly as it is and the open
 fails with a visible reason, so going back to an older Assetarium never rewrites newer data. Check before any DDL:

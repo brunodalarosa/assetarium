@@ -1,4 +1,4 @@
-"""Proof that re-keying keeps every finished result and re-queues nothing (decision 0023, ASSETRM-0002 phase 1).
+"""Proof that re-keying keeps every finished result and re-queues nothing (decision 0023, library rework phase 1).
 
 Read only for asset folders and their generated folders: each folder's stage ledger is copied into scratch and
 re-keyed there, with a scratch library store. For every folder it compares the dry-run pending assets under the

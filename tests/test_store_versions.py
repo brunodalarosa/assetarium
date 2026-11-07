@@ -1,4 +1,4 @@
-"""A store written by a newer Assetarium is refused before anything changes (ASSETRM-0004)."""
+"""A store written by a newer Assetarium is refused before anything changes (safe upgrades)."""
 from contextlib import closing
 import sqlite3
 from types import SimpleNamespace
