@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-17
+area: Search
 ---
 # 0005 — Embedding worker returns vectors; the app pre-starts it
 

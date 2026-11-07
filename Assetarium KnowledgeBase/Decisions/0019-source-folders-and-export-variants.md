@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-26
+area: Sources and Catalog
 ---
 # 0019 — Excluded folders, owner-confirmed duplicate export folders, folder variants
 
@@ -9,7 +10,10 @@ upstream).** Packs often ship the same models several times: per format (`FBX/`,
 `OBJ/`) and per engine (`Unity FBX/`, `FBX(Unity)/`…), with names that differ by publisher.
 Assetarium recognizes a fixed list of format folders ([decision 0009](0009-general-capabilities.md)
 keeps that structural); anything else became separate, often failing assets. Three general
-capabilities, all saved per source in `metadata-lal/source.json`:
+capabilities, saved per library folder in the library store (`source.json`,
+[decision 0032](0032-library-store-and-queue.md)); inside a pack they are rules of its pack profile, versioned
+with it ([decision 0035](0035-packs-and-variant-groups.md)). "Folder variants" here (files of one asset per export
+folder) are unrelated to variant groups (separate assets whose names differ in a last token):
 
 - **Excluded folders** (`excluded_folders`). A pattern is a folder name with `*` (any level) or a
   path from the source root; case is ignored. A scan neither walks nor hashes an excluded folder;
@@ -27,8 +31,8 @@ capabilities, all saved per source in `metadata-lal/source.json`:
   they are. The card and CLI say how many names are shared and which stay as they are, and Exclude
   says how many ungrouped names it would also skip. Near-miss answers are bound to the shared names
   and to each folder's remaining and repeated names. Exact matches keep their suggestion identities,
-  so earlier answers stay valid. Nothing groups on a guess: the owner answers **Group**, **Keep separate** or
-  **Exclude** (adds the extra folders to the exclusions). An answer is bound to the anchor, the
+  so earlier answers stay valid. Nothing groups on a guess: the owner or a connected agent ([decision 0029](0029-agent-trust.md), shown in
+  Agent activity with Undo) answers **Group**, **Keep separate** or **Exclude** (adds the extra folders to the exclusions). An answer is bound to the anchor, the
   folders and a hash of the name list; when a folder's names change it stops applying (its files
   are separate again and the suggestion returns) and applies again if the names match again.
   Grouping keeps the identity of the reference folder's file (recognized group or standalone), so
@@ -52,10 +56,8 @@ and an `OBJ/` folder whose subfolder is spelled `Landscape` instead of `Landscap
 answer; an answer that no longer matches is inert. Exclusions never delete anything. A
 variant is chosen from an asset's own files only.
 
-> **Since [decision 0023](0023-central-asset-library.md) (October 30, 2026):** the per-source generated folder named
-> here is replaced by the central library store; the rules of this decision are unchanged and now apply to
-> library folders, packs and folders.
+## Changes
 
-> **Since [decision 0024](0024-pack-profiles-and-variant-groups.md) (October 31, 2026):** excluded folders and export
-> answers inside a pack are rules of its pack profile and versioned with it. "Folder variants" here (files of one
-> asset per export folder) are unrelated to variant groups (separate assets whose names differ in a last token).
+- 2026-10-30: the answers moved from each folder's generated folder into the central library store.
+- 2026-10-31: inside a pack, excluded folders and export answers became pack-profile rules (decision 0035).
+- 2026-11-07: a connected agent may answer too, like any pack-profile rule (decision 0029); it was owner-only.

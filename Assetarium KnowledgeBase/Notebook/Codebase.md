@@ -88,6 +88,11 @@ read it first. Up: [Notebook](Notebook.md).
   purpose: only an older install that still has one keeps that contract.
 - The package and CLI keep the old name (`local_asset_library`, `local-assets`, `Local Asset
   Library.vbs`); the app is branded Assetarium.
+- **Before renaming anything, check whether the file is hashed into a fingerprint.** Editing
+  `caption_backend.py`, `caption_batching.py`, `engine_server.py`, the Blender workers
+  (`blender_worker.py`, `render_math.py`, repair workers) or a `runtime/*/uv.lock` sends finished
+  descriptions or inspections back to pending (`incremental.py`, decision 0022). Search-index
+  metadata names are not fingerprint inputs: vector reuse keys on each vector's own fingerprint.
 - `scripts/historical/` scripts need the original owner's data and asset IDs from the original
   pilot (history); some call code removed since, so run them from an older checkout. They are not
   general tools.

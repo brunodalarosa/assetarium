@@ -17,9 +17,8 @@ discovery, and how model inference is plugged in. Up: [Notebook](../Notebook.md)
 
 ## Read first
 
-- Decisions: [0001](../../Decisions/0001-config-local-precedence.md),
-  [0014](../../Decisions/0014-setup-wizard.md), [0015](../../Decisions/0015-description-engines.md),
-  [0016](../../Decisions/0016-agent-setup.md), [0018](../../Decisions/0018-cpu-search-embedder.md).
+- Decisions: [0031](../../Decisions/0031-setup.md), [0033](../../Decisions/0033-descriptions-and-engines.md),
+  [0018](../../Decisions/0018-cpu-search-embedder.md).
 - User guide: [Description engines and search device](../../../docs/description-engines.md).
 
 ## Rules

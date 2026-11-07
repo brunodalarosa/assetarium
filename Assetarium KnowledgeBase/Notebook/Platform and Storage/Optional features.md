@@ -14,13 +14,13 @@ works fully without them. Core features are in [Core features](Core%20features.m
 
 | Optional feature | Off means | When turned on, setup must… |
 | --- | --- | --- |
-| Asset descriptions (Qwen3-VL or a local model server) | Names, filters, keyword and image search still work ([decision 0008](../../Decisions/0008-optional-descriptions-and-notifications.md)) | finish its setup: engine, batch size, runtime and weights listed with Copy, or a checked loopback server |
+| Asset descriptions (Qwen3-VL or a local model server) | Names, filters, keyword and image search still work ([decision 0033](../../Decisions/0033-descriptions-and-engines.md)) | finish its setup: engine, batch size, runtime and weights listed with Copy, or a checked loopback server |
 | Sample assets | The Library starts empty | add `samples/Sample assets` and scan it |
 
 ## Rules
 
 - **Turned on means working**: an optional feature the user enables during setup is held to the core rule
-  ([decision 0026](../../Decisions/0026-setup-leaves-core-features-working.md)): no hidden step afterwards.
+  ([decision 0031](../../Decisions/0031-setup.md)): no hidden step afterwards.
 - Turning an optional feature off never deletes its results.
 
 ## Related

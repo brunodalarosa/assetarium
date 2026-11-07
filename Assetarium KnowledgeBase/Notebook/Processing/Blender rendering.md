@@ -9,7 +9,7 @@ branch: feature/library-view
 
 Hub: [Processing](Processing.md). Inspection loads each model in Blender in the background with
 scripts disabled, measures it and renders preview views. Start at `incremental.run_inspection`,
-`render_pool.py` and `blender_batch_worker.py`. Decision: [0022](../../Decisions/0022-parallel-rendering.md).
+`render_pool.py` and `blender_batch_worker.py`. Decision: [0034](../../Decisions/0034-rendering.md).
 
 ## How it works
 

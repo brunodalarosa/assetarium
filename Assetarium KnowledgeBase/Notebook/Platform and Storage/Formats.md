@@ -9,7 +9,7 @@ branch: feature/library-view
 
 Hub: [Platform and Storage](Platform%20and%20Storage.md). "Formats Assetarium uses" (Settings → General, setup, CLI
 `settings set --formats / --image-formats`, agent `apply_setup`): a format that is off does not exist for Assetarium
-([decision 0026](../../Decisions/0026-setup-leaves-core-features-working.md)).
+([decision 0031](../../Decisions/0031-setup.md)).
 
 ## How it works
 
@@ -47,4 +47,4 @@ Hub: [Platform and Storage](Platform%20and%20Storage.md). "Formats Assetarium us
 ## Related
 
 [Core features](Core%20features.md) · [Folder views](../Sources%20and%20Catalog/Sources.md) ·
-Decisions: [0019](../../Decisions/0019-source-folders-and-export-variants.md), [0026](../../Decisions/0026-setup-leaves-core-features-working.md).
+Decisions: [0019](../../Decisions/0019-source-folders-and-export-variants.md), [0031](../../Decisions/0031-setup.md).

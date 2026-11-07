@@ -2,10 +2,10 @@
 
 Assetarium's MCP server exposes `search_assets` and `get_asset`, plus the collection tools
 `list_collections`, `get_collection`, `edit_collection` and `tag_assets`
-([decision 0012](../../Assetarium%20KnowledgeBase/Decisions/0012-collections-and-tags.md); see
+([decision 0036](../../Assetarium%20KnowledgeBase/Decisions/0036-collections-and-tags.md); see
 [Collections and tags](#collections-and-tags)) and the setup tools
 `get_setup_status`, `validate_blender`, `apply_setup`, `propose_setup` and
-`finish_setup` ([decision 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md); see
+`finish_setup` ([decision 0031](../../Assetarium%20KnowledgeBase/Decisions/0031-setup.md); see
 [Agent setup](#agent-setup)), over local STDIO. Each request is pinned to one published
 catalog/index generation. There is no HTTP listener, export tool, arbitrary-path input,
 copy operation or source-writing API. Restart older server connections after an update to
@@ -154,8 +154,8 @@ them; `register-mcp.py` refuses to overwrite an existing entry.
 ## Agent setup
 
 An agent can set Assetarium up for the computer it runs on
-([decisions 0016](../../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md) and
-[0024](../../Assetarium%20KnowledgeBase/Decisions/0024-pack-profiles-and-variant-groups.md)); the procedure is the user-invoked skill
+([decisions 0031](../../Assetarium%20KnowledgeBase/Decisions/0031-setup.md) and
+[0035](../../Assetarium%20KnowledgeBase/Decisions/0035-packs-and-variant-groups.md)); the procedure is the user-invoked skill
 [`skills/assetarium-setup`](../../skills/assetarium-setup/SKILL.md) and the server prompt
 `set_up_assetarium`. The tools wrap `setup_core`, the same rules as the app's wizard.
 

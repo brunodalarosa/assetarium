@@ -1,13 +1,14 @@
 ---
 tags: [decision]
 decided: 2026-10-25
+area: Search
 ---
 # 0018 — CPU search embedder; local-server descriptions without the description runtime
 
 **Decision (user of this checkout, October 25, 2026; for the owner's review before any merge
 upstream).** Search by description and by image can run EmbeddingGemma 2 on the CPU. A saved
 setting, `search_device` (`cuda` or `cpu`, default `cuda`), chooses the embedder; nothing ever
-falls back from one to the other. This extends [decision 0015](0015-description-engines.md),
+falls back from one to the other. This extends [decision 0033](0033-descriptions-and-engines.md),
 whose "only EmbeddingGemma (CUDA, BF16)" bullet it replaces.
 
 - **Same model, own identity.** `embedding_cpu.py` loads the pinned EmbeddingGemma revision with

@@ -1,13 +1,14 @@
 ---
 tags: [decision]
 decided: 2026-10-17
+area: Platform and Storage
 ---
 # 0006 — Retention of superseded generated data
 
 **Decision.**
 - **Publications:** keep the active generation plus the **two** newest older
-  `v_*` generations, centrally (`data/library/generations`) and in each source's
-  `metadata-lal/library/generations`. `work`/scan folders are never touched.
+  `v_*` generations, centrally (`data/library/generations`) and in each library folder's
+  generations in the library store ([decision 0032](0032-library-store-and-queue.md)). `work`/scan folders are never touched.
   Combined-publication shortcuts that point at a retired generation are removed,
   so that combination is rebuilt on demand instead of failing as incomplete.
   Runs after every combined publication (`sources.aggregate`); a retention fault
@@ -33,6 +34,6 @@ verification folders about 3.4 GB, with no policy that stopped the growth.
 exact locations. Do not widen retention (fewer generations, other evidence
 folders) without the owner. Keep receipts.
 
-> **Since [decision 0023](0023-central-asset-library.md) (October 30, 2026):** the per-source generated folder named
-> here is replaced by the central library store; the rules of this decision are unchanged and now apply to
-> library folders, packs and folders.
+## Changes
+
+- 2026-10-30: each folder's generations moved from its own generated folder into the central library store; the rules are unchanged.

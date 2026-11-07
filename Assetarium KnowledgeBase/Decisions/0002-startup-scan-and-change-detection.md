@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-17
+area: Sources and Catalog
 ---
 # 0002 — Startup scan, change detection, no manual Scan/Status buttons
 

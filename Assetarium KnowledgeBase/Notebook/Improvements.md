@@ -51,6 +51,10 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
   uses the original pilot asset IDs, so a fresh install can't record it the historical way (see
   [Inference ports](../Architecture/Setup%20and%20Engines/Inference%20ports.md#known-debt-and-direction)). Seen: 2026-10-26
 
+- **Three GUI verify scripts fail on `develop`**: `verify-gui` and `verify-library-retrieval` expect an
+  MCP tool list that predates the pack tools, and `verify-library-gui --synthetic` fails its arrow-key
+  card focus check. Tracked in the owner's task notes. Seen: 2026-11-07
+
 ## Codebase-wide
 
 - **Error and warning text can't be copied easily**: users need to paste fault reasons into bug

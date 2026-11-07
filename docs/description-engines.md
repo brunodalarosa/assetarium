@@ -1,6 +1,6 @@
 # Description engines and search device
 
-[Decision 0015](../Assetarium%20KnowledgeBase/Decisions/0015-description-engines.md). Descriptions come from the built-in
+[Decision 0033](../Assetarium%20KnowledgeBase/Decisions/0033-descriptions-and-engines.md). Descriptions come from the built-in
 engine (Qwen3-VL-2B-Instruct) or, experimentally, from a vision model already served on this computer.
 Search vectors are made on an NVIDIA GPU or on the CPU. How engines are wired internally (ports, adapters
 and the one composition root) is in the knowledge base:

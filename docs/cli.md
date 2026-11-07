@@ -165,11 +165,11 @@ rendering cancel                        # cancel a running speed test; the previ
 
 Limits only lower the number of renders at a time or change their memory allowance; rendering
 never goes past the fastest tested number or the memory free now
-([decision 0022](../Assetarium%20KnowledgeBase/Decisions/0022-parallel-rendering.md)).
+([decision 0034](../Assetarium%20KnowledgeBase/Decisions/0034-rendering.md)).
 
 ## Setup
 
-The desktop app's setup wizard, in a terminal ([decision 0014](../Assetarium%20KnowledgeBase/Decisions/0014-setup-wizard.md));
+The desktop app's setup wizard, in a terminal ([decision 0031](../Assetarium%20KnowledgeBase/Decisions/0031-setup.md));
 the same backend rules decide everything.
 
 ```text
@@ -193,7 +193,7 @@ copy that no longer exists (after moving or deleting a checkout: the agent then 
 with 1 when an entry needs fixing; `setup agent` prints the fix. `doctor` includes the same check.
 
 `setup agent` is the terminal version of the app's **Set up with my agent**
-([decisions 0016, 0024](../Assetarium%20KnowledgeBase/Decisions/0016-agent-setup.md)): it prints the client
+([decisions 0031](../Assetarium%20KnowledgeBase/Decisions/0031-setup.md) and [0029](../Assetarium%20KnowledgeBase/Decisions/0029-agent-trust.md)): it prints the client
 configuration and the prompt to give your agent; a connected agent can apply setup values at any time
 (each one labeled and noticed). Deciding its Blender proposal (`setup agent proposals`) needs an
 interactive terminal and has no flag, so an agent running commands cannot approve itself.

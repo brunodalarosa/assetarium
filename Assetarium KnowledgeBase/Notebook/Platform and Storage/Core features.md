@@ -8,7 +8,7 @@ branch: feature/library-view
 # Core features
 
 Hub: [Platform and Storage](Platform%20and%20Storage.md). What must work right after setup, with nothing left for the
-user to run ([decision 0026](../../Decisions/0026-setup-leaves-core-features-working.md)). Optional features are in
+user to run ([decision 0031](../../Decisions/0031-setup.md)). Optional features are in
 [Optional features](Optional%20features.md).
 
 ## How it works
@@ -34,5 +34,5 @@ user to run ([decision 0026](../../Decisions/0026-setup-leaves-core-features-wor
 ## Related
 
 [Optional features](Optional%20features.md) · [Formats](Formats.md) · [Runtimes](Runtimes.md) ·
-Decisions: [0014](../../Decisions/0014-setup-wizard.md), [0016](../../Decisions/0016-agent-setup.md),
-[0026](../../Decisions/0026-setup-leaves-core-features-working.md).
+Decisions: [0031](../../Decisions/0031-setup.md), [0029](../../Decisions/0029-agent-trust.md),
+[0030](../../Decisions/0030-counted-exclusions.md).

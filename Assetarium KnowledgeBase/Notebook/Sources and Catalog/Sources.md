@@ -11,7 +11,7 @@ Hub: [Sources and Catalog](Sources%20and%20Catalog.md). A library folder (in cod
 one watched root. Start reading at `sources.py` (folders, scans, the combined catalog),
 `library_store.py` (folders, recognized assets and their history) and `source_operations.py`
 (durable, cancellable operations the [processing queue](../Processing/Processing%20queue.md) starts). User guide: [Asset sources](../../../docs/asset-sources.md).
-Binding: [decision 0023](../../Decisions/0023-central-asset-library.md).
+Binding: [decision 0032](../../Decisions/0032-library-store-and-queue.md).
 
 ## How it works
 

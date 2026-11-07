@@ -11,7 +11,7 @@ Hub: [Setup and Engines](Setup%20and%20Engines.md). `setup_core.py` holds every 
 GUI-free functions: the environment report, Blender discovery and checks, the minimal
 `config.local.toml` writer, the first-run rule and `data/library/setup.json` (with who set each
 value). The desktop wizard, `local-assets setup` and the agent tools only wrap it. Decision:
-[0014](../../Decisions/0014-setup-wizard.md).
+[0031](../../Decisions/0031-setup.md).
 
 ## How it works
 
@@ -25,10 +25,13 @@ value). The desktop wizard, `local-assets setup` and the agent tools only wrap i
 - **Weights** are `verified` (receipt matches), `present` (manifest sizes match, no receipt: verify locally,
   never download), `changed` or `absent` (`engines.weights_ready`); `engines.weights_command` picks the command.
 - Blender lives in `config.local.toml` (`[tools].blender`); `config.local.toml` overrides
-  `config.example.toml` (decision 0001). The tracked example stays neutral.
+  `config.example.toml`. The tracked example stays neutral.
 
 ## Rules
 
+- **Every entry point loads configuration through `config.load_project_config`** (or
+  `project_config_path`): ignored `config.local.toml` when it exists, otherwise `config.example.toml`. Never
+  hard-code the example path (it once made every local override silently ignored; retired decision 0001).
 - **Add setup logic to `setup_core`, not to a surface**, so app, CLI and agent stay identical.
 - **Changing the saved Blender re-renders finished 3D previews** (its path and mtime are
   inspection fingerprint inputs), so the surfaces ask for confirmation first.

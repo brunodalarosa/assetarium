@@ -8,7 +8,7 @@ branch: feature/try-your-agent
 # Agent practice
 
 Hub: [MCP](MCP.md). **Try your agent** replaces the removed local-model benchmark. Binding:
-[decision 0024](../../Decisions/0024-pack-profiles-and-variant-groups.md).
+[decision 0035](../../Decisions/0035-packs-and-variant-groups.md).
 
 ## How it works
 
