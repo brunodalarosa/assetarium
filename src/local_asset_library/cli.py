@@ -13,8 +13,8 @@ from contextlib import nullcontext
 import numpy as np
 
 from .config import ConfigError, load_config, project_config_path, runtime_command
-from .catalog import compact_search_result, detail, pilot, query, scan, verify_source
-from .inspection import blender_candidates, inspect_pilot, review_sheet
+from .catalog import compact_search_result, detail, query, scan, verify_source
+from .inspection import blender_candidates
 from .library_policy import library_mode
 
 
@@ -27,18 +27,14 @@ def main() -> int:
         epilog="Owner commands: sources, settings, process --asset-source KEY, describe, cancel, failures, "
                "collections (for example: local-assets sources -h).")
     parser.add_argument("--config", type=Path, default=project_config_path(root))
-    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "pilot", "verify-source", "inspect", "review-sheet", "embed-index", "detail", "process", "refresh", "status"])
+    parser.add_argument("command", choices=["check-config", "doctor", "scan", "search", "get", "verify-source", "embed-index", "detail", "process", "refresh", "status"])
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--stage', choices=['inspection', 'caption', 'embeddings'], default='inspection')
     parser.add_argument('--asset-source', help='Registered source key for source-specific maintenance')
     parser.add_argument("value", nargs="?")
     parser.add_argument("--limit", type=int, default=5)
-    parser.add_argument("--selection", type=Path, default=root / "docs/pilot-selection.json")
-    parser.add_argument("--phase", choices=["representatives", "pilot"], default="representatives")
     parser.add_argument("--resolution", type=int, default=640)
-    parser.add_argument("--timeout", type=int, default=180)
-    parser.add_argument("--retry-faults", action="store_true", help="Explicitly retry unchanged faulty inspection results")
-    parser.add_argument("--mode", choices=["keyword", "description", "image", "keyword_description", "combined", "reference"], help="Pilot retrieval channel; omit to preserve full-catalog keyword baseline")
+    parser.add_argument("--mode", choices=["keyword", "description", "image", "keyword_description", "combined", "reference"], help="Search channel; omit for the plain keyword search over the whole catalog")
     parser.add_argument("--reference", help="Reference image under data/, scratch/, or source/")
     parser.add_argument("--pack")
     parser.add_argument("--format", dest="source_format")
@@ -118,12 +114,12 @@ def main() -> int:
             print(json.dumps({k: v for k, v in result.items() if k != 'outcomes'}, ensure_ascii=False))
             return 0
         if args.command in {"embed-index", "detail"} or (args.command == "search" and args.mode):
-            from .retrieval import SearchEngine, index_pilot, resolved_detail
+            from .retrieval import SearchEngine, build_search_index, resolved_detail
             if args.command == "detail":
                 result = resolved_detail(config, args.value or "", args.source_format)
             elif args.command == "embed-index":
                 from .engines import embedder
-                report = index_pilot(config, embedder(config))
+                report = build_search_index(config, embedder(config))
                 result = {k: v for k, v in report.items() if k != "outcomes"}
             else:
                 backend = None
@@ -157,21 +153,12 @@ def main() -> int:
             print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
             return 0
         if args.command == "search" and (args.reference or args.pack or args.source_format or args.max_triangles is not None or args.rigged or args.min_similarity is not None or args.rankings_output):
-            raise ConfigError("Pilot options require an explicit --mode")
-        if args.command == "review-sheet":
-            print(json.dumps(review_sheet(config, args.phase)))
-            return 0
-        if args.command == "inspect":
-            result = inspect_pilot(config, args.phase, args.resolution, args.timeout, args.retry_faults)
-            print(json.dumps(result, ensure_ascii=False, separators=(",", ":")))
-            return 0 if not result["failed"] else 1
-        if args.command in {"scan", "search", "get", "pilot", "verify-source"}:
+            raise ConfigError("Search filters and options require an explicit --mode")
+        if args.command in {"scan", "search", "get", "verify-source"}:
             if args.command == "scan":
                 result = scan(config)
             elif args.command == "verify-source":
                 result = verify_source(config)
-            elif args.command == "pilot":
-                result = pilot(config, args.selection)
             elif args.command == "get":
                 result = detail(config, args.value or "")
             else:

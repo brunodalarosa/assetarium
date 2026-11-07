@@ -8,7 +8,7 @@ from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
 from .library_cache import file_digest
 from .mcp_assets import AssetService, FORMATS, IMAGE_FACTS, MODES, VIEWS, error_payload, validate
-from .retrieval import current_overlay, matches, observations, pilot_records, scope, source_check
+from .retrieval import current_overlay, library_records, matches, observations, scope, source_check
 from .publication import pinned, generation,read_json
 
 
@@ -80,17 +80,13 @@ class DesktopService(AssetService):
     @pinned
     def context(self):
         version = self.synchronize()
-        records = pilot_records(self.config)
+        records = library_records(self.config)
         with closing(read_database(self.config)) as db:
             total = db.execute('SELECT COUNT(*) FROM assets').fetchone()[0]
         hashes = {}
-        from .membership import membership
-        scope=membership(self.config)
-        membership_path='library/membership.json' if scope.get('scope')=='library' else 'pilot/selection-manifest.json'
         for name, relative in (('catalog', 'catalog.sqlite'), ('index', 'embeddings/index.sqlite'),
-                               ('membership', membership_path)):
+                               ('membership', 'library/membership.json')):
             hashes[name] = file_digest(self.config.output_path('data', relative))
-        hashes['pilot']=hashes['membership']  # Historical UI key; current membership digest is authoritative.
         from .incremental import coverage
         import json
         from .incremental import working
@@ -103,7 +99,7 @@ class DesktopService(AssetService):
                             'reason':'Worker stopped; use Process pending to resume completed checkpoints.'}
         pending_coverage = (coverage(working(self.config)) if not self.config.sources_registry and
                             working(self.config).output_path('data','catalog.sqlite').exists() else None)
-        return {'pilot_count': len(records), 'inventory_count': total, 'generation': version,
+        return {'asset_count': len(records), 'inventory_count': total, 'generation': version,
                 'visible_asset_ids': [r['asset_id'] for r in records],
                 'managed_sources': bool(self.config.sources_registry), 'sources_revision': self.source_revision,
                 'coverage': coverage(self.config),
@@ -120,7 +116,7 @@ class DesktopService(AssetService):
         filters = {} if filters is None else filters
         # Same validation and measured-filter implementation as search; never an empty semantic query.
         validate('search_assets', {'query': 'browse', 'mode': 'keyword', 'filters': filters})
-        records = pilot_records(self.config)
+        records = library_records(self.config)
         items = []
         allowed = scope(self.config, filters)
         from .settings import used_formats
@@ -153,7 +149,7 @@ class DesktopService(AssetService):
                 'source_faulty': bool(faults), **caption_summary(self.config, record),
                 'caption_owner_review': owner_review})
             items[-1]['processing']=record['processing']
-        return {'status': 'browse', 'pilot_count': len(records), 'shown_count': len(items), 'items': items,
+        return {'status': 'browse', 'asset_count': len(records), 'shown_count': len(items), 'items': items,
                 'total_count': len(matching), 'offset': offset, 'page_size': page_size, 'generation': version,
                 'faults': list(self.item_faults.values()), 'model_loaded': False}
 

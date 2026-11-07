@@ -939,7 +939,7 @@ def scan_source(config, source, progress=None):
 def aggregate(config):
     """Publish a derived combined catalog; source snapshots remain authoritative."""
     from .catalog import encoded, digest
-    from .retrieval import index_database
+    from .retrieval import index_database, INDEX_IDS_KEY, current_meta
     from .publication import generation
     records, inventories, jobs, vectors, meta = [], [], [], [], {}
     signature = []
@@ -990,13 +990,14 @@ def aggregate(config):
                 meta = {k: json.loads(v) for k,v in db.execute('SELECT key,value FROM meta')}
         elif contract_path.exists():
             meta = {k: json.loads(v) for k,v in read_json(contract_path).items()}
+    meta = current_meta(meta)
     if meta.get('contract'):
-        atomic_json(contract_path, {k: encoded(v) for k,v in meta.items() if k != 'pilot_ids'})
+        atomic_json(contract_path, {k: encoded(v) for k,v in meta.items() if k != INDEX_IDS_KEY})
     target = replace(config, catalog_generation="v_" + uuid.uuid4().hex)
     write_catalog(target, inventories, records)
     write_membership(target, records)
     with closing(index_database(target)) as db, db:
-        meta["pilot_ids"] = sorted(r["asset_id"] for r in records)
+        meta[INDEX_IDS_KEY] = sorted(r["asset_id"] for r in records)
         db.executemany("INSERT INTO meta VALUES (?,?)", [(k, encoded(v)) for k, v in meta.items()])
         db.executemany("INSERT INTO jobs VALUES (?,?,?,?,?,?)", jobs)
         db.executemany("INSERT INTO vectors VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", vectors)

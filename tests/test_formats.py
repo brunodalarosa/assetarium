@@ -49,7 +49,7 @@ def test_search_and_collections_follow_the_formats(managed, monkeypatch):
     from local_asset_library import asset_collections, retrieval
     config, backend, one, _ = managed
     ready_source(config, backend, one)
-    record = next(r for r in retrieval.pilot_records(config))
+    record = next(r for r in retrieval.library_records(config))
     assert retrieval.matches(record, {}, None, settings.used_formats(config))
     assert not retrieval.matches(record, {}, None, ['fbx'])  # Its OBJ file's format is off.
     assert retrieval.matches(record, {}, None, None)

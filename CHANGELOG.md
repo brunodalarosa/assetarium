@@ -14,6 +14,14 @@ All notable changes to Assetarium are listed here. The project follows
 - **Quiet launch check**: at launch the top bar shows "Checking for changes" instead of scan phases; a check that
   finds changes says so in one note ("Library updated · 3 new"), and the Library no longer reloads the shown
   folder while a scan only reports progress.
+- **Search by reference** is now called "Similar to an asset" and picks any library asset as the reference; the
+  pilot wording is gone from search, filters and CLI help.
+
+### Removed
+
+- **Pilot-only CLI commands**: `pilot`, `inspect --phase` and `review-sheet`, with their `--selection`, `--phase`,
+  `--timeout` and `--retry-faults` options. They only worked on the original 40-asset pilot data. Libraries no
+  longer fall back to `data/pilot/selection-manifest.json` when `data/library/membership.json` is missing.
 
 ## [0.2.0] — 2026-11-05
 

@@ -18,8 +18,8 @@ library. How agents reach it is the [MCP](../MCP/MCP.md) area. Up: [Notebook](..
 
 ## Read first
 
-- [Embedding contract](../../Architecture/Search/Embedding%20contract.md) and the frozen pilot
-  evaluation in [`docs/evaluation/`](../../../docs/evaluation/README.md).
+- [Embedding contract](../../Architecture/Search/Embedding%20contract.md) and the frozen
+  evaluation (history: from the original pilot) in [`docs/evaluation/`](../../../docs/evaluation/README.md).
 - Decisions: [0003](../../Decisions/0003-per-publication-read-caches.md),
   [0004](../../Decisions/0004-stat-identity-hash-reuse.md),
   [0005](../../Decisions/0005-embedding-worker-and-prestart.md),

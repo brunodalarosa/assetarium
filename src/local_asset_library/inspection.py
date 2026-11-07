@@ -1,25 +1,24 @@
-"""Bounded pilot jobs, catalog publication, and source immutability evidence."""
+"""Blender discovery and isolation, inspection result checks, catalog publication and source evidence."""
 
 from contextlib import closing
 from datetime import datetime, timezone
-import json
-import hashlib
 import os
 from pathlib import Path
-import re
 import shutil
 import sqlite3
 import subprocess
 import time
 
-from .catalog import detail, digest, encoded, file_hash, read_database, save_json
+from .catalog import detail, encoded, file_hash, save_json
 from .config import ConfigError
 
 VERSION = "inspect-render-v1"
-REPRESENTATIVES = {("kenney_car-kit", "sedan"): "glb",
-                   ("kenney_car-kit", "sedan-sports"): "obj",
-                   ("kenney_food-kit", "apple"): "fbx",
-                   ("quaternius_ultimate-nature-pack", "BirchTree_1"): "blend"}
+# Pinned importer checks: these assets always inspect this format. Changing the set would
+# re-inspect them with another source, so it stays as recorded.
+PINNED_SOURCES = {("kenney_car-kit", "sedan"): "glb",
+                  ("kenney_car-kit", "sedan-sports"): "obj",
+                  ("kenney_food-kit", "apple"): "fbx",
+                  ("quaternius_ultimate-nature-pack", "BirchTree_1"): "blend"}
 SUPPORTED = {"glb", "gltf", "obj", "fbx", "blend", "stl"}
 BLENDER_FLAGS = ("--background", "--factory-startup", "--disable-autoexec", "--offline-mode")
 # The worker scripts call os.path.isreserved, which only Windows provides. Their hashes
@@ -106,24 +105,6 @@ def discover_blender(config):
     raise ConfigError("No usable installed Blender; see discovery attempts before considering a project-local portable release: " + encoded(attempts))
 
 
-def load_pilot(config):
-    path = config.output_path("data", "pilot/selection-manifest.json")
-    manifest = json.loads(path.read_text(encoding="utf-8"))
-    if len(manifest.get("assets", [])) != 40 or len({a["asset_id"] for a in manifest["assets"]}) != 40:
-        raise ConfigError("Expected the existing 40-distinct-asset pilot")
-    with closing(read_database(config)) as db:
-        fingerprint = json.loads(db.execute("SELECT value FROM metadata WHERE key='source_fingerprint'").fetchone()[0])
-    if manifest["source_fingerprint"] != fingerprint:
-        raise ConfigError("Pilot and catalog source fingerprints differ")
-    for asset in manifest["assets"]:
-        if not re.fullmatch(r"asset_[0-9a-f]{32}", asset["asset_id"]):
-            raise ConfigError("Invalid pilot asset ID")
-        record = detail(config, asset["asset_id"])
-        if (asset["pack"], asset["identity"]) != (record["pack_id"], record["source_relative_identity"]):
-            raise ConfigError("Pilot identity does not match catalog")
-    return manifest
-
-
 def source_evidence(config, assets, additional=()):
     paths = set(additional)
     expected = {}
@@ -151,11 +132,11 @@ def choose_source(asset, formats=None):
     if formats is not None:
         from .settings import format_group
         asset = dict(asset, files=[f for f in asset['files'] if format_group(f['format']) in formats])
-    requested = REPRESENTATIVES.get((asset["pack"], asset["name"]))
+    requested = PINNED_SOURCES.get((asset["pack"], asset["name"]))
     if formats is not None and requested and format_group(requested) not in formats:
         requested = None
     if requested:
-        reason = "Explicit pilot representative to validate the " + requested + " importer; only this file's facts are measured"
+        reason = "Pinned importer check for " + requested + "; only this file's facts are measured"
     else:
         ranking = {"glb": 0, "gltf": 1, "obj": 2, "fbx": 3, "blend": 4, "stl": 5}
         available = [f for f in asset["files"] if f["availability"] == "available"]
@@ -165,7 +146,7 @@ def choose_source(asset, formats=None):
         reason = "Prefer portable GLB with embedded materials; otherwise OBJ with explicit MTL references; alternate features remain unknown"
     source = next((f for f in asset["files"] if f["format"] == requested and f["availability"] == "available"), None)
     if source is None:
-        raise ConfigError("Required inspection format missing from pilot: " + requested)
+        raise ConfigError("Required inspection format is missing: " + requested)
     return source, reason
 
 
@@ -260,125 +241,3 @@ def reuse_result(record, fingerprint, retry_faults=False):
     run = record.get("inspection_run", {})
     faulty = run.get("status") in {"failed", "unsupported"} or bool(run.get("source_faults"))
     return run.get("fingerprint") == fingerprint and not (faulty and retry_faults)
-
-
-def inspect_pilot(config, phase="representatives", resolution=640, timeout=180, retry_faults=False):
-    if phase not in {"representatives", "pilot"} or resolution not in {320, 640, 960} or not 10 <= timeout <= 600:
-        raise ConfigError("Invalid phase/resolution/timeout")
-    manifest = load_pilot(config)
-    if phase == "pilot":
-        review_path = config.output_path("data", "inspection/review/representatives-review.json")
-        if not review_path.is_file():
-            raise ConfigError("Review the four representative cases with image tools and save technical review evidence before the full pilot")
-        review = json.loads(review_path.read_text(encoding="utf-8"))
-        reviewed = {r["asset_id"]: r for r in review.get("assets", [])}
-        if review.get("status") != "technical_pass":
-            raise ConfigError("Representative technical image review has not passed")
-        for asset in manifest["assets"]:
-            if (asset["pack"], asset["name"]) in REPRESENTATIVES:
-                current = detail(config, asset["asset_id"])
-                entry = reviewed.get(asset["asset_id"], {})
-                if entry.get("inspection_fingerprint") != current.get("inspection_run", {}).get("fingerprint"):
-                    raise ConfigError("Representative review does not match current rendered inputs")
-    selected = [a for a in manifest["assets"] if phase == "pilot" or (a["pack"], a["name"]) in REPRESENTATIVES]
-    blender, runtime = discover_blender(config)
-    env = environment(config)
-    worker = Path(__file__).with_name("blender_worker.py")
-    mathematics = Path(__file__).with_name("render_math.py")
-    script_hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (worker, mathematics)}
-    before = source_evidence(config, manifest["assets"])
-    if not all(row["matches_catalog"] for row in before):
-        raise ConfigError("Pilot source/dependency files differ from catalog; inspection not started")
-    save_json(config.output_path("data", f"evidence/step3-{phase}-before.json"), before)
-    outcomes = []
-    started = time.perf_counter()
-    for index, asset in enumerate(selected, 1):
-        print(f"Inspecting {index}/{len(selected)}: {asset['pack']} / {asset['name']}", flush=True)
-        source, reason = choose_source(asset)
-        fingerprint = digest({"version": VERSION, "source": source, "dependencies": asset["dependencies"],
-                              "blender": runtime["version_output"], "scripts": script_hashes, "resolution": resolution})
-        if phase == "pilot" and (asset["pack"], asset["name"]) in REPRESENTATIVES:
-            if reviewed[asset["asset_id"]]["inspection_fingerprint"] != fingerprint:
-                raise ConfigError("Renderer settings/code changed since representative image review; rerun and review representatives first")
-        relative = f"inspection/{asset['asset_id']}/{source['format']}/{fingerprint[:16]}"
-        output = config.output_path("data", relative)
-        job = {"schema_version": 1, "project_root": str(config.project_root), "source_root": str(config.source_root),
-               "asset_id": asset["asset_id"], "source_path": source["path"], "format": source["format"],
-               "source_sha256": source["sha256"], "output": str(output), "resolution": resolution}
-        task = config.output_path("data", relative + "/job.json")
-        result_path = config.output_path("data", relative + "/result.json")
-        record = detail(config, asset["asset_id"])
-        cached = False
-        try:
-            if reuse_result(record, fingerprint, retry_faults) and result_path.is_file():
-                result = json.loads(result_path.read_text(encoding="utf-8"))
-                validate_result(config, job, result)
-                cached = result["status"] in {"complete", "failed", "unsupported"}
-            if not cached:
-                save_json(task, job)
-                command = blender_command(blender, "--python-exit-code", "5", "--python", str(worker), "--", str(task))
-                process = run_process(command, config.project_root, env, timeout)
-                log = config.output_path("data", relative + "/blender.log")
-                log.write_text(process["output"], encoding="utf-8")
-                if process["timed_out"]:
-                    raise TimeoutError(f"Blender job exceeded {timeout} seconds")
-                if process["returncode"] != 0:
-                    raise RuntimeError(f"Blender exited {process['returncode']}; see {log}")
-                if not result_path.is_file():
-                    raise RuntimeError("Blender produced no result record")
-                result = json.loads(result_path.read_text(encoding="utf-8"))
-                validate_result(config, job, result)
-        except (OSError, ValueError, RuntimeError, ConfigError) as exc:
-            result = {"status": "failed", "asset_id": asset["asset_id"], "source_path": source["path"],
-                      "format": source["format"], "technical": None, "previews": [], "errors": [str(exc)]}
-            save_json(result_path, result)
-        publish(config, asset, source, reason, result, fingerprint, relative)
-        outcomes.append({"asset_id": asset["asset_id"], "name": asset["name"], "pack": asset["pack"],
-                         "source_faults": detail(config, asset["asset_id"])["inspection_run"]["source_faults"],
-                         "format": source["format"], "status": result["status"], "cached": cached,
-                         "views": len(result.get("previews", [])), "errors": result.get("errors", []),
-                         "warnings": result.get("warnings", []),
-                         "elapsed_seconds": result.get("elapsed_seconds"), "result_path": "data/" + relative + "/result.json"})
-    extra = {image["path"] for asset in selected for image in (detail(config, asset["asset_id"]).get("technical") or {}).get("textures", []) if image.get("status") == "available"}
-    after = source_evidence(config, manifest["assets"], extra)
-    before_map = {r["path"]: r for r in before}
-    mutations = [r["path"] for r in after if r["path"] in before_map and r != before_map[r["path"]]]
-    save_json(config.output_path("data", f"evidence/step3-{phase}-after.json"), after)
-    report = {"version": VERSION, "phase": phase, "runtime": runtime["executable"],
-              "elapsed_seconds": round(time.perf_counter() - started, 3), "resolution": resolution,
-              "outcomes": outcomes, "complete": sum(o["status"] == "complete" for o in outcomes),
-              "failed": sum(o["status"] != "complete" for o in outcomes), "source_mutations": mutations,
-              "faulty": sum(o["status"] != "complete" or bool(o["source_faults"]) for o in outcomes),
-              "source_files_verified": len(after), "visual_review": "pending", "caption_generation": "not_started"}
-    save_json(config.output_path("data", f"inspection/{phase}-report.json"), report)
-    with closing(sqlite3.connect(config.output_path("data", "catalog.sqlite"))) as db, db:
-        for key, value in {"inspection_version": VERSION, "inspection_phase": phase,
-                           "logical_fingerprint_scope": "step2 inventory snapshot; later inspection fields have per-stage fingerprints"}.items():
-            db.execute("INSERT OR REPLACE INTO metadata VALUES (?,?)", (key, encoded(value)))
-    if mutations:
-        raise ConfigError("Source mutation detected; see step 3 evidence")
-    if phase == "pilot":
-        save_json(config.output_path("data", "inspection/processed-manifest.json"), {
-            "selection_version": manifest["selection_version"], "source_fingerprint": manifest["source_fingerprint"],
-            "assets": [{"asset_id": asset["asset_id"], "primary_inspection_path": detail(config, asset["asset_id"])["primary_inspection_path"],
-                        "primary_inspection_reason": detail(config, asset["asset_id"])["primary_inspection_reason"],
-                        "result_path": outcome["result_path"], "status": outcome["status"],
-                        "source_faults": detail(config, asset["asset_id"])["inspection_run"]["source_faults"]}
-                       for asset, outcome in zip(selected, outcomes)]})
-    return report
-
-
-def review_sheet(config, phase):
-    if phase not in {"representatives", "pilot"}:
-        raise ConfigError("Invalid review phase")
-    blender, _ = discover_blender(config)
-    script = config.project_root / "scripts/blender_review_sheet.py"
-    process = run_process(blender_command(blender, "--python-exit-code", "5", "--python", str(script), "--", phase),
-                          config.project_root, environment(config), 60)
-    log = config.output_path("data", f"inspection/review/{phase}-sheet.log")
-    log.parent.mkdir(parents=True, exist_ok=True)
-    log.write_text(process["output"], encoding="utf-8")
-    if process["returncode"] != 0 or process["timed_out"]:
-        raise ConfigError("Review-sheet creation failed; see " + str(log))
-    return {"sheet": str(config.output_path("data", f"inspection/review/{phase}.png")),
-            "grid_map": str(config.output_path("data", f"inspection/review/{phase}-grid-map.json"))}

@@ -26,10 +26,10 @@ def capture(name):
     ui.capture(name)
 def verify():
     try:
-        from local_asset_library.retrieval import pilot_records
+        from local_asset_library.retrieval import library_records
         from local_asset_library.sources import importing_failures,registry,source_status
-        members,registered=len(pilot_records(config)),registry(config)['sources']
-        ui.wait_ready(90,f'lal.state.context.pilot_count==={members}&&lal.state.sources.length==={len(registered)}')
+        members,registered=len(library_records(config)),registry(config)['sources']
+        ui.wait_ready(90,f'lal.state.context.asset_count==={members}&&lal.state.sources.length==={len(registered)}')
         js("(async()=>{await lal.submitSearch();return true})()")
         wait(f"lal.state.library.items.length===Math.min(40,{members})")
         wait("document.querySelectorAll('#grid .thumb img').length>0")
@@ -38,7 +38,7 @@ def verify():
         assert operation_status(config)['status']=='complete'
         assert not bridge._gateway.model_requested
         attention="lal.state.sources.filter(s=>s.needs_processing||s.scan_fault).length"
-        report['library']=js("({assets:lal.state.context.pilot_count,sources:lal.state.sources.length,attention:"+attention+",cards:lal.state.library.items.length})")
+        report['library']=js("({assets:lal.state.context.asset_count,sources:lal.state.sources.length,attention:"+attention+",cards:lal.state.library.items.length})")
         expected=importing_failures(config)
         assert expected['assets']>0 and not expected['unavailable']
         statuses=[source_status(config,source) for source in registry(config)['sources']]

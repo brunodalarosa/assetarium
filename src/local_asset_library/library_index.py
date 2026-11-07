@@ -12,7 +12,7 @@ from .publication import atomic_json
 from .membership import records
 from .asset_structure import asset_type
 from .retrieval import (index_database, checked_vector, source_check, description_input, preview_file, image_input, normalize,
-                        recorded_contract, VERSION)
+                        recorded_contract, VERSION, INDEX_IDS_KEY, LEGACY_NAMES)
 
 
 def shared_input(config, representative, value):
@@ -177,8 +177,9 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
                     if identifier not in current_ids or (identifier in visited and job not in expected):
                         db.execute("DELETE FROM vectors WHERE job_id=?", (job,))
                         db.execute("DELETE FROM jobs WHERE job_id=?", (job,))
-                values = {"version": VERSION, "contract": contract, "contract_fingerprint": common, "pilot_ids": [r["asset_id"] for r in inventory], "input_policy": "effective-description-content-v1",'image_input_policy':'verified-view-content-v1'}
+                values = {"version": VERSION, "contract": contract, "contract_fingerprint": common, INDEX_IDS_KEY: [r["asset_id"] for r in inventory], "input_policy": "effective-description-content-v1",'image_input_policy':'verified-view-content-v1'}
                 db.executemany("INSERT OR REPLACE INTO meta VALUES (?,?)", [(k, encoded(v)) for k, v in values.items() if metadata.get(k) != v])
+                db.execute("DELETE FROM meta WHERE key=?", (LEGACY_NAMES["ids"],))
         report = {"stage": "embeddings", "pending": pending, "processed": processed, "restored": restored,
                   "deferred_descriptions": deferred, "dry_run": dry_run, "outcomes": outcomes, "elapsed_seconds": time.monotonic() - started, "vectors": db.execute("SELECT COUNT(*) FROM vectors").fetchone()[0]}
         if backend is not None and hasattr(backend,'resources'):

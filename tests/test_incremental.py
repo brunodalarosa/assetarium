@@ -390,9 +390,7 @@ def test_library_review_writer_preserves_results_owner_and_vectors(library,monke
         'findings':[{'severity':'review_note','evidence':'Exact facet count is uncertain.','reason':'Minor precision.'}]}}})
     monkeypatch.setattr(config_module,'load_config',lambda *_:config)
     monkeypatch.setattr(sys,'argv',['record_caption_review.py','library','--notes',str(notes)])
-    with pytest.raises(SystemExit) as stopped:
-        runpy.run_path(str(Path(__file__).resolve().parents[1]/'scripts/record_caption_review.py'),run_name='__main__')
-    assert stopped.value.code==0
+    runpy.run_path(str(Path(__file__).resolve().parents[1]/'scripts/record_caption_review.py'),run_name='__main__')
     from local_asset_library.caption_quality import caption_summary
     current=detail(work,record['asset_id'])
     assert caption_summary(work,current)['caption_status']=='review_note'

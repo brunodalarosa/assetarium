@@ -107,11 +107,11 @@ def test_no_findings_is_not_owner_approval(tmp_path):
 
 
 @pytest.mark.parametrize("severity", ["review_note", "warning"])
-def test_future_review_preserves_severity_without_pilot_classification(tmp_path, severity):
+def test_future_review_preserves_severity_without_recorded_classification(tmp_path, severity):
     config, item = Config(tmp_path, tmp_path / "source", None), record()
     supplied = {"findings": [{"severity": severity, "evidence": "Uncertain <script> detail", "reason": "Explicit reviewer rationale."}]}
     before = deepcopy(supplied)
-    # A future review for an existing asset must supersede its old pilot overlay.
+    # A future review for an existing asset must supersede its old classified overlay.
     write_classification(config, [item])
     item["caption_provenance"]["visual_faults"] = review_findings(supplied)
     quality = caption_quality(config, item)
@@ -148,38 +148,6 @@ def test_future_legacy_review_is_a_warning_and_processing_failure_stays_fault(tm
                                  {"findings": "invalid"}, {"faults": [None]}])
 def test_future_review_rejects_invalid_severity_or_silent_evidence_loss(note):
     with pytest.raises(ValueError): review_findings(note)
-
-
-def test_review_writer_publishes_nonfault_severity_and_retains_source_facts(indexed, monkeypatch, tmp_path):
-    import runpy
-    from pathlib import Path
-    from local_asset_library import config as config_module
-    from local_asset_library.catalog import detail
-    config, _, records = indexed
-    item = records[0]
-    identifier = item["asset_id"]
-    result = {"status": "complete", "description": item["description"], "suggested_uses": item["suggested_uses"],
-              "provenance": {"fingerprint": "synthetic-caption", "input_views": []}}
-    folder = config.output_path("data", "captions/pilot-v2")
-    folder.mkdir(parents=True)
-    (folder / (identifier + ".json")).write_text(json.dumps(result), encoding="utf-8")
-    config.output_path("data", "captions/pilot-v2-report.json").write_text(
-        json.dumps({"outcomes": [{"asset_id": identifier}]}), encoding="utf-8")
-    notes = tmp_path / "notes.json"
-    notes.write_text(json.dumps({"scope": "Synthetic review only", "assets": {identifier: {
-        "observations": "Synthetic object identity agrees", "findings": [{"severity": "review_note",
-        "evidence": "Exact count uncertain", "reason": "Minor detail"}]}}}), encoding="utf-8")
-    monkeypatch.setattr(config_module, "load_config", lambda *_: config)
-    monkeypatch.setattr("sys.argv", ["record_caption_review.py", "pilot-v2", "--notes", str(notes)])
-    script = Path(__file__).resolve().parents[1] / "scripts/record_caption_review.py"
-    runpy.run_path(str(script), run_name="__main__")
-    published = detail(config, identifier)
-    assert published["processing"]["caption"] == "complete"
-    assert published["description"] == item["description"] and published["technical"] == item["technical"]
-    assert published["files"] == item["files"]
-    assert published["caption_provenance"]["visual_faults"][0]["status"] == "review_note"
-    assert published["caption_provenance"]["visual_faults"][0]["owner_review"] == "pending"
-    assert caption_quality(config, published)["status"] == "review_note"
 
 
 def test_shared_browse_search_detail_flags_do_not_change_ranking_or_usability(indexed):

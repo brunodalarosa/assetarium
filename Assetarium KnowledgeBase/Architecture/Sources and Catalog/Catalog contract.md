@@ -342,14 +342,14 @@ The fingerprint includes worker/framing code hashes, source and known dependenci
 runtime version output and resolution. Successful caches require current source,
 dependency and rendered-image hashes. Errors/timeouts/unsupported imports remain
 separate outcomes; processing continues with the next asset. No alternative source
-is silently substituted after failure. Changed settings invalidate representative
-review before the full pilot can proceed.
+is silently substituted after failure. (History: during the 40-asset pilot, changed
+settings invalidated the representative review before the full run.)
 
 Rendered `previews` include origin, view label, SHA-256, renderer/settings,
 coordinate convention, alpha-mask foreground/boundary checks and a separate image
-review receipt. Technical review never implies owner artistic approval. The pilot
-review scope is the three-quarter overview plus automated checks for other views;
-all three required views of the four representatives are reviewed with image tools.
+review receipt. Technical review never implies owner artistic approval. (History: the 40-asset
+pilot reviewed the three-quarter overview plus automated checks for other views, and
+all three required views of four representative assets with image tools.)
 Existing supplied thumbnails retain their source association and provenance.
 Search returns `preview_root` so source and generated preview paths are unambiguous.
 

@@ -84,8 +84,8 @@ routinely discard a larger shortlist under a fixed compact cap. Typical compact
 records fit the requested count; unusually large metadata can still truncate. It removes
 lowest-ranked results deterministically to enforce the cap. The
 `ceil(characters/4)` estimate is heuristic, not client billing/model tokens.
-Semantic results remain weak/unvalidated even after approval of this bounded
-pilot; rank scores are not probabilities or an absence detector.
+Semantic results remain weak and unvalidated beyond the recorded benchmark
+(`docs/evaluation/`); rank scores are not probabilities or an absence detector.
 
 Caption summaries now expose `caption_status`: `clear`, `review_note`, `warning`
 or `fault`. `caption_faulty` is true only for an unusable caption; minor notes and

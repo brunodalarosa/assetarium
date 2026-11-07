@@ -5,7 +5,7 @@ from test_sources import managed, ready_source  # noqa: F401  (fixtures)
 from local_asset_library import library_cache, sources
 from local_asset_library.desktop import DesktopBridge
 from local_asset_library.membership import records
-from local_asset_library.retrieval import pilot_records
+from local_asset_library.retrieval import library_records
 
 
 def test_records_are_reused_slim_and_rebuilt_after_publication(managed):
@@ -13,8 +13,8 @@ def test_records_are_reused_slim_and_rebuilt_after_publication(managed):
     library_cache.clear()
     ready_source(config, backend, one)
     sources.aggregate(config)
-    first = pilot_records(config)
-    assert first is pilot_records(config)  # Unchanged publication: shared view, no reparse.
+    first = library_records(config)
+    assert first is library_records(config)  # Unchanged publication: shared view, no reparse.
     assert first and all('variants' not in r and 'license_evidence' not in r for r in first)
     assert {r['asset_id'] for r in first} == {r['asset_id'] for r in records(config)}
     full = {r['asset_id']: r for r in records(config)}
@@ -23,7 +23,7 @@ def test_records_are_reused_slim_and_rebuilt_after_publication(managed):
         assert record['files'] == full[record['asset_id']]['files']
     ready_source(config, backend, two)
     sources.aggregate(config)
-    second = pilot_records(config)
+    second = library_records(config)
     assert second is not first and len(second) > len(first)
 
 

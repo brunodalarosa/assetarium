@@ -11,8 +11,8 @@ code: [caption_quality.py, caption_review.py, scripts/record_caption_review.py]
 
 Up: [Architecture](../Architecture.md) · Where in code: [Descriptions](../../Notebook/Processing/Descriptions.md). Moved from `docs/caption-quality.md` on 2026-10-28. `AGENTS.md` and the `local-asset-library` skill point here.
 
-The current pilot uses a practical severity classification separate from its
-original AI caption review. A successful search or usable source does not require
+Assetarium uses a practical severity classification, separate from the original
+AI caption review. A successful search or usable source does not require
 every caption detail to be accurate. Caption findings never exclude an otherwise
 usable source or alter search ranking.
 
@@ -79,8 +79,8 @@ Record a caption review using `findings`, for example:
 ```
 
 `scripts/record_caption_review.py` preserves that explicit severity and rationale
-in caption provenance. Future usable captions do not need entries in the pilot's
-historical reclassification file. Newly recorded severity takes precedence over
+in caption provenance. Future usable captions do not need entries in the historical
+reclassification file (from the original 40-asset pilot). Newly recorded severity takes precedence over
 that older file; it belongs to the reviewed caption's provenance. Legacy `faults`
 strings are accepted as unclassified warnings, rather than automatically becoming
 `faulty`. Ambiguous severity stays a warning. Review-only findings cannot use a
@@ -106,9 +106,9 @@ under “Original caption review evidence.” Earlier static review pages and re
 retain their historical wording. No catalog, caption result, correction overlay,
 embedding/index, original asset, dependency pin, or model file is rewritten.
 
-Verification: `data/caption-classification/{before,after}.json` retains protected
+Historical verification (original 40-asset pilot): `data/caption-classification/{before,after}.json` retains protected
 input hashes and all 40 keyword-query rankings, plus classification parity across
-the real pilot. Focused synthetic tests cover stale/invalid classifications,
+those 40 assets. Focused synthetic tests cover stale/invalid classifications,
 failed/missing descriptions, source-fault preservation and shared search behavior.
 The actual Windows rendering/STDIO checks are retained separately under
 `data/gui/caption-classification/`.

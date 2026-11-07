@@ -15,7 +15,7 @@ def main():
     parser.add_argument("phase", choices=["representatives", "pilot"])
     parser.add_argument("--observations", required=True)
     args = parser.parse_args()
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     config = load_project_config(root)
     report_path = config.output_path("data", f"inspection/{args.phase}-report.json")
     report = json.loads(report_path.read_text(encoding="utf-8"))

@@ -10,13 +10,19 @@ Moved here from `scripts/` on October 25, 2026 without behavior changes (only th
 repository-root lookup, now `parents[2]`). Older documents and receipts cite them under
 their earlier `scripts/<name>` paths.
 
+The pilot-era cleanup of November 2026 moved seven more scripts here and removed the
+pilot-only code paths they and several others call (the CLI `pilot`, `inspect` and
+`review-sheet` commands, `inspection.inspect_pilot`/`load_pilot`, `captions.run_batch`,
+`retrieval.pilot_records`, now `library_records`). To rerun one of those scripts, check out a
+commit from before that cleanup.
+
 | Group | Scripts |
 | --- | --- |
 | One-time migrations and repairs | `migrate-sources.py`, `complete-source-report-copies.py`, `reduce-storage.py`, `retry-storage-links.py` (loads `reduce-storage.py`), `relocate-models.ps1`, `cleanup-gui-checks.py`, `cleanup-source-check-projections.py`, `finish-texture-repair-descriptions.py`, `kaykit-gltf-maintenance.py`, `repair-textures.py`, `verify-texture-repairs.py`, `verify-kaykit-gltf.py`, `release-desert-parts-captions.py`, `revalidate-caption-wording.py` |
-| 40-asset caption pilot | `caption_pilot.py`, `caption_review_images.py`, `caption_review_text.py`, `check_caption_review.py`, `check_catalog.py`, `check_inspection.py`, `check_captions.py`, `check_embeddings.py` |
+| 40-asset caption pilot | `caption_pilot.py`, `caption_review_images.py`, `caption_review_text.py`, `check_caption_review.py`, `check_catalog.py`, `check_inspection.py`, `check_captions.py`, `check_embeddings.py`, `record_image_review.py`, `blender_review_sheet.py`, `measure_captions.py`, `check-caption-classification.py` |
 | Frozen search benchmark ([`docs/evaluation/`](../../docs/evaluation/README.md)) | `prepare_evaluation.py`, `label_evaluation.py`, `benchmark_evaluation.py`, `report_evaluation.py`, `review-owner-results.py`, `verify_evaluation.py`, `embedding_capability.py`, `embedding_demo.py` |
 | Image pilot (October 20, 2026) | `image-pilot.py`, `image-pilot-describe.py`, `image-preprocessing-eval.py`, `image-pilot-search-eval.py` |
-| Step 8 delivery report | `report-library-delivery.py` |
+| Step 8 delivery report and preservation checks (pre-library data layout) | `report-library-delivery.py`, `verify-library-preservation.py`, `verify-storage.py`, `gui-preservation.py` |
 | Real installed-client check (original machine's Codex/OpenCode) | `verify-agent-workflow.py` |
 
 Current tools: `local-assets` (`scripts/local-assets.ps1` / `.sh`), `check-config`,

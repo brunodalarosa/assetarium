@@ -9,7 +9,7 @@ import zipfile
 import pytest
 
 from local_asset_library.catalog import (
-    asset_id, build_inventory, check_fts5, compact_search_result, detail, encoded, pilot, query, scan, verify_source,
+    asset_id, build_inventory, check_fts5, compact_search_result, detail, encoded, query, scan, verify_source,
 )
 from local_asset_library.config import Config, ConfigError
 
@@ -260,25 +260,6 @@ def test_source_binding_and_later_stage_guard(catalog_config):
     with pytest.raises(ConfigError, match="corrections"):
         scan(catalog_config)
     assert detail(catalog_config, old["asset_id"])["owner_overlay"] == {"review": "keep"}
-
-
-def test_pilot_reproducibility_and_incomplete_selection(catalog_config):
-    for n in range(8):
-        exports(catalog_config, f"pack{n}", tuple(f"chair-{i}" for i in range(5)))
-    scan(catalog_config)
-    selection = {"selection_version": "fixture-v1", "rationale": "synthetic coverage",
-                 "assets": [{"pack": f"pack{n}", "identity": f"Models/@exports/chair-{i}", "rationale": "fixture"} for n in range(8) for i in range(5)]}
-    path = catalog_config.project_root / "selection.json"
-    path.write_text(json.dumps(selection))
-    first = pilot(catalog_config, path)
-    content = Path(first["manifest"]).read_bytes()
-    pilot(catalog_config, path)
-    assert Path(first["manifest"]).read_bytes() == content
-    assert first["assets"] == 40 and first["coverage"]["with_dependencies"] == 40
-    selection["assets"].pop()
-    path.write_text(json.dumps(selection))
-    with pytest.raises(ConfigError, match="40 distinct"):
-        pilot(catalog_config, path)
 
 
 def test_compact_budget_and_long_query(catalog_config):

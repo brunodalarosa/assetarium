@@ -34,7 +34,7 @@ export function SearchBar({ compact }: { compact: boolean }) {
         disabled={reference}
         maxLength={mode === "keyword" ? 256 : 1024}
         autoComplete="off"
-        placeholder={reference ? "Searching by a pilot preview reference · change it in filters" : "Search your whole asset library"}
+        placeholder={reference ? "Searching for assets similar to a reference · change it in filters" : "Search your whole asset library"}
         className={cn("h-full min-w-0 flex-1 bg-transparent px-2 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed [&::-webkit-search-cancel-button]:hidden", compact ? "text-[21px]" : "text-[22px]")}
       />
       {query && !reference && (
@@ -139,7 +139,7 @@ export function FiltersPanel() {
             <SelectField id="limit" label="Shortlist limit" value={draft.limit} onChange={set("limit")} options={LIMITS.map((l): [string, string] => [l, l])} />
             {draft.mode === "reference" && (
               <>
-                <SelectField id="reference-asset" className="lg:col-span-2" label="Reference pilot asset" value={draft.reference_asset} onChange={set("reference_asset")} options={referenceChoices.length ? referenceChoices : [["", "Loading pilot assets…"]]} />
+                <SelectField id="reference-asset" className="lg:col-span-2" label="Reference asset" value={draft.reference_asset} onChange={set("reference_asset")} options={referenceChoices.length ? referenceChoices : [["", "Loading assets…"]]} />
                 <SelectField id="reference-view" label="Reference view" value={draft.reference_view} onChange={set("reference_view")} options={Object.entries(VIEWS)} />
               </>
             )}

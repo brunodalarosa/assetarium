@@ -77,9 +77,9 @@ def named(value, name):
 
 def library(config):
     """Visible library records by ID; an unpublished library simply has none."""
-    from .retrieval import pilot_records
+    from .retrieval import library_records
     try:
-        return {r['asset_id']: r for r in pilot_records(config)}
+        return {r['asset_id']: r for r in library_records(config)}
     except (OSError, ValueError):
         return {}
 

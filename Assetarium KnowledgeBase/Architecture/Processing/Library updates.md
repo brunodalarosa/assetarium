@@ -143,7 +143,7 @@ Scan stages an inventory and merges downstream results instead of replacing
 them. It compares two complete read-only inventories before changing working
 data. Dry runs summarize work without inference. Process uses prepared runtime
 wrappers with `--locked --no-sync --offline`; no dependencies or weights are
-installed. It preserves successful pilot results and existing caption faults.
+installed. It preserves successful earlier results and existing caption faults.
 
 Process checkpoints each inspection/caption and each vector. Repeat the explicit
 operation after interruption to resume running/pending jobs. Completed matching

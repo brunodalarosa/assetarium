@@ -1,4 +1,4 @@
-"""Frozen pilot evaluation arithmetic; no inference, tuning or owner-approval inference."""
+"""Frozen evaluation arithmetic for the recorded benchmark in docs/evaluation; no inference, tuning or owner-approval inference."""
 import json
 import math
 from pathlib import Path

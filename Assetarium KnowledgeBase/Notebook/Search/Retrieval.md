@@ -35,9 +35,12 @@ live in `search_policy.py`.
 
 ## Gotchas
 
-- The module docstring and `VERSION = "pilot-retrieval-v1"` say "pilot"; this is the live engine for
-  the whole library.
-- `pilot_records` returns the shared slim records from `library_cache`, not pilot-only data.
+- Every index stores `VERSION` and its member IDs under `INDEX_IDS_KEY`, checked on load. Indexes
+  from 0.2.0 use the old names in `LEGACY_NAMES`; always read index metadata through
+  `current_meta` (search, publish and every copy-forward writer do). Vector reuse doesn't depend
+  on these names, so renaming them never re-embeds anything.
+- `library_records` returns the shared slim records from `library_cache`; `build_search_index`
+  (CLI `embed-index`) rebuilds a legacy single-source index.
 - Search used to re-hash every member's files on every request (about 8,000 files per search on the
   original library). [Hash reuse and caches](Hash%20reuse%20and%20caches.md) explains what replaced it;
   don't reintroduce per-request full verification.

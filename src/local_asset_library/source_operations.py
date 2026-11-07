@@ -270,7 +270,7 @@ def scan_reporter(config, source_name=None):
 
 def ensure_index(config, scoped):
     from .incremental import working
-    from .retrieval import index_database
+    from .retrieval import index_database, INDEX_IDS_KEY, current_meta
     from .catalog import encoded
     path = working(scoped).output_path("data", "embeddings/index.sqlite")
     if path.exists():
@@ -280,14 +280,15 @@ def ensure_index(config, scoped):
     metadata = {}
     if base.exists():
         with closing(read_only(base)) as db:
-            metadata = dict(db.execute("SELECT key,value FROM meta"))
+            metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
     if not metadata.get('contract'):
         capability = config.project_root / 'data/library/embedding-contract.json'
         if capability.exists():
-            metadata.update(read_json(capability))
-    metadata["pilot_ids"] = encoded([r["asset_id"] for r in read_records(working(scoped))])
+            metadata.update({k: json.loads(v) for k, v in read_json(capability).items()})
+    metadata = current_meta(metadata)
+    metadata[INDEX_IDS_KEY] = [r["asset_id"] for r in read_records(working(scoped))]
     with closing(index_database(working(scoped))) as db, db:
-        db.executemany("INSERT INTO meta VALUES (?,?)", list(metadata.items()))
+        db.executemany("INSERT INTO meta VALUES (?,?)", [(k, encoded(v)) for k, v in metadata.items()])
 
 
 def publish_source(scoped):
@@ -299,12 +300,15 @@ def publish_source(scoped):
     ids = {r["asset_id"] for r in current}
     index = work.output_path("data", "embeddings/index.sqlite")
     from .catalog import encoded
+    from .retrieval import INDEX_IDS_KEY, LEGACY_NAMES, VERSION
     with closing(sqlite3.connect(index)) as db, db:
         for table in ("vectors", "jobs"):
             for job, identifier in db.execute("SELECT job_id,asset_id FROM " + table).fetchall():
                 if identifier not in ids:
                     db.execute("DELETE FROM " + table + " WHERE job_id=?", (job,))
-        db.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", ("pilot_ids", encoded(sorted(ids))))
+        db.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", (INDEX_IDS_KEY, encoded(sorted(ids))))
+        db.execute("DELETE FROM meta WHERE key=?", (LEGACY_NAMES["ids"],))
+        db.execute("UPDATE meta SET value=? WHERE key='version' AND value=?", (encoded(VERSION), encoded(LEGACY_NAMES["version"])))
         if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ConfigError("Source index integrity check failed")
     if scoped.output_path("data", "library/active.json").exists():

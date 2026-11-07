@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 from local_asset_library.caption_quality import caption_quality, caption_summary
 from local_asset_library.config import load_project_config

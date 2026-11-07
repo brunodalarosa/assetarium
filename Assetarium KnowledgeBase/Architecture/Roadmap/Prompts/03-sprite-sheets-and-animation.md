@@ -12,7 +12,7 @@ Work in this repository; implement only expansion step 3 of [Project_v2_expansio
 
 Read root `AGENTS.md`, `KnowledgeBase/Decisions/`, `KnowledgeBase/Status.md`, the expansion plan's shared requirements/step 3/verification/storage sections, and contracts produced by steps 1-2. Claude also reads `CLAUDE.md`. Inspect only the relevant type adapter, identity/relationship handling, image previews, retrieval aggregation, and desktop/MCP detail paths first.
 
-Resolve the first concrete atlas metadata dialect, animated-image format, pilot membership, and frame/playback UX through read-only evidence. In one checkpoint, restate scope in one sentence, identify inclusions, exclusions, and ambiguities, then explain implementation, ownership, risks, checks, estimated duration, and additional peak/retained disk space, including crops/videos, contract changes, assumptions, and significant uncertainty. Ask **"Do this scope and implementation plan match what you want, and do you approve proceeding?"**, then stop and wait before implementation edits. Honor existing approval for the same unchanged scope and plan; reconfirm material changes.
+Resolve the first concrete atlas metadata dialect, animated-image format, trial set membership, and frame/playback UX through read-only evidence. In one checkpoint, restate scope in one sentence, identify inclusions, exclusions, and ambiguities, then explain implementation, ownership, risks, checks, estimated duration, and additional peak/retained disk space, including crops/videos, contract changes, assumptions, and significant uncertainty. Ask **"Do this scope and implementation plan match what you want, and do you approve proceeding?"**, then stop and wait before implementation edits. Honor existing approval for the same unchanged scope and plan; reconfirm material changes.
 
 ## Implement after approval
 
@@ -22,7 +22,7 @@ Provide frame inspection and play/pause/scrub/loop controls. Reference the origi
 
 Reuse direct image embeddings for suitable evidence, with frame/sequence context explicit. Optional descriptions belong to separate per-source **Generate descriptions**, with validated inputs/batching/provenance and existing notifications under decisions 0007-0008. Missing/failed descriptions do not block import, frame playback, or other search channels; retain description failures in detail/counts, outside import-failure reporting. Preserve completed results and leave unfinished assets pending on description GPU-memory stops, without automatic retry. Do not treat a whole-sheet caption as verified description of each frame, or independent still embeddings as proof of motion understanding. Aggregate results so frames do not crowd a shortlist; return parent linkage and useful frame/animation references through MCP and desktop.
 
-Proposed pilot: about 10 sheets/atlases plus 10 short animations, selected by the owner. Defer automatic slicing and native authoring-tool adapters unless explicitly scoped. Preserve original packs, existing image/3D IDs and corrections, model/runtime contracts, and fault/retry rules.
+Proposed trial set: about 10 sheets/atlases plus 10 short animations, selected by the owner. Defer automatic slicing and native authoring-tool adapters unless explicitly scoped. Preserve original packs, existing image/3D IDs and corrections, model/runtime contracts, and fault/retry rules.
 
 ## Verify and hand off
 

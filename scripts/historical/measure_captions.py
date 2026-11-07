@@ -11,7 +11,7 @@ from local_asset_library.config import load_project_config
 from local_asset_library.model_storage import project_model_bytes
 from local_asset_library.caption_quality import caption_quality
 
-root = Path(__file__).resolve().parents[1]
+root = Path(__file__).resolve().parents[2]
 config = load_project_config(root)
 report = json.loads((root / "data/captions/pilot-v2-report.json").read_text(encoding="utf-8"))
 attempts = [a for o in report["outcomes"] for a in o["attempts"] if "metrics" in a]

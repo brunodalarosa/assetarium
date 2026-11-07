@@ -8,7 +8,7 @@ import re
 from .catalog import detail, encoded, relevant_license_evidence
 from .caption_quality import caption_quality, caption_summary
 from .config import ConfigError
-from .retrieval import SearchEngine, pilot_records, preview_file, resolved_detail, validate_filters
+from .retrieval import SearchEngine, library_records, preview_file, resolved_detail, validate_filters
 
 from .search_policy import DEFAULT_MODE, MAX_LIMIT, search_character_cap
 from .asset_structure import ASSET_TYPES, structure, supported_stage
@@ -372,7 +372,7 @@ class AssetService:
         key = encoded(args)
         if key in self.query_faults:
             raise ConfigError("Unchanged faulty query retained: " + self.query_faults[key])
-        has_sources = bool(pilot_records(self.config)) if self.config.sources_registry else True
+        has_sources = bool(library_records(self.config)) if self.config.sources_registry else True
         if mode != "keyword" and has_sources and self.backend is None:
             if self.backend_fault:
                 raise ConfigError("Embedding runtime faulty; explicit repair/retry required: " + self.backend_fault)
