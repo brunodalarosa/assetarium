@@ -1,13 +1,14 @@
 ---
 tags: [decision]
 decided: 2026-10-17
+area: Search
 ---
 # 0003 — Read paths reuse per-publication caches
 
 **Decision.** `library_cache.py` holds read-only views keyed by publication
 identity: project/metadata root, source key, generation, catalog and membership
 file stats, and the source revision. Any change rebuilds the view.
-- `retrieval.pilot_records` returns shared **slim** records (no `variants`,
+- `library_cache.library_records` returns shared **slim** records (`library_cache.slim`) (no `variants`,
   `grouping`, `dependency_inspection`, `provenance`, `texture_repair_history`,
   `license_evidence`, `effective_caption`; `technical` limited to the inspected
   facts used by filters and source checks). Detail views read the full record.
@@ -18,6 +19,10 @@ file stats, and the source revision. Any change rebuilds the view.
 the library summary re-hashed 208 MB of SQLite every call.
 
 **Keep true.** Cached records are shared: never mutate them. Processing and
-indexing (`index_pilot`, `incremental`, batch scripts) read fresh full records
+indexing (`incremental`, batch scripts) read fresh full records
 through `membership.records`. A new field needed by list/search views must be
 kept by `library_cache.slim`.
+
+## Changes
+
+- 2026-11-07: function names updated after the pilot-era cleanup (`pilot_records`, `index_pilot` were removed); the rules are unchanged.

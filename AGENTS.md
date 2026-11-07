@@ -6,7 +6,32 @@ adds codebase orientation only.
 
 Read `Assetarium KnowledgeBase/Decisions/` before changing behavior. Those owner-approved decisions
 bind future changes; if a change would contradict one, ask the owner first and
-update the decision record together with the code.
+update the decision record together with the code. Every decision file is current truth.
+
+**Changing decisions.** Only with the owner's approval, and in this order:
+
+1. **Place it.** Each decision has an `area`. A change in an area that already has a decision covering it
+   **edits that decision in place**: rewrite the text so it reads as today's truth and add a dated line under
+   `## Changes`. Never stack a note ("Since…", "Update…", "partly superseded") on top. Write a new file only
+   for a subject no decision covers, or to split a decision that would pass 150 lines.
+2. **Check it.** At the scope checkpoint, read every decision with the same `area` or overlapping `code`
+   names, and show this block:
+
+   ```
+   Decision check · <proposal>
+   Area: <area> · placement: edit <NNNN> | new file (why)
+   Read: <numbers>
+   <NNNN> keep "<quoted Keep true line>" → holds | CONFLICT: <why>
+   ```
+
+   Quote every Keep true line you compared; "no conflicts" without quotes is not a check. A conflict is
+   resolved with the owner before writing.
+3. **Replace, don't keep halves.** When a decision is replaced, the new one lists the old numbers in `replaces`
+   and carries over the why and any alternatives the owner rejected; the old file is deleted and its number
+   moves to the Replaced table in `Decisions.md` (numbers are never reused).
+
+`tests/test_decisions.py` enforces the mechanical part (index, numbers, `area`, size, no patch notes, cited
+code still exists).
 
 ## Knowledge base
 

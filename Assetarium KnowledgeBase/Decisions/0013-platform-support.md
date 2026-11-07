@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-24
+area: Project
 ---
 # 0013 — Platform support: Windows primary, Linux v1 is CLI + MCP
 

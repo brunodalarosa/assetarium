@@ -6,8 +6,10 @@ tags: [hub]
 Up: [Home](../Home.md). Decisions are owner-owned: agents never edit one on their own initiative (see `AGENTS.md` → Recorded decisions).
 
 Owner-approved decisions that later changes must respect. Each file states the decision, why it was made, and
-what future work must keep true. **Every file here is current.** To change one, ask the owner first, then update
-it, or write a new decision that replaces it.
+what future work must keep true. **Every file here is current.** How to change one (place it, check it, replace
+without keeping halves) is in `AGENTS.md` → Recorded decisions; `tests/test_decisions.py` enforces the
+mechanical rules. Each decision has an `area` (a Notebook area, or `Project` for project-wide ones) and a
+`## Changes` list of dated edits.
 
 **Replacing a decision.** The new decision lists the numbers it takes over in `replaces`, carries over the why and
 any alternatives the owner rejected, and the old file is deleted. Its number stays in [Replaced](#replaced) below,

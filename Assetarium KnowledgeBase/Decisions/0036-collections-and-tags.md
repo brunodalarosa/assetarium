@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
+area: Desktop App
 replaces: [0012]
 code: [asset_collections.py, mcp_server.py, frontend/src/pages/Collections.tsx, frontend/src/pages/Collection.tsx]
 ---

@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
+area: Processing
 replaces: [0007, 0008, 0015]
 code: [description_engines.py, engines.py, engine_transformers.py, engine_server.py, caption_backend.py, caption_batching.py, incremental.process, notifications.py, sources.import_outcome]
 ---

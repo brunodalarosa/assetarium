@@ -1,7 +1,8 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-replaces: ["0008, 0026 (their silent exclusions)"]
+area: Desktop App
+replaces: [0008, 0026]
 code: [settings.uses, settings.format_off, settings.inspected_path, folder_view.py, retrieval.py, incremental.inspection_input]
 ---
 # 0030 — Left-out items are hidden, counted once

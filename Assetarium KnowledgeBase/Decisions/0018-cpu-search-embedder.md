@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-25
+area: Search
 ---
 # 0018 — CPU search embedder; local-server descriptions without the description runtime
 

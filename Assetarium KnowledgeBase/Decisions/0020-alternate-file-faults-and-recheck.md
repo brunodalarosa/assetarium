@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-26
+area: Processing
 ---
 # 0020 — A broken alternate file fails alone; owner-confirmed recheck of check failures
 

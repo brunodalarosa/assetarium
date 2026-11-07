@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
+area: Setup and Engines
 replaces: [0014, 0016, 0026]
 code: [setup_core.py, setup_core.first_run, setup_core.save_setup, setup_core.check_blender, setup_agent.py, search_check.record, source_operations.search_check, source_operations.ensure_search_check, sources.include_samples, engines.search_readiness, settings.uses, frontend/src/ui/SetupWizard.tsx]
 ---

@@ -1,7 +1,8 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-replaces: [0004, "0007, 0014, 0015, 0022, 0023 (their result-identity parts)"]
+area: Processing
+replaces: [0004, 0007, 0014, 0015, 0022, 0023]
 code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, result_store.adopt, result_store.location_free, library_migration.rekey, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
 ---
 # 0028 — Result identity: what makes finished work run again

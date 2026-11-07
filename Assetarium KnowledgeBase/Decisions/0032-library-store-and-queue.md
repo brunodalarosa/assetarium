@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
+area: Sources and Catalog
 replaces: [0023]
 code: [library_store.py, result_store.py, library_migration.py, processing_queue.py, sources.py, asset_structure.py]
 ---

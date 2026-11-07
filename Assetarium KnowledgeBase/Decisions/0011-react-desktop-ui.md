@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-21
+area: Desktop App
 ---
 # 0011 — React desktop interface, view navigation and themes
 

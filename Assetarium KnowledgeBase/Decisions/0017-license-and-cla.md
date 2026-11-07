@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-25
+area: Project
 ---
 # 0017 — License: AGPL-3.0-only with a Contributor License Agreement
 

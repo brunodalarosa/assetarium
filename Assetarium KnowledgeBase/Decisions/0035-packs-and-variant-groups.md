@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
+area: Sources and Catalog
 replaces: [0024]
 code: [pack_profiles.py, pack_profiles.KINDS, pack_profiles.effect, pack_agent.py, agent_activity.py, agent_practice.py, folder_view.py]
 ---

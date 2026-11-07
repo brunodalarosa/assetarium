@@ -1,7 +1,8 @@
 ---
 tags: [decision]
 decided: 2026-11-07
-replaces: ["0012, 0016, 0023, 0024 (their agent parts)"]
+area: MCP
+replaces: [0012, 0016, 0023, 0024]
 code: [mcp_server.py, mcp_server.DESCRIPTIONS, pack_agent.propose, pack_agent.decide, setup_agent.py, agent_activity.py, agent_activity.sentence]
 ---
 # 0029 — Agent trust: agents act freely, in the open

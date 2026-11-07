@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-26
+area: Processing
 ---
 # 0021 — Owner-chosen texture folder for models whose textures were not found
 
@@ -34,6 +35,6 @@ texture dependencies"; `Textures/PBR` alone resolves 49, and with the two textur
 **Keep true.** Exact file names only, never similar names. One decision per source, applied only by
 the owner. All or nothing per model. Originals and the inspection worker stay unchanged.
 
-> **Since [decision 0032](0032-library-store-and-queue.md) (October 30, 2026):** the per-source generated folder named
-> here is replaced by the central library store; the rules of this decision are unchanged and now apply to
-> library folders, packs and folders.
+## Changes
+
+- 2026-10-30: the choice is saved in the central library store instead of each folder's generated folder; the rules are unchanged.

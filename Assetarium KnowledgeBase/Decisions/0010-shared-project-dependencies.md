@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-19
+area: Processing
 ---
 # 0010 — Shared dependencies across registered project fragments
 

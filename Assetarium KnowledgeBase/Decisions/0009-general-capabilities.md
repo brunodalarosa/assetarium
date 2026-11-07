@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-10-19
+area: Project
 ---
 # 0009 — Fixes and processing support are reusable system features
 

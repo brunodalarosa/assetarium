@@ -1,6 +1,7 @@
 ---
 tags: [decision]
 decided: 2026-11-07
+area: Processing
 replaces: [0022]
 code: [render_pool.py, blender_batch_worker.py, render_devices.py, search_speed.py, incremental.process, scripts/check-render-stability.py]
 ---
