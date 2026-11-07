@@ -799,8 +799,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
 
 
 def coverage(config):
-    from .retrieval import pilot_records
-    selected = pilot_records(config)
+    from .retrieval import library_records
+    selected = library_records(config)
     from .asset_structure import asset_type
     types = defaultdict(lambda: {'assets': 0, 'stages': {s: Counter() for s in COVERAGE_STAGES}})
     packs = defaultdict(lambda: {"assets": 0, "stages": {s: Counter() for s in COVERAGE_STAGES}, "captions": Counter(), "owner_review": Counter(),
@@ -833,8 +833,9 @@ def publish(config):
     scope = membership(work)
     index = work.output_path("data", "embeddings/index.sqlite")
     with closing(read_only(index)) as db:
-        meta = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
-        if set(meta.get("pilot_ids", [])) != set(scope["asset_ids"]):
+        from .retrieval import INDEX_IDS_KEY, current_meta
+        meta = current_meta({k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")})
+        if set(meta.get(INDEX_IDS_KEY, [])) != set(scope["asset_ids"]):
             raise ConfigError("Cannot publish mismatched catalog/index membership")
         if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or db.execute("PRAGMA foreign_key_check").fetchall():
             raise ConfigError("Cannot publish corrupt index")

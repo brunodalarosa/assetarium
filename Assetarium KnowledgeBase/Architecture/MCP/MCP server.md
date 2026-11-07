@@ -84,8 +84,8 @@ be used to claim retrieval-only token savings.
 See `docs/mcp/client-results.json`, `owner-review.json`, `preservation.json` and
 the [progress journal](../../../docs/history/progress-2026-10.md) for real outcomes and current limitations. Owner labels were
 validated and quality recomputed only from saved first-repeat rankings; frozen
-step 6 artifacts were preserved. The current session supplies the explicit
-bounded pilot decision recorded in those historical receipts. Step 8 received
+step 6 artifacts were preserved. The original bounded approval (history: the
+40-asset pilot) is recorded in those historical receipts. Step 8 received
 separate scope and runtime/storage approval; its current contract and coverage
 are documented in [Library updates](../Processing/Library%20updates.md) and the progress journal.
 

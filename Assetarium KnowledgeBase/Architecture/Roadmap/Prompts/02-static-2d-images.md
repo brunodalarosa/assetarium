@@ -12,7 +12,7 @@ Work in `C:\BrunoOS\Local-Asset-Library` and implement only expansion step 2 of 
 
 Read root `AGENTS.md`, `KnowledgeBase/Decisions/`, `KnowledgeBase/Status.md`, the expansion plan's shared requirements/step 2/verification/storage sections, and current catalog, caption, embedding, and caption-quality contracts. Claude also reads `CLAUDE.md`. Begin read-only at `catalog.py`, type dispatch from step 1, `caption_backend.py`, `embedding_backend.py`, `retrieval.py`, `desktop_service.py`, and `mcp_assets.py`.
 
-In one checkpoint, restate scope in one sentence, identify inclusions, exclusions, pilot membership, and unresolved image UX/preprocessing choices, then explain changes, ownership, risks, verification, estimated duration, and additional peak/retained disk space, including migration/reindex costs, assumptions, and significant uncertainty. Ask **"Do this scope and implementation plan match what you want, and do you approve proceeding?"**, then stop and wait. Use existing explicit approval for the same unchanged scope and plan; reconfirm material changes before editing implementation files.
+In one checkpoint, restate scope in one sentence, identify inclusions, exclusions, trial set membership, and unresolved image UX/preprocessing choices, then explain changes, ownership, risks, verification, estimated duration, and additional peak/retained disk space, including migration/reindex costs, assumptions, and significant uncertainty. Ask **"Do this scope and implementation plan match what you want, and do you approve proceeding?"**, then stop and wait. Use existing explicit approval for the same unchanged scope and plan; reconfirm material changes before editing implementation files.
 
 ## Implement after approval
 

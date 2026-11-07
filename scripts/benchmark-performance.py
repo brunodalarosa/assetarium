@@ -44,7 +44,7 @@ def main():
     service = DesktopService(config)
     context = timed(results, 'context_1', service.context)
     timed(results, 'context_2', service.context)
-    results['members'] = context['pilot_count']
+    results['members'] = context['asset_count']
     page = timed(results, 'browse_1', service.browse, {}, 0, 40)
     timed(results, 'browse_2', service.browse, {}, 0, 40)
     identifiers = [item['asset_id'] for item in page['items']][:12]

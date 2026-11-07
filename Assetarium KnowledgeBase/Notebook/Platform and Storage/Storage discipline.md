@@ -23,7 +23,7 @@ Sources, shared weights, asset results and historical fault evidence were retain
 Final measurements and verification receipts are in `data/storage/`.
 
 Verification: 146 tests passed, including real Blender fixtures; full source
-SHA-256/size/mtime comparison passed; catalog/index/pilot and dependency locks
+SHA-256/size/mtime comparison passed; catalog/index/membership and dependency locks
 retained their hashes. Real GPU captioning, all semantic modes, actual image
 embeddings, PNG hash checks, the active agent connection and a fresh 17-call
 connector protocol/lifecycle check passed. Partial helper/environment faults
@@ -91,8 +91,8 @@ new dependencies may require downloading packages again. Use `run --locked --no-
 Do not clear runtime/model caches, generated asset data, or fault evidence as part
 of package-cache cleanup. No automatic startup cleanup or scheduled deletion is used.
 
-The pilot's planning target is 6 GiB of unique allocated storage. Explain expected
-growth of 500 MiB or more or exceeding that target at the mandatory plan checkpoint.
+The library's limit is the owner's Storage budget in Settings. Explain expected
+growth of 500 MiB or more, or another runtime, at the mandatory plan checkpoint.
 Store one copy of each model revision in shared storage and reference source assets
 instead of copying them. Preserve useful evidence, including fault evidence.
 

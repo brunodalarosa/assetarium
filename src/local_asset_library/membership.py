@@ -1,5 +1,4 @@
 """Explicit approved membership, never an unguarded full-catalog fallback."""
-import json
 from contextlib import closing
 import re
 
@@ -18,11 +17,7 @@ def membership(config):
                 or value.get("fingerprint") != digest(ids)):
             raise ConfigError("Configured library membership is invalid")
         return value
-    manifest = json.loads(config.output_path("data", "pilot/selection-manifest.json").read_text(encoding="utf-8"))
-    ids = [a["asset_id"] for a in manifest["assets"]]
-    if len(ids) != 40 or len(set(ids)) != 40:
-        raise ConfigError("Require the existing 40-asset pilot or configured membership")
-    return {"schema_version": 1, "asset_ids": ids, "fingerprint": digest(ids), "scope": "pilot"}
+    raise ConfigError("Library membership is missing; refresh the library to create it")
 
 
 def records(config):

@@ -58,7 +58,7 @@ def verify():
         wait("lal.state.library.items.length===40&&$('grid').getAttribute('aria-busy')==='false'")
         wait("document.querySelectorAll('#grid .thumb img').length>0")
         assert not bridge._gateway.model_requested
-        initial=js("({count:lal.state.context.pilot_count,cards:lal.state.library.items.length,images:document.querySelectorAll('#grid .thumb img').length,workers:lal.thumbnailWorkers(),offset:lal.state.library.offset})")
+        initial=js("({count:lal.state.context.asset_count,cards:lal.state.library.items.length,images:document.querySelectorAll('#grid .thumb img').length,workers:lal.thumbnailWorkers(),offset:lal.state.library.offset})")
         assert initial['count']>300 and initial['cards']==40 and initial['images']<40 and initial['workers']<=3
         report['initial']=initial
         report['checks'].append('Bounded 40-card page, visible-only thumbnails, <=3 thumbnail requests, no model load on startup')

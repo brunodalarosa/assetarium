@@ -984,37 +984,3 @@ def verify_source(config):
     if changed:
         raise ConfigError(f"Source differs from baseline in {len(changed)} entries; see source-verification.json")
     return result
-
-
-def pilot(config, selection_path):
-    selection = json.loads(selection_path.read_text(encoding="utf-8"))
-    with closing(read_database(config)) as db:
-        assets = [json.loads(row[0]) for row in db.execute("SELECT record FROM assets ORDER BY pack_id,identity")]
-        metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM metadata")}
-    lookup = {(a["pack_id"], a["source_relative_identity"]): a for a in assets}
-    chosen = []
-    for entry in selection["assets"]:
-        key = (entry["pack"], entry["identity"])
-        if key not in lookup:
-            raise ConfigError(f"Pilot selection is absent: {key}")
-        asset = lookup[key]
-        for f in asset["files"]:
-            config.source_file(f["path"])
-        chosen.append({"asset_id": asset["asset_id"], "pack": asset["pack_id"], "identity": asset["source_relative_identity"],
-                       "name": asset["display_name"], "rationale": entry["rationale"], "files": asset["files"],
-                       "dependencies": asset["dependencies"], "previews": asset["previews"],
-                       "primary_inspection_path": asset["primary_inspection_path"]})
-    counts = Counter(a["pack"] for a in chosen)
-    if len(chosen) != 40 or len({a["asset_id"] for a in chosen}) != 40 or len(counts) != 8 or set(counts.values()) != {5}:
-        raise ConfigError("Pilot must contain 40 distinct logical assets: five from each of eight packs")
-    manifest = {"schema_version": 1, "selection_version": selection["selection_version"],
-                "selection_sha256": digest(selection), "source_fingerprint": metadata["source_fingerprint"],
-                "rationale": selection["rationale"], "assets": chosen,
-                "coverage": {"by_pack": dict(sorted(counts.items())),
-                             "formats": sorted({f["format"] for a in chosen for f in a["files"]}),
-                             "with_previews": sum(bool(a["previews"]) for a in chosen),
-                             "missing_previews": sum(not a["previews"] for a in chosen),
-                             "with_dependencies": sum(bool(a["dependencies"]) for a in chosen)}}
-    path = config.output_path("data", "pilot/selection-manifest.json")
-    save_json(path, manifest)
-    return {"manifest": str(path), "assets": len(chosen), "coverage": manifest["coverage"], "selection_sha256": manifest["selection_sha256"]}

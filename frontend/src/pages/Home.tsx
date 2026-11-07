@@ -18,7 +18,7 @@ function ResultsHeader() {
     <div className="results-bar flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <h2 id="results-title" className="text-[21px] font-semibold text-foreground" aria-label={search.title}>{heading}</h2>
-        <p className="mt-1.5 truncate text-[13px] text-muted-foreground">{browsing ? "Browsing the filtered library" : search.queryUsed || (search.modeUsed === "reference" ? "Similar to a pilot preview" : "")}</p>
+        <p className="mt-1.5 truncate text-[13px] text-muted-foreground">{browsing ? "Browsing the filtered library" : search.queryUsed || (search.modeUsed === "reference" ? "Similar to the reference asset" : "")}</p>
         <p id="status" role="status" aria-live="polite" title={search.statusTitle || undefined} className="mt-1 text-[11.5px] text-subtle">{search.status}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

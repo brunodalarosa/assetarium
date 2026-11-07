@@ -76,15 +76,18 @@ read it first. Up: [Notebook](Notebook.md).
 
 ## Misleading or historical names
 
-- **"Step N" and "pilot" in names and docstrings are history, not scope.** The project began as a
-  40-asset pilot in eight steps (October 2026). `retrieval.py` still says "Pilot-only exact
-  retrieval" and `inspection.py` "Bounded pilot jobs", yet both serve the whole configured library
-  today; `catalog.py` and `cli.py` mention "step 2". Treat them as current code.
+- **"Step N" in names and docstrings is history, not scope.** The project began as a 40-asset
+  pilot in eight steps (October 2026); `catalog.py` and `cli.py` still mention "step 2". The
+  pilot-only code paths were removed in November 2026.
+- **Search indexes from 0.2.0 still carry pilot-era names** (`"pilot-retrieval-v1"`, `pilot_ids`).
+  `retrieval.current_meta` reads them as `retrieval-v1` / `member_ids`; the next processing run
+  rewrites them. Drop `retrieval.LEGACY_NAMES` only in a release that stops upgrading from 0.2.0.
 - `catalog-summary.json` and `embedding-contract.json` are generated under `data/`
   (`data/reports/`, `data/library/`), not docs.
 - `docs/library-membership.json` is referenced by `library_policy.LEGACY` and tests but is absent on
   purpose: only an older install that still has one keeps that contract.
 - The package and CLI keep the old name (`local_asset_library`, `local-assets`, `Local Asset
   Library.vbs`); the app is branded Assetarium.
-- `scripts/historical/` scripts need the original owner's data and pilot asset IDs; they are not
+- `scripts/historical/` scripts need the original owner's data and asset IDs from the original
+  pilot (history); some call code removed since, so run them from an older checkout. They are not
   general tools.

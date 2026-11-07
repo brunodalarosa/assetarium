@@ -1,4 +1,4 @@
-"""MCP policy tests reuse explicit synthetic pilot fixtures, never production assets."""
+"""MCP policy tests reuse explicit synthetic library fixtures, never production assets."""
 from copy import deepcopy
 import json
 import sqlite3
@@ -80,7 +80,7 @@ def test_preview_pixels_and_fault_preserves_detail(indexed):
     assert evidence['excluded']
 
 
-def test_unknown_and_nonpilot_ids(indexed):
+def test_unknown_and_nonmember_ids(indexed):
     config,_,_=indexed
     with pytest.raises(ConfigError): AssetService(config).execute('get_asset',{'asset_id':'asset_'+'f'*32})
 

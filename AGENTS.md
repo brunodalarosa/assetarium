@@ -113,11 +113,12 @@ processing of other items; never edit originals to resolve them.
   `scripts/storage-report.py` using the existing base Python environment and save
   a new receipt under `data/storage/`. Compare unique allocated bytes, not the sum
   of folder sizes, because Windows can count hard links more than once.
-- Aim to keep this approved 40-asset pilot below **6 GiB of unique allocated
-  project storage**, excluding external assets and shared models. A projected
-  increase of **500 MiB or more**, another runtime, or exceeding this target must
-  be included in the implementation plan with its purpose and alternatives.
-  This is a planning target, not permission to delete results or evidence.
+- The library's storage limit is the owner's **Storage budget** in Settings (the setup
+  wizard and `local-assets settings`); processing asks before it would exceed it. For
+  development work, a projected increase of **500 MiB or more** of unique allocated
+  project storage (excluding external assets and shared models) or another runtime
+  must be included in the implementation plan with its purpose and alternatives.
+  The budget is a limit, not permission to delete results or evidence.
 - After a successful installation and runtime verification, clear redundant uv
   cache entries with uv's cache commands against the exact project-local cache.
   Hard-linked installed files remain usable after their cache names are removed.

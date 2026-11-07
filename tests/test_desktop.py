@@ -32,7 +32,7 @@ def test_browse_no_embedding_and_shared_filters(indexed):
     config, backend, records = indexed
     service = DesktopService(config)
     result = service.browse()
-    assert result['pilot_count'] == len(records) == len(result['items'])
+    assert result['asset_count'] == len(records) == len(result['items'])
     assert service.backend is None and not result['model_loaded']
     filtered = service.browse({'pack': 'even', 'format': 'obj', 'max_triangles': 100, 'rigged': False})
     assert len(filtered['items']) == 6
@@ -204,7 +204,7 @@ def test_desktop_default_exact_shared_shortlist_and_close(indexed, monkeypatch):
         async def slow():
             await asyncio.sleep(.1)
         future = asyncio.run_coroutine_threadsafe(slow(), bridge._loop)
-        assert bridge.browse()['pilot_count'] == 40
+        assert bridge.browse()['asset_count'] == 40
         future.result()
         assert bridge._thread.ident != threading.get_ident()
     finally:

@@ -2,7 +2,7 @@
 tags: [architecture]
 level: macro
 parent: "[Architecture](../Architecture.md)"
-status: reviewed
+status: draft
 code: []
 verified:
 branch:
@@ -145,7 +145,7 @@ Start with PNG, JPEG, and WebP, subject to verified decoding. Add first-class im
 
 Use EmbeddingGemma for direct image search during **Process assets**, without waiting for descriptions. Offer Qwen3-VL descriptions from actual images through separate **Generate descriptions**, with an image-appropriate versioned prompt and validated reuse of existing batching, provenance, controls, and notifications. Add description search when valid results exist; missing/stale/failed descriptions must not block import or exclude an otherwise usable image. Preserve existing 3D description contracts and fingerprints when adding the new prompt. Test tiny sprites, white/black transparent icons, wide art, duplicates, and damaged images. Decide the small-image preprocessing contract explicitly; nearest-neighbor enlargement is a candidate, not a preapproved default. Keep query/index preprocessing compatible and prevent derived backgrounds becoming invented source colors.
 
-Proposed pilot: 30-50 owner-selected images covering sprites, icons, pixel art, UI artwork, and backgrounds. Unknown purpose remains a generic image rather than a guessed subtype. Initially defer authoring formats, SVG, automatic atlas slicing, and animation playback.
+Proposed trial set: 30-50 owner-selected images covering sprites, icons, pixel art, UI artwork, and backgrounds. Unknown purpose remains a generic image rather than a guessed subtype. Initially defer authoring formats, SVG, automatic atlas slicing, and animation playback.
 
 Done when: desktop and MCP can find, inspect, and retrieve an unchanged source image; semantic retrieval consumes actual pixels; difficult transparency/size cases are reviewed; image faults retain useful metadata; source selection and existing 3D searches remain correct.
 
@@ -155,7 +155,7 @@ Catalog a sheet as a parent asset, even before frame boundaries are known. Add f
 
 Provide frame inspection and play/pause/scrub/loop controls. Store source rectangles/timing as references, not copies of entire packs. Bounded derived crops may support previews/inference; fingerprint them against the sheet and region metadata. Query results aggregate to the appropriate parent/animation and identify a matching frame when useful.
 
-Proposed pilot: about 10 sheets/atlases plus 10 short animations. Verify padding, trimming, rotation, transparency, timing, and changed metadata. Defer guessed slicing, missing-timing invention, and native Aseprite/PSD adapters unless separately scoped.
+Proposed trial set: about 10 sheets/atlases plus 10 short animations. Verify padding, trimming, rotation, transparency, timing, and changed metadata. Defer guessed slicing, missing-timing invention, and native Aseprite/PSD adapters unless separately scoped.
 
 Done when: a user can select a sheet, inspect known frames, play a defined sequence, and retrieve the original sheet plus frame/animation metadata. Unsupported or ambiguous metadata remains visible without fabricating extraction or playback success.
 
@@ -169,7 +169,7 @@ Support individual texture records and linked material sets. Record resolution, 
 
 Generate bounded, reproducible plane/sphere previews for supported mappings, with renderer/version, lighting, geometry, map bindings, and any substitutions stated. Do not silently fill missing required maps or change normal/channel conventions. Preserve usable individual images when assembly fails. Do not feed normal/roughness maps to Qwen as if they directly depict the final surface.
 
-Search appearance using direct vectors from appropriate color maps and assembled previews plus separate metadata. Optional Qwen appearance descriptions use the separate per-source generation operation; their absence/failure does not gate usable materials or become an import failure. Reuse applicable batching/notification behavior while validating material-specific prompts and inputs. A rendered sample demonstrates that setup, not physical correctness or universal engine compatibility. Proposed pilot: about 20 varied material sets, including incomplete and packed-channel examples. Begin with conventional image-based materials; defer procedural authoring graphs such as Substance until a separate adapter is approved.
+Search appearance using direct vectors from appropriate color maps and assembled previews plus separate metadata. Optional Qwen appearance descriptions use the separate per-source generation operation; their absence/failure does not gate usable materials or become an import failure. Reuse applicable batching/notification behavior while validating material-specific prompts and inputs. A rendered sample demonstrates that setup, not physical correctness or universal engine compatibility. Proposed trial set: about 20 varied material sets, including incomplete and packed-channel examples. Begin with conventional image-based materials; defer procedural authoring graphs such as Substance until a separate adapter is approved.
 
 Done when: a query such as "stylized cracked stone" finds useful reviewed candidates; a person can inspect maps and assembled appearance; app/MCP return the complete known set and honest unresolved dependencies; originals stay unchanged.
 
@@ -181,7 +181,7 @@ Enable EmbeddingGemma's audio encoder through a new validated contract and worke
 
 Define separate bounded policies for short SFX and long tracks: timestamped coverage, context/segment limits, aggregation, and matched-passage navigation. Never silently analyze only an introduction or concatenate disjoint excerpts as a single continuous event. Avoid storing full decoded copies of the collection. Preserve stereo originals and document information lost by model preprocessing.
 
-Proposed pilot: about 40 SFX/ambience clips and 10 BGM tracks, reviewed separately. Compare direct-audio retrieval with filename/metadata search, including silence, very short sounds, long tracks, near matches, and negative queries. No generated audio captions are required yet. If quality is inadequate, record the result and propose a bounded specialist comparison instead of silently changing models.
+Proposed trial set: about 40 SFX/ambience clips and 10 BGM tracks, reviewed separately. Compare direct-audio retrieval with filename/metadata search, including silence, very short sounds, long tracks, near matches, and negative queries. No generated audio captions are required yet. If quality is inadequate, record the result and propose a bounded specialist comparison instead of silently changing models.
 
 Done when: audio is useful to browse/play without AI, direct text-to-audio search has actual local evidence, matched segments resolve to one track, GUI/MCP agree, and decoder/search failures preserve usable results.
 
@@ -212,7 +212,7 @@ Provide clip selection and play/pause/scrub/loop controls plus bounded offline p
 
 Evaluate motion-aware direct embeddings before exposing motion-search claims. Optional descriptions use ordered timestamped frames/video through separate **Generate descriptions**, after validating temporal inputs, batching, and provenance; missing/failed descriptions neither gate clip processing/playback nor exclude usable clips from search. Qwen video support is a candidate beyond the existing image adapter. EmbeddingGemma's default video sampling is one frame per second, so validate sampling for fast game motions. Single thumbnails or unordered frame averages are insufficient evidence for temporal distinctions such as movement direction.
 
-Proposed pilot: 10-20 clips covering idle, locomotion, jumps, attacks, short actions, root motion, in-place motion, and animation-only cases. Do not automatically retarget, repair rigs, rewrite originals, or claim target-game compatibility. Morph/baked/vertex animation support is a later adapter unless explicitly selected.
+Proposed trial set: 10-20 clips covering idle, locomotion, jumps, attacks, short actions, root motion, in-place motion, and animation-only cases. Do not automatically retarget, repair rigs, rewrite originals, or claim target-game compatibility. Morph/baked/vertex animation support is a later adapter unless explicitly selected.
 
 Done when: a user can find a motion, play the identified clip, and retrieve the source with clip/rig references; temporal claims have reviewed evidence; unresolved compatibility is visible; existing static 3D behavior remains usable.
 
@@ -226,7 +226,7 @@ A preview needs a recorded engine build, scene/object, parameter values, texture
 
 Use code/metadata retrieval first, with a distinct validated code-query contract if introduced. Use EmbeddingGemma for screenshots/temporal previews after validation. Offer Qwen descriptions of actual rendered appearance through separate optional generation with validated inputs/batching and the existing notification workflow; their absence/failure does not block cataloging, previews, or other search channels. Do not claim behavior based only on plausible code interpretation. Supplied screenshots remain supplied evidence unless linkage to the selected source/setup is established.
 
-Proposed pilot: about 10 shader assets covering static and animated effects plus missing dependencies/compilation failures. Bound preview time, size, and retained video volume. Additional engines, graph exporters, universal conversion, and automatic source fixes are separate work.
+Proposed trial set: about 10 shader assets covering static and animated effects plus missing dependencies/compilation failures. Bound preview time, size, and retained video volume. Additional engines, graph exporters, universal conversion, and automatic source fixes are separate work.
 
 Done when: source/dependency search works in both interfaces; at least one approved engine/category renders reproducibly; queries such as "animated water distortion" lead to inspectable effects with explicit requirements; unsupported engines and failed previews remain honest catalog states.
 
@@ -248,32 +248,32 @@ Update `docs/history/progress-2026-10.md` and directly affected contracts/usage 
 
 ## Rough duration and storage assumptions
 
-These are planning estimates, not measurements or approved budgets. Working days include implementation and focused verification; they exclude waiting for owner reviews. Estimates assume the existing Windows app/runtimes remain usable, modest supplied metadata, and small pilots rather than whole-collection processing.
+These are planning estimates, not measurements or approved budgets. Working days include implementation and focused verification; they exclude waiting for owner reviews. Estimates assume the existing Windows app/runtimes remain usable, modest supplied metadata, and small trial sets rather than whole-collection processing.
 
-| Step | Rough effort | Generated pilot output allowance, excluding dependencies/models/originals |
+| Step | Rough effort | Generated trial output allowance, excluding dependencies/models/originals |
 | --- | --- | --- |
 | 1 | 2-4 working days | Under 50 MiB of new synthetic evidence; existing-index migration copies need separate sizing |
 | 2 | 3-5 working days | 50-200 MiB for 30-50 images |
 | 3 | 3-5 working days | 100-300 MiB for bounded sheets/animation previews |
 | 4 | 4-7 working days | 100-500 MiB for about 20 material sets |
 | 5 | 4-7 working days | 50-300 MiB for waveforms, segments/indexes, and evidence; avoid retained full decoded audio |
-| 6 | 4-8 working days | 50-200 MiB for pilot results; model/runtime installation is additional and potentially many GiB |
+| 6 | 4-8 working days | 50-200 MiB for trial results; model/runtime installation is additional and potentially many GiB |
 | 7 | 5-9 working days | 200-1,000 MiB for bounded clip previews |
 | 8 | 7-14 working days across 8A/8B | 200-1,000 MiB for bounded effect previews; engine installation is additional |
 
-Total rough effort is 32-59 working days, approximately 6-12 working weeks. Audio model feasibility, native codecs, animation rig compatibility, and shader setup are the greatest uncertainties. Generated pilot output is on the order of 1-4 GiB across these assumptions; peak usage can be higher because publications, evidence, temporary rendering, and migrations coexist. Do not multiply logical folder sizes to estimate hard-linked dependency storage.
+Total rough effort is 32-59 working days, approximately 6-12 working weeks. Audio model feasibility, native codecs, animation rig compatibility, and shader setup are the greatest uncertainties. Generated trial output is on the order of 1-4 GiB across these assumptions; peak usage can be higher because publications, evidence, temporary rendering, and migrations coexist. Do not multiply logical folder sizes to estimate hard-linked dependency storage.
 
 Recalculate every selected milestone from actual samples at its plan checkpoint. Existing full embedding weights appear to include audio; this is not a promise of zero decoder/dependency growth. A new caption model or runtime needs exact download, installed unique allocation, transient peak, and alternatives stated before installation. Do not extrapolate the generated-output allowance to the full collection or treat prior source-specific budgets as expansion approval.
 
-Follow `AGENTS.md` and `KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`: use existing wrappers and `cache/uv` hard links, independently pinned runtimes where necessary, and immutable dependency files. Explain any projected growth of at least 500 MiB, another runtime, or crossing the existing pilot target. Save new base-Python `scripts/storage-report.py` receipts under `data/storage/` before/after installations or bulk work, and include source-side generated allocation in combined accounting. Keep shared revisions in configured model storage. Apply documented cache cleanup only after verification and decision 0006 retention only in its exact locations; keep receipts, faults, protected evidence, and usable active results.
+Follow `AGENTS.md` and `KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`: use existing wrappers and `cache/uv` hard links, independently pinned runtimes where necessary, and immutable dependency files. Explain any projected growth of at least 500 MiB, another runtime, or crossing the Settings storage budget. Save new base-Python `scripts/storage-report.py` receipts under `data/storage/` before/after installations or bulk work, and include source-side generated allocation in combined accounting. Keep shared revisions in configured model storage. Apply documented cache cleanup only after verification and decision 0006 retention only in its exact locations; keep receipts, faults, protected evidence, and usable active results.
 
 ## Decisions still open
 
-- Representative source packs and the exact pilot membership for each type.
+- Representative source packs and the exact trial set membership for each type.
 - Final asset/sub-asset schema and identity rules, with migration costs.
 - Tiny-image and transparency preprocessing; first atlas metadata dialect and animated-image format.
 - Supported material conventions and how uncertain map assignments are reviewed.
-- Audio segmentation/coverage, useful retrieval thresholds judged on the pilot, and whether specialist retrieval is needed.
+- Audio segmentation/coverage, useful retrieval thresholds judged on the trial set, and whether specialist retrieval is needed.
 - Audio caption model, inference precision/hardware/runtime, release suitability, and storage budget.
 - First animation format/rig path and motion sampling policy.
 - First shader engine/category and the permitted preview setup.

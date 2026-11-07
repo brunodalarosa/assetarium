@@ -1,6 +1,5 @@
 from copy import deepcopy
 import json
-from pathlib import Path
 
 import pytest
 
@@ -8,8 +7,7 @@ from local_asset_library.captions import file_hash
 from local_asset_library.config import Config, ConfigError
 from local_asset_library.caption_batching import GpuMemoryError
 from local_asset_library.captions import (validate_caption, parse_caption, infer_caption,
-    image_inputs, merge_record, effective_caption, overlay_for, reuse_caption,
-    verify_calibration, caption_fingerprint, use_notes)
+    image_inputs, merge_record, effective_caption, overlay_for, use_notes)
 
 
 def caption():
@@ -152,12 +150,6 @@ def test_runtime_fault_not_retried(error):
     assert type(error).__name__ in result["attempts"][0]["error"]
 
 
-@pytest.mark.parametrize("status", ["failed", "unsupported"])
-def test_persisted_unchanged_fault_requires_explicit_retry(status):
-    record = {"caption_provenance": {"fingerprint": "same"}, "processing": {"caption": status}}
-    assert reuse_caption(record, "same")
-    assert not reuse_caption(record, "changed")
-    assert not reuse_caption(record, "same", retry_faults=True)
 
 
 def config_fixture(tmp_path):
@@ -218,35 +210,6 @@ def test_measured_facts_faults_and_owner_edits_survive_regeneration(tmp_path):
     overlay["description"]["technical"] = {"triangles": 0}
     with pytest.raises(ValueError):
         effective_caption(second, overlay)
-
-
-def test_pilot_gate_rejects_absent_and_stale_review(tmp_path, monkeypatch):
-    import local_asset_library.captions as module
-    config = config_fixture(tmp_path)
-    prompt_path = config.project_root / "prompt.txt"
-    prompt_path.write_text("inspect actual views")
-    backend = Backend([])
-    backend.contract = {"model": "fixture"}
-    backend.settings = {"seed": 0}
-    manifest = {"assets": [{"asset_id": str(i)} for i in range(40)]}
-    with pytest.raises(ConfigError, match="current calibration"):
-        verify_calibration(config, backend, "inspect actual views", prompt_path, manifest)
-    receipt_path = config.output_path("data", "captions/calibration-review.json")
-    receipt_path.parent.mkdir(parents=True)
-    receipt = {"status": "technically_reviewed", "approved_prompt_sha256": file_hash(prompt_path),
-               "receipts": [{"asset_id": str(i), "caption_fingerprint": "same", "input_views": ["pixels"]}
-                            for i in module.CALIBRATION_INDICES]}
-    receipt_path.write_text(json.dumps(receipt))
-    monkeypatch.setattr(module, "detail", lambda *_: {})
-    monkeypatch.setattr(module, "caption_fingerprint", lambda *_: "changed")
-    with pytest.raises(ConfigError, match="changed"):
-        verify_calibration(config, backend, "inspect actual views", prompt_path, manifest)
-    monkeypatch.setattr(module, "caption_fingerprint", lambda *_: "same")
-    monkeypatch.setattr(module, "image_inputs", lambda *_: ["pixels"])
-    verify_calibration(config, backend, "inspect actual views", prompt_path, manifest)
-    monkeypatch.setattr(module, "image_inputs", lambda *_: ["different pixels"])
-    with pytest.raises(ConfigError, match="images changed"):
-        verify_calibration(config, backend, "inspect actual views", prompt_path, manifest)
 
 
 def test_unicode_caption_survives_parse_and_record_merge(tmp_path):

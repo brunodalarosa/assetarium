@@ -1,4 +1,4 @@
-"""Pilot-only exact retrieval. Channel rankings remain separate from RRF output."""
+"""Exact library retrieval. Channel rankings remain separate from RRF output."""
 from contextlib import closing
 import hashlib
 import json
@@ -21,11 +21,26 @@ from .search_policy import DEFAULT_MODE, MAX_LIMIT, RRF_K, RRF_WEIGHTS, search_c
 from .asset_structure import asset_type
 from .dependency_resolution import dependency_file
 
-VERSION = "pilot-retrieval-v1"
+VERSION = "retrieval-v1"
+INDEX_IDS_KEY = "member_ids"
+# Indexes written by 0.2.0 and earlier still carry these names; they are read as the current
+# ones and rewritten on the next processing run, so upgrading never stops search.
+LEGACY_NAMES = {"version": "pilot-retrieval-v1", "ids": "pilot_ids"}
+
+
+def current_meta(meta):
+    """Index metadata under the current names; values are otherwise unchanged."""
+    meta = dict(meta)
+    if LEGACY_NAMES["ids"] in meta:
+        meta.setdefault(INDEX_IDS_KEY, meta[LEGACY_NAMES["ids"]])
+        del meta[LEGACY_NAMES["ids"]]
+    if meta.get("version") == LEGACY_NAMES["version"]:
+        meta["version"] = VERSION
+    return meta
 MODES = {"keyword", "description", "image", "keyword_description", "combined", "reference"}
 
 
-def pilot_records(config):
+def library_records(config):
     """Shared read-only slim records of the pinned publication (see library_cache)."""
     from .library_cache import library_records
     return library_records(config)
@@ -219,7 +234,7 @@ def index_database(config, readonly=False):
     path = config.output_path("data", "embeddings/index.sqlite")
     if readonly:
         if not path.is_file():
-            raise ConfigError("Pilot embedding index missing")
+            raise ConfigError("Search index is missing")
         return read_only(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     db = checked(sqlite3.connect(path), 'The search index', 1)
@@ -279,7 +294,7 @@ def recorded_contract(config, contract):
     return result
 
 
-def index_pilot(config, backend):
+def build_search_index(config, backend):
     started = time.perf_counter()
     from .membership import records as full_records
     records = full_records(config)  # Processing reads fresh full records.
@@ -356,11 +371,11 @@ def index_pilot(config, backend):
             db.executemany("INSERT INTO jobs VALUES (?,?,?,?,?,?)", jobs)
             db.executemany("INSERT INTO vectors VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", vectors)
             metadata = {"version": VERSION, "contract": contract, "contract_fingerprint": common,
-                        "pilot_ids": [r["asset_id"] for r in records]}
+                        INDEX_IDS_KEY: [r["asset_id"] for r in records]}
             db.executemany("INSERT OR REPLACE INTO meta VALUES (?,?)", [(k, encoded(v)) for k, v in metadata.items()])
         if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or db.execute("PRAGMA foreign_key_check").fetchall():
             raise ConfigError("Embedding database integrity check failed")
-    report = {"contract_fingerprint": common, "pilot_assets": len(records), "vector_count": len(vectors),
+    report = {"contract_fingerprint": common, "assets": len(records), "vector_count": len(vectors),
               "complete": sum(o["status"] == "complete" for o in outcomes),
               "failed": sum(o["status"] == "failed" for o in outcomes),
               "elapsed_seconds": time.perf_counter() - started, "outcomes": outcomes}
@@ -539,7 +554,7 @@ class SearchEngine:
         allowed = scope(self.config, filters)
         from .settings import used_formats
         formats = used_formats(self.config) if self.config.sources_registry else None
-        for record in pilot_records(self.config):
+        for record in library_records(self.config):
             if not matches(record, filters, allowed, formats):
                 continue
             try:
@@ -555,14 +570,14 @@ class SearchEngine:
                 raise ConfigError("Semantic search requires the verified embedding runtime")
             fingerprint = digest(self.contract)
             with closing(index_database(self.config, readonly=True)) as db:
-                metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
+                metadata = current_meta({k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")})
                 if metadata.get("version") != VERSION or metadata.get("contract_fingerprint") != fingerprint or metadata.get("contract") != self.contract:
                     raise ConfigError("Query/index embedding contract mismatch; reindex explicitly")
                 from .membership import membership
                 expected_ids = (set(membership(self.config)['asset_ids']) if self.config.sources_registry and not self.config.source_key
-                                else {r['asset_id'] for r in pilot_records(self.config)})
-                if set(metadata["pilot_ids"]) != expected_ids:
-                    raise ConfigError("Pilot query/index scope mismatch")
+                                else {r['asset_id'] for r in library_records(self.config)})
+                if set(metadata[INDEX_IDS_KEY]) != expected_ids:
+                    raise ConfigError("Search index members do not match the library; refresh the library")
                 channels = (["description", "image"] if mode == "combined" else
                             ["description"] if mode == "keyword_description" else
                             ["image" if mode == "reference" else mode])

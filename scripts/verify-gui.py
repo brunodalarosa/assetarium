@@ -107,7 +107,7 @@ def screenshot(name):
 
 
 # Home browses (Enter on an empty search) 40-card pages; thumbnails load only near the viewport.
-PAGE = 'Math.min(40,lal.state.context.pilot_count)'
+PAGE = 'Math.min(40,lal.state.context.asset_count)'
 THUMBNAILS_SETTLED = "document.querySelectorAll('#grid .thumb img').length>0&&lal.thumbnailWorkers()===0"
 
 

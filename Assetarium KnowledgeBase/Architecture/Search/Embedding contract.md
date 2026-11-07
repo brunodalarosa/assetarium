@@ -9,7 +9,7 @@ code: [embedding_backend.py, embedding_cpu.py, library_index.py, retrieval.recor
 ---
 # Step 5 embedding and retrieval contract
 
-Up: [Architecture](../Architecture.md) · Where in code: [Search](../../Notebook/Search/Search.md). Moved from `docs/embedding-contract.md` on 2026-10-28 (written as pilot step 5).
+Up: [Architecture](../Architecture.md) · Where in code: [Search](../../Notebook/Search/Search.md). Moved from `docs/embedding-contract.md` on 2026-10-28 (history: written as step 5 of the original 40-asset pilot).
 
 Verified October 11, 2026 against Google's [model card](https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2),
 [text inference guide](https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers),
@@ -96,7 +96,8 @@ still a contract change. The published index counts because a library store
 can bring vectors built on another checkout to an install with no search check yet;
 the search check then records that reconciled form.
 
-Only the existing 40 IDs in the pilot manifest are accepted for step 5 indexing.
+Only the members of the configured library (`data/library/membership.json`) are
+indexed; the index records their IDs and a search refuses an index whose members differ.
 Jobs publish atomically to SQLite and preserve usable successful items. Unchanged
 successful vectors are reused after verification; unchanged inference failures
 are retained without another inference attempt. Changed inputs/contracts are new
@@ -114,9 +115,9 @@ reported, never inferred from a successful render.
 
 ## Retrieval and evidence
 
-Omitting `--mode` preserves the step 2 full-catalog keyword CLI exactly. Explicit
+Omitting `--mode` keeps the plain full-catalog keyword CLI. Explicit
 `keyword`, `description`, `image`, `combined` and `reference` modes operate on the
-same pilot. Filename/keyword ranking uses the existing FTS5 literal AND terms and
+configured library. Filename/keyword ranking uses the existing FTS5 literal AND terms and
 BM25 ordering. Semantic ranking is normalized exact NumPy dot product; each image
 channel ranks an asset by its best individual view. All views/formats resolve to
 one logical ID. Combine unique-asset ranked lists by reciprocal rank fusion with

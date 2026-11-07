@@ -87,14 +87,14 @@ search browses the filtered library forty cards at a time with Previous/Next; th
 are kept). The sliders button opens **Filters & search options**: Asset type,
 Pack, Source format, Maximum triangles, Rigged, Image transparency, Image size,
 Search mode and Shortlist limit, with **Reset** and **Apply filters**. Choosing
-**Pilot preview reference** also shows the reference asset and view. Technical
+**Similar to an asset** also shows the reference asset and view. Technical
 filters require inspected facts for the requested format; unknowns do not
 qualify, and image filters match processed 2D images only.
 
 Search modes keep their backend values: **Name + description + image** is
 `combined`, the default; **Name + description** is `keyword_description`; then
-**Exact keywords**, **Visual description**, **Text → image** and **Pilot preview
-reference**. `combined` uses reciprocal rank fusion with image rank weight 3,
+**Exact keywords**, **Visual description**, **Text → image** and **Similar to an
+asset** (`reference`). `combined` uses reciprocal rank fusion with image rank weight 3,
 keyword and description weight 1 each, `k=60`. Shortlist choices are exactly
 **5, 10, 20, 30, 40** (default **20**; MCP's omitted limit remains 5). Both
 interfaces share the request-scaled response cap in `../mcp/README.md`.

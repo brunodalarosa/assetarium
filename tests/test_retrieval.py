@@ -12,7 +12,7 @@ from local_asset_library.catalog import scan, read_database, save_json, encoded,
 from local_asset_library.captions import file_hash
 from local_asset_library.config import Config, ConfigError
 from local_asset_library.embedding_backend import normalize
-from local_asset_library.retrieval import (SearchEngine, index_pilot, pilot_records, resolved_detail,
+from local_asset_library.retrieval import (SearchEngine, build_search_index, resolved_detail,
                                           description_input, index_database)
 
 
@@ -75,11 +75,12 @@ def indexed(tmp_path):
                                        "view_label": view, "origin": "rendered"})
     with sqlite3.connect(config.output_path("data", "catalog.sqlite")) as db:
         db.executemany("UPDATE assets SET record=? WHERE asset_id=?", [(encoded(r), r["asset_id"]) for r in records])
-    save_json(config.output_path("data", "pilot/selection-manifest.json"), {"assets": [{"asset_id": r["asset_id"]} for r in records]})
+    ids = [r["asset_id"] for r in records]
+    save_json(config.output_path("data", "library/membership.json"), {"schema_version": 1, "asset_ids": ids, "fingerprint": digest(ids), "scope": "library"})
     backend = SyntheticBackend()
     save_json(config.output_path("data", "embeddings/capability.json"), {"contract_fingerprint": digest(backend.contract),
                   "actual_text_and_image_inference": True, "reference_image_query_support": True, "test_double": True})
-    report = index_pilot(config, backend)
+    report = build_search_index(config, backend)
     assert report["complete"] == 120 and report["failed"] == 0
     return config, backend, records
 
@@ -103,6 +104,19 @@ def test_contract_mismatch(indexed, change):
     wrong = {**backend.contract, **change}
     with pytest.raises(ConfigError, match="contract mismatch"):
         SearchEngine(config, backend, wrong).search("red object", "description")
+
+
+def test_index_written_by_0_2_0_still_searches(indexed):
+    from local_asset_library.retrieval import INDEX_IDS_KEY, LEGACY_NAMES, VERSION, current_meta
+    config, backend, records = indexed
+    current, _ = SearchEngine(config, backend).search("item00", "combined")
+    with closing(sqlite3.connect(config.output_path("data", "embeddings/index.sqlite"))) as db, db:
+        db.execute("UPDATE meta SET key=? WHERE key=?", (LEGACY_NAMES["ids"], INDEX_IDS_KEY))
+        db.execute("UPDATE meta SET value=? WHERE key='version'", (encoded(LEGACY_NAMES["version"]),))
+    legacy, _ = SearchEngine(config, backend).search("item00", "combined")
+    assert [r["asset_id"] for r in legacy["results"]] == [r["asset_id"] for r in current["results"]]
+    assert current_meta({"version": LEGACY_NAMES["version"], LEGACY_NAMES["ids"]: ["a"]}) == {"version": VERSION, INDEX_IDS_KEY: ["a"]}
+    assert current_meta({"version": "other", INDEX_IDS_KEY: ["a"]}) == {"version": "other", INDEX_IDS_KEY: ["a"]}
 
 
 def test_channels_duplicate_views_and_compact_size(indexed):
@@ -178,10 +192,10 @@ def test_failed_index_never_retains_stale_vector_or_retries(indexed):
         record["description"]["colors"] = ["blue"]
         db.execute("UPDATE assets SET record=? WHERE asset_id=?", (encoded(record), record["asset_id"]))
     backend.failure = "inference failed"
-    report = index_pilot(config, backend)
+    report = build_search_index(config, backend)
     assert report["failed"] == 1 and report["complete"] == 119
     calls = len(backend.calls)
-    repeated = index_pilot(config, backend)
+    repeated = build_search_index(config, backend)
     assert len(backend.calls) == calls and repeated["failed"] == 1
     with closing(index_database(config, True)) as db:
         assert db.execute("SELECT count(*) FROM vectors WHERE asset_id=? AND channel='description'", (records[0]["asset_id"],)).fetchone()[0] == 0
@@ -311,7 +325,7 @@ def test_line_endings_alone_keep_embedding_contract_and_vectors(indexed):
     save_json(config.output_path("data", "embeddings/capability.json"), {"contract": backend.contract,
               "contract_fingerprint": digest(backend.contract), "actual_text_and_image_inference": True,
               "reference_image_query_support": True, "test_double": True})
-    assert index_pilot(config, backend)["complete"] == 120
+    assert build_search_index(config, backend)["complete"] == 120
     # A checkout may rewrite the adapter or runtime lock as CRLF (or back); inference reads the same text.
     lock.write_bytes(b"version = 1\r\nrevision = 3\r\n")
     flipped = SyntheticBackend()
@@ -319,7 +333,7 @@ def test_line_endings_alone_keep_embedding_contract_and_vectors(indexed):
     assert digest(flipped.contract) != digest(backend.contract)
     response, _ = SearchEngine(config, flipped).search("red object", "description")
     assert response["results"]
-    report = index_pilot(config, flipped)
+    report = build_search_index(config, flipped)
     assert report["complete"] == 120 and all(o["reused"] for o in report["outcomes"])
     assert not [c for c in flipped.calls if c[0] != "query"]
     lock.write_bytes(b"version = 1\r\nrevision = 4\r\n")

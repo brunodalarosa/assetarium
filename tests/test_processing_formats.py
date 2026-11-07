@@ -17,6 +17,7 @@ from local_asset_library.inspection import choose_source
 from local_asset_library.incremental import working, process, inspection_input, update_record
 from local_asset_library.library_index import index_library
 from local_asset_library.membership import records
+from local_asset_library.retrieval import INDEX_IDS_KEY
 from local_asset_library.publication import atomic_json
 from local_asset_library.settings import (GIB, processing_formats, general_settings, save_general_settings,
                                           settings_path, processing_eligible)
@@ -48,7 +49,7 @@ def test_invalid_format_settings_preserve_the_saved_file(library, formats):
     assert settings_path(config).read_bytes() == before
 
 
-def test_source_selection_filters_alternates_and_pilot_override():
+def test_source_selection_filters_alternates_and_pinned_source():
     asset = {'pack': 'kenney_food-kit', 'name': 'apple', 'files': [
         {'path': 'apple.fbx', 'format': 'fbx', 'availability': 'available'},
         {'path': 'apple.glb', 'format': 'glb', 'availability': 'available'},
@@ -187,7 +188,7 @@ def test_indexing_enabled_assets_preserves_disabled_vectors_and_pinned_source(li
     assert index_library(work, backend)['processed'] == 1
     with closing(sqlite3.connect(work.output_path('data', 'embeddings/index.sqlite'))) as db:
         assert db.execute('SELECT * FROM vectors WHERE asset_id=? ORDER BY job_id', (disabled['asset_id'],)).fetchall() == old
-        assert disabled['asset_id'] in json.loads(db.execute("SELECT value FROM meta WHERE key='pilot_ids'").fetchone()[0])
+        assert disabled['asset_id'] in json.loads(db.execute("SELECT value FROM meta WHERE key=?", (INDEX_IDS_KEY,)).fetchone()[0])
 
 
 def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(managed, monkeypatch):

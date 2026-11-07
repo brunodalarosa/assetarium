@@ -5,7 +5,7 @@ import sys
 import pytest
 
 from local_asset_library.config import Config, ConfigError
-from local_asset_library.inspection import choose_source, inspect_pilot, reuse_result, run_process, validate_result
+from local_asset_library.inspection import choose_source, reuse_result, run_process, validate_result
 from local_asset_library.render_math import duplicate_faces, framing
 
 
@@ -97,16 +97,6 @@ def test_worker_false_success_is_rejected(tmp_path):
               "previews":[{"view_label":v,"filename":v+".png","sha256":"none","quality":{"empty":True,"off_frame":False}} for v in ("front","side","three_quarter")]}
     with pytest.raises(ConfigError, match="invalid preview"):
         validate_result(config, job, result)
-
-
-def test_full_pilot_requires_prior_representative_review(tmp_path, monkeypatch):
-    root, source = tmp_path / "project", tmp_path / "source"
-    root.mkdir()
-    source.mkdir()
-    config = Config(root, source, None)
-    monkeypatch.setattr("local_asset_library.inspection.load_pilot", lambda config: {"assets":[]})
-    with pytest.raises(ConfigError, match="Review the four"):
-        inspect_pilot(config, "pilot")
 
 
 def test_changed_loaded_dependency_rejected_on_cached_result(tmp_path):

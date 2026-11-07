@@ -9,7 +9,7 @@ export const MODES: [string, string][] = [
   ["keyword", "Exact keywords"],
   ["description", "Visual description"],
   ["image", "Text → image"],
-  ["reference", "Pilot preview reference"],
+  ["reference", "Similar to an asset"],
 ];
 export const modeLabel = (mode: string) => MODES.find(([value]) => value === mode)?.[1] ?? mode;
 export const LIMITS = ["5", "10", "20", "30", "40"];

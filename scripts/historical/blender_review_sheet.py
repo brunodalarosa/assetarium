@@ -7,7 +7,7 @@ import sys
 import bpy
 import numpy as np
 
-root = Path(__file__).resolve().parents[1]
+root = Path(__file__).resolve().parents[2]
 phase = sys.argv[sys.argv.index("--") + 1]
 if phase not in {"representatives", "pilot"}:
     raise ValueError("Invalid review phase")

@@ -291,8 +291,8 @@ class Gateway:
         return {'payload': payload, 'image': image, 'evidence': evidence, 'is_error': False}
 
     def _has_sources(self):
-        from .retrieval import pilot_records
-        return bool(pilot_records(self.config)) if self.config.sources_registry else True
+        from .retrieval import library_records
+        return bool(library_records(self.config)) if self.config.sources_registry else True
 
     def note_client(self, ctx):
         """The client's name from its initialize request, once, into the connection record."""
