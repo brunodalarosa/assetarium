@@ -21,13 +21,14 @@ A short list of actions stays owner-only.
 | --- | --- | --- |
 | Reading | Search, assets, packs, profiles, collections, setup status (bounded responses) | — |
 | Organization | Create and edit collections, labels, notes; add and remove owner tags | Deleting a collection |
-| Pack structure | Apply any pack profile, including rules that rescan a library folder | — |
-| Processing | Start Make previews and Generate descriptions on a pack, folder or selection; they join the same queue as the owner's jobs | — |
+| Pack structure | Apply any pack profile, including rules that rescan a library folder: excluded folders, export-folder groups ([decision 0019](0019-source-folders-and-export-variants.md)), the texture folder ([decision 0021](0021-texture-folder-choice.md)) | — |
+| Processing | Start Make previews and Generate descriptions on a pack, folder or selection; they join the same queue as the owner's jobs | Releasing recorded failures for a recheck ([decision 0020](0020-alternate-file-faults-and-recheck.md)) |
 | Setup | Apply settings (budget, formats, engines, batch size, descriptions on/off, model server); verify weights | Saving a Blender executable (the agent proposes it) |
 | Anything destructive | — | Deletions, Forget missing, removing results or old folders (interactive owner only, [decision 0013](0013-platform-support.md)) |
 | Control | — | **Pause agents**, Undo, Stop |
 
-Why the Blender path stays owner-only: it decides which program Assetarium runs, and a change re-renders every
+Why recheck stays owner-only: failures are retried only on the owner's explicit request (`AGENTS.md` → Fault
+handling); an agent may suggest a recheck. Why the Blender path stays owner-only: it decides which program Assetarium runs, and a change re-renders every
 3D asset until it is keyed by version ([decision 0028](0028-result-identity.md)). Installs and
 downloads never happen inside Assetarium; an agent with its own shell runs them with the user's approval there.
 
@@ -88,3 +89,6 @@ directly. Say so rather than claiming more.
 - Pause, Stop and Undo stay owner-only and stay reachable from the app (and the CLI on Linux).
 - Destructive actions stay interactive and owner-only; no flag or tool argument bypasses that.
 
+## Changes
+
+- 2026-11-07: named the export-folder groups and the texture folder as agent-applicable pack rules (0019, 0021 updated to match), and made recheck owner-only (PR review).

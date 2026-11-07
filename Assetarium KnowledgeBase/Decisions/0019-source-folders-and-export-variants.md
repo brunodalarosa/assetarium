@@ -31,8 +31,8 @@ folder) are unrelated to variant groups (separate assets whose names differ in a
   they are. The card and CLI say how many names are shared and which stay as they are, and Exclude
   says how many ungrouped names it would also skip. Near-miss answers are bound to the shared names
   and to each folder's remaining and repeated names. Exact matches keep their suggestion identities,
-  so earlier answers stay valid. Nothing groups on a guess: the owner answers **Group**, **Keep separate** or
-  **Exclude** (adds the extra folders to the exclusions). An answer is bound to the anchor, the
+  so earlier answers stay valid. Nothing groups on a guess: the owner or a connected agent ([decision 0029](0029-agent-trust.md), shown in
+  Agent activity with Undo) answers **Group**, **Keep separate** or **Exclude** (adds the extra folders to the exclusions). An answer is bound to the anchor, the
   folders and a hash of the name list; when a folder's names change it stops applying (its files
   are separate again and the suggestion returns) and applies again if the names match again.
   Grouping keeps the identity of the reference folder's file (recognized group or standalone), so
@@ -60,3 +60,4 @@ variant is chosen from an asset's own files only.
 
 - 2026-10-30: the answers moved from each folder's generated folder into the central library store.
 - 2026-10-31: inside a pack, excluded folders and export answers became pack-profile rules (decision 0035).
+- 2026-11-07: a connected agent may answer too, like any pack-profile rule (decision 0029); it was owner-only.

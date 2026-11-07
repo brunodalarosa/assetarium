@@ -19,8 +19,9 @@ texture repair only maps unique matches.
   of each such name, listed with how many models each fixes alone and with single copies, sorted by
   the former. Settings → Asset sources shows the choice; the Asset processing card points to it;
   `local-assets sources textures KEY` lists it.
-- **Apply.** The owner picks a folder and whether single copies may be used
-  (`source.json` `texture_folder`). The rescan writes a `texture_folder_paths` texture-repair recipe
+- **Apply.** The owner or a connected agent ([decision 0029](0029-agent-trust.md)) picks a folder and whether
+  single copies may be used (`source.json` `texture_folder`, a pack-profile rule inside a pack,
+  [decision 0035](0035-packs-and-variant-groups.md)). An agent's choice shows in Agent activity with Undo. The rescan writes a `texture_folder_paths` texture-repair recipe
   (exact paths and hashes, the choice as authorization, `originals_modified: false`) for each model
   whose **every** missing texture resolves, and marks its failed render stages pending; the next
   Process assets renders it once through the existing `blender_repair_worker.py`. Models with any
@@ -32,9 +33,10 @@ texture repair only maps unique matches.
 texture dependencies"; `Textures/PBR` alone resolves 49, and with the two textures that exist once
 (`Textures/Other/GrassAlpha_D.png`, `Textures/URP/Plants/Cactus_AlbedoTransparency.png`) all 117.
 
-**Keep true.** Exact file names only, never similar names. One decision per source, applied only by
-the owner. All or nothing per model. Originals and the inspection worker stay unchanged.
+**Keep true.** Exact file names only, never similar names. One choice per library folder, applied by
+the owner or a connected agent and undoable. All or nothing per model. Originals and the inspection worker stay unchanged.
 
 ## Changes
 
 - 2026-10-30: the choice is saved in the central library store instead of each folder's generated folder; the rules are unchanged.
+- 2026-11-07: a connected agent may apply the choice too, like any pack-profile rule (decision 0029); it was owner-only.

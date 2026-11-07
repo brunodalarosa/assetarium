@@ -73,8 +73,12 @@ def test_decisions_are_rewritten_not_patched():
                            'line under "## Changes" instead (AGENTS.md → Recorded decisions)')
 
 
-def _exists(name):
-    """A cited `module.attr`, `file.py` or repo path still exists (attributes by definition or assignment)."""
+def _exists(name, anchor):
+    """A cited `module.attr`, `file.py` or repo path still exists (attributes by definition or assignment).
+
+    ``anchor``: the name comes from the `code` frontmatter, so a missing module is a stale anchor. In the text a
+    missing module is prose that only looks like code (`shutil.rmtree`, `window.lal`) and is not checked.
+    """
     if '/' in name:
         return (ROOT / name).exists()
     if name.endswith(FILE_TYPES):
@@ -82,18 +86,28 @@ def _exists(name):
     module, _, attr = name.partition('.')
     source = PACKAGE / f'{module}.py'
     if not source.exists():
-        return None  # Not a package module (prose like `config.local.toml`): nothing to check.
+        return False if anchor else None
     last = attr.split('.')[-1]
     return not last or re.search(rf'^\s*(def|class|async def)\s+{re.escape(last)}\b|^\s*{re.escape(last)}\s*[:=]',
                                  source.read_text(encoding='utf-8'), re.M) is not None
+
+
+def stale_names(fields, text):
+    anchors = [c.strip() for c in fields.get('code', '').strip(' []').split(',') if c.strip()]
+    prose = [name for name in re.findall(r'`([a-z_]+\.[A-Za-z_][\w.]*)`', text)  # `module.function` in the text
+             if not name.endswith(FILE_TYPES)]  # File names in prose (`settings.json`) are data, not code.
+    return [n for n in dict.fromkeys(anchors) if _exists(n, True) is False] + \
+           [n for n in dict.fromkeys(prose) if n not in anchors and _exists(n, False) is False]
 
 
 def test_cited_code_still_exists():
     missing = []
     for path in records():
         fields, text = front(path)
-        cited = [c.strip() for c in fields.get('code', '').strip(' []').split(',') if c.strip()]
-        cited += [name for name in re.findall(r'`([a-z_]+\.[A-Za-z_][\w.]*)`', text)  # `module.function` in the text
-                  if not name.endswith(FILE_TYPES)]  # File names in prose (`settings.json`) are data, not code.
-        missing += [f'{path.name}: {name}' for name in dict.fromkeys(cited) if _exists(name) is False]
+        missing += [f'{path.name}: {name}' for name in stale_names(fields, text)]
     assert not missing, 'Decisions cite code that no longer exists:\n' + '\n'.join(missing)
+
+
+def test_a_removed_module_is_a_stale_anchor_but_not_stale_prose():
+    fields = {'code': ' [removed_module.no_longer_exists, incremental.inspection_input]'}
+    assert stale_names(fields, '`removed_module.no_longer_exists` and `shutil.rmtree`') == ['removed_module.no_longer_exists']
