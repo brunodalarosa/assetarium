@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-10-18
+superseded_in_part_by: "0030"
 ---
 # 0008 — Descriptions are optional extra data; notifications report them
+
+> **Partly superseded on November 7, 2026 by [0030 Left-out items are hidden, counted once](0030-counted-exclusions.md):** search no longer ignores unusable descriptions silently; it counts them.
+> The rest of this record still binds.
 
 **Decision.**
 - **Importing never generates descriptions.** **Process assets** runs inspection/

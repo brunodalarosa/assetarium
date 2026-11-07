@@ -3,6 +3,7 @@ tags: [decision]
 decided: 2026-11-07
 supersedes: [0004, 0007 (identity parts), 0015 (fingerprint part), 0022 (device and equivalent workers), 0023 ("results keyed by inputs")]
 code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, result_store.adopt, result_store.location_free, library_migration.rekey, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
+superseded_in_part_by: "0030"
 ---
 # 0028 — Result identity: what makes finished work run again
 
@@ -65,13 +66,14 @@ stays in the key and setup keeps asking before saving a different Blender.
 - The caption model revision changes.
 - The Blender path or executable changes (until the version change above lands).
 - Search device switches between `cpu` and `cuda` (search data only).
+- A format is turned off and an asset's previews came from it while another of its formats is on: it becomes
+  pending from that format ([decision 0030](0030-counted-exclusions.md); not built yet). Its old results are kept,
+  so turning the format back on reuses them without rendering.
 
 **Does not run again (on purpose):**
 - A file moves, is renamed, duplicated or reorganized; a folder joins or splits.
 - Render device, renders at a time, batch size, search threads, or the configured engine changes: finished
   work is checked against what it recorded.
-- A format is turned off: a finished inspection keeps the file it inspected (`settings.inspected_path`) and
-  shows as Format off; only assets not inspected yet pick their file from the formats that are on.
 - A fingerprint **definition** changes: existing results are re-keyed, never re-queued.
 - An unchanged failure: it is kept and skipped, never retried automatically.
 

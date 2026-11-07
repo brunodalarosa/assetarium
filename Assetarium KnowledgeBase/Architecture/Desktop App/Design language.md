@@ -89,8 +89,9 @@ inspector, a tooltip or an expanded row.
   it, in one line. The same rule holds in every view, the Library included, where each folder shows its count.
 - First applied to a model whose previews were made from a file in a format that is off (an FBX inspected model
   that also has an OBJ, with FBX off). It used to look Ready while descriptions and search by meaning quietly
-  left it out. It became **Format off** (`settings.format_off`) with **Turn FBX on**; under the hiding rule it
-  leaves the views and is counted: *"120 hidden: FBX is off · Show · Turn FBX on"* (not built yet).
+  left it out. It became **Format off** (`settings.format_off`) with **Turn FBX on**. Under the hiding rule it
+  leaves the views, is counted and is re-inspected from its OBJ on the next Make previews:
+  *"15 hidden until previews from OBJ are made · Make previews"* (decision 0030; not built yet).
 - Closing the app while work runs says so and asks; the next start says what stopped (decision 0023).
 
 ## P6 — Agents first, in the open

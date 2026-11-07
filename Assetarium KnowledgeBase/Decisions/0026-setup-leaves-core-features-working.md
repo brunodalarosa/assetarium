@@ -1,8 +1,12 @@
 ---
 tags: [decision]
 decided: 2026-11-01
+superseded_in_part_by: "0030"
 ---
 # 0026 — Setup leaves every core feature working; built-in samples; formats Assetarium uses
+
+> **Partly superseded on November 7, 2026 by [0030 Left-out items are hidden, counted once](0030-counted-exclusions.md):** a format that is off no longer "does not exist": its assets are hidden and counted, and assets with another format on are re-inspected from it.
+> The rest of this record still binds.
 
 **Decision (owner, November 1, 2026; co-designed, approved for implementation).** After setup finishes (the app
 wizard, the CLI wizard or the agent-assisted setup), every **core feature** works without an extra step from the
