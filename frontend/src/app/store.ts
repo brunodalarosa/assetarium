@@ -19,7 +19,8 @@ export interface Route {
 }
 /** A card grid with its own selection and inspection: Home, the Asset sources tab or an open collection. */
 export type GridId = "library" | "source" | "collection";
-export type InspectorTab = "overview" | "sources" | "evidence";
+/** The inspector's collapsible sections; each remembers being left open (settings.INSPECTOR_SECTIONS). */
+export type InspectorSection = "file" | "geometry" | "image" | "record";
 
 export interface Thumb {
   image?: string;
@@ -244,7 +245,7 @@ export interface AppState {
   confirm: ConfirmRequest | null;
   create: CreateRequest | null;
   knownTags: Json[];
-  inspector: { open: boolean; width: number; tab: InspectorTab };
+  inspector: { open: boolean; width: number; sections: Record<InspectorSection, boolean> };
   sourcesView: SourcesView;
   /** The processing queue (decision 0023); null until first loaded. */
   queue: Json | null;
@@ -311,6 +312,7 @@ const idleSearch: SearchState = {
 };
 
 const boot = window.LAL_BOOT || { appearance: "system", inspector_width: 440 };
+const CLOSED_SECTIONS: Record<InspectorSection, boolean> = { file: false, geometry: false, image: false, record: false };
 let state: AppState = {
   api: null, ready: false, startupError: null, context: null,
   history: [{ page: "home" }], historyIndex: 0,
@@ -319,7 +321,7 @@ let state: AppState = {
   collectionView: emptyCollectionView(),
   collections: { items: [], total: 0, loading: false, loaded: false, error: null, query: "" },
   selection: { active: false, ids: [], anchor: null }, menu: null, confirm: null, create: null, knownTags: [],
-  inspector: { open: false, width: boot.inspector_width, tab: "overview" },
+  inspector: { open: false, width: boot.inspector_width, sections: { ...CLOSED_SECTIONS, ...boot.inspector_sections } },
   sourcesView: emptySourcesView(),
   queue: null,
   sources: [], globalScan: null, sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
@@ -673,8 +675,19 @@ export function setInspectorOpen(open: boolean) {
   const c = state[id];
   if (open && c.selected && c.detail && !c.detail.loading) void selectAsset(id, c.selected, c.detail.format, c.detail.view, false);
 }
-export function setInspectorTab(tab: InspectorTab) {
-  setState((s) => ({ inspector: { ...s.inspector, tab } }));
+let sectionsTimer: ReturnType<typeof setTimeout> | undefined;
+let sectionsPending: Partial<Record<InspectorSection, boolean>> = {};
+/** Open or close one inspector section; the state is saved app-wide, like the panel width. */
+export function setInspectorSection(name: InspectorSection, open: boolean) {
+  if (state.inspector.sections[name] === open) return;
+  setState((s) => ({ inspector: { ...s.inspector, sections: { ...s.inspector.sections, [name]: open } } }));
+  sectionsPending[name] = open;
+  clearTimeout(sectionsTimer);
+  sectionsTimer = setTimeout(() => {
+    const patch = sectionsPending;
+    sectionsPending = {};
+    void api().save_interface_settings(null, null, patch).catch(() => {});
+  }, 250);
 }
 let widthTimer: ReturnType<typeof setTimeout> | undefined;
 export function setInspectorWidth(width: number, persist = false) {

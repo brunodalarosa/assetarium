@@ -114,19 +114,45 @@ newer busy state. Reduced-motion preferences stop the animation.
 
 **Asset inspection.** The right sidebar is only for inspection. Clicking a card
 opens it (the card is highlighted); the toggle or **×** hides it and shows it
-again with the same selection and tab. With nothing selected it shows **No asset
+again with the same selection. With nothing selected it shows **No asset
 selected**. Drag the grip (or focus it and use ←/→, Home/End) to resize it
 continuously; the width is remembered. Results and inspection scroll
 independently. On narrow windows the panel floats over the results.
 
-- **Overview:** the preview, **Source format** and **Preview view**, **Open
-  interactive 3D preview**, measured facts, generated observations and suggested
-  uses. A missing or faulty requested view produces a reason, not another image.
-- **Sources:** the original path with **Copy source path** (text only) and its
-  SHA-256, dependencies with their referring source, and license evidence.
-- **Evidence:** caption notes and warnings (with the original review evidence),
-  recorded faults with full fault/processing evidence, measurement and
-  structured-observation evidence, and owner review.
+The panel is one scroll, top to bottom:
+
+1. The name, type and pack, then a **fault line** only when something is recorded
+   as faulty: its first reason and **Details**, which opens the Processing record.
+2. The preview, with **Preview view** and **Open interactive 3D preview**.
+   **Source format** appears only when the asset has more than one format. A
+   missing or faulty requested view produces a reason, not another image.
+3. **Fact chips**: for 3D models the triangle count, the format, the number of
+   dependency files, **Rigged** and **Animated · N clips** when they apply, and the
+   license; for images the size, transparency, colours and format, and the
+   license. Clicking a chip opens its section and scrolls to it. The license chip
+   says **CC0** when the supplied license file is recognized as Creative Commons
+   Zero, **License file** when a file exists but isn't recognized, and **No
+   license file** otherwise.
+4. Variants and, in a collection, the asset's label and notes.
+5. The **description** with a small **Generated** label (hover it for what that
+   means). When the description has caption warnings or review notes, a chip
+   beside it shows how many and opens their reasons. **Suggested uses** follow as
+   chips when there are any.
+6. **Tags**.
+7. Three collapsible sections:
+   - **File & license:** the original path with **Copy source path** (text only),
+     other variants, the dependency files and each license file with its excerpt.
+     Images also show the folder-name purpose suggestion and identical copies.
+   - **Geometry** (3D models): triangles, vertices, armatures, animation clips, and
+     the inspected format when it differs from the one shown. Images have
+     **Image** instead: the measured facts and how search reads the image.
+   - **Processing record:** the recorded faults and the raw evidence: fault and
+     processing evidence, the source SHA-256, measurement JSON, structured
+     observations, caption review evidence and the image derivation record.
+
+Each section stays open or closed the way you left it, for every asset and after
+a restart. All three start closed. Agents read every field through MCP
+`get_asset`, whatever the panel shows.
 
 Click the inspection image or **Open interactive 3D preview** to explore the
 selected source in place; **Fullscreen** opens the same preview across the
@@ -136,7 +162,7 @@ background, edges, up-axis and navigation. Escape returns from fullscreen;
 **Back to image** releases the viewer. See [interactive previews](3d-preview.md).
 
 **2D images** appear with a **2D image** or **SVG image** badge on a checkerboard,
-and small-palette art keeps hard pixel edges. Their Overview shows an image
+and small-palette art keeps hard pixel edges. Their inspection shows an image
 viewer instead of the 3D preview: **Fit**, **1:1**, zoom out/in (12.5–3,200%),
 **Background** (checkerboard, light, dark, mid gray; remembered for the session)
 and **Hard pixel edges**; with the image focused, `+`, `-`, `0` and `1` work too.
