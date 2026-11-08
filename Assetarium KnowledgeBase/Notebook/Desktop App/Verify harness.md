@@ -33,6 +33,14 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   poll still in flight then logs a harmless `_returnValuesCallbacks … is not a function` traceback.
   See `scripts/verify-inspector-layout.py`.
 
+- **Timers are throttled in the verify window.** It runs in the background, so `setInterval` /
+  `setTimeout` can fire far less often than asked. To count UI changes during fast input, use a
+  `MutationObserver` (for example on `aria-pressed`), not a sampling timer. See the browsing check in
+  `scripts/verify-interactive-preview.py`.
+
+- **A fixture with no registered sources opens setup**, which covers the window and swallows global keys.
+  Close it after `ui.wait_ready()` with `lal.closeSetup()`.
+
 - `verify-setup-wizard.py`'s opening-focus check (`opens_by_itself_on_a_fresh_install` → `focus`)
   failed on unchanged `develop` when launched from an agent session on 2026-10-28; treat a failure there
   as possibly environmental before blaming a change *(unverified: cause)*.
