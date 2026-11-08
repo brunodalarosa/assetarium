@@ -1,8 +1,9 @@
 """Real WebView2 check of the asset inspection panel: one scroll, fact chips and remembered sections.
 
-Synthetic assets only (the 2D art fixture plus one inspected 3D model with a rig, clips and a license file).
+Synthetic assets only (the 2D art fixture plus inspected 3D models with a rig, clips and a license file; one is
+measured in another format than the one selected).
 Covers: no tabs; the top-to-bottom order; a fault line only on a faulty asset; chips that open and scroll to
-their section; section state that survives another selection and a restart (a reload from the saved boot
+their section; a format-mismatch caveat beside the chips while Geometry is closed; section state that survives another selection and a restart (a reload from the saved boot
 payload); the Image section for images; and the fields the redesign dropped. No model, GPU or real asset source
 is used. Evidence: data/gui/<run-name>/.
 """
@@ -42,26 +43,29 @@ config, backend, source, art_root = art.__wrapped__(fixture)
 (art_root / 'Pixel/License.txt').write_text('Pixel icons. License: Creative Commons Zero (CC0).\n', encoding='utf-8')
 (art_root / 'Models/License.txt').write_text('Crate model. License: CC0 1.0 Universal.\n', encoding='utf-8')
 (art_root / 'Wide/LICENSE.txt').write_text('Wide images. All rights reserved; ask before use.\n', encoding='utf-8')
+(art_root / 'Models/barrel.obj').write_text('v 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n', encoding='utf-8')
 work, _ = ready_images(config, backend, source)
 # The art fixture has no Blender; give its crate model the record a successful inspection would leave.
-crate = next(r for r in records(work) if r['display_name'] == 'crate')
-crate['processing'].update(inspection='complete', previews='complete')
-crate['stage_faults'] = {}
-crate['technical'] = {'inspected_path': crate['files'][0]['path'], 'inspected_sha256': crate['files'][0]['sha256'], 'inspected_format': 'obj',
-                      'evaluated_instance_totals': {'triangles': 1248, 'vertices': 702}, 'armatures': [{'object': 'Rig', 'bones': 12}],
-                      'animation_clips': [{'name': 'Idle', 'frame_range': [1, 40]}, {'name': 'Walk', 'frame_range': [1, 24]}]}
-crate['previews'] = []
-for view in ('three_quarter', 'front', 'side'):
-    path = work.output_path('data', f'results/synthetic/crate-{view}.png')
-    path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new('RGB', (96, 96), '#8a6a4b').save(path)
-    crate['previews'].append({'path': path.relative_to(work.project_root).as_posix(), 'sha256': file_hash(path), 'view_label': view, 'origin': 'rendered'})
-update_record(work, crate)
+# The barrel's measurements claim FBX while only its OBJ exists: the selected format is not the inspected one.
+for name, inspected in (('crate', 'obj'), ('barrel', 'fbx')):
+    model = next(r for r in records(work) if r['display_name'] == name)
+    model['processing'].update(inspection='complete', previews='complete')
+    model['stage_faults'] = {}
+    model['technical'] = {'inspected_path': model['files'][0]['path'], 'inspected_sha256': model['files'][0]['sha256'], 'inspected_format': inspected,
+                          'evaluated_instance_totals': {'triangles': 1248, 'vertices': 702}, 'armatures': [{'object': 'Rig', 'bones': 12}],
+                          'animation_clips': [{'name': 'Idle', 'frame_range': [1, 40]}, {'name': 'Walk', 'frame_range': [1, 24]}]}
+    model['previews'] = []
+    for view in ('three_quarter', 'front', 'side'):
+        path = work.output_path('data', f'results/synthetic/{name}-{view}.png')
+        path.parent.mkdir(parents=True, exist_ok=True)
+        Image.new('RGB', (96, 96), '#8a6a4b').save(path)
+        model['previews'].append({'path': path.relative_to(work.project_root).as_posix(), 'sha256': file_hash(path), 'view_label': view, 'origin': 'rendered'})
+    update_record(work, model)
 index_library(work, backend)
 publish_source(sources.bound(config, source))
 sources.aggregate(config)
 sources.scan_source(config, source)
-IDS = {r['display_name']: r['asset_id'] for r in records(work) if r['display_name'] in ('crate', 'potion', 'banner', 'box', 'damaged')}
+IDS = {r['display_name']: r['asset_id'] for r in records(work) if r['display_name'] in ('crate', 'barrel', 'potion', 'banner', 'box', 'damaged')}
 saved = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in art_root.rglob('*') if p.is_file()}
 
 
@@ -115,8 +119,17 @@ def verify():
             chips:JSON.stringify({CHIPS})===JSON.stringify(['1,248 tris','OBJ','2 dependency files','Rigged','Animated · 2 clips','CC0']),
             sections:JSON.stringify({EXPANDED})==='{{"file":false,"geometry":false,"record":false}}',
             oneFormatNoSelect:!$('detail-format')&&!!$('detail-view'),
-            dropped:{json.dumps(DROPPED)}.every(t=>!text.includes(t))}}}})()""")
+            noCaveat:!at('.format-caveat'),dropped:{json.dumps(DROPPED)}.every(t=>!text.includes(t))}}}})()""")
         capture('01-model-collapsed.png')
+
+        select('barrel')
+        check('format_caveat_beside_chips', f"""(()=>{{const d=$('detail'),caveat=d.querySelector('.format-caveat'),chips={CHIPS};
+          const box=caveat?.getBoundingClientRect(),list=d.querySelector('.fact-chips').getBoundingClientRect();
+          return {{geometryClosed:!{EXPANDED}.geometry,visible:!!box&&box.height>0&&box.top>=list.bottom-1&&box.top-list.bottom<24,
+            text:caveat?.textContent==='OBJ is uninspected; the measurements describe FBX.',
+            chips:JSON.stringify(chips)===JSON.stringify(['1,248 tris · FBX','OBJ','Rigged · FBX','Animated · 2 clips · FBX','CC0'])}}}})()""")
+        capture('01b-model-format-caveat.png')
+        select('crate')
 
         check('chip_opens_geometry', f"""(async()=>{{{chip('Rigged')}.click();await until(()=>$('inspector-section-geometry-content'));
           await new Promise(r=>setTimeout(r,700));const box=$('inspector-section-geometry').getBoundingClientRect(),view=$('detail').getBoundingClientRect();

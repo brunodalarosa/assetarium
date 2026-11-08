@@ -159,6 +159,7 @@ function FactChips({ result, image }: { result: Json; image: boolean }) {
   const p = result.payload, info = p.presentation || {}, t = info.technical || {};
   const [license, licenseHint] = licenseFact(info.license_evidence || []);
   const chips: [InspectorSection, string, string][] = [];
+  let caveat: string | null = null;
   if (image) {
     if (t.width != null) {
       chips.push(["image", t.vector ? `${t.width} × ${t.height} canvas units` : `${t.width} × ${t.height} px`, "Measured size"]);
@@ -168,21 +169,34 @@ function FactChips({ result, image }: { result: Json; image: boolean }) {
     const format = t.format || p.selected_source?.format || (info.formats || [])[0];
     if (format) chips.push(["file", formatLabel(format), "File format"]);
   } else {
-    const triangles = t.evaluated_instance_totals?.triangles;
-    if (triangles != null) chips.push(["geometry", `${triangles.toLocaleString()} tris`, "Triangles"]);
     const format = p.selected_source?.format;
+    // Measurements come from the inspected file; when another format is selected they name their source.
+    const measured = format && t.inspected_format && format !== t.inspected_format ? t.inspected_format : null;
+    const from = measured ? ` · ${formatLabel(measured)}` : "";
+    const fromHint = measured ? `, measured in ${formatLabel(measured)}` : "";
+    const triangles = t.evaluated_instance_totals?.triangles;
+    if (triangles != null) chips.push(["geometry", `${triangles.toLocaleString()} tris${from}`, `Triangles${fromHint}`]);
     if (format) chips.push(["file", formatLabel(format), "Source format"]);
     const dependencies: Json[] = p.dependencies || info.dependencies || [];
     if (dependencies.length) chips.push(["file", plural(dependencies.length, "dependency file", "dependency files"), "Files this model refers to"]);
-    if ((t.armatures || []).length) chips.push(["geometry", "Rigged", plural(t.armatures.length, "armature", "armatures")]);
+    if ((t.armatures || []).length) chips.push(["geometry", `Rigged${from}`, plural(t.armatures.length, "armature", "armatures") + fromHint]);
     const clips: Json[] = t.animation_clips || t.actions || [];
-    if (clips.length) chips.push(["geometry", `Animated · ${plural(clips.length, "clip", "clips")}`, "Animation clips"]);
+    if (clips.length) chips.push(["geometry", `Animated · ${plural(clips.length, "clip", "clips")}${from}`, `Animation clips${fromHint}`]);
+    if (measured && chips.some(([to]) => to === "geometry")) caveat = `${formatLabel(format)} is uninspected; the measurements describe ${formatLabel(measured)}.`;
   }
   chips.push(["file", license, licenseHint]);
   return (
-    <ul className="fact-chips flex flex-wrap gap-1.5" aria-label="Facts">
-      {chips.map(([to, label, hint]) => <FactChip key={label} to={to} hint={hint}>{label}</FactChip>)}
-    </ul>
+    <div className="grid gap-2">
+      <ul className="fact-chips flex flex-wrap gap-1.5" aria-label="Facts">
+        {chips.map(([to, label, hint]) => <FactChip key={label} to={to} hint={hint}>{label}</FactChip>)}
+      </ul>
+      {caveat && (
+        <p role="note" className="format-caveat flex items-start gap-2 text-[12px] leading-relaxed text-warning">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>{caveat}</span>
+        </p>
+      )}
+    </div>
   );
 }
 

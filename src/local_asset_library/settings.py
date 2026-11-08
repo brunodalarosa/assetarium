@@ -1,6 +1,7 @@
 """Application-owned settings shared by the desktop and processing workers."""
 import json
 import logging
+import threading
 
 from .config import ConfigError
 from .publication import atomic_json, read_json
@@ -310,6 +311,8 @@ APPEARANCES = ('system', 'light', 'dark')
 INSPECTOR_WIDTH = (320, 960, 440)  # minimum, maximum, default in CSS pixels
 # The inspector's collapsible sections; each remembers being left open, app-wide. All start closed.
 INSPECTOR_SECTIONS = ('file', 'geometry', 'image', 'record')
+# Saves are partial patches merged into the file; one at a time so concurrent patches never drop each other.
+_interface_lock = threading.Lock()
 
 
 def interface_path(config):
@@ -333,6 +336,11 @@ def interface_settings(config):
 
 
 def save_interface_settings(config, appearance=None, inspector_width=None, inspector_sections=None):
+    with _interface_lock:
+        return _save_interface_settings(config, appearance, inspector_width, inspector_sections)
+
+
+def _save_interface_settings(config, appearance, inspector_width, inspector_sections):
     current = interface_settings(config)
     if appearance is not None:
         if appearance not in APPEARANCES:

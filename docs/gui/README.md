@@ -132,7 +132,9 @@ The panel is one scroll, top to bottom:
    license. Clicking a chip opens its section and scrolls to it. The license chip
    says **CC0** when the supplied license file is recognized as Creative Commons
    Zero, **License file** when a file exists but isn't recognized, and **No
-   license file** otherwise.
+   license file** otherwise. When the format shown was not the one measured, the
+   triangle, rig and animation chips name the measured format (**1,248 tris ·
+   OBJ**) and a warning line under the chips says the shown format is uninspected.
 4. Variants and, in a collection, the asset's label and notes.
 5. The **description** with a small **Generated** label (hover it for what that
    means). When the description has caption warnings or review notes, a chip

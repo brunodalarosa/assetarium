@@ -193,6 +193,24 @@ def test_interface_preferences_default_validate_and_never_touch_budget_settings(
     assert general_settings(config)['storage_budget_gib'] == 10
 
 
+def test_concurrent_interface_saves_keep_every_patch(config, monkeypatch):
+    # The desktop saves width and sections on separate timers and runs them in parallel.
+    import threading, time
+    from local_asset_library import settings
+    read = settings.interface_settings
+    def slow_read(config):
+        value = read(config)
+        time.sleep(0.05)  # Widens the read-merge-write window so an unserialized save would drop the other.
+        return value
+    monkeypatch.setattr(settings, 'interface_settings', slow_read)
+    saves = [threading.Thread(target=settings.save_interface_settings, args=(config,), kwargs=kwargs)
+             for kwargs in ({'inspector_width': 600}, {'inspector_sections': {'geometry': True}}, {'appearance': 'light'})]
+    for save in saves: save.start()
+    for save in saves: save.join()
+    saved = read(config)
+    assert (saved['inspector_width'], saved['inspector_sections']['geometry'], saved['appearance']) == (600, True, 'light')
+
+
 def test_damaged_interface_preferences_reset_presentation_only(config):
     from local_asset_library.settings import interface_path, interface_settings
     interface_path(config).parent.mkdir(parents=True, exist_ok=True)
