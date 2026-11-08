@@ -13,6 +13,7 @@ committed bundle. Linux has no desktop app yet (decision 0013). Up: [Notebook](.
 - [Desktop bridge](Desktop%20bridge.md): `DesktopBridge`, its gateway loop and the shape of bridge methods.
 - [Frontend build](Frontend%20build.md): React source, the committed `ui/build/` bundle, UTF-8 rules.
 - [Verify harness](Verify%20harness.md): real WebView2 checks driven through `window.lal`.
+- [Asset inspector](Asset%20inspector.md): the one-scroll right sidebar and its remembered sections.
 - [3D preview](3D%20preview.md): the sandboxed Online 3D Viewer frame.
 - [Design system](Design%20system.md): tokens, components, icon meanings and UI rules. The design principles are in the
   [Design language](../../Architecture/Desktop%20App/Design%20language.md).

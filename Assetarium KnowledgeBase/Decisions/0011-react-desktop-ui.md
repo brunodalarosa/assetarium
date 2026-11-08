@@ -13,26 +13,27 @@ prefers [beUI](https://beui.dev) components (MIT, copied with notices into
 into `src/local_asset_library/ui/build/`; that bundle is committed, and
 `desktop.create_window` inlines it, so launching the app never needs Node.
 
-- **Shell.** Left rail: back/forward history of views, then Home, Library,
-  Collections, Asset processing, with Settings at the bottom. Library and
-  Collections are reserved pages without actions. A top bar holds the
-  notifications bell and the inspection toggle.
+- **Shell.** Left rail: back/forward history of views, then Home,
+  Collections ([decision 0036](0036-collections-and-tags.md)), Asset processing,
+  with Library ([decision 0032](0032-library-store-and-queue.md)) and Settings at
+  the bottom. A top bar holds the notifications bell and the inspection toggle.
 - **Home** is a centred search pill (no suggestion chips). The sliders button
   opens the existing nine filters with Reset and Apply. Search modes, defaults
   and the 5/10/20/30/40 limits are unchanged; an empty search browses.
 - **The right sidebar is only asset inspection.** It is continuously resizable
-  (width remembered), hides and shows without losing the selection or tab, and
-  has Overview / Sources / Evidence tabs that keep measured facts, generated
-  observations, caption notes, faults and owner review separate. On narrow
-  windows it floats over the results.
+  (width remembered), hides and shows without losing the selection, and is one
+  scroll: a fault line when something is faulty, the preview, fact chips, the
+  description, tags, and collapsible File & license, Geometry (Image for images)
+  and Processing record sections. Each section stays open or closed as the owner
+  left it. On narrow windows it floats over the results.
 - **Asset processing** gathers per-source import work (Process assets, progress,
   Cancel), optional descriptions (Generate descriptions, progress, Cancel, run
   reports), published-library status and the importing failures report.
   Processing notifications lead there, focused on their source.
 - **Themes.** Light and dark token sets; Settings → General → Appearance offers
-  Match Windows (default), Light and Dark. Appearance and inspector width live in
-  app-owned `data/library/interface.json`, separate from `settings.json`, and
-  the theme is applied before the first paint.
+  Match Windows (default), Light and Dark. Appearance, inspector width and the
+  inspector's open sections live in app-owned `data/library/interface.json`,
+  separate from `settings.json`, and the theme is applied before the first paint.
 
 **Why.** The owner asked for a complete visual and layout revamp using beUI's
 React components, with dark mode. Committing the bundle keeps the launcher and
@@ -46,7 +47,9 @@ change (`npm run build` in `frontend/`). Verification scripts drive the app
 through `window.lal` (`frontend/src/main.tsx`) and real controls; keep that
 surface working. Notices only offer actions that can change their state.
 
-> **Later changes.** Collections became a working page under [decision 0036](0036-collections-and-tags.md),
-> superseding "Library and Collections are reserved pages" for Collections. On October 25, 2026 the owner
-> hid the reserved **Library** destination from the rail until a library browser is built (beta cleanup);
-> the placeholder page stays in the source for that future work.
+## Changes
+
+- 2026-10-25: the reserved Library destination was hidden from the rail until a library browser was built (beta cleanup).
+- 2026-11-01: Library became the library browser (formerly Asset sources, decision 0032) and returned to the rail above Settings.
+- 2026-11-07: Collections became a working page (decision 0036); it was a reserved page without actions.
+- 2026-11-08: inspector tabs (Overview / Sources / Evidence) replaced by one scroll with remembered sections (owner co-design, 2026-11-07).
