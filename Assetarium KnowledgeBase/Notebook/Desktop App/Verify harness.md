@@ -28,6 +28,11 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
 
 - **Routes are not in `location.hash`.** Wait on `lal.state.history[lal.state.historyIndex].page` (for example `'sources'`) to see where `navigate` went.
 
+- **A restart can be simulated.** Set a flag (`window.__beforeRestart=true`), call
+  `window.load_html(page_html(config)[0])`, then `ui.wait_ready(extra='!window.__beforeRestart')`. A bridge
+  poll still in flight then logs a harmless `_returnValuesCallbacks … is not a function` traceback.
+  See `scripts/verify-inspector-layout.py`.
+
 - `verify-setup-wizard.py`'s opening-focus check (`opens_by_itself_on_a_fresh_install` → `focus`)
   failed on unchanged `develop` when launched from an agent session on 2026-10-28; treat a failure there
   as possibly environmental before blaming a change *(unverified: cause)*.
