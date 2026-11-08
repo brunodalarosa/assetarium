@@ -22,7 +22,8 @@ into `src/local_asset_library/ui/build/`; that bundle is committed, and
   and the 5/10/20/30/40 limits are unchanged; an empty search browses.
 - **The right sidebar is only asset inspection.** It is continuously resizable
   (width remembered), hides and shows without losing the selection, and is one
-  scroll: a fault line when something is faulty, the preview, fact chips, the
+  scroll: a fault line when something is faulty, the preview (a model's live 3D
+  view loads by itself once the selection rests, over its still), fact chips, the
   description, tags, and collapsible File & license, Geometry (Image for images)
   and Processing record sections. Each section stays open or closed as the owner
   left it. On narrow windows it floats over the results.
@@ -53,3 +54,4 @@ surface working. Notices only offer actions that can change their state.
 - 2026-11-01: Library became the library browser (formerly Asset sources, decision 0032) and returned to the rail above Settings.
 - 2026-11-07: Collections became a working page (decision 0036); it was a reserved page without actions.
 - 2026-11-08: inspector tabs (Overview / Sources / Evidence) replaced by one scroll with remembered sections (owner co-design, 2026-11-07).
+- 2026-11-08: the 3D preview became a live viewer that loads on a resting selection, with its controls on the canvas (owner co-design, 2026-11-07).

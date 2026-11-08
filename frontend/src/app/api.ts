@@ -31,7 +31,7 @@ export interface Bridge {
   confirm_setup_review(): Promise<Json>;
   undo_setup_value(key: string): Promise<Json>;
   interface_settings(): Promise<Json>;
-  save_interface_settings(appearance: string | null, inspectorWidth: number | null, inspectorSections?: Record<string, boolean> | null): Promise<Json>;
+  save_interface_settings(appearance: string | null, inspectorWidth: number | null, inspectorSections?: Record<string, boolean> | null, previewHintSeen?: boolean | null): Promise<Json>;
   importing_failures(): Promise<Json>;
   notification_action(action: string, identifier?: string | null): Promise<Json>;
   source_action(action: string, key?: string | null, directory?: string | null, enabled?: boolean | null): Promise<Json>;
@@ -78,7 +78,7 @@ export function sourceApi(bridge: Bridge, key: string): AssetApi {
 declare global {
   interface Window {
     pywebview?: { api: Bridge };
-    LAL_BOOT?: { appearance: string; inspector_width: number; inspector_sections?: Record<string, boolean> };
+    LAL_BOOT?: { appearance: string; inspector_width: number; inspector_sections?: Record<string, boolean>; preview_hint_seen?: boolean };
     LALPreview: {
       mount(container: HTMLElement, item: Json, api: AssetApi): Json;
       dispose(): void;

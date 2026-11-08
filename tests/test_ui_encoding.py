@@ -42,7 +42,8 @@ def packaged(monkeypatch, appearance='system', windows_dark=False):
     monkeypatch.setitem(sys.modules, 'webview', Webview)
     monkeypatch.setattr('local_asset_library.settings.interface_settings',
                         lambda config: {'status': 'ready', 'appearance': appearance, 'inspector_width': 512,
-                                        'inspector_sections': {'file': True, 'record': False}})
+                                        'inspector_sections': {'file': True, 'record': False},
+                                        'preview_hint_seen': False})
     monkeypatch.setattr(desktop, 'windows_prefers_dark', lambda: windows_dark)
     return create_window(None, Bridge())
 
@@ -54,7 +55,7 @@ def test_packaged_shell_keeps_punctuation_icons_and_accessible_text(monkeypatch)
     for expected in (
         'charset="utf-8"', 'Kenney · ', 'Loading preview…', 'Loading asset evidence…',
         'You’re all caught up.', ' in the library · ', '% of this phase', 'Settings → General',
-        'Filters & search options', '↻ Explore in 3D', 'Opening fullscreen…',
+        'Filters & search options', 'Live 3D isn’t available for .', 'Loading 3D…', 'Drag to rotate · right-drag',
     ):
         assert expected in html, repr(expected)
     # The CSP still allows only inline code, data: images and now data: fonts (bundled Geist).
@@ -69,5 +70,5 @@ def test_theme_is_resolved_before_first_paint(monkeypatch, appearance, windows_d
     window = packaged(monkeypatch, appearance, windows_dark)
     assert f'<html lang="en" data-theme="{theme}" data-appearance="{appearance}">' in window['html']
     assert ('window.LAL_BOOT={"appearance": "%s", "inspector_width": 512, '
-            '"inspector_sections": {"file": true, "record": false}};' % appearance) in window['html']
+            '"inspector_sections": {"file": true, "record": false}, "preview_hint_seen": false};' % appearance) in window['html']
     assert window['background_color'] == background

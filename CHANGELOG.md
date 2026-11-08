@@ -23,6 +23,11 @@ All notable changes to Assetarium are listed here. The project follows
   Image, Processing record) that stay open or closed as you left them, also after a restart. The always-unknown
   physical scale, the owner review states and the empty "no notes / no faults" lines are no longer shown; agents
   still receive every field through `get_asset`.
+- **Live 3D in the inspector**: a model's still shows at once and its live 3D view loads by itself after a quarter
+  second and fades in; there is no Open button or Back to image any more. View buttons (3/4 · Front · Side · Top),
+  fullscreen and a ⋯ menu sit on the canvas; double-click fits, R resets. Formats the viewer can't open, models over
+  16 MiB ("Large model · click to load") and load faults say why over the still. While the inspector shows an
+  asset, arrow keys in the results select as they move, and browsing fast loads no viewer for the assets it passes.
 
 ### Removed
 

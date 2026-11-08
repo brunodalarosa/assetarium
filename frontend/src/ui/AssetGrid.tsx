@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { Tooltip } from "@/components/beui/tooltip";
 import { cardMeta, hasDescription, packName } from "../app/format";
-import { type GridId, openAssetMenu, pathAction, pickAsset, requestThumb, selectAsset, type Thumb, toggleSelected, useApp } from "../app/store";
+import { getState, type GridId, openAssetMenu, pathAction, pickAsset, requestThumb, selectAsset, type Thumb, toggleSelected, useApp } from "../app/store";
 
 /** A library pack is an object on the Asset sources tab ({name}); elsewhere a folder key. */
 const packLabel = (item: Json) => (item.pack && typeof item.pack === "object" ? item.pack.name : packName(item.pack));
@@ -245,11 +245,11 @@ export function AssetGrid({ grid, id, pending, append }: { grid: GridId; id: str
   const gridRef = useRef<HTMLDivElement>(null);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const card = (event.target as Element).closest(".card");
-    const grid = gridRef.current;
-    if (!card || !grid) return;
-    const cards = [...grid.querySelectorAll<HTMLElement>(".card")];
+    const element = gridRef.current;
+    if (!card || !element) return;
+    const cards = [...element.querySelectorAll<HTMLElement>(".card")];
     const index = cards.indexOf(card as HTMLElement);
-    const columns = Math.max(1, getComputedStyle(grid).gridTemplateColumns.split(" ").length);
+    const columns = Math.max(1, getComputedStyle(element).gridTemplateColumns.split(" ").length);
     let next = index;
     if (event.key === "ArrowRight") next++;
     else if (event.key === "ArrowLeft") next--;
@@ -259,7 +259,14 @@ export function AssetGrid({ grid, id, pending, append }: { grid: GridId; id: str
     else if (event.key === "End") next = cards.length - 1;
     else return;
     event.preventDefault();
-    cards[Math.max(0, Math.min(cards.length - 1, next))]?.focus();
+    const target = cards[Math.max(0, Math.min(cards.length - 1, next))];
+    target?.focus();
+    // While the inspector shows an asset, arrows browse: the still shows at once and the live 3D view
+    // waits until the selection rests (ui/interactive-preview.js), so passing assets loads no viewer.
+    const s = getState(), assetId = target?.dataset.id;
+    if (assetId && assetId !== selected && selected && s.inspector.open && !(grid === "collection" && s.selection.active)) {
+      void selectAsset(grid, assetId, null, "three_quarter", false);
+    }
   };
   return (
     <div

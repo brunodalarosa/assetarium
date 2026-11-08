@@ -1,9 +1,9 @@
 ---
 area: Desktop App
 tags: [system]
-code: [interactive_preview.py, src/local_asset_library/ui/viewer.html, src/local_asset_library/ui/viewer.js, src/local_asset_library/ui/interactive-preview.js, src/local_asset_library/ui/vendor, scripts/verify-interactive-preview.py, tests/test_interactive_preview.py]
-verified:
-branch:
+code: [interactive_preview.py, src/local_asset_library/ui/viewer.html, src/local_asset_library/ui/viewer.js, src/local_asset_library/ui/interactive-preview.js, src/local_asset_library/ui/vendor, scripts/verify-interactive-preview.py, tests/test_interactive_preview.py, settings.save_interface_settings]
+verified: 2026-11-08
+branch: feature/live-3d-preview
 ---
 # 3D preview
 
@@ -13,6 +13,19 @@ sandboxed iframe; start reading at `interactive_preview.py` (delivery, tickets, 
 Moved from that guide on 2026-10-28; not yet re-verified line by line.
 
 ## How it works
+
+**Live on a resting selection.** `LALPreview.mount` shows the still and starts a 250 ms timer
+(`AUTO_DELAY`); `dispose()` on the next selection cancels it, so browsing passes assets without a
+`preview_prepare` call or a frame (`LALPreview.stats` counts both for the verify script). After
+`prepare`, a package over `AUTO_BYTES` (16 MiB) is released unread and waits for **Click to load**.
+The frame loads hidden (`.model-viewport` opacity 0) and `.model-stage.live` crossfades it over the
+still. The live camera starts at the still's angle: `viewer.js` `direction()` uses
+`render_math.VIEWS` turned Y-up, so 3/4 · Front · Side · Top match the Blender renders. Before the
+live view, the view buttons call `item.onView`, which re-selects the asset with that still view
+(that remounts the preview); once live they only send `view` to the frame. The first-use hint is
+`interface.json` `preview_hint_seen`, retired by the first gesture in the frame (`interacted`
+message), opening ⋯, or 8 s. Real library (2026-11-08, `live-preview-real-02`): live 443–797 ms after
+selection, the 250 ms rest included; the largest package (2.3 MiB, Rig_Medium_General) 797 ms.
 
 Online 3D Viewer **0.18.0** and the official Draco **1.5.7** JS/WASM decoder are
 bundled locally, together with a lighting cube and upstream license notices.
@@ -71,6 +84,13 @@ These are representative format checks, not full-library compatibility approval.
   unchanged faulty input returns the saved failure instead of re-importing.
 
 ## Gotchas
+
+- **Record a fault before releasing its ticket.** `preview_fault` resolves the inputs through the
+  ticket; `fault()` keeps it through `fail(..., keepTicket)` and releases it after recording.
+- The inline preview is an always-open non-modal `<dialog>` (fullscreen re-opens it modal, so the
+  iframe never moves and never reloads). `App.tsx` therefore excludes only `dialog:not(.model-preview)`
+  from Escape-hides-inspection, and Escape in the canvas calls `item.onEscape`.
+- Leaving fullscreen by Tab wraps through `document.body` briefly; that is the browser, not a focus leak.
 
 - The upstream importer resolves dependencies by basename, so two dependencies with the same basename
   and different bytes are an explicit fault, not a guess.

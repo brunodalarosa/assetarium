@@ -134,12 +134,14 @@ def test_desktop_bridge_round_trips_interface_preferences(indexed):
     try:
         closed = {'file': False, 'geometry': False, 'image': False, 'record': False}
         assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440,
-                                               'inspector_sections': closed}
+                                               'inspector_sections': closed, 'preview_hint_seen': False}
         assert bridge.save_interface_settings('dark', None)['appearance'] == 'dark'
         assert bridge.save_interface_settings(None, 610)['inspector_width'] == 610
         assert bridge.save_interface_settings(None, None, {'geometry': True})['inspector_sections']['geometry'] is True
+        assert bridge.save_interface_settings(None, None, None, True)['preview_hint_seen'] is True
         assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'dark', 'inspector_width': 610,
-                                               'inspector_sections': dict(closed, geometry=True)}
+                                               'inspector_sections': dict(closed, geometry=True), 'preview_hint_seen': True}
+        assert bridge.save_interface_settings(None, None, None, 'yes')['status'] == 'faulty'
         assert bridge.save_interface_settings('sepia', None)['status'] == 'faulty'
         assert bridge.save_interface_settings(None, None, {'tabs': True})['status'] == 'faulty'
     finally:

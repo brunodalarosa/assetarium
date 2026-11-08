@@ -311,10 +311,11 @@ class DesktopBridge:
         from .settings import interface_settings
         return self._wait(self._present(interface_settings, self._config, guarded=False))
 
-    def save_interface_settings(self, appearance=None, inspector_width=None, inspector_sections=None):
+    def save_interface_settings(self, appearance=None, inspector_width=None, inspector_sections=None,
+                                preview_hint_seen=None):
         from .settings import save_interface_settings
         return self._wait(self._present(save_interface_settings, self._config, appearance, inspector_width,
-                                        inspector_sections, guarded=False))
+                                        inspector_sections, preview_hint_seen, guarded=False))
 
     def importing_failures(self):
         from .sources import importing_failures
@@ -1105,7 +1106,7 @@ def page_html(config):
     resolved = interface['appearance'] if interface['appearance'] != 'system' else (
         'dark' if windows_prefers_dark() else 'light')
     boot = {'appearance': interface['appearance'], 'inspector_width': interface['inspector_width'],
-            'inspector_sections': interface['inspector_sections']}
+            'inspector_sections': interface['inspector_sections'], 'preview_hint_seen': interface['preview_hint_seen']}
     # "</" cannot close the inline script; JSON keeps every other character literal.
     boot_json = json.dumps(boot, ensure_ascii=False).replace('</', '<\\/')
     html = (ui / 'index.html').read_text(encoding='utf-8')

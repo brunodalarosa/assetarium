@@ -167,9 +167,10 @@ def test_interface_preferences_default_validate_and_never_touch_budget_settings(
     from local_asset_library.settings import interface_path, interface_settings, save_interface_settings
     closed = {'file': False, 'geometry': False, 'image': False, 'record': False}
     assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440,
-                                          'inspector_sections': closed}
+                                          'inspector_sections': closed, 'preview_hint_seen': False}
     saved = save_interface_settings(config, appearance='dark')
-    assert saved == {'status': 'saved', 'appearance': 'dark', 'inspector_width': 440, 'inspector_sections': closed}
+    assert saved == {'status': 'saved', 'appearance': 'dark', 'inspector_width': 440, 'inspector_sections': closed,
+                     'preview_hint_seen': False}
     assert save_interface_settings(config, inspector_width=5000)['inspector_width'] == 960  # clamped
     assert save_interface_settings(config, inspector_width=12)['inspector_width'] == 320
     assert interface_settings(config)['appearance'] == 'dark'  # width saves keep the appearance
@@ -188,6 +189,12 @@ def test_interface_preferences_default_validate_and_never_touch_budget_settings(
         with pytest.raises(ConfigError, match='Inspector sections'):
             save_interface_settings(config, inspector_sections=bad)
     assert interface_settings(config)['inspector_sections'] == dict(closed, record=True)
+    # The live 3D hint, once retired, stays retired; other saves keep it.
+    save_interface_settings(config, preview_hint_seen=True)
+    save_interface_settings(config, inspector_width=480)
+    assert interface_settings(config)['preview_hint_seen'] is True
+    with pytest.raises(ConfigError, match='hint'):
+        save_interface_settings(config, preview_hint_seen='yes')
     # Presentation lives apart from settings.json, so budget validation never sees it.
     assert not settings_path(config).exists() and interface_path(config).exists()
     assert general_settings(config)['storage_budget_gib'] == 10
@@ -216,10 +223,11 @@ def test_damaged_interface_preferences_reset_presentation_only(config):
     interface_path(config).parent.mkdir(parents=True, exist_ok=True)
     interface_path(config).write_text('{not json', encoding='utf-8')
     assert interface_settings(config)['appearance'] == 'system'
-    atomic_json(interface_path(config), {'appearance': 'neon', 'inspector_width': 'wide',
+    atomic_json(interface_path(config), {'appearance': 'neon', 'inspector_width': 'wide', 'preview_hint_seen': 'yes',
                                          'inspector_sections': {'file': 'yes', 'record': True, 'tabs': True}})
     assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440,
-                                          'inspector_sections': dict({'file': False, 'geometry': False, 'image': False, 'record': False}, record=True)}
+                                          'inspector_sections': dict({'file': False, 'geometry': False, 'image': False, 'record': False}, record=True),
+                                          'preview_hint_seen': False}
     atomic_json(interface_path(config), {'inspector_sections': ['file']})
     assert not any(interface_settings(config)['inspector_sections'].values())
 

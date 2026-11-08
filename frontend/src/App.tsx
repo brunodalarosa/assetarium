@@ -48,10 +48,9 @@ function useGlobalKeys() {
     const onKey = (event: KeyboardEvent) => {
       if (getState().setup.open) return; // Setup owns the window until it closes.
       const preview = window.LALPreview?.current;
-      if (preview?.dialog.open && event.key === "Escape") {
+      if (preview?.fullscreen && event.key === "Escape") {
         event.preventDefault();
-        if (preview.fullscreen) preview.exitFullscreen();
-        else preview.stop();
+        preview.exitFullscreen();
         return;
       }
       if (preview?.fullscreen) return;
@@ -64,7 +63,7 @@ function useGlobalKeys() {
       // Escape outside any overlay hides inspection; the selection is kept.
       const s = getState();
       const target = event.target as HTMLElement;
-      if (event.key === "Escape" && !event.defaultPrevented && s.inspector.open && !s.filtersOpen && !s.notificationsOpen && !s.runReport && !target.closest('[role="listbox"], [aria-haspopup="listbox"], input, textarea, dialog')) {
+      if (event.key === "Escape" && !event.defaultPrevented && s.inspector.open && !s.filtersOpen && !s.notificationsOpen && !s.runReport && !target.closest('[role="listbox"], [aria-haspopup="listbox"], input, textarea, dialog:not(.model-preview), .model-menu')) {
         setInspectorOpen(false);
         document.getElementById("toggle-inspector")?.focus();
       }

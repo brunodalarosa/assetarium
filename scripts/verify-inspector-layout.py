@@ -118,7 +118,7 @@ def verify():
             ordered:order.every(Boolean)&&order.every((el,i)=>!i||order[i-1].compareDocumentPosition(el)&Node.DOCUMENT_POSITION_FOLLOWING),
             chips:JSON.stringify({CHIPS})===JSON.stringify(['1,248 tris','OBJ','2 dependency files','Rigged','Animated · 2 clips','CC0']),
             sections:JSON.stringify({EXPANDED})==='{{"file":false,"geometry":false,"record":false}}',
-            oneFormatNoSelect:!$('detail-format')&&!!$('detail-view'),
+            oneFormatNoSelect:!$('detail-format')&&!$('detail-view')&&!!d.querySelector('.model-views [data-view=front]'),
             noCaveat:!at('.format-caveat'),dropped:{json.dumps(DROPPED)}.every(t=>!text.includes(t))}}}})()""")
         capture('01-model-collapsed.png')
 

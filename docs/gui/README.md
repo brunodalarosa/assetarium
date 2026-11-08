@@ -123,9 +123,10 @@ The panel is one scroll, top to bottom:
 
 1. The name, type and pack, then a **fault line** only when something is recorded
    as faulty: its first reason and **Details**, which opens the Processing record.
-2. The preview, with **Preview view** and **Open interactive 3D preview**.
-   **Source format** appears only when the asset has more than one format. A
-   missing or faulty requested view produces a reason, not another image.
+2. The preview. For 3D models the still render shows at once and the live 3D
+   view fades in over it by itself (see below). **Source format** appears only
+   when the asset has more than one format. A missing or faulty requested view
+   produces a reason, not another image.
 3. **Fact chips**: for 3D models the triangle count, the format, the number of
    dependency files, **Rigged** and **Animated · N clips** when they apply, and the
    license; for images the size, transparency, colours and format, and the
@@ -156,12 +157,17 @@ Each section stays open or closed the way you left it, for every asset and after
 a restart. All three start closed. Agents read every field through MCP
 `get_asset`, whatever the panel shows.
 
-Click the inspection image or **Open interactive 3D preview** to explore the
-selected source in place; **Fullscreen** opens the same preview across the
-window. Drag to rotate, right-drag to pan, scroll to zoom. The toolbar has Fit,
-Reset view, zoom buttons and view presets; Display options add projection,
-background, edges, up-axis and navigation. Escape returns from fullscreen;
-**Back to image** releases the viewer. See [interactive previews](3d-preview.md).
+**Live 3D.** When a model's selection rests for a quarter second, its live view
+loads behind the still and fades in; nothing to click. Browsing with the arrow
+keys (they select while the panel shows an asset) passes assets without loading
+a viewer for each. Drag to rotate, right-drag to pan, scroll to zoom,
+double-click to fit, R to reset. On the canvas: **3/4 · Front · Side · Top**
+move the camera (before the live view is up they switch the still renders), and
+the corner holds **?** (the controls), **Fullscreen** and **⋯** (Fit, Reset view,
+projection, background, navigation, up axis, edges). The canvas always says why
+there is no live view: a format the viewer can't open (**Live 3D isn’t available
+for .blend · showing renders**), a model over 16 MiB (**Large model · click to
+load**) or a load fault, with its reason. See [interactive previews](3d-preview.md).
 
 **2D images** appear with a **2D image** or **SVG image** badge on a checkerboard,
 and small-palette art keeps hard pixel edges. Their inspection shows an image

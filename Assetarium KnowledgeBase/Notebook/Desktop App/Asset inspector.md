@@ -14,7 +14,9 @@ Hub: [Desktop App](Desktop%20App.md). The right sidebar that inspects one asset:
 
 - One scroll: header, fault line (only when something is faulty), preview, fact chips, variants or
   collection entry, description, tags, then the collapsible File & license, Geometry (Image for images)
-  and Processing record sections.
+  and Processing record sections. A model's preview is the live 3D view ([3D preview](3D%20preview.md)).
+- While the inspector shows an asset, arrow keys in a result grid select the card they move to
+  (`AssetGrid` `onKeyDown`); with the panel hidden they only move focus.
 - Collapsible sections remember their state app-wide in `interface.json` (`inspector_sections`, names in
   `settings.INSPECTOR_SECTIONS`). The boot payload delivers them and `store.setInspectorSection` saves a
   change. All sections are closed by default.
