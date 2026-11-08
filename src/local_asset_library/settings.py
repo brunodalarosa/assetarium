@@ -1,6 +1,7 @@
 """Application-owned settings shared by the desktop and processing workers."""
 import json
 import logging
+import threading
 
 from .config import ConfigError
 from .publication import atomic_json, read_json
@@ -308,6 +309,10 @@ def save_general_settings(config, storage_budget_gib, processing_formats=None, c
 # Presentation preferences live apart from settings.json so they never touch budget validation.
 APPEARANCES = ('system', 'light', 'dark')
 INSPECTOR_WIDTH = (320, 960, 440)  # minimum, maximum, default in CSS pixels
+# The inspector's collapsible sections; each remembers being left open, app-wide. All start closed.
+INSPECTOR_SECTIONS = ('file', 'geometry', 'image', 'record')
+# Saves are partial patches merged into the file; one at a time so concurrent patches never drop each other.
+_interface_lock = threading.Lock()
 
 
 def interface_path(config):
@@ -323,11 +328,19 @@ def interface_settings(config):
     appearance = value.get('appearance')
     width = value.get('inspector_width')
     low, high, default = INSPECTOR_WIDTH
+    sections = value.get('inspector_sections')
+    sections = sections if isinstance(sections, dict) else {}
     return {'status': 'ready', 'appearance': appearance if appearance in APPEARANCES else 'system',
-            'inspector_width': width if type(width) is int and low <= width <= high else default}
+            'inspector_width': width if type(width) is int and low <= width <= high else default,
+            'inspector_sections': {name: sections.get(name) is True for name in INSPECTOR_SECTIONS}}
 
 
-def save_interface_settings(config, appearance=None, inspector_width=None):
+def save_interface_settings(config, appearance=None, inspector_width=None, inspector_sections=None):
+    with _interface_lock:
+        return _save_interface_settings(config, appearance, inspector_width, inspector_sections)
+
+
+def _save_interface_settings(config, appearance, inspector_width, inspector_sections):
     current = interface_settings(config)
     if appearance is not None:
         if appearance not in APPEARANCES:
@@ -338,6 +351,13 @@ def save_interface_settings(config, appearance=None, inspector_width=None):
         if isinstance(inspector_width, bool) or not isinstance(inspector_width, (int, float)):
             raise ConfigError('Inspector width must be a number of pixels')
         current['inspector_width'] = int(min(high, max(low, round(inspector_width))))
+    if inspector_sections is not None:
+        # Only the sections named change; the others keep their saved state.
+        if not isinstance(inspector_sections, dict) or any(
+                name not in INSPECTOR_SECTIONS or type(open_) is not bool for name, open_ in inspector_sections.items()):
+            raise ConfigError('Inspector sections must map ' + ', '.join(INSPECTOR_SECTIONS) + ' to open or closed')
+        current['inspector_sections'] = dict(current['inspector_sections'], **inspector_sections)
     atomic_json(interface_path(config), {'schema_version': 1, 'appearance': current['appearance'],
-                                         'inspector_width': current['inspector_width']})
+                                         'inspector_width': current['inspector_width'],
+                                         'inspector_sections': current['inspector_sections']})
     return dict(current, status='saved')

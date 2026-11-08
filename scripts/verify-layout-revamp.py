@@ -129,23 +129,26 @@ def verify():
           await until(()=>!lal.state.library.detail.loading);await frame();
           return {heading:document.activeElement===document.querySelector('.detail-header h2'),
             pressed:document.querySelector('#grid .card').getAttribute('aria-pressed')==='true',
-            tabs:[...document.querySelectorAll('#inspector [role=tab]')].map(t=>t.id).join(',')==='inspector-tab-overview,inspector-tab-sources,inspector-tab-evidence',
+            noTabs:!document.querySelector('#inspector [role=tab]'),chips:!!document.querySelector('#inspector .fact-chips .fact-chip'),
+            sections:['file','record'].every(n=>$('inspector-section-'+n+'-toggle')?.getAttribute('aria-expanded')==='false'),
             preview:!!document.querySelector('#inspector .preview-still')}})()""")
         capture('05-inspection-selected.png')
         check('inspection_resize', """(async()=>{lal.setInspectorWidth(600);await frame();const w=$('inspector').getBoundingClientRect().width;
           const sep=document.querySelector('[role=separator]');return {width:Math.abs(w-624)<2,separator:sep.getAttribute('aria-valuenow')==='600'}})()""")
         capture('06-inspection-wider.png')
         js("lal.setInspectorWidth(440)")
-        check('evidence_tab', """(async()=>{$('inspector-tab-evidence').click();await frame();
-          return {panel:!$('inspector-panel-evidence').hidden,faults:!!document.querySelector('#inspector .fault-list'),review:$('inspector-panel-evidence').textContent.includes('Owner review')}})()""")
-        capture('10-inspection-evidence.png')
+        check('processing_record', """(async()=>{$('inspector-section-record-toggle').click();await until(()=>$('inspector-section-record-content'));await frame();
+          const text=$('inspector').textContent;
+          return {open:$('inspector-section-record-toggle').getAttribute('aria-expanded')==='true',evidence:$('inspector-section-record-content').textContent.includes('Fault & processing evidence'),
+            noOwnerReview:!text.includes('Owner review')&&!text.includes('Artistic suitability')}})()""")
+        capture('10-inspection-processing-record.png')
         check('hide_keeps_selection', """(async()=>{const id=lal.state.library.selected;$('toggle-inspector').click();await until(()=>!$('inspector'));
-          const kept=lal.state.library.selected===id;$('toggle-inspector').click();await until(()=>$('inspector-panel-evidence'));
-          return {kept,tab:!$('inspector-panel-evidence').hidden,highlight:document.querySelector('#grid .card[aria-pressed=true]')?.dataset.id===id}})()""")
+          const kept=lal.state.library.selected===id;$('toggle-inspector').click();await until(()=>$('inspector-section-record-content'));
+          return {kept,sectionStillOpen:lal.state.inspector.sections.record,highlight:document.querySelector('#grid .card[aria-pressed=true]')?.dataset.id===id}})()""")
         js("$('toggle-inspector').click()")
         capture('07-inspection-hidden-selection-retained.png')
         js("$('toggle-inspector').click()")
-        js("$('inspector-tab-overview').click()")
+        js("lal.setInspectorSection('record',false)")
 
         js("""window.fixtureApi=lal.state.api;const synthetic=%s;
           lal.setState({api:Object.assign(Object.create(fixtureApi),{sources:async()=>structuredClone(synthetic),importing_failures:async()=>({status:'ready',assets:2,paths:['D:/Assets/Dungeon props/broken_door.obj','D:/Assets/Dungeon props/torn_banner.png']}),

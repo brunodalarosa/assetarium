@@ -16,6 +16,13 @@ All notable changes to Assetarium are listed here. The project follows
   folder while a scan only reports progress.
 - **Search by reference** is now called "Similar to an asset" and picks any library asset as the reference; the
   pilot wording is gone from search, filters and CLI help.
+- **Asset inspection is one scroll**: the Overview / Sources / Evidence tabs are gone. A fault line comes first
+  when something is faulty, then the preview, clickable fact chips (triangles, format, dependency files, rig,
+  animation clips, license; measurements taken from another format than the one shown name that format, with a
+  warning line under the chips), the description, tags and three collapsible sections (File & license, Geometry or
+  Image, Processing record) that stay open or closed as you left them, also after a restart. The always-unknown
+  physical scale, the owner review states and the empty "no notes / no faults" lines are no longer shown; agents
+  still receive every field through `get_asset`.
 
 ### Removed
 

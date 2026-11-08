@@ -286,7 +286,7 @@ class DesktopService(AssetService):
             'asset_type': record.get('asset_type', 'model_3d'),
             'technical': {k: technical.get(k) for k in ('inspected_path', 'inspected_format', 'inspected_sha256') + (
                 IMAGE_FACTS if record.get('asset_type') == 'image' else ('original_geometry_totals', 'evaluated_instance_totals',
-                'unit_settings', 'armatures', 'actions', 'world_bounds', 'objects', 'meshes', 'materials'))},
+                'unit_settings', 'armatures', 'actions', 'animation_clips', 'world_bounds', 'objects', 'meshes', 'materials'))},
             'type_metadata': record.get('type_metadata') if record.get('asset_type') == 'image' else None,
             'model_input': next(({'derivation': p.get('derivation'), 'path': p.get('path')} for p in record['previews']
                                  if p.get('role') == 'model_input'), None),

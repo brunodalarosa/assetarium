@@ -165,6 +165,7 @@ def verify():
                 assert actual_badges == {'warning': page_expected['warning'], 'fault': 0}, (actual_badges, page_expected)
                 report['caption_counts'] = expected
                 wire = Wire()
+                record_was = js('lal.state.inspector.sections.record')  # Restored below: the owner's saved choice.
                 for level in ('review_note', 'warning', 'fault'):
                     item = next(r for r in records if r['caption_status'] == level)
                     identifier = item['asset_id']
@@ -177,21 +178,21 @@ def verify():
                     quality = detail['presentation']['caption_quality']
                     assert quality == mcp_payload['metadata']['caption_quality']
                     assert detail['caption_status'] == mcp_payload['caption_status'] == level
-                    # Evidence tab: open the original-evidence disclosure, then read notes, faults and raw evidence.
-                    rendered = js("""(async()=>{$('inspector-tab-evidence').click();await frame();
-                      const sections=[...$('detail').querySelectorAll('.evidence')];const find=name=>sections.find(s=>s.querySelector('h3').textContent===name);
-                      const notes=find('Caption warnings & notes'),faults=find('Recorded faults');
-                      [...notes.querySelectorAll('button[aria-expanded=false]')].find(b=>b.textContent.includes('Original caption review evidence'))?.click();
-                      await until(()=>notes.querySelector('pre'));
-                      return {notes:[...notes.querySelectorAll('ul > li')].map(li=>li.querySelector('span').textContent+': '+li.querySelector('p').textContent),
-                        faults:[...faults.querySelectorAll('.fault-list li')].map(li=>li.textContent),evidence:notes.querySelector('pre').textContent};})()""")
+                    # Caption notes open beside the description; faults and raw evidence are in the Processing record.
+                    rendered = js("""(async()=>{lal.setInspectorSection('record',true);await until(()=>$('inspector-section-record-content'));
+                      const chip=$('detail').querySelector('.caption-notes-chip');if(chip&&chip.getAttribute('aria-expanded')==='false')chip.click();await frame();
+                      const record=$('inspector-section-record-content');
+                      [...record.querySelectorAll('button[aria-expanded=false]')].find(b=>b.textContent.includes('Caption review evidence'))?.click();
+                      await until(()=>[...record.querySelectorAll('pre')].length);
+                      return {notes:[...$('detail').querySelectorAll('.caption-notes > li')].map(li=>li.querySelector('span').textContent+': '+li.querySelector('p').textContent),
+                        faults:[...record.querySelectorAll('.fault-list li')].map(li=>li.textContent),evidence:[...record.querySelectorAll('pre')].map(pre=>pre.textContent).join(' ')};})()""")
                     assert rendered['notes'] == [('Warning: ' if i['severity'] == 'warning' else 'Review note: ') + i['reason']
                                                  for i in quality['issues'] if i['severity'] != 'fault']
                     for issue in quality['issues']:
                         if issue['severity'] == 'fault': assert issue['evidence'] in rendered['faults']
                         else: assert issue['evidence'] not in rendered['faults']
                         assert issue['evidence'] in rendered['evidence']
-                    js("(()=>{const section=[...$('detail').querySelectorAll('.evidence')].find(s=>s.querySelector('h3').textContent==='Caption warnings & notes');$('detail').scrollTop=section.offsetTop-$('detail').offsetTop-20;return true})()")
+                    js("(()=>{const section=$('detail').querySelector('.inspector-description');$('detail').scrollTop=section.offsetTop-$('detail').offsetTop-20;return true})()")
                     screenshot('caption-' + level + '.png')
                     search_args = {'query': item['name'], 'mode': 'keyword', 'filters': {}, 'limit': 5}
                     gui = js(search_script(search_args))
@@ -200,6 +201,7 @@ def verify():
                     report['searches'].append({'arguments': search_args, 'asset_ids': gui['ids'], 'caption_level': level})
                     js('lal.browse()')
                     wait_js(THUMBNAILS_SETTLED)
+                js(f"lal.setInspectorSection('record',{json.dumps(record_was)})")
                 wire.close()
                 wire = None
                 report['checks'].append('Actual severity badges and rendered note/warning/fault separation; three real STDIO detail/search payloads agree; original evidence retained')

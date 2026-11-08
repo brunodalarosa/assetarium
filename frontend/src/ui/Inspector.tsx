@@ -1,16 +1,16 @@
-import { Box, Copy, GripVertical, SwatchBook, X } from "lucide-react";
+import { Box, ChevronRight, CircleAlert, Copy, GripVertical, SwatchBook, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/beui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/beui/tabs";
-import { SPRING_PANEL } from "@/lib/ease";
+import { Tooltip } from "@/components/beui/tooltip";
+import { EASE_OUT, SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
-import { display, packName, plural, VIEWS } from "../app/format";
+import { display, formatLabel, packName, plural, VIEWS } from "../app/format";
 import {
-  activeGridId, assetTags, type GridId, gridApi, copyText, getState, type InspectorTab, packProfileAction, saveAssetTags, selectAsset,
+  activeGridId, assetTags, type GridId, gridApi, copyText, getState, type InspectorSection, packProfileAction, saveAssetTags, selectAsset,
   pushToast, setCollectionItem, startSelection, turnFormatOn,
-  setInspectorOpen, setInspectorTab, setInspectorWidth, useApp,
+  setInspectorOpen, setInspectorSection, setInspectorWidth, useApp,
 } from "../app/store";
 import { FolderPanel } from "./FolderPanel";
 import { ImageViewer } from "./ImageViewer";
@@ -22,6 +22,9 @@ const MAX_WIDTH = 960;
 const MAIN_MIN = 420;
 
 const ALPHA_TEXT: Record<string, string> = { none: "None (opaque)", binary: "Cut-out (fully transparent or opaque pixels)", partial: "Soft (partially transparent pixels)" };
+const ALPHA_CHIP: Record<string, string> = { none: "Opaque", binary: "Cut-out", partial: "Soft transparency" };
+const SECTION_TITLE: Record<InspectorSection, string> = { file: "File & license", geometry: "Geometry", image: "Image", record: "Processing record" };
+const sectionId = (name: InspectorSection) => `inspector-section-${name}`;
 
 function Section({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
   return (
@@ -29,6 +32,15 @@ function Section({ title, children, className }: { title: string; children: Reac
       <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
       {children}
     </section>
+  );
+}
+/** A titled group inside a collapsible section. */
+function Group({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn("grid gap-2", className)}>
+      <h4 className="text-[11.5px] font-medium text-muted-foreground">{title}</h4>
+      {children}
+    </div>
   );
 }
 function Facts({ entries }: { entries: [string, unknown][] }) {
@@ -48,6 +60,158 @@ const Text = ({ children, className }: { children: ReactNode; className?: string
 
 function faultText(fault: Json) {
   return typeof fault === "string" ? fault : fault.evidence || fault.reason || fault.issue || fault.kind || display(fault);
+}
+
+/** Every recorded fault of the asset: the fault line and the Processing record show this same list. */
+function recordedFaults(result: Json, image: boolean): Json[] {
+  const p = result.payload, info = p.presentation || {}, quality = info.caption_quality || {};
+  const processed = info.processing?.inspection === "complete";
+  return image
+    ? [
+        ...(info.source_faults || []),
+        ...Object.entries(info.stage_faults || {}).filter(([stage]) => stage !== "caption").map(([stage, f]: [string, Json]) => ({ reason: stage + ": " + (f.reason || f.error || display(f)) })),
+        ...(quality.issues || []).filter((i: Json) => i.severity === "fault"),
+        ...(info.faults || []).filter((f: Json) => processed || !String(f.channel).startsWith("preview")),
+      ]
+    : [...(info.source_faults || []), ...(quality.issues || []).filter((i: Json) => i.severity === "fault"), ...(info.faults || []), ...(p.preview?.status === "faulty" ? [{ channel: "requested preview", reason: p.preview.reason }] : [])];
+}
+
+let revealing: InspectorSection | null = null;
+const scrollToSection = (name: InspectorSection, reduce: boolean | null) =>
+  document.getElementById(sectionId(name))?.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+/** Open a section and bring it into view: where a fact chip or the fault line points. */
+function reveal(name: InspectorSection, reduce: boolean | null) {
+  // A closed section scrolls again once it has opened: until then the panel may be too short to reach it.
+  revealing = getState().inspector.sections[name] ? null : name;
+  setInspectorSection(name, true);
+  requestAnimationFrame(() => requestAnimationFrame(() => scrollToSection(name, reduce)));
+}
+
+/** One of the panel's collapsible sections; it stays open or closed as the owner left it, app-wide. */
+function Collapsible({ name, children }: { name: InspectorSection; children: ReactNode }) {
+  const open = useApp((s) => s.inspector.sections[name]);
+  const reduce = useReducedMotion();
+  const id = sectionId(name);
+  return (
+    <section id={id} data-section={name} aria-labelledby={id + "-toggle"} className="inspector-section scroll-mt-3 border-t border-border">
+      <h3>
+        <button
+          id={id + "-toggle"}
+          type="button"
+          aria-expanded={open}
+          aria-controls={id + "-content"}
+          onClick={() => setInspectorSection(name, !open)}
+          className="-mx-1.5 flex min-h-12 w-[calc(100%+0.75rem)] items-center gap-2 rounded-lg px-1.5 text-left text-[13.5px] font-semibold text-foreground outline-none hover:bg-surface-2/70 focus-visible:ring-2 focus-visible:ring-ring/40"
+        >
+          <motion.span animate={{ rotate: open ? 90 : 0 }} transition={reduce ? { duration: 0 } : { type: "spring", duration: 0.35, bounce: 0.25 }} className="grid place-items-center text-muted-foreground">
+            <ChevronRight className="size-4" aria-hidden />
+          </motion.span>
+          {SECTION_TITLE[name]}
+        </button>
+      </h3>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id={id + "-content"}
+            key="content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={reduce ? { duration: 0 } : { height: { type: "spring", duration: 0.4, bounce: 0.18 }, opacity: { duration: 0.16, ease: EASE_OUT } }}
+            onAnimationComplete={() => {
+              if (revealing !== name) return;
+              revealing = null;
+              scrollToSection(name, reduce);
+            }}
+            className="overflow-hidden"
+          >
+            <div className="grid gap-4 pt-1 pb-5">{children}</div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+/** A fact at a glance; it opens the section that holds the detail behind it. */
+function FactChip({ to, hint, children }: { to: InspectorSection; hint: string; children: ReactNode }) {
+  const reduce = useReducedMotion();
+  return (
+    <li>
+      <Tooltip content={`${hint} · Opens ${SECTION_TITLE[to]}`} delay={350}>
+        <button type="button" data-section={to} onClick={() => reveal(to, reduce)}
+          className="fact-chip inline-flex h-7 items-center rounded-full bg-surface-2 px-2.5 text-[12px] text-foreground outline-none transition-colors hover:bg-accent-soft hover:text-accent-soft-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
+          {children}
+        </button>
+      </Tooltip>
+    </li>
+  );
+}
+
+/** The license as far as Assetarium can tell: only CC0 is recognized; anything else stays honest. */
+function licenseFact(licenses: Json[]): [string, string] {
+  if (!licenses.length) return ["No license file", "No license file was found with this asset"];
+  if (licenses.every((l) => l.license_identifier === "CC0-1.0")) return ["CC0", "Creative Commons Zero, recognized in the license file supplied with it"];
+  return ["License file", `${plural(licenses.length, "license file", "license files")} supplied with it; the license is not recognized automatically`];
+}
+
+function FactChips({ result, image }: { result: Json; image: boolean }) {
+  const p = result.payload, info = p.presentation || {}, t = info.technical || {};
+  const [license, licenseHint] = licenseFact(info.license_evidence || []);
+  const chips: [InspectorSection, string, string][] = [];
+  let caveat: string | null = null;
+  if (image) {
+    if (t.width != null) {
+      chips.push(["image", t.vector ? `${t.width} × ${t.height} canvas units` : `${t.width} × ${t.height} px`, "Measured size"]);
+      if (t.alpha) chips.push(["image", ALPHA_CHIP[t.alpha] || t.alpha, "Transparency"]);
+      if (t.color_count != null) chips.push(["image", plural(t.color_count, "colour", "colours"), "Distinct colours"]);
+    }
+    const format = t.format || p.selected_source?.format || (info.formats || [])[0];
+    if (format) chips.push(["file", formatLabel(format), "File format"]);
+  } else {
+    const format = p.selected_source?.format;
+    // Measurements come from the inspected file; when another format is selected they name their source.
+    const measured = format && t.inspected_format && format !== t.inspected_format ? t.inspected_format : null;
+    const from = measured ? ` · ${formatLabel(measured)}` : "";
+    const fromHint = measured ? `, measured in ${formatLabel(measured)}` : "";
+    const triangles = t.evaluated_instance_totals?.triangles;
+    if (triangles != null) chips.push(["geometry", `${triangles.toLocaleString()} tris${from}`, `Triangles${fromHint}`]);
+    if (format) chips.push(["file", formatLabel(format), "Source format"]);
+    const dependencies: Json[] = p.dependencies || info.dependencies || [];
+    if (dependencies.length) chips.push(["file", plural(dependencies.length, "dependency file", "dependency files"), "Files this model refers to"]);
+    if ((t.armatures || []).length) chips.push(["geometry", `Rigged${from}`, plural(t.armatures.length, "armature", "armatures") + fromHint]);
+    const clips: Json[] = t.animation_clips || t.actions || [];
+    if (clips.length) chips.push(["geometry", `Animated · ${plural(clips.length, "clip", "clips")}${from}`, `Animation clips${fromHint}`]);
+    if (measured && chips.some(([to]) => to === "geometry")) caveat = `${formatLabel(format)} is uninspected; the measurements describe ${formatLabel(measured)}.`;
+  }
+  chips.push(["file", license, licenseHint]);
+  return (
+    <div className="grid gap-2">
+      <ul className="fact-chips flex flex-wrap gap-1.5" aria-label="Facts">
+        {chips.map(([to, label, hint]) => <FactChip key={label} to={to} hint={hint}>{label}</FactChip>)}
+      </ul>
+      {caveat && (
+        <p role="note" className="format-caveat flex items-start gap-2 text-[12px] leading-relaxed text-warning">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <span>{caveat}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Shown only when something is recorded as faulty: the first reason, and where the rest is. */
+function FaultLine({ faults }: { faults: Json[] }) {
+  const reduce = useReducedMotion();
+  return (
+    <div role="alert" className="fault-line flex items-start gap-2.5 rounded-xl bg-fault-bg px-3.5 py-2.5 text-[12.5px] leading-relaxed text-fault">
+      <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span className="line-clamp-3 min-w-0 flex-1 break-words">
+        {faultText(faults[0])}{faults.length > 1 && <span className="font-medium"> · {plural(faults.length - 1, "more fault", "more faults")}</span>}
+      </span>
+      <button type="button" onClick={() => reveal("record", reduce)} className="shrink-0 rounded font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-fault/40">Details</button>
+    </div>
+  );
 }
 
 /** The 3D still and interactive viewer from ui/interactive-preview.js, mounted per selection. */
@@ -77,156 +241,182 @@ function ModelPreview({ grid, assetId, result, view }: { grid: GridId; assetId: 
   return <div ref={ref} className="detail-preview" />;
 }
 
-function CaptionNotes({ info }: { info: Json }) {
-  const quality = info.caption_quality || {};
-  const notes = (quality.issues || []).filter((issue: Json) => issue.severity !== "fault");
+function Preview({ grid, result, assetId, format, view }: { grid: GridId; result: Json; assetId: string; format: string | null; view: string }) {
+  const p = result.payload, info = p.presentation || {}, t = info.technical || {};
+  const context = useApp((s) => s.context);
+  const formats: string[] = info.formats || [];
+  const formatValue = format || p.selected_source?.format || formats[0] || "";
+  const prefix = { library: "", source: "source-", collection: "collection-" }[grid];
+  // The format choice only appears when there is a choice to make.
+  const formatSelect = (nextView: string) => formats.length > 1 && (
+    <SelectField id={prefix + "detail-format"} label="Source format" value={formatValue} onChange={(value) => void selectAsset(grid, assetId, value, nextView, false)} options={formats.map((f): [string, string] => [f, formatLabel(f)])} />
+  );
+  if (info.asset_type === "image") {
+    const processed = info.processing?.inspection === "complete";
+    return (
+      <>
+        <div className="detail-preview">
+          {processed ? (
+            <ImageViewer key={assetId + formatValue} assetId={assetId} name={info.name || p.name || assetId} image={result.image} api={gridApi(grid, assetId)} version={result.generation ?? null} native={[t.width, t.height]} pixelArt={Boolean(t.pixel_art_candidate)} vector={t.format === "svg"} />
+          ) : (
+            <div className="grid min-h-40 place-items-center rounded-2xl bg-thumb p-6 text-center text-[12.5px] text-muted-foreground">
+              {({ pending: "This image has not been processed yet. Process this source in Asset processing to measure it and prepare image search.", failed: "This image could not be processed; the recorded fault is in the Processing record.", unsupported: "This image is recognized but not supported yet; the reason is in the Processing record." } as Record<string, string>)[info.processing?.inspection] || p.preview?.reason || "Image unavailable."}
+            </div>
+          )}
+        </div>
+        {formatSelect("image")}
+      </>
+    );
+  }
+  const views: string[] = (context?.views as string[] | undefined)?.filter((v) => v !== "image") || ["three_quarter", "front", "side"];
   return (
-    <Section title="Caption warnings & notes">
-      {notes.length ? (
-        <ul className="grid gap-3">
-          {notes.map((issue: Json, index: number) => (
+    <>
+      <ModelPreview grid={grid} assetId={assetId} result={result} view={view} />
+      <div className={cn("detail-controls grid gap-3", formats.length > 1 && "grid-cols-2")}>
+        {formatSelect(view)}
+        <SelectField id={prefix + "detail-view"} label="Preview view" value={view} onChange={(value) => void selectAsset(grid, assetId, format, value, false)} options={views.map((v): [string, string] => [v, VIEWS[v] || v])} />
+      </div>
+      <Button variant="secondary" className="w-full" disabled={!p.selected_source?.format} onClick={() => void window.LALPreview.current?.start(false)}>Open interactive 3D preview</Button>
+    </>
+  );
+}
+
+/** The generated description and suggested uses, labeled as generated; caption notes open beside it. */
+function Description({ info, image }: { info: Json; image: boolean }) {
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notes: Json[] = ((info.caption_quality || {}).issues || []).filter((issue: Json) => issue.severity !== "fault");
+  const warnings = notes.filter((issue) => issue.severity === "warning").length;
+  const uses: string[] = info.suggested_uses || [];
+  const processed = !image || info.processing?.inspection === "complete";
+  const text = info.observations ? info.observations.description || display(info.observations) : null;
+  const generated = info.description_shared_from
+    ? `Shared from ${info.description_shared_from}: one description serves this variant group, so colors or materials may describe another variant.`
+    : "Written from the previews during processing. It interprets how the asset looks; measured facts are in the sections below.";
+  return (
+    <section className="inspector-description grid gap-2.5" aria-labelledby="description-title">
+      <div className="flex min-h-7 flex-wrap items-center gap-2">
+        <h3 id="description-title" className="text-[14px] font-semibold text-foreground">Description</h3>
+        {notes.length > 0 && (
+          <button type="button" aria-expanded={notesOpen} aria-controls="caption-notes" onClick={() => setNotesOpen(!notesOpen)}
+            className={cn("caption-notes-chip inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40", warnings ? "bg-warning-bg text-warning" : "bg-surface-2 text-muted-foreground hover:text-foreground")}>
+            {warnings > 0 && <TriangleAlert className="size-3" aria-hidden />}
+            {[warnings && plural(warnings, "warning", "warnings"), notes.length - warnings && plural(notes.length - warnings, "review note", "review notes")].filter(Boolean).join(" · ")}
+          </button>
+        )}
+        {text && (
+          <Tooltip content={generated} delay={250}>
+            <span tabIndex={0} className="generated-label ml-auto rounded px-1 text-[11px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{info.description_shared_from ? "Generated · shared" : "Generated"}</span>
+          </Tooltip>
+        )}
+      </div>
+      {notesOpen && (
+        <ul id="caption-notes" className="caption-notes grid gap-3 rounded-xl bg-surface-2/60 px-3.5 py-3">
+          {notes.map((issue, index) => (
             <li key={index} className={cn("grid justify-items-start gap-1.5", issue.severity === "warning" && "caption-warning")}>
               <Badge tone={issue.severity === "warning" ? "warning" : "neutral"}>{issue.severity === "warning" ? "Warning" : "Review note"}</Badge>
               <Text>{issue.reason}</Text>
             </li>
           ))}
         </ul>
-      ) : (
-        <Text className="text-muted-foreground">{quality.status === "fault" ? "Caption unavailable; see recorded faults below." : "No caption review notes recorded."}</Text>
       )}
-      {notes.length > 0 && <Hint>Notes and warnings do not make the description unusable. Owner review is {info.owner_review || "pending"}.</Hint>}
-      <EvidenceBlock title="Original caption review evidence" value={{ classification: quality.classification, issues: quality.issues, original_findings: info.caption_faults }} />
-    </Section>
-  );
-}
-
-function Observations({ info, processed = true, image = false }: { info: Json; processed?: boolean; image?: boolean }) {
-  return (
-    <Section title="Generated observations">
-      {info.observations ? (
-        <>
-          <Text>{info.observations.description || display(info.observations)}</Text>
-          {info.description_shared_from
-            ? <Hint>Shared from {info.description_shared_from}: one description serves this variant group, so colors or materials may describe another variant.</Hint>
-            : <Hint>Generated description · owner review {info.owner_review || "pending"}. Interpretations, separate from measured facts.</Hint>}
-        </>
+      {text ? (
+        <Text>{text}</Text>
       ) : (
         <Text className="text-muted-foreground">
           {info.caption_faulty
-            ? "Description generation failed; the recorded fault is listed under Evidence."
+            ? "Description generation failed; the fault is in the Processing record."
             : !processed
               ? "Descriptions can be generated after the image is processed. It is still found by name."
-              : `No description yet. Descriptions are optional: this ${image ? "image is searchable by name and by its pixels" : "asset is searchable by name and image"}. Generate them in Asset processing.`}
+              : `No description yet. This ${image ? "image is searchable by name and by its pixels" : "asset is searchable by name and image"}; generate descriptions in Asset processing.`}
         </Text>
       )}
-    </Section>
+      {uses.length > 0 && (
+        <div className="suggested-uses grid gap-1.5">
+          <h4 className="text-[11.5px] font-medium text-muted-foreground">Suggested uses</h4>
+          <ul className="flex flex-wrap gap-1.5">
+            {uses.map((use) => <li key={use} className="inline-flex h-7 items-center rounded-full border border-border px-2.5 text-[12px] text-foreground">{use}</li>)}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
 
-function SuggestedUses({ info }: { info: Json }) {
-  const uses: string[] = info.suggested_uses || [];
-  return (
-    <Section title="Suggested uses">
-      {uses.length ? <Text>{uses.join(", ")}</Text> : <Text className="text-muted-foreground">No suggestions recorded.</Text>}
-      <Hint>Suggestions are interpretations, not verified asset capabilities.</Hint>
-    </Section>
-  );
-}
-
-function SourcesTab({ result, image }: { result: Json; image: boolean }) {
-  const p = result.payload, info = p.presentation || {};
+function FileSection({ result, image }: { result: Json; image: boolean }) {
+  const p = result.payload, info = p.presentation || {}, meta = info.type_metadata || {};
   const licenses: Json[] = info.license_evidence || [];
   const dependencies: Json[] = p.dependencies || info.dependencies || [];
+  const source = p.selected_source;
+  const others: Json[] = source ? (p.source_variants || []).filter((v: Json) => v.variant !== source.variant || v.format !== source.format) : [];
+  const suggested = meta.suggested_purpose;
   return (
-    <div className="grid gap-5">
-      <Section title="Source location">
-        {p.selected_source ? (
+    <Collapsible name="file">
+      <Group title="Source file">
+        {source ? (
           <>
-            <Text>{p.selected_source.format.toUpperCase()}{p.selected_source.variant ? ` · ${p.selected_source.variant} folder` : ""} · original file · verified hash</Text>
-            {(p.source_variants || []).length > 1 && (
-              <Hint>
-                Also in this asset: {(p.source_variants as Json[]).filter((v) => v.variant !== p.selected_source.variant || v.format !== p.selected_source.format).map((v) => `${v.variant} (${String(v.format).toUpperCase()}${v.usable === false ? `, unusable: ${v.reason}` : ""})`).join(" · ")}. Agents can ask for a usable one by its folder name.
-              </Hint>
+            <Text>{formatLabel(source.format)}{source.variant ? ` · ${source.variant} folder` : ""}</Text>
+            <code className="path block rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed break-all text-muted-foreground select-text">{source.resolved_path}</code>
+            <div><Button variant="secondary" className="h-9 px-4" onClick={() => void copyText(source.resolved_path, "Source path copied. Asset files were not copied.")}><Copy className="size-3.5" aria-hidden />Copy source path</Button></div>
+            {others.length > 0 && (
+              <Hint>Also in this asset: {others.map((v) => `${v.variant} (${formatLabel(v.format)}${v.usable === false ? `, unusable: ${v.reason}` : ""})`).join(" · ")}. Agents can ask for a usable one by its folder name.</Hint>
             )}
-            <code className="path block rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed break-all text-muted-foreground select-text">{p.selected_source.resolved_path}</code>
-            <div><Button variant="secondary" className="h-9 px-4" onClick={() => void copyText(p.selected_source.resolved_path, "Source path copied. Asset files were not copied.")}><Copy className="size-3.5" aria-hidden />Copy source path</Button></div>
-            <Hint>Original files stay in their source folder.</Hint>
-            <EvidenceBlock title="Source SHA-256" value={p.selected_source.sha256} />
           </>
         ) : (
-          <Text className="text-muted-foreground">No currently verified usable source. See recorded fault evidence.</Text>
+          <Text className="text-muted-foreground">No usable source file; the reason is in the Processing record.</Text>
         )}
-      </Section>
-      {!image && (
-        <Section title="Dependencies">
-          <Text className="text-muted-foreground">{dependencies.length ? `${plural(dependencies.length, "referenced file", "referenced files")} · ` : ""}{p.dependency_completeness || "Known references only; completeness is unknown."}</Text>
-          <EvidenceBlock title="Dependency paths & referring source" value={dependencies} />
-        </Section>
+      </Group>
+      {!image && dependencies.length > 0 && (
+        <Group title={`Dependencies · ${plural(dependencies.length, "file", "files")}`}>
+          <ul className="dependency-list grid gap-1 rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-muted-foreground select-text">
+            {dependencies.map((d, index) => (
+              <li key={index} className="break-all">{d.path || d.resolved_path || display(d)}{(d.fault || d.status === "missing") && <span className="text-fault"> · {d.fault || "missing"}</span>}</li>
+            ))}
+          </ul>
+        </Group>
       )}
-      <Section title="License evidence">
-        <Text className="text-muted-foreground">{licenses.length ? plural(licenses.length, "license record", "license records") + " supplied with the source." : "No license evidence recorded."} Unknowns remain unknown.</Text>
-        <EvidenceBlock title="Recorded license evidence" value={licenses} />
-      </Section>
-    </div>
+      <Group title="License" className="license">
+        {licenses.length ? licenses.map((l, index) => (
+          <div key={l.path || index} className="grid gap-1.5">
+            <Text>{l.license_identifier === "CC0-1.0" ? "CC0 1.0 (Creative Commons Zero)" : "Not recognized automatically"} <span className="text-muted-foreground">· {l.path}</span></Text>
+            {l.excerpt && <pre className="license-excerpt max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-surface-2 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground select-text scroll-thin">{l.excerpt}</pre>}
+          </div>
+        )) : <Text className="text-muted-foreground">No license file was found with this asset.</Text>}
+      </Group>
+      {image && (suggested || meta.identical_content) && (
+        <Group title="Purpose">
+          {suggested && <Text>Suggested: {suggested.value} — {suggested.evidence}</Text>}
+          {suggested && <Hint>Suggestions come from folder names and are not verified. Search and filters treat every image the same way.</Hint>}
+          {meta.identical_content && <Text>Byte-identical to {plural(meta.identical_content.total, "other image", "other images")} in this source; kept separate.</Text>}
+        </Group>
+      )}
+    </Collapsible>
   );
 }
 
-function EvidenceTab({ result, image }: { result: Json; image: boolean }) {
-  const p = result.payload, info = p.presentation || {}, quality = info.caption_quality || {};
-  const processed = info.processing?.inspection === "complete";
-  const combined: Json[] = image
-    ? [
-        ...(info.source_faults || []),
-        ...Object.entries(info.stage_faults || {}).filter(([stage]) => stage !== "caption").map(([stage, f]: [string, Json]) => ({ reason: stage + ": " + (f.reason || f.error || display(f)) })),
-        ...(quality.issues || []).filter((i: Json) => i.severity === "fault"),
-        ...(info.faults || []).filter((f: Json) => processed || !String(f.channel).startsWith("preview")),
-      ]
-    : [...(info.source_faults || []), ...(quality.issues || []).filter((i: Json) => i.severity === "fault"), ...(info.faults || []), ...(p.preview?.status === "faulty" ? [{ channel: "requested preview", reason: p.preview.reason }] : [])];
-  const derivation = info.model_input?.derivation;
+function GeometrySection({ result }: { result: Json }) {
+  const p = result.payload, t = p.presentation?.technical || {};
+  const totals = t.evaluated_instance_totals || {};
+  const armatures: Json[] = t.armatures || [];
+  const clips: Json[] = t.animation_clips || t.actions || [];
+  const selected = p.selected_source?.format;
+  const differs = Boolean(selected && t.inspected_format && selected !== t.inspected_format);
+  if (totals.triangles == null) return null;
+  const entries: [string, unknown][] = [["Triangles", totals.triangles.toLocaleString()], ["Vertices", totals.vertices?.toLocaleString?.()]];
+  if (armatures.length) entries.push(["Armatures", armatures.map((a) => (a.bones != null ? `${a.object} · ${plural(a.bones, "bone", "bones")}` : a.object || display(a))).join(", ")]);
+  if (clips.length) entries.push(["Animations", clips.map((c) => c.name || display(c)).join(", ")]);
+  if (differs) entries.push(["Inspected format", formatLabel(t.inspected_format)]);
   return (
-    <div className="grid gap-5">
-      <CaptionNotes info={info} />
-      <Section title="Recorded faults">
-        {combined.length ? (
-          <ul className="fault-list grid gap-1.5 rounded-xl bg-fault-bg px-4 py-3 text-[12.5px] leading-relaxed text-fault">
-            {combined.map((fault, index) => <li key={index} className="break-words">{faultText(fault)}</li>)}
-          </ul>
-        ) : (
-          <Text className="fault-list text-muted-foreground">No faults recorded for this asset.</Text>
-        )}
-        <EvidenceBlock title="Full fault & processing evidence" value={image ? { stages: info.stage_faults, caption: quality, runtime: info.faults, processing: info.processing } : { source: info.source_faults, caption: quality, runtime: info.faults, processing: info.processing }} />
-      </Section>
-      {(!image || info.technical?.width != null || info.observations) && (
-        <Section title="Measurements & observations">
-          {/* Unmeasured images have no measurement evidence to show. */}
-          {(!image || info.technical?.width != null) && <EvidenceBlock title={image ? "Measurement evidence" : "Measurement & inspected-source evidence"} value={info.technical} />}
-          {info.observations && <EvidenceBlock title="Structured generated observations" value={info.observations} />}
-        </Section>
-      )}
-      {image && (
-        <Section title="Search and description input">
-          <Text className="text-muted-foreground">
-            {derivation
-              ? `Image search and descriptions read a derived copy${derivation.scale > 1 ? `, enlarged ${derivation.scale}× with hard pixel edges` : ""}${derivation.resample?.includes("lanczos-downscale") ? ", reduced to fit 1024 px" : ""}${derivation.background ? ` on a flat rgb(${derivation.background.join(", ")}) backdrop. The backdrop fills transparent pixels only; it is not a colour of this image.` : ". No backdrop was needed."}`
-              : "No derived search input yet; the image is still found by name."}
-          </Text>
-          {derivation && <EvidenceBlock title="Derivation record" value={derivation} />}
-        </Section>
-      )}
-      <Section title="Owner review">
-        <dl className="grid gap-1 text-[13px] text-muted-foreground">
-          <div><dt className="inline">Caption review: </dt><dd className="inline">{info.owner_review || "pending"}</dd></div>
-          <div><dt className="inline">Artistic suitability: </dt><dd className="inline">{info.owner_artistic_approval || "pending"}</dd></div>
-        </dl>
-      </Section>
-    </div>
+    <Collapsible name="geometry">
+      {differs && <Banner tone="warning" role="note">{formatLabel(selected)} is uninspected; these facts describe {formatLabel(t.inspected_format)}.</Banner>}
+      <Facts entries={entries} />
+    </Collapsible>
   );
 }
 
 function imageFacts(t: Json): [string, unknown][] {
   const size = t.width == null ? "Unknown" : t.vector ? `${t.width} × ${t.height} canvas units` : `${t.width} × ${t.height} px`;
   return [
-    ["Format", t.format?.toUpperCase()], ["Size", size],
+    ["Format", t.format ? formatLabel(t.format) : undefined], ["Size", size],
     ["Transparency", t.alpha ? ALPHA_TEXT[t.alpha] + (t.alpha !== "none" && t.alpha_coverage != null ? ` · ${Math.round(t.alpha_coverage * 100)}% of pixels visible` : "") : undefined],
     ["Colours", t.color_count == null ? (t.vector ? "Not measured for vectors" : "More than 4,096") : t.color_count.toLocaleString()],
     ["Size class", t.size_class], ["Shape", t.aspect],
@@ -236,64 +426,49 @@ function imageFacts(t: Json): [string, unknown][] {
   ];
 }
 
-function OverviewTab({ grid, result, assetId, format, view }: { grid: GridId; result: Json; assetId: string; format: string | null; view: string }) {
-  const p = result.payload, info = p.presentation || {}, t = info.technical || {};
-  const context = useApp((s) => s.context);
-  const version = result.generation ?? null;
-  const formats: string[] = info.formats || [];
-  const formatValue = format || p.selected_source?.format || formats[0] || "";
-  const prefix = { library: "", source: "source-", collection: "collection-" }[grid];
-  if (info.asset_type === "image") {
-    const meta = info.type_metadata || {}, processed = info.processing?.inspection === "complete";
-    const suggested = meta.suggested_purpose;
-    return (
-      <div className="grid gap-5">
-        <div className="detail-preview">
-          {processed ? (
-            <ImageViewer key={assetId + formatValue} assetId={assetId} name={info.name || p.name || assetId} image={result.image} api={gridApi(grid, assetId)} version={version} native={[t.width, t.height]} pixelArt={Boolean(t.pixel_art_candidate)} vector={t.format === "svg"} />
-          ) : (
-            <div className="grid min-h-40 place-items-center rounded-2xl bg-thumb p-6 text-center text-[12.5px] text-muted-foreground">
-              {({ pending: "This image has not been processed yet. Process this source in Asset processing to measure it and prepare image search.", failed: "This image could not be processed; the recorded fault is listed under Evidence.", unsupported: "This image is recognized but not supported yet; the reason is listed under Evidence." } as Record<string, string>)[info.processing?.inspection] || p.preview?.reason || "Image unavailable."}
-            </div>
-          )}
-        </div>
-        {formats.length > 1 && <SelectField id={prefix + "detail-format"} label="Source format" value={formatValue} onChange={(value) => void selectAsset(grid, assetId, value, "image", false)} options={formats.map((f): [string, string] => [f, f.toUpperCase()])} />}
-        <Section title="Measured facts">
-          <Hint>{info.scale}</Hint>
-          {t.width != null ? <Facts entries={imageFacts(t)} /> : <Text className="text-muted-foreground">{processed ? "No measurements recorded." : "Measured when the image is processed successfully."}</Text>}
-        </Section>
-        <Section title="Purpose">
-          <Facts entries={[["Recorded", "Generic image"], ["Suggested", suggested ? suggested.value + " — " + suggested.evidence : "None"]]} />
-          <Hint>Suggestions come from folder names and are not verified. Search and filters treat every image the same way.</Hint>
-          {meta.identical_content && <Text>Byte-identical to {plural(meta.identical_content.total, "other image", "other images")} in this source; kept separate.</Text>}
-        </Section>
-        <Observations info={info} processed={processed} image />
-        <SuggestedUses info={info} />
-        <TagsSection assetId={assetId} />
-      </div>
-    );
-  }
-  const selectedFormat = p.selected_source?.format;
-  const views: string[] = (context?.views as string[] | undefined)?.filter((v) => v !== "image") || ["three_quarter", "front", "side"];
+function ImageSection({ result }: { result: Json }) {
+  const info = result.payload.presentation || {}, t = info.technical || {};
+  const derivation = info.model_input?.derivation;
+  if (t.width == null) return null;
   return (
-    <div className="grid gap-5">
-      <ModelPreview grid={grid} assetId={assetId} result={result} view={view} />
-      <div className="detail-controls grid grid-cols-2 gap-3">
-        <SelectField id={prefix + "detail-format"} label="Source format" value={formatValue} onChange={(value) => void selectAsset(grid, assetId, value, view, false)} options={formats.map((f): [string, string] => [f, f.toUpperCase()])} />
-        <SelectField id={prefix + "detail-view"} label="Preview view" value={view} onChange={(value) => void selectAsset(grid, assetId, format, value, false)} options={views.map((v): [string, string] => [v, VIEWS[v] || v])} />
-      </div>
-      <Button variant="secondary" className="w-full" disabled={!selectedFormat} onClick={() => void window.LALPreview.current?.start(false)}>Open interactive 3D preview</Button>
-      <Section title="Measured facts">
-        {selectedFormat && t.inspected_format && selectedFormat !== t.inspected_format && (
-          <Banner tone="warning" role="note">{selectedFormat.toUpperCase()} is uninspected; the facts below describe {t.inspected_format.toUpperCase()}.</Banner>
+    <Collapsible name="image">
+      <Facts entries={imageFacts(t)} />
+      <Hint>{info.scale}</Hint>
+      <Text className="search-input text-muted-foreground">
+        {derivation
+          ? `Image search and descriptions read a derived copy${derivation.scale > 1 ? `, enlarged ${derivation.scale}× with hard pixel edges` : ""}${derivation.resample?.includes("lanczos-downscale") ? ", reduced to fit 1024 px" : ""}${derivation.background ? ` on a flat rgb(${derivation.background.join(", ")}) backdrop. The backdrop fills transparent pixels only; it is not a colour of this image.` : ". No backdrop was needed."}`
+          : "No derived search input yet; the image is still found by name."}
+      </Text>
+    </Collapsible>
+  );
+}
+
+/** The raw record behind everything above: faults with their evidence, hashes and measurement JSON. */
+function RecordSection({ result, image, faults }: { result: Json; image: boolean; faults: Json[] }) {
+  const p = result.payload, info = p.presentation || {}, quality = info.caption_quality || {};
+  const technical: Json = info.technical || {};
+  const measured = image ? technical.width != null : Object.values(technical).some((value) => value != null);
+  const derivation = info.model_input?.derivation;
+  return (
+    <Collapsible name="record">
+      {faults.length > 0 && (
+        <Group title={plural(faults.length, "recorded fault", "recorded faults")}>
+          <ul className="fault-list grid gap-1.5 rounded-xl bg-fault-bg px-4 py-3 text-[12.5px] leading-relaxed text-fault">
+            {faults.map((fault, index) => <li key={index} className="break-words">{faultText(fault)}</li>)}
+          </ul>
+        </Group>
+      )}
+      <div className="grid gap-1">
+        <EvidenceBlock title="Fault & processing evidence" value={image ? { stages: info.stage_faults, caption: quality, runtime: info.faults, processing: info.processing } : { source: info.source_faults, caption: quality, runtime: info.faults, processing: info.processing }} />
+        {p.selected_source?.sha256 && <EvidenceBlock title="Source SHA-256" value={p.selected_source.sha256} />}
+        {measured && <EvidenceBlock title={image ? "Measurement evidence" : "Measurement & inspected-source evidence"} value={technical} />}
+        {info.observations && <EvidenceBlock title="Structured observations" value={info.observations} />}
+        {((quality.issues || []).length > 0 || (info.caption_faults || []).length > 0) && (
+          <EvidenceBlock title="Caption review evidence" value={{ classification: quality.classification, issues: quality.issues, original_findings: info.caption_faults }} />
         )}
-        <Facts entries={[["Triangles", t.evaluated_instance_totals?.triangles?.toLocaleString?.()], ["Vertices", t.evaluated_instance_totals?.vertices?.toLocaleString?.()], ["Inspected format", t.inspected_format?.toUpperCase()], ["Physical scale", "Unknown"], ["Armatures", t.armatures?.length], ["Actions", t.actions?.length]]} />
-        <Hint>{info.scale}</Hint>
-      </Section>
-      <Observations info={info} />
-      <SuggestedUses info={info} />
-      <TagsSection assetId={assetId} />
-    </div>
+        {derivation && <EvidenceBlock title="Image derivation record" value={derivation} />}
+      </div>
+    </Collapsible>
   );
 }
 
@@ -539,7 +714,7 @@ function FormatOff({ hold }: { hold: Json }) {
   const [busy, setBusy] = useState(false);
   const label = hold.format === "gltf" ? "glTF" : String(hold.format).toUpperCase();
   return (
-    <Banner tone="warning" className="format-off mt-1 grid gap-2">
+    <Banner tone="warning" className="format-off grid gap-2">
       <span>{hold.reason}</span>
       <span>
         <Button variant="secondary" className="h-8 px-3" disabled={busy} onClick={() => { setBusy(true); void turnFormatOn(hold.format).finally(() => setBusy(false)); }}>
@@ -552,7 +727,6 @@ function FormatOff({ hold }: { hold: Json }) {
 
 function DetailBody({ grid }: { grid: GridId }) {
   const detail = useApp((s) => s[grid].detail);
-  const tab = useApp((s) => s.inspector.tab);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focusToken = detail?.focusToken ?? 0;
   const hasResult = Boolean(detail?.result);
@@ -579,8 +753,8 @@ function DetailBody({ grid }: { grid: GridId }) {
     );
   const result = detail.result, p = result.payload, info = p.presentation || {};
   const image = info.asset_type === "image";
-  const tabs: [InspectorTab, string][] = [["overview", "Overview"], ["sources", "Sources"], ["evidence", "Evidence"]];
-  const ids = (value: string) => ({ tab: `inspector-tab-${value}`, panel: `inspector-panel-${value}` });
+  const faults = recordedFaults(result, image);
+  // One scroll, top to bottom: what is wrong, the asset itself, its facts, then the detail behind them.
   return (
     <div className="grid content-start gap-5 px-6 pb-8">
       <div className="detail-header grid gap-2">
@@ -590,27 +764,21 @@ function DetailBody({ grid }: { grid: GridId }) {
           <span className="pack inline-flex h-6 items-center text-[12px] text-muted-foreground">{packName(info.pack || p.pack || "")}</span>
           {detail.loading && <Spinner className="ml-1 size-3.5 self-center text-muted-foreground" />}
         </div>
-        {p.status === "faulty" && <Banner className="state-banner mt-1">{p.reason}</Banner>}
-        {info.format_off && <FormatOff hold={info.format_off} />}
       </div>
+      {faults.length > 0 && <FaultLine faults={faults} />}
+      {info.format_off && <FormatOff hold={info.format_off} />}
+      {p.status === "faulty" && !faults.some((fault) => faultText(fault) === p.reason) && <Banner className="state-banner">{p.reason}</Banner>}
+      <Preview grid={grid} result={result} assetId={detail.assetId} format={detail.format} view={detail.view} />
+      <FactChips result={result} image={image} />
       {info.variant_group && <Variants grid={grid} group={info.variant_group} assetId={detail.assetId} />}
       {grid === "collection" && <CollectionEntry assetId={detail.assetId} />}
-      <Tabs value={tab} onValueChange={(value) => setInspectorTab(value as InspectorTab)} variant="segment">
-        <TabsList aria-label="Inspection sections" wrapperClassName="w-full" className="flex w-full rounded-full bg-surface-2 p-1 [--tabs-active-fg:var(--color-foreground)]">
-          {tabs.map(([value, label]) => (
-            <TabsTrigger key={value} value={value} id={ids(value).tab} aria-controls={ids(value).panel} wrapperClassName="flex-1" className="h-9 w-full rounded-full text-[12.5px] font-medium" indicatorClassName="rounded-full bg-surface shadow-[0_1px_3px_rgb(0_0_0/0.08)]">
-              {label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-      {tabs.map(([value]) => (
-        <div key={value} id={ids(value).panel} role="tabpanel" aria-labelledby={ids(value).tab} hidden={tab !== value} tabIndex={0} className="outline-none">
-          {value === "overview" && <OverviewTab grid={grid} result={result} assetId={detail.assetId} format={detail.format} view={detail.view} />}
-          {value === "sources" && <SourcesTab result={result} image={image} />}
-          {value === "evidence" && <EvidenceTab result={result} image={image} />}
-        </div>
-      ))}
+      <Description key={detail.assetId} info={info} image={image} />
+      <TagsSection assetId={detail.assetId} />
+      <div className="inspector-sections grid">
+        <FileSection result={result} image={image} />
+        {image ? <ImageSection result={result} /> : <GeometrySection result={result} />}
+        <RecordSection result={result} image={image} faults={faults} />
+      </div>
     </div>
   );
 }

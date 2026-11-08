@@ -132,11 +132,16 @@ def test_desktop_bridge_round_trips_interface_preferences(indexed):
     config, _, _ = indexed
     bridge = DesktopBridge(config, prestart_worker=False)
     try:
-        assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440}
+        closed = {'file': False, 'geometry': False, 'image': False, 'record': False}
+        assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440,
+                                               'inspector_sections': closed}
         assert bridge.save_interface_settings('dark', None)['appearance'] == 'dark'
         assert bridge.save_interface_settings(None, 610)['inspector_width'] == 610
-        assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'dark', 'inspector_width': 610}
+        assert bridge.save_interface_settings(None, None, {'geometry': True})['inspector_sections']['geometry'] is True
+        assert bridge.interface_settings() == {'status': 'ready', 'appearance': 'dark', 'inspector_width': 610,
+                                               'inspector_sections': dict(closed, geometry=True)}
         assert bridge.save_interface_settings('sepia', None)['status'] == 'faulty'
+        assert bridge.save_interface_settings(None, None, {'tabs': True})['status'] == 'faulty'
     finally:
         bridge._close()
 

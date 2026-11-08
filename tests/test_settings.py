@@ -165,9 +165,11 @@ def test_cancelling_caption_stage_names_the_batch():
 
 def test_interface_preferences_default_validate_and_never_touch_budget_settings(config):
     from local_asset_library.settings import interface_path, interface_settings, save_interface_settings
-    assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440}
+    closed = {'file': False, 'geometry': False, 'image': False, 'record': False}
+    assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440,
+                                          'inspector_sections': closed}
     saved = save_interface_settings(config, appearance='dark')
-    assert saved == {'status': 'saved', 'appearance': 'dark', 'inspector_width': 440}
+    assert saved == {'status': 'saved', 'appearance': 'dark', 'inspector_width': 440, 'inspector_sections': closed}
     assert save_interface_settings(config, inspector_width=5000)['inspector_width'] == 960  # clamped
     assert save_interface_settings(config, inspector_width=12)['inspector_width'] == 320
     assert interface_settings(config)['appearance'] == 'dark'  # width saves keep the appearance
@@ -175,9 +177,38 @@ def test_interface_preferences_default_validate_and_never_touch_budget_settings(
         save_interface_settings(config, appearance='sepia')
     with pytest.raises(ConfigError, match='pixels'):
         save_interface_settings(config, inspector_width=True)
+    # Each section remembers its own state; saving one leaves the others and the width alone.
+    save_interface_settings(config, inspector_width=500)
+    save_interface_settings(config, inspector_sections={'file': True})
+    save_interface_settings(config, inspector_sections={'record': True})
+    assert save_interface_settings(config, inspector_sections={'file': False})['inspector_sections'] == dict(
+        closed, record=True)
+    assert interface_settings(config)['inspector_width'] == 500 and interface_settings(config)['appearance'] == 'dark'
+    for bad in ({'evidence': True}, {'file': 'open'}, {'file': 1}, ['file']):
+        with pytest.raises(ConfigError, match='Inspector sections'):
+            save_interface_settings(config, inspector_sections=bad)
+    assert interface_settings(config)['inspector_sections'] == dict(closed, record=True)
     # Presentation lives apart from settings.json, so budget validation never sees it.
     assert not settings_path(config).exists() and interface_path(config).exists()
     assert general_settings(config)['storage_budget_gib'] == 10
+
+
+def test_concurrent_interface_saves_keep_every_patch(config, monkeypatch):
+    # The desktop saves width and sections on separate timers and runs them in parallel.
+    import threading, time
+    from local_asset_library import settings
+    read = settings.interface_settings
+    def slow_read(config):
+        value = read(config)
+        time.sleep(0.05)  # Widens the read-merge-write window so an unserialized save would drop the other.
+        return value
+    monkeypatch.setattr(settings, 'interface_settings', slow_read)
+    saves = [threading.Thread(target=settings.save_interface_settings, args=(config,), kwargs=kwargs)
+             for kwargs in ({'inspector_width': 600}, {'inspector_sections': {'geometry': True}}, {'appearance': 'light'})]
+    for save in saves: save.start()
+    for save in saves: save.join()
+    saved = read(config)
+    assert (saved['inspector_width'], saved['inspector_sections']['geometry'], saved['appearance']) == (600, True, 'light')
 
 
 def test_damaged_interface_preferences_reset_presentation_only(config):
@@ -185,8 +216,12 @@ def test_damaged_interface_preferences_reset_presentation_only(config):
     interface_path(config).parent.mkdir(parents=True, exist_ok=True)
     interface_path(config).write_text('{not json', encoding='utf-8')
     assert interface_settings(config)['appearance'] == 'system'
-    atomic_json(interface_path(config), {'appearance': 'neon', 'inspector_width': 'wide'})
-    assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440}
+    atomic_json(interface_path(config), {'appearance': 'neon', 'inspector_width': 'wide',
+                                         'inspector_sections': {'file': 'yes', 'record': True, 'tabs': True}})
+    assert interface_settings(config) == {'status': 'ready', 'appearance': 'system', 'inspector_width': 440,
+                                          'inspector_sections': dict({'file': False, 'geometry': False, 'image': False, 'record': False}, record=True)}
+    atomic_json(interface_path(config), {'inspector_sections': ['file']})
+    assert not any(interface_settings(config)['inspector_sections'].values())
 
 def test_model_preparation_uses_unique_allocation_and_saved_budget(config, monkeypatch):
     from local_asset_library import model_storage, source_storage

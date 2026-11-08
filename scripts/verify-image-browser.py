@@ -102,6 +102,8 @@ def names():
 def verify():
     try:
         ui.wait_ready(extra='lal.state.sources.length===1')
+        # The facts, purpose and faults read below sit in the inspector's collapsible sections.
+        js("['file','image','record'].forEach(n=>lal.setInspectorSection(n,true))")
         browse('image')
         wait("[...$('grid').querySelectorAll('.card')].length===12")
         assert names() == sorted(['arrow', 'arrow', 'bare', 'banner', 'blink', 'box', 'copy', 'damaged', 'glow', 'linked', 'potion', 'wood']), names()  # wood: a material texture (decision 0023)

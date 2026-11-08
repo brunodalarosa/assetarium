@@ -41,7 +41,8 @@ def packaged(monkeypatch, appearance='system', windows_dark=False):
         pass
     monkeypatch.setitem(sys.modules, 'webview', Webview)
     monkeypatch.setattr('local_asset_library.settings.interface_settings',
-                        lambda config: {'status': 'ready', 'appearance': appearance, 'inspector_width': 512})
+                        lambda config: {'status': 'ready', 'appearance': appearance, 'inspector_width': 512,
+                                        'inspector_sections': {'file': True, 'record': False}})
     monkeypatch.setattr(desktop, 'windows_prefers_dark', lambda: windows_dark)
     return create_window(None, Bridge())
 
@@ -67,5 +68,6 @@ def test_packaged_shell_keeps_punctuation_icons_and_accessible_text(monkeypatch)
 def test_theme_is_resolved_before_first_paint(monkeypatch, appearance, windows_dark, theme, background):
     window = packaged(monkeypatch, appearance, windows_dark)
     assert f'<html lang="en" data-theme="{theme}" data-appearance="{appearance}">' in window['html']
-    assert 'window.LAL_BOOT={"appearance": "%s", "inspector_width": 512};' % appearance in window['html']
+    assert ('window.LAL_BOOT={"appearance": "%s", "inspector_width": 512, '
+            '"inspector_sections": {"file": true, "record": false}};' % appearance) in window['html']
     assert window['background_color'] == background
