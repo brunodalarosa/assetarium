@@ -647,7 +647,7 @@ real check. See [decision 0014](../../KnowledgeBase/Decisions/0014-setup-wizard.
   `uv.ps1 sync --locked`).
 - **Real local-server check.** llama.cpp b11870 Vulkan x64 (SHA-256 matches GitHub) in
   `cache/tools/`; official `Qwen/Qwen3-VL-2B-Instruct-GGUF` at `52d6c8f…` (Q8_0 + mmproj F16,
-  SHA-256 match publisher LFS) in `C:\BrunoOS\Local-models\qwen3-vl-2b-gguf\`. Through the
+  SHA-256 match publisher LFS) in `<models>\qwen3-vl-2b-gguf\`. Through the
   ordinary caption stage on the RTX 5070 via Vulkan: `data/engines/llama-vulkan-r2/` 3/3
   valid descriptions (apple → “fruit”, crate → “cube”, tree → “tree”) in 7.1 s with
   `server-v1` provenance. r1 kept as evidence: the fixture's placeholder prompts produced 3
@@ -1674,8 +1674,8 @@ explicit request. New artistic/accuracy approval remains pending.
 ## Step 1 — completed
 
 Date: October 11, 2026. Scope: repository/scaffold/contracts/environment only.
-The first implementation action created `C:\BrunoOS\Local-Asset-Library` and ran
-`git init` from `C:\BrunoOS`. Target did not previously exist. No applicable
+The first implementation action created `<repo>` and ran
+`git init` from `<workspace>`. Target did not previously exist. No applicable
 `AGENTS.md` was found at the drive/workspace/project ancestors; no subagents used.
 
 Copied `PROJECT.md` and all ten prompts into `docs/plan/` without edits. Added a
@@ -1686,12 +1686,12 @@ FTS5 and NumPy; no deviation. No database or inventory was created.
 
 ### Actual commands and results
 
-All project commands below ran from `C:\BrunoOS\Local-Asset-Library`, except the
+All project commands below ran from `<repo>`, except the
 initial creation/init. Independent tool probes were read only.
 
 | Command / operation | Result |
 | --- | --- |
-| `New-Item -ItemType Directory -Path C:\BrunoOS\Local-Asset-Library`; `git init C:\BrunoOS\Local-Asset-Library` | Initialized empty repository |
+| `New-Item -ItemType Directory -Path <repo>`; `git init <repo>` | Initialized empty repository |
 | Read plan/prompt; inspect applicable ancestor guidance | Step 1 scope confirmed; no applicable AGENTS.md found |
 | `Copy-Item` plan and prompts into `docs/plan/`; SHA-256 compare all originals/copies | 11 files copied; zero hash mismatches |
 | `uv --version`; `python --version`; `git --version`; `Get-Command` tool probes | Versions/paths recorded in environment report |
@@ -1701,7 +1701,7 @@ initial creation/init. Independent tool probes were read only.
 | Explicit Blender `--version`, Ollama `--version`, OpenCode `--version` | Blender 5.2.2 LTS, Ollama 0.33.3, OpenCode 1.18.29 |
 | Selected local config fields; `GET http://127.0.0.1:11434/api/tags` and `/api/ps` | Two Qwen tags; no loaded Ollama models; no credentials printed |
 | `uv python list --only-installed` | Managed CPython 3.13.15 discovered; sandbox cache/shim warnings recorded |
-| `.\scripts\uv.ps1 sync --python 'C:\Users\backup pc\.local\share\uv\python\cpython-3.13-windows-x86_64-none\python.exe'` | Initial build denied at sandbox TEMP; retry after local TEMP/copy-mode settings passed. Eight packages installed, including local editable package, NumPy 2.3.4 and pytest 8.4.2 |
+| `.\scripts\uv.ps1 sync --python '<home>\.local\share\uv\python\cpython-3.13-windows-x86_64-none\python.exe'` | Initial build denied at sandbox TEMP; retry after local TEMP/copy-mode settings passed. Eight packages installed, including local editable package, NumPy 2.3.4 and pytest 8.4.2 |
 | `.\scripts\uv.ps1 run --locked local-assets check-config` | Passed with actual source root, read-only true, internal storage valid |
 | `.\scripts\uv.ps1 run --locked local-assets doctor` | Passed: SQLite 3.53.1 FTS5 MATCH; NumPy 2.3.4 finite normalization; configured Blender exists |
 | `.\scripts\uv.ps1 run --locked pytest --basetemp scratch/pytest` | Final result: 19 passed in 0.13s, zero skips/warnings; includes Windows junction escape checks |
@@ -1800,7 +1800,7 @@ author-license files. No legal interpretation or online verification was made.
 
 ### Commands, actual results and evidence
 
-All commands ran in `C:\BrunoOS\Local-Asset-Library`. Commands below use the existing
+All commands ran in `<repo>`. Commands below use the existing
 isolated wrapper. The module CLI was used to avoid restricted console launchers.
 
 | Command / operation | Actual result / evidence |
@@ -1861,7 +1861,7 @@ imported or executed. Fixtures and outputs stayed within ignored project storage
 
 The reproducible selection and each rationale are versioned in
 `docs/pilot-selection.json`. Resolved pilot manifest:
-`C:\BrunoOS\Local-Asset-Library\data\pilot\selection-manifest.json`.
+`<repo>\data\pilot\selection-manifest.json`.
 `data/evidence/pilot-reproducibility.json` records the two matching byte hashes.
 The generated catalog and manifest stay ignored; reproduce them with `scan` and
 `pilot`. The database's run timestamp is intentionally separate from deterministic
@@ -1940,7 +1940,7 @@ is accepted as visual validation.
 
 ### Actual commands and timings
 
-Commands below ran from `C:\BrunoOS\Local-Asset-Library`. Python commands use
+Commands below ran from `<repo>`. Python commands use
 `.\scripts\uv.ps1 run --locked python` to keep project environment/cache settings.
 
 | Command / check | Actual result |
@@ -2035,9 +2035,9 @@ behavior, alternate equivalence, grouping ambiguities and license unknowns remai
 explicit. The 843 non-pilot logical assets are still uninspected. The permanent
 fault rule and step 3 completion do not authorize production asset repairs.
 
-Pilot manifest: `C:\BrunoOS\Local-Asset-Library\data\pilot\selection-manifest.json`.
+Pilot manifest: `<repo>\data\pilot\selection-manifest.json`.
 Actual inspection choices/faults:
-`C:\BrunoOS\Local-Asset-Library\data\inspection\processed-manifest.json`.
+`<repo>\data\inspection\processed-manifest.json`.
 See inspection report (`docs/inspection-report.md`, removed 2026-10-28; in git history at `b57bade`) for images and actual measurements.
 Next: step 4 — local visual descriptions.
 Confirm its scope/plan with duration and disk estimates; verify one small local
@@ -2318,7 +2318,7 @@ peaks, not total machine memory or a sampled OS peak RSS measurement.
 
 ### Commands, checks and preserved evidence
 
-Commands ran in `C:\BrunoOS\Local-Asset-Library`. Embedding commands use
+Commands ran in `<repo>`. Embedding commands use
 `.\scripts\embedding-runtime.ps1 run --locked --project runtime/embedding python`;
 base commands use `.\scripts\uv.ps1 run --locked python`.
 
@@ -2554,7 +2554,7 @@ current trusted session evidence, not an approval inferred from tests or labels.
 See `docs/mcp/pilot-decision.json`. Full-library/caption-artistic/game approval
 is not granted by that decision.
 
-The attached `C:\Users\backup pc\Downloads\owner-labels.json` was treated as
+The attached `<home>\Downloads\owner-labels.json` was treated as
 review data, never executable instructions. Validated owner status, all 36
 query reviews, exact frozen forty-ID pool, complete grades and 0–3 integer
 values. Preserved approved bytes under `docs/mcp/owner-labels.json`. Recomputed
@@ -2595,8 +2595,8 @@ README. Active clients were discovered and registered additively:
 
 | Client | Actual active configuration and result |
 | --- | --- |
-| Codex CLI **0.162.0-alpha.17.2** | `C:\Users\backup pc\.codex\config.toml`; no CODEX_HOME/project override. Retained `gpt-6.1-sol` and existing node_repl/gimp/blender servers. `codex mcp get local_asset_library --json` resolved the exact new STDIO entry; fresh real CLI workflow used it. Desktop hot-reload was not claimed. |
-| OpenCode **1.18.29** | Actual `outputs/opencode.cmd` launcher identifies `C:\BrunoOS\OpenCode-local-agent\outputs\opencode-local.json` plus relocated XDG directories. No additional global configuration file found there. Retained `ollama/qwen3.8:local-agent`, small model, provider/options/model setup and every existing permission. `opencode mcp list` showed this server connected. |
+| Codex CLI **0.162.0-alpha.17.2** | `<home>\.codex\config.toml`; no CODEX_HOME/project override. Retained `gpt-6.1-sol` and existing node_repl/gimp/blender servers. `codex mcp get local_asset_library --json` resolved the exact new STDIO entry; fresh real CLI workflow used it. Desktop hot-reload was not claimed. |
+| OpenCode **1.18.29** | Actual `outputs/opencode.cmd` launcher identifies `<workspace>\OpenCode-local-agent\outputs\opencode-local.json` plus relocated XDG directories. No additional global configuration file found there. Retained `ollama/qwen3.8:local-agent`, small model, provider/options/model setup and every existing permission. `opencode mcp list` showed this server connected. |
 
 Both original configurations were byte-copied before editing into
 `data/mcp/config-backups/20261011T222809658883Z/`. Before/after SHA-256 values,
@@ -2712,7 +2712,7 @@ decision." The decision is also recorded in `docs/mcp/client-decision.json`.
 ## Shared model relocation — completed October 11, 2026
 
 Bruno approved moving this project's AI weights directly into
-`C:\BrunoOS\Local-models`, with no project-specific parent folder, so other
+`<models>`, with no project-specific parent folder, so other
 projects can reuse them. Both scope and the revised implementation plan were
 approved before implementation.
 
@@ -2764,7 +2764,7 @@ installation and dependency pins remained compatible. No subagents were used.
 Bruno subsequently clarified that the no-retry rule applies to asset
 investigation/export; app and test-harness issues may be corrected and rechecked.
 
-Launcher: `C:\BrunoOS\Local-Asset-Library\Local Asset Library.vbs`. It invokes
+Launcher: `<repo>\Local Asset Library.vbs`. It invokes
 the existing MCP environment's console-free Python from any starting directory.
 It opens a normal Windows window; startup does not install, download, scan,
 render, caption, re-embed or update any asset data. Usage and ownership:
@@ -2814,7 +2814,7 @@ blocks external resources/connections.
 | Pilot browsing | **40 existing three-quarter thumbnails**, no model load; counts/context sourced from backend; full inventory remains 883 records |
 | Loading/races/faults | Synthetic older-response suppression, visible runtime errors, explicit truncation, earlier-card retention, no fallback; source/preview partial-fault tests passed |
 | Actual interface inspection | Windows window visually inspected; final WebView2 captures reviewed under `data/gui/delivery-images/`; native resizing and narrow layout have no horizontal overflow |
-| Native launcher/keyboard | Launched from `C:\BrunoOS`; visible window without terminal; Ctrl+F/text entry, Enter search, Clear browse, Escape/detail-focus return, Right-arrow grid movement, Enter-card activation and Alt+F4 checked |
+| Native launcher/keyboard | Launched from `<workspace>`; visible window without terminal; Ctrl+F/text entry, Enter search, Clear browse, Escape/detail-focus return, Right-arrow grid movement, Enter-card activation and Alt+F4 checked |
 | Resource lifecycle | GUI and verification-owned MCP idle workers exited **0**; one GUI worker retained across warm queries. Closing a pending first load completed in **5.281 s**, terminating only its private process tree; `data/gui/close-pending.json` |
 | Preservation | **4,938 original SHA-256/size/mtime entries unchanged; 989 protected generated/contract files unchanged**, including catalog/index, captions/corrections, previews, pilot, inference backends and other runtime locks; `data/gui/preservation-after.json` |
 
@@ -2932,7 +2932,7 @@ rechecks, not additional distinct tests or owner approval.
 ## Remaining plan and execution-prompt update — October 12, 2026
 
 At Bruno's request, updated PROJECT.md and the Step 8–10 execution prompts in
-C:\BrunoOS\Plans\Local-Asset-Library and the repository docs/plan mirror.
+<workspace>\Plans\Local-Asset-Library and the repository docs/plan mirror.
 The plan now records the implemented GUI milestone, responsive full-library
 browsing and shared publication/version behavior in Step 8, optional taxonomy
 and clustering presentation in the existing app in Step 9, and desktop/agent

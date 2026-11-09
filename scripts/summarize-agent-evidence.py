@@ -106,5 +106,6 @@ summary={'clients':results,'two_tool_schema_characters':len(encoded(tools)),
     'registration':registration['records'],'unrelated_active_settings_reverified':True,
     'cloud_disclosure':'Codex returns include descriptions, metadata, source/dependency paths and requested PNGs. The current cloud-backed verification chat also inspected the same PNG and reviewed bounded audit summaries. OpenCode inference uses the existing localhost Ollama provider; reviewing its evidence here does not make this whole task fully local.',
     'no_public_server_or_game_import':True,'full_library_processed':False}
-(root/'docs/mcp/client-results.json').write_text(json.dumps(summary,indent=2)+'\n',encoding='utf-8')
+out=root/'data/evidence/client-results.json';out.parent.mkdir(parents=True,exist_ok=True)
+out.write_text(json.dumps(summary,indent=2)+'\n',encoding='utf-8')
 print(json.dumps({'clients':{k:{f:v[f] for f in ['workflow_verified','status','tool_calls','returned_text_characters_total','returned_image_bytes_total','faults']} for k,v in results.items()},'schema_characters':summary['two_tool_schema_characters']},indent=2))

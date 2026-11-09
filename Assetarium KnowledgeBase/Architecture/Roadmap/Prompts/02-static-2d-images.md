@@ -6,7 +6,7 @@ parent: "[Expansion plan](../Expansion%20plan.md)"
 
 Up: [Expansion plan](../Expansion%20plan.md).
 
-Work in `C:\BrunoOS\Local-Asset-Library` and implement only expansion step 2 of [Project_v2_expansion.md](../Expansion%20plan.md). Verify step 1's actual contract/evidence; do not implement against a merely proposed schema. Do not spawn subagents. This prompt does not approve implementation or processing.
+Work in this repository and implement only expansion step 2 of [Project_v2_expansion.md](../Expansion%20plan.md). Verify step 1's actual contract/evidence; do not implement against a merely proposed schema. Do not spawn subagents. This prompt does not approve implementation or processing.
 
 ## Read and obtain approval
 

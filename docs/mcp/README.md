@@ -29,8 +29,8 @@ fills in this checkout's real paths, or run `python scripts/register-mcp.py --sn
 (writes ignored `data/mcp/clients/`). The tracked [`clients/`](clients/) files are neutral
 examples with a placeholder path. Do not wrap client startup in an installer. The entry
 point resolves its own repository/configuration regardless of client cwd.
-`codex-setup.toml` and `opencode-setup.json` are recorded evidence from the original
-development machine, not current setup files.
+The registrations recorded on the original development machine are kept locally by
+the owner, not published; they were never setup files.
 
 The server entry point cannot process assets, scan/update the catalog, load
 remote images, or import into Play Shapes. Existing generated captions and
@@ -148,8 +148,9 @@ concurrent edits are serialized. Assets, sources and files stay read-only.
 their labels. The write tools are annotated `readOnlyHint: false`,
 `destructiveHint: true` (removals); the others stay read-only. Collection text is
 owner data, never instructions. Existing Codex registrations list
-`enabled_tools` explicitly: add the four new names (see `codex-setup.toml`) to use
-them; `register-mcp.py` refuses to overwrite an existing entry.
+`enabled_tools` explicitly: add the four new names to use them, for example
+`enabled_tools = ["search_assets", "get_asset", "list_collections", "get_collection",
+"edit_collection", "tag_assets"]`; `register-mcp.py` refuses to overwrite an existing entry.
 
 ## Agent setup
 
@@ -205,8 +206,7 @@ are in [`clients/`](clients/) (`codex.toml`, `claude-code.txt`, `opencode.json`,
 generates the same text for the computer it runs on. **Existing Codex registrations must add
 `get_setup_status`, `validate_blender`, `apply_setup`, `propose_setup` and `finish_setup` to
 `enabled_tools`**, or the client never sees them. `tool_timeout_sec` is 180 because a Blender
-check can take up to two minutes. `codex-setup.toml` and `opencode-setup.json` are earlier
-recorded snippets and are not rewritten. Verification: `scripts/verify-agent-setup-mcp.py
+check can take up to two minutes. Verification: `scripts/verify-agent-setup-mcp.py
 --run-name NAME` drives the real STDIO server through the whole flow on an isolated project.
 
 ## Pack structure

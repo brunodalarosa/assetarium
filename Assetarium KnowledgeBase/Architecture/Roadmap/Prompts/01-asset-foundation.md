@@ -6,7 +6,7 @@ parent: "[Expansion plan](../Expansion%20plan.md)"
 
 Up: [Expansion plan](../Expansion%20plan.md).
 
-Work in the existing `C:\BrunoOS\Local-Asset-Library` repository. Implement only step 1 of [Project_v2_expansion.md](../Expansion%20plan.md); historical v1 step numbers are not this workflow. Do not recreate the repository or spawn subagents. This prompt is a proposed scope, not implementation approval.
+Work in this repository. Implement only step 1 of [Project_v2_expansion.md](../Expansion%20plan.md); historical v1 step numbers are not this workflow. Do not recreate the repository or spawn subagents. This prompt is a proposed scope, not implementation approval.
 
 ## Read and obtain approval
 

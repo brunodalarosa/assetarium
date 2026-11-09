@@ -715,7 +715,7 @@
           "characters": 1019
         },
         "after_first_query_seconds": 0.5674243999528699,
-        "stderr": "Failed to find real location of C:\\Users\\backup pc\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n",
+        "stderr": "Failed to find real location of <home>\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n",
         "startup_and_first_query_wall_seconds": 0.9260902404785156,
         "total_process_wall_seconds": 1.5125141000025906
       },
@@ -734,7 +734,7 @@
           "characters": 3336
         },
         "after_first_query_seconds": 1.1303714999812655,
-        "stderr": "Failed to find real location of C:\\Users\\backup pc\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  28%|##7       | 173/624 [00:00<00:00, 1719.47it/s]\nLoading weights:  55%|#####5    | 345/624 [00:00<00:00, 1315.58it/s]\nLoading weights:  77%|#######7  | 483/624 [00:00<00:00, 1207.97it/s]\nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1626.99it/s]\n",
+        "stderr": "Failed to find real location of <home>\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  28%|##7       | 173/624 [00:00<00:00, 1719.47it/s]\nLoading weights:  55%|#####5    | 345/624 [00:00<00:00, 1315.58it/s]\nLoading weights:  77%|#######7  | 483/624 [00:00<00:00, 1207.97it/s]\nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1626.99it/s]\n",
         "startup_and_first_query_wall_seconds": 13.419570446014404,
         "total_process_wall_seconds": 15.287488600006327
       },
@@ -753,7 +753,7 @@
           "characters": 3350
         },
         "after_first_query_seconds": 1.075774500030093,
-        "stderr": "Failed to find real location of C:\\Users\\backup pc\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  23%|##3       | 144/624 [00:00<00:00, 1434.07it/s]\nLoading weights:  46%|####6     | 288/624 [00:00<00:00, 791.64it/s] \nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1696.71it/s]\n",
+        "stderr": "Failed to find real location of <home>\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  23%|##3       | 144/624 [00:00<00:00, 1434.07it/s]\nLoading weights:  46%|####6     | 288/624 [00:00<00:00, 791.64it/s] \nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1696.71it/s]\n",
         "startup_and_first_query_wall_seconds": 13.732694149017334,
         "total_process_wall_seconds": 15.553245799965225
       },
@@ -772,7 +772,7 @@
           "characters": 3326
         },
         "after_first_query_seconds": 1.056436799990479,
-        "stderr": "Failed to find real location of C:\\Users\\backup pc\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  28%|##7       | 173/624 [00:00<00:00, 1715.20it/s]\nLoading weights:  55%|#####5    | 345/624 [00:00<00:00, 915.81it/s] \nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1759.71it/s]\n",
+        "stderr": "Failed to find real location of <home>\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  28%|##7       | 173/624 [00:00<00:00, 1715.20it/s]\nLoading weights:  55%|#####5    | 345/624 [00:00<00:00, 915.81it/s] \nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1759.71it/s]\n",
         "startup_and_first_query_wall_seconds": 13.589010000228882,
         "total_process_wall_seconds": 15.367822600004729
       },
@@ -791,7 +791,7 @@
           "characters": 3377
         },
         "after_first_query_seconds": 1.4666193999582902,
-        "stderr": "Failed to find real location of C:\\Users\\backup pc\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  27%|##6       | 168/624 [00:00<00:00, 1678.36it/s]\nLoading weights:  54%|#####3    | 336/624 [00:00<00:00, 1246.47it/s]\nLoading weights:  79%|#######9  | 493/624 [00:00<00:00, 1370.69it/s]\nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1725.87it/s]\n",
+        "stderr": "Failed to find real location of <home>\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  27%|##6       | 168/624 [00:00<00:00, 1678.36it/s]\nLoading weights:  54%|#####3    | 336/624 [00:00<00:00, 1246.47it/s]\nLoading weights:  79%|#######9  | 493/624 [00:00<00:00, 1370.69it/s]\nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1725.87it/s]\n",
         "startup_and_first_query_wall_seconds": 14.132445335388184,
         "total_process_wall_seconds": 16.370154300006106
       },
@@ -810,7 +810,7 @@
           "characters": 3339
         },
         "after_first_query_seconds": 1.188916499959305,
-        "stderr": "Failed to find real location of C:\\Users\\backup pc\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  27%|##7       | 169/624 [00:00<00:00, 1675.92it/s]\nLoading weights:  54%|#####4    | 337/624 [00:00<00:00, 1184.35it/s]\nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1826.62it/s]\n",
+        "stderr": "Failed to find real location of <home>\\.local\\share\\uv\\python\\cpython-3.13-windows-x86_64-none\\python.exe\n\nLoading weights:   0%|          | 0/624 [00:00<?, ?it/s]\nLoading weights:  27%|##7       | 169/624 [00:00<00:00, 1675.92it/s]\nLoading weights:  54%|#####4    | 337/624 [00:00<00:00, 1184.35it/s]\nLoading weights: 100%|##########| 624/624 [00:00<00:00, 1826.62it/s]\n",
         "startup_and_first_query_wall_seconds": 13.4408860206604,
         "total_process_wall_seconds": 15.37132749997545
       }

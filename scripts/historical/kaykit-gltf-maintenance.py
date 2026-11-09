@@ -414,7 +414,7 @@ def main():
         parser.error('Use a unique kaykit-gltf- run name')
     config = load_project_config(ROOT)
     scoped = bound(config, get_source(config, 'KayKit_Free_pack'))
-    if scoped.source_root != Path('C:/BrunoOS/Game assets/KayKit_Free_pack'):
+    if scoped.source_root != Path('<assets>/KayKit_Free_pack'):
         raise ConfigError('This approved cleanup is limited to the configured KayKit free pack')
     out = ROOT / 'data/library/maintenance' / args.run
     contained(ROOT, out)

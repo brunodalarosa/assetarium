@@ -81,7 +81,7 @@ The original Step 8 publication contained 883 inspected assets, 514 valid genera
 captions and 369 retained caption generation/schema failures. Image retrieval and
 usable previews remain available for partial results; new captions still await
 review. Actual coverage, resource measurements and verification are recorded in
-`docs/step8-verification.json` and `docs/history/progress-2026-10.md`.
+the Step 8 verification receipt (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published) and `docs/history/progress-2026-10.md`.
 The City Kit addition publishes 964 assets, with its 81 new descriptions pending;
 see `docs/city-kits-import.md` (removed 2026-10-28; in git history at `b57bade`) for that import's preservation evidence.
 The October 14 Synty/CraftPix addition publishes 1,901 records: 937 new models,
@@ -227,7 +227,7 @@ and pending AI/owner reviews. Unreviewed new captions have no accuracy approval.
 Successful import/inference/retrieval and automated/native GUI checks are
 technical evidence, separate from owner relevance, usability, accessibility and
 artistic acceptance. Current results and limitations are recorded in
-`docs/step8-verification.json` and `docs/history/progress-2026-10.md` when delivery completes.
+the Step 8 verification receipt (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published) and `docs/history/progress-2026-10.md` when delivery completes.
 
 The separately approved October 14 texture repair run has a 2 GiB growth limit
 and the same 10 GiB total ceiling. It uses hash-bound library overrides and

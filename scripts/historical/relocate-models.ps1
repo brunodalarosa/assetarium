@@ -2,8 +2,8 @@
 $ErrorActionPreference = 'Stop'
 $relocationProject = [IO.Path]::GetFullPath((Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
 $relocationSource = (Resolve-Path -LiteralPath (Join-Path $relocationProject 'models')).Path
-$relocationTarget = (Resolve-Path -LiteralPath 'C:\BrunoOS\Local-models').Path
-if ($relocationSource -ne 'C:\BrunoOS\Local-Asset-Library\models' -or $relocationTarget -ne 'C:\BrunoOS\Local-models') { throw 'Unexpected migration roots' }
+$relocationTarget = (Resolve-Path -LiteralPath '<models>').Path
+if ($relocationSource -ne '<repo>\models' -or $relocationTarget -ne '<models>') { throw 'Unexpected migration roots' }
 $relocationReportDir = Join-Path $relocationProject 'data\model-relocation'
 New-Item -ItemType Directory -Path $relocationReportDir -Force | Out-Null
 $relocationReport = @{ source = $relocationSource; destination = $relocationTarget; items = @(); faults = @() }
