@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [captions.py, caption_backend.QwenBackend, caption_batching.py, caption_quality.py, caption_review.py, overnight.py, engines.description_engine, incremental.run_captions, scripts/record_caption_review.py, prompts]
+code: [captions.py, captions.save_edit, caption_backend.QwenBackend, caption_batching.py, caption_quality.py, caption_review.py, overnight.py, engines.description_engine, incremental.run_captions, scripts/record_caption_review.py, prompts]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -20,6 +20,13 @@ rendered previews by Qwen3-VL (or an experimental local model server). Start at
   pending with a suggestion to lower the batch size.
 - The core parses and validates every engine's text, so every engine meets the same rules
   ([Inference ports](../../Architecture/Setup%20and%20Engines/Inference%20ports.md)).
+- **Owner edits** (`captions.save_edit`) go into the overlay `captions/corrections/<asset>.json` (schema v1):
+  only fields that differ from the generated text, validated with `validate_caption` on the merged result. The
+  generated record never changes. Search embeds the effective text (`retrieval.observations`), so an edit changes
+  the description vector's input digest; the edit's queue item (`mode: 'edited'`) runs only the embeddings stage
+  and publishes. A variant sharing its group's description edits the representative's overlay.
+- **Try again** (`mode: 'retry'`) is the owner's explicit request for one named asset: `incremental.process(retry=…)`
+  ignores that asset's kept caption fault once; a second failure is recorded and kept.
 - Caption severity (`caption_quality.py`) is stored separately from immutable generation and review
   evidence: `clear`, `review_note`, `warning` or `fault`.
 

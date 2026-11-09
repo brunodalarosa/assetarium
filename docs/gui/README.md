@@ -137,10 +137,31 @@ The panel is one scroll, top to bottom:
    triangle, rig and animation chips name the measured format (**1,248 tris ·
    OBJ**) and a warning line under the chips says the shown format is uninspected.
 4. Variants and, in a collection, the asset's label and notes.
-5. The **description** with a small **Generated** label (hover it for what that
-   means). When the description has caption warnings or review notes, a chip
-   beside it shows how many and opens their reasons. **Suggested uses** follow as
-   chips when there are any.
+5. The **description**. It shows one line for its state and the one action that
+   resolves it:
+
+   | State | Line and action |
+   | --- | --- |
+   | None yet | **Generate description** (this asset only; it waits in line like any queue item) |
+   | Waiting / running | Its place in line ("2nd in line"), or that it is being written now |
+   | Failed | The recorded reason and **Try again** (one new attempt, only when you ask) |
+   | No description model | **Set up descriptions** opens the setup wizard at its descriptions step |
+   | Generated | The text, a **Generated** label (hover it for the local model that wrote it) and **Edit** |
+   | Edited | The text, an **Edited** label, **Edit** and **Show original** (the generated text is kept) |
+
+   **Edit** opens the text with a word count (10–170 words). **More details** (folded)
+   holds what the asset is with its certainty, and its shape, colors, parts, style,
+   distinguishing features and uncertainties, one item per line. **Save** checks the
+   same rules as a generated description and says which one an edit breaks; nothing
+   is saved then. Search reads every corrected field: after **Save** a search update
+   for that asset waits in line (Asset processing lists it as *Update search for an
+   edited description*), rebuilds its search data without a description model, and
+   the line under the text shows it waiting or running. If it does not finish, the
+   line says so and offers **Update search**. When a variant group shares one
+   description, the form says it *changes the description for all N variants*.
+   There is no approval step: editing is the review. When the description has
+   caption warnings or review notes, a chip beside it shows how many and opens their
+   reasons. **Suggested uses** follow as chips when there are any.
 6. **Tags**.
 7. Three collapsible sections:
    - **File & license:** the original path with **Copy source path** (text only),
@@ -206,7 +227,7 @@ rail dot means you must act (a folder offline, an answer to give, files missing,
 Search results gain **Show in pack**. See [asset sources](../asset-sources.md).
 
 **Asset processing** is the queue. **Make previews** and **Generate descriptions** (from the Library
-tab) start at once or wait in **Up next**; previews always go first, and items can be moved or removed. An
+tab, or for one asset from the inspector) start at once or wait in **Up next**; previews always go first, and items can be moved or removed. An
 item that waits for a busy folder (a scan) starts as soon as that work ends. Jobs under 10 minutes start on
 the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones ask first with the estimate.
 Closing the app while work runs asks first; **Stop & close** stops it at once, and the next start shows
