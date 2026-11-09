@@ -113,8 +113,11 @@ def operation_lease(config, scoped, token):
         acquired.__exit__(None,None,None)
 
 
-def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None, quiet=False):
+def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=None, quiet=False, mode=None):
     """Start a durable operation; ``asset_ids`` narrows process/describe to a queue item's resolved scope.
+
+    ``mode`` (describe, named assets only): ``retry`` generates their recorded failures once more on the owner's
+    request; ``edited`` writes no text and only rebuilds search vectors after an owner edit, then publishes.
 
     ``quiet`` marks the app's launch check of every folder (decision 0027): the app shows it as a hint, not a scan.
 
@@ -140,7 +143,9 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=No
         from .settings import used_formats
         if not used_formats(config):
             raise ConfigError('Processing is paused. Select formats in Settings → General before processing assets')
-    if operation == 'describe':
+    if mode not in {None, 'retry', 'edited'} or (mode and (operation != 'describe' or not asset_ids)):
+        raise ConfigError('Try again and search updates name the assets of a description run')
+    if operation == 'describe' and mode != 'edited':
         from .settings import descriptions_enabled
         if not descriptions_enabled(config):
             raise ConfigError(DESCRIPTIONS_OFF)
@@ -159,7 +164,7 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=No
         state(scoped, token=token, pid=os.getpid(), status="queued", phase="Queued", progress=0,
               operation=operation, key=key, reason=None, current_asset=None, completed=None, total=None, stage=None,
               asset_ids=sorted(asset_ids) if asset_ids is not None else None, queue_item=queue_item, owner=owner,
-              quiet=bool(quiet and operation == 'scan' and not key), changes=None)
+              quiet=bool(quiet and operation == 'scan' and not key), changes=None, mode=mode)
         command = [str(python), str(config.project_root / "scripts/source-operation.py"), operation, "--token", token]
         if key:
             command.extend(["--source", key])
@@ -184,7 +189,7 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=No
                                   'Create it from the project folder with: ' + command)
             state(scoped, status="faulty", reason=str(exc))
             raise exc
-    if operation == "describe":
+    if operation == "describe" and mode is None:
         from .notifications import clear_ready
         clear_ready(config, get_source(config, key)["id"])
     return {"status": "started", "token": token}
@@ -366,6 +371,8 @@ def stage_runtime(config, stage):
 def run_stages(config, source, scoped, token, operation, base):
     """Run each stage in its own locked runtime; returns False when cancelled."""
     for stage in OPERATION_STAGES[operation]:
+        if stage == 'caption' and operation_status(scoped).get('mode') == 'edited':
+            continue  # The owner wrote the text; only search follows it.
         if cancelled(scoped, token):
             return False
         state(scoped, status="processing", phase=STAGE_LABELS[stage], stage=stage, progress=stage_progress(operation, stage))
@@ -495,6 +502,9 @@ DESCRIBE_END = {'complete': ('complete', 'Descriptions generated and published')
                 'complete_with_failures': ('complete_with_faults', 'Descriptions generated; some failed and were recorded'),
                 'cancelled': ('cancelled', 'Cancelled; finished descriptions are published'),
                 'stopped': ('faulty', 'Stopped; finished descriptions are published')}
+EDITED_END = {'complete': ('complete', 'Search updated for the edited description'),
+              'cancelled': ('cancelled', 'Cancelled; the edit is saved and search still uses the earlier text'),
+              'stopped': ('faulty', 'Stopped; the edit is saved and search still uses the earlier text')}
 
 
 def describe_source(config, source, token):
@@ -521,6 +531,11 @@ def describe_source(config, source, token):
         # Machine limits (GPU memory, storage budget) stop the run; assets stay pending.
         outcome, reason = 'stopped', str(exc)
     publish_and_verify(config, source, scoped, "Publishing descriptions")
+    if operation_status(scoped).get('mode') == 'edited':
+        # The inspector shows the edit and its search update; a report notice would only repeat it.
+        status, phase = EDITED_END.get(outcome or 'complete', EDITED_END['stopped'])
+        state(scoped, status=status, phase=phase, progress=1, current_asset=None, reason=reason)
+        return
     after = description_counts(scoped)
     failed = max(0, after['failed'] - before['failed'])
     outcome = outcome or ('complete_with_failures' if failed else 'complete')
@@ -568,10 +583,16 @@ def worker_stage(config, source, stage, token):
     # A queue item's scope, resolved when it started (decision 0023); None is the whole folder.
     scope = operation_status(scoped).get("asset_ids")
     only = set(scope) if scope is not None else None
+    retry = set()
     if stage == "caption":
         from .sources import description_state
-        missing = {r["asset_id"] for r in read_records(working(scoped)) if description_state(r) == "missing"}
+        # Try again (the owner named the assets) generates a recorded failure once more, once.
+        wanted = {"missing", "failed"} if operation_status(scoped).get("mode") == "retry" else {"missing"}
+        states = {r["asset_id"]: description_state(r) for r in read_records(working(scoped))}
+        missing = {i for i, value in states.items() if value in wanted}
         only = missing if only is None else missing & only
+        if "failed" in wanted:
+            retry = {i for i in only if states[i] == "failed"}
     def on_progress(identifier, completed, total):
         state(scoped, status="cancelling" if cancelled(scoped, token) else "processing",
               phase=(finishing(stage) if cancelled(scoped, token) else STAGE_LABELS[stage]),
@@ -588,7 +609,7 @@ def worker_stage(config, source, stage, token):
             atomic_json(stage_fault_path(scoped, token), {"reason": DESCRIPTIONS_STOPPED, "utc": now()})
             raise ConfigError(DESCRIPTIONS_STOPPED)
         try:
-            preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only)
+            preview = process(scoped, stage, limit=1000, dry_run=True, asset_ids=only, retry=retry)
         except (ConfigError, OSError, ValueError):
             if stage != "embeddings":
                 raise
@@ -608,9 +629,10 @@ def worker_stage(config, source, stage, token):
                         from .search_speed import ensure
                         ensure(scoped, backend, progress=lambda phase: state(scoped, status="processing", phase=phase,
                                stage=stage), cancelled=lambda: cancelled(scoped, token))
-                result = process(scoped, stage, limit=1000, backend=backend, asset_ids=only,
+                result = process(scoped, stage, limit=1000, backend=backend, asset_ids=only, retry=retry,
                                  cancelled=lambda: cancelled(scoped, token), progress=on_progress,
                                  status=lambda phase: state(scoped, status="processing", phase=phase, stage=stage))
+                retry = set()  # One new attempt: a second failure is recorded and kept.
             except EngineStop as exc:
                 # A machine limit, not an asset fault: the coordinator shows this reason.
                 atomic_json(stage_fault_path(scoped, token), {"reason": str(exc), "utc": now()})

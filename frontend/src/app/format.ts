@@ -41,10 +41,6 @@ export function elapsed(seconds: number | undefined) {
   return minutes < 1 ? `${seconds} s` : minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
-export function hasDescription(item: Json) {
-  return !item.caption_faulty && !["pending", undefined].includes(item.caption_status);
-}
-
 /** Card meta line from measured facts: "GLB · 1,248 tris", or "PNG · 512 × 512" for images. */
 export function cardMeta(item: Json, card?: Json) {
   const formats: string[] = item.formats || [];

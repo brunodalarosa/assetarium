@@ -758,6 +758,25 @@ class DesktopBridge:
     def asset(self, asset_id, source_format=None, preview_view='three_quarter', expected_version=None):
         return self._wait(self._present(self._service.asset, asset_id, source_format, preview_view, expected_version))
 
+    def edit_description(self, asset_id, fields):
+        """Save an owner edit of a description, then queue the search update that re-embeds and publishes it."""
+        return self._wait(self._present(self._edit_description, asset_id, fields, guarded=False))
+
+    def _edit_description(self, asset_id, fields):
+        with self._presentation_lock:
+            try:
+                saved = self._service.edit_description(asset_id, fields)
+            except ValueError as exc:  # The edit breaks a description rule: nothing was saved.
+                return {'status': 'invalid', 'reason': str(exc)}
+        if saved['status'] == 'unchanged' or not saved['key']:
+            return saved
+        from .processing_queue import add
+        try:
+            search = add(self._config, 'descriptions', {'key': saved['key'], 'asset_ids': [saved['asset_id']], 'mode': 'edited'})
+        except ConfigError as exc:  # The edit stays saved; the inspector shows that search still uses the earlier text.
+            search = {'status': 'faulty', 'reason': str(exc)}
+        return {**saved, 'search': {k: search.get(k) for k in ('status', 'title', 'body', 'reason')}}
+
     def thumbnail(self, asset_id, expected_version=None):
         return self._wait(self._present(self._service.thumbnail, asset_id, expected_version))
 

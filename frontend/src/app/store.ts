@@ -43,6 +43,8 @@ export interface Detail {
   focusToken: number;
   /** A collection member that can no longer be read; inspection shows its entry and reason. */
   unavailable?: Json;
+  /** Newer description fields than ``result`` (after an edit or queued work moved); the 3D preview keeps its mount. */
+  description?: Json;
 }
 export interface Grid {
   id: GridId;
@@ -1234,18 +1236,67 @@ export async function makePreviews(scope: { key: string; path?: string; asset_id
 export async function makeDescriptions(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
   return queueAction("descriptions", scope, count);
 }
-export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false): Promise<Json> {
+/** The inspector's description action for one asset: Generate (none), Try again (failed) or Update search (edited). */
+export async function describeAsset(id: GridId, edit: Json, mode: "generate" | "retry" | "edited" = "generate") {
+  // The description line shows where the work stands, so only a refusal gets a toast.
+  const result = await queueAction("descriptions", { key: edit.key, asset_ids: [edit.asset_id], ...(mode === "generate" ? {} : { mode }) }, 1, false, true);
+  await refreshDescription(id);
+  return result;
+}
+const DESCRIPTION_FIELDS = ["observations", "description_edit", "description_shared_from", "suggested_uses", "caption_quality", "caption_faulty"];
+let describing = false;
+/** Reload only the shown asset's description fields, so the live 3D preview is not mounted again. */
+export async function refreshDescription(id: GridId = activeGridId()) {
+  const detail = state[id].detail;
+  if (!detail?.result || describing) return;
+  describing = true;
+  try {
+    const result = await gridApi(id, detail.assetId).asset(detail.assetId, detail.format, detail.view, null);
+    const info = result.payload?.presentation;
+    if (info && state[id].detail?.assetId === detail.assetId)
+      patchGrid(id, (c) => ({ detail: c.detail && { ...c.detail, description: Object.fromEntries(DESCRIPTION_FIELDS.map((key) => [key, info[key]])) } }));
+  } catch {
+    /* The shown description stays; the next selection reads it again. */
+  } finally {
+    describing = false;
+  }
+}
+/** The shown asset waits for description work (generation or an edit's search update). */
+function describingShown() {
+  const detail = state[activeGridId()].detail;
+  const work = (detail?.description || detail?.result?.payload?.presentation)?.description_edit?.work;
+  return Boolean(work && work.status !== "faulty");
+}
+/** Save the owner's corrected description; search follows through a queued update (re-embed, publish). */
+export async function editDescription(id: GridId, assetId: string, fields: Json): Promise<Json> {
+  const result = await api().edit_description(assetId, fields);
+  if (result.status === "saved") {
+    const search = result.search || {};
+    pushToast(search.status === "faulty"
+      ? { tone: "warning", title: "Description saved", body: "Search still uses the earlier text: " + search.reason }
+      : { tone: "success", title: "Description saved", body: "Search updates in the background." });
+    void loadQueue();
+  }
+  if (result.status !== "invalid" && result.status !== "faulty") await refreshDescription(id);
+  return result;
+}
+/** Descriptions can't run here yet: the setup wizard's descriptions step, filled with what is saved now. */
+export async function openDescriptionSetup() {
+  if (!state.setup.open) await openSetup();
+  await changeSetupStep("descriptions");
+}
+export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false, quiet = false): Promise<Json> {
   try {
     const result = await api().queue_add(action, scope, confirmed);
     if (result.status === "faulty") throw Error(result.reason);
     if (result.status === "confirm") {
       // Over 30 minutes, or the storage budget would be reached: ask first with the estimate.
       askConfirm({ title: result.title, body: result.body, confirmLabel: result.confirm_label, tone: "neutral",
-        run: () => queueAction(action, scope, count, true) });
+        run: () => queueAction(action, scope, count, true, quiet) });
       return result;
     }
     const undo = result.undo ? [{ label: "Undo", run: () => void api().queue_remove(result.item.id).then(loadQueue) }] : undefined;
-    pushToast({ tone: "info", title: result.title, body: result.body, actions: undo });
+    if (!quiet) pushToast({ tone: "info", title: result.title, body: result.body, actions: undo });
     void loadQueue();
     return result;
   } catch (error) {
@@ -2463,6 +2514,8 @@ async function watchChanges() {
       // Running operations also report worker liveness, which is not a file change.
       const revision = state.sourcesRevision, scanning = onlyScans();
       if (sourcesChanged || operationActive(state.globalScan) || state.sources.some((source) => operationActive(source.operation))) await loadSources();
+      // Queued description work moved: the inspector's description line follows it.
+      if (sourcesChanged && describingShown()) void refreshDescription();
       // The tree and the shown folder follow scans and processing; the rail's folder dot follows the tree.
       // While only scans run, their progress writes change nothing shown: wait for the revision (decision 0027).
       if (sourcesChanged && !(scanning && onlyScans() && state.sourcesRevision === revision)) {

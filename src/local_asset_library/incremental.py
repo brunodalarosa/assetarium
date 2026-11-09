@@ -540,7 +540,8 @@ def restore_fault(record, stage, evidence, status, apply=True):
 
 
 def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640,
-            cancelled=None, progress=None, asset_ids=None, status=None):
+            cancelled=None, progress=None, asset_ids=None, status=None, retry=()):
+    """``retry`` names assets whose recorded caption failure the owner asked to try again (never implied by settings)."""
     if stage not in STAGES or type(limit) is not int or not 1 <= limit <= 1000:
         raise ConfigError("Invalid bounded stage/limit")
     work = working(config)
@@ -581,6 +582,8 @@ def process(config, stage, limit=40, backend=None, dry_run=False, resolution=640
     with closing(ledger(config)) as db:
         for record in selected:
             old = db.execute("SELECT fingerprint,status,evidence FROM jobs WHERE asset_id=? AND stage=?", (record["asset_id"], stage)).fetchone()
+            if old and old[1] in {'failed', 'unsupported'} and stage == 'caption' and record['asset_id'] in retry:
+                old = None  # The owner's explicit Try again: the kept fault stays in the stage history.
             recorded = old[0] if old else None
             try:
                 fp = (inspection_input(work, record, resolution, formats=formats, recorded=recorded)[3] if stage == "inspection"

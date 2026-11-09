@@ -1,6 +1,6 @@
-import { Box, ChevronRight, CircleAlert, Copy, GripVertical, SwatchBook, TriangleAlert, X } from "lucide-react";
+import { Box, ChevronRight, CircleAlert, Clock, Copy, GripVertical, SwatchBook, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/beui/switch";
 import { Tooltip } from "@/components/beui/tooltip";
 import { EASE_OUT, SPRING_PANEL } from "@/lib/ease";
@@ -8,14 +8,15 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { display, formatLabel, packName, plural, VIEWS } from "../app/format";
 import {
-  activeGridId, assetTags, type GridId, gridApi, copyText, getState, type InspectorSection, packProfileAction, saveAssetTags, selectAsset,
+  activeGridId, assetTags, describeAsset, editDescription, type GridId, gridApi, copyText, getState, type InspectorSection,
+  openDescriptionSetup, packProfileAction, saveAssetTags, selectAsset,
   markPreviewHintSeen, pushToast, setCollectionItem, startSelection, turnFormatOn,
   setInspectorOpen, setInspectorSection, setInspectorWidth, useApp,
 } from "../app/store";
 import { FolderPanel } from "./FolderPanel";
 import { ImageViewer } from "./ImageViewer";
 import { InspectorGhost, Skeleton, useShownWhile } from "./Loading";
-import { Badge, Banner, Button, EvidenceBlock, IconButton, SelectField, Spinner } from "./primitives";
+import { Badge, Banner, Button, Disclosure, EvidenceBlock, IconButton, SelectField, Spinner, TextField } from "./primitives";
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 960;
@@ -280,19 +281,153 @@ function Preview({ grid, result, assetId, format, view }: { grid: GridId; result
   );
 }
 
-/** The generated description and suggested uses, labeled as generated; caption notes open beside it. */
-function Description({ info, image }: { info: Json; image: boolean }) {
+const ORDINAL = ["", "1st", "2nd", "3rd"];
+const ordinal = (n: number) => ORDINAL[n] || n + "th";
+const LIST_FIELDS: [string, string][] = [["shape", "Shape"], ["colors", "Colors"], ["parts", "Parts"], ["style", "Style"], ["distinguishing_features", "Distinguishing features"], ["uncertainties", "Uncertainties"]];
+const CERTAINTY: [string, string][] = [["probable", "Probable"], ["uncertain", "Uncertain"], ["unknown", "Unknown"]];
+const AREA = "w-full min-w-0 resize-y rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px] leading-relaxed text-foreground outline-none transition-colors hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25";
+const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
+
+/** The owner's correction: the prose first, the other observation fields folded under More details. */
+function DescriptionForm({ grid, assetId, observations, shared, onDone }: { grid: GridId; assetId: string; observations: Json; shared: number; onDone: () => void }) {
+  const [text, setText] = useState<string>(observations.description || "");
+  const [label, setLabel] = useState<string>(observations.identity?.label || "");
+  const [certainty, setCertainty] = useState<string>(observations.identity?.certainty || "probable");
+  const [lists, setLists] = useState<Record<string, string>>(() => Object.fromEntries(LIST_FIELDS.map(([key]) => [key, (observations[key] || []).join("\n")])));
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const reduce = useReducedMotion();
+  const field = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => field.current?.focus(), []);
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    const result = await editDescription(grid, assetId, { description: text, identity: { label, certainty }, ...lists })
+      .catch((reason) => ({ status: "faulty", reason: (reason as Error).message }));
+    setSaving(false);
+    if (result.status === "invalid" || result.status === "faulty") setError(result.reason);
+    else onDone();
+  };
+  const keys = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onDone();
+    }
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) void save();
+  };
+  return (
+    <motion.form initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: EASE_OUT }}
+      className="description-form grid gap-3" onKeyDown={keys} onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      {shared > 1 && <Hint>Changes the description for all {shared} variants.</Hint>}
+      <div className="grid gap-1.5">
+        <label htmlFor="description-edit" className="sr">Description</label>
+        <textarea id="description-edit" ref={field} rows={6} maxLength={1800} value={text} onChange={(event) => setText(event.target.value)} className={AREA} />
+        <Hint>{plural(wordCount(text), "word", "words")} · 10–170 words about how it looks</Hint>
+      </div>
+      <Disclosure title="More details">
+        <div className="grid gap-3">
+          <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+            <TextField label="What it is" id="description-identity" value={label} maxLength={160} onChange={(event) => setLabel(event.target.value)} />
+            <SelectField label="Certainty" id="description-certainty" value={certainty} onChange={setCertainty} options={CERTAINTY} />
+          </div>
+          {LIST_FIELDS.map(([key, title]) => (
+            <div key={key} className="grid gap-1.5">
+              <label htmlFor={"description-" + key} className="text-xs text-muted-foreground">{title}</label>
+              <textarea id={"description-" + key} data-field={key} rows={Math.min(5, Math.max(2, lists[key].split("\n").length))} value={lists[key]}
+                onChange={(event) => setLists({ ...lists, [key]: event.target.value })} className={AREA} />
+            </div>
+          ))}
+          <Hint>One item per line. Search reads every field, so a corrected color or part helps it too.</Hint>
+        </div>
+      </Disclosure>
+      {error && <Banner className="description-error">{error}</Banner>}
+      <div className="flex gap-2">
+        <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        <Button type="button" variant="quiet" onClick={onDone}>Cancel</Button>
+      </div>
+    </motion.form>
+  );
+}
+
+/** One line and the one action that resolves each state without a description (P5). */
+function DescriptionState({ grid, edit, image, processed }: { grid: GridId; edit: Json; image: boolean; processed: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const run = async (mode: "generate" | "retry") => {
+    setBusy(true);
+    await describeAsset(grid, edit, mode).catch(() => undefined);
+    setBusy(false);
+  };
+  const work = edit.work || {};
+  const searchable = image ? "It is found by name and by its pixels" : "It is found by name and by its previews";
+  const line = (icon: ReactNode, text: ReactNode, action?: ReactNode) => (
+    <div className="description-state grid justify-items-start gap-2.5" data-state={edit.state}>
+      <p className="flex items-start gap-2 text-[13px] leading-relaxed text-muted-foreground">{icon}<span className="min-w-0 break-words">{text}</span></p>
+      {action}
+    </div>
+  );
+  switch (edit.state) {
+    case "none":
+      return line(null, `No description yet. ${searchable}.`,
+        <Button variant="secondary" disabled={busy} onClick={() => void run("generate")}>Generate description</Button>);
+    case "queued":
+      return line(<Clock className="mt-0.5 size-4 shrink-0" aria-hidden />,
+        `Waiting to be described · ${ordinal(work.position)} in line${work.paused ? ". The queue is paused; continue it in Asset processing" : ""}`);
+    case "running":
+      return line(<Spinner className="mt-0.5 size-4 shrink-0" />, "Writing the description now…");
+    case "failed":
+      return line(<CircleAlert className="mt-0.5 size-4 shrink-0 text-fault" aria-hidden />, `Description generation failed: ${edit.failure}`,
+        <Button variant="secondary" disabled={busy} onClick={() => void run("retry")}>Try again</Button>);
+    case "not_set_up":
+      return line(null, `No description yet. ${edit.setup?.reason || "Descriptions are not set up"}, so none can be generated here. ${searchable}.`,
+        <Button variant="secondary" onClick={() => void openDescriptionSetup()}>Set up descriptions</Button>);
+    default:
+      return line(null, processed ? `Descriptions can be generated once previews are made. ${searchable}.`
+        : "Descriptions can be generated after the image is processed. It is still found by name.");
+  }
+}
+
+/** Where the search update after an edit stands; one that did not finish offers to run it again. */
+function SearchUpdate({ grid, edit }: { grid: GridId; edit: Json }) {
+  const work = edit.work;
+  if (!work || work.mode !== "edited") return null;
+  if (work.status === "faulty")
+    return (
+      <div className="search-update grid justify-items-start gap-2" data-status="faulty">
+        <p className="flex items-start gap-2 text-[12px] leading-relaxed text-warning"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />Search still uses the earlier text: {work.reason}</p>
+        <Button variant="secondary" className="h-8 px-3 text-[12px]" onClick={() => void describeAsset(grid, edit, "edited")}>Update search</Button>
+      </div>
+    );
+  return (
+    <p className="search-update flex items-center gap-2 text-[12px] text-muted-foreground" data-status={work.status}>
+      {work.status === "running" ? <Spinner className="size-3.5" /> : <Clock className="size-3.5" aria-hidden />}
+      {work.status === "running" ? "Updating search for this edit…" : `Search update waiting · ${ordinal(work.position)} in line`}
+    </p>
+  );
+}
+
+/** The description with its state, the owner's Edit (no approval step) and the generated original beside an edit. */
+function Description({ grid, assetId, info, image }: { grid: GridId; assetId: string; info: Json; image: boolean }) {
   const [notesOpen, setNotesOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [original, setOriginal] = useState(false);
+  const reduce = useReducedMotion();
   const notes: Json[] = ((info.caption_quality || {}).issues || []).filter((issue: Json) => issue.severity !== "fault");
   const warnings = notes.filter((issue) => issue.severity === "warning").length;
   const uses: string[] = info.suggested_uses || [];
   const processed = !image || info.processing?.inspection === "complete";
-  const text = info.observations ? info.observations.description || display(info.observations) : null;
-  const generated = info.description_shared_from
-    ? `Shared from ${info.description_shared_from}: one description serves this variant group, so colors or materials may describe another variant.`
-    : "Written from the previews during processing. It interprets how the asset looks; measured facts are in the sections below.";
+  const edit: Json = info.description_edit || {};
+  const written = edit.state === "generated" || edit.state === "edited";
+  const text = written && info.observations ? info.observations.description || display(info.observations) : null;
+  const edited = edit.state === "edited";
+  const shared = info.description_shared_from
+    ? ` Shared from ${info.description_shared_from}: one description serves this variant group, so colors or materials may describe another variant.` : "";
+  const tooltip = edited
+    ? "You edited this description; search reads your text. The generated original is kept."
+    : `Written by ${edit.model ? edit.model + ", a local model on this computer," : "a local model on this computer"} from the previews.${shared || " It interprets how the asset looks; measured facts are in the sections below."}`;
+  const also: string[] = (edit.edited_fields || []).filter((key: string) => key !== "description").map((key: string) => key === "identity" ? "what it is" : key.replace(/_/g, " "));
   return (
-    <section className="inspector-description grid gap-2.5" aria-labelledby="description-title">
+    <section className="inspector-description grid gap-2.5" aria-labelledby="description-title" data-state={edit.state}>
       <div className="flex min-h-7 flex-wrap items-center gap-2">
         <h3 id="description-title" className="text-[14px] font-semibold text-foreground">Description</h3>
         {notes.length > 0 && (
@@ -303,8 +438,10 @@ function Description({ info, image }: { info: Json; image: boolean }) {
           </button>
         )}
         {text && (
-          <Tooltip content={generated} delay={250}>
-            <span tabIndex={0} className="generated-label ml-auto rounded px-1 text-[11px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40">{info.description_shared_from ? "Generated · shared" : "Generated"}</span>
+          <Tooltip content={tooltip} delay={250}>
+            <span tabIndex={0} className={cn("generated-label ml-auto rounded px-1 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40", edited ? "text-foreground" : "text-muted-foreground")}>
+              {edited ? "Edited" : info.description_shared_from ? "Generated · shared" : "Generated"}
+            </span>
           </Tooltip>
         )}
       </div>
@@ -318,16 +455,33 @@ function Description({ info, image }: { info: Json; image: boolean }) {
           ))}
         </ul>
       )}
-      {text ? (
-        <Text>{text}</Text>
+      {!text ? (
+        <DescriptionState grid={grid} edit={edit} image={image} processed={processed} />
+      ) : editing ? (
+        <DescriptionForm grid={grid} assetId={assetId} observations={info.observations} shared={edit.shared_variants || 0} onDone={() => setEditing(false)} />
       ) : (
-        <Text className="text-muted-foreground">
-          {info.caption_faulty
-            ? "Description generation failed; the fault is in the Processing record."
-            : !processed
-              ? "Descriptions can be generated after the image is processed. It is still found by name."
-              : `No description yet. This ${image ? "image is searchable by name and by its pixels" : "asset is searchable by name and image"}; generate descriptions in Asset processing.`}
-        </Text>
+        <>
+          <Text className="description-text">{text}</Text>
+          <AnimatePresence initial={false}>
+            {original && edit.original && (
+              <motion.div key="original" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                transition={reduce ? { duration: 0 } : { height: { type: "spring", duration: 0.35, bounce: 0.15 }, opacity: { duration: 0.15, ease: EASE_OUT } }} className="overflow-hidden">
+                <div className="description-original grid gap-1.5 rounded-xl bg-surface-2/60 px-3.5 py-3">
+                  <h4 className="text-[11.5px] font-medium text-muted-foreground">Generated original{edit.model ? ` · ${edit.model}` : ""}</h4>
+                  <Text className="text-muted-foreground">{edit.original.description}</Text>
+                  {also.length > 0 && <Hint>You also corrected: {also.join(", ")}.</Hint>}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <SearchUpdate grid={grid} edit={edit} />
+          <div className="description-actions flex flex-wrap gap-2">
+            <Button variant="secondary" className="h-8 px-3 text-[12px]" onClick={() => setEditing(true)}>Edit</Button>
+            {edited && (
+              <Button variant="quiet" className="h-8 px-3 text-[12px]" aria-expanded={original} onClick={() => setOriginal(!original)}>{original ? "Hide original" : "Show original"}</Button>
+            )}
+          </div>
+        </>
       )}
       {uses.length > 0 && (
         <div className="suggested-uses grid gap-1.5">
@@ -775,7 +929,7 @@ function DetailBody({ grid }: { grid: GridId }) {
       <FactChips result={result} image={image} />
       {info.variant_group && <Variants grid={grid} group={info.variant_group} assetId={detail.assetId} />}
       {grid === "collection" && <CollectionEntry assetId={detail.assetId} />}
-      <Description key={detail.assetId} info={info} image={image} />
+      <Description key={detail.assetId} grid={grid} assetId={detail.assetId} info={{ ...info, ...detail.description }} image={image} />
       <TagsSection assetId={detail.assetId} />
       <div className="inspector-sections grid">
         <FileSection result={result} image={image} />
