@@ -730,8 +730,12 @@ function DetailBody({ grid }: { grid: GridId }) {
   const focusToken = detail?.focusToken ?? 0;
   const hasResult = Boolean(detail?.result);
   const waiting = useShownWhile(Boolean(detail && !detail.result && !detail.error && !detail.unavailable));
+  // Focus follows only a selection that asked for it (a new token); arrow browsing keeps focus on the cards.
+  const focused = useRef(0);
   useEffect(() => {
-    if (focusToken && hasResult) headingRef.current?.focus();
+    if (!focusToken || !hasResult || focused.current === focusToken) return;
+    focused.current = focusToken;
+    headingRef.current?.focus();
   }, [focusToken, hasResult]);
   if (!detail)
     return (

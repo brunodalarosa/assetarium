@@ -48,7 +48,8 @@ function useGlobalKeys() {
     const onKey = (event: KeyboardEvent) => {
       if (getState().setup.open) return; // Setup owns the window until it closes.
       const preview = window.LALPreview?.current;
-      if (preview?.fullscreen && event.key === "Escape") {
+      // The ⋯ menu handles its own Escape first (defaultPrevented); the next one leaves fullscreen.
+      if (preview?.fullscreen && event.key === "Escape" && !event.defaultPrevented) {
         event.preventDefault();
         preview.exitFullscreen();
         return;

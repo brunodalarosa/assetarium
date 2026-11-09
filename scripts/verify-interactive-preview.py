@@ -293,6 +293,11 @@ def verify():
             # Wrapping past the modal's last control leaves the document briefly (body); it never reaches inert content.
             assert window.evaluate_js('LALPreview.current.dialog.contains(document.activeElement)||document.activeElement===document.body'), window.evaluate_js(
                 "(()=>{const a=document.activeElement;return a?a.tagName+'#'+a.id+'.'+a.className+' '+(a.getAttribute('aria-label')||a.textContent.slice(0,40)):'none'})()")
+        window.evaluate_js("LALPreview.current.more.click()")
+        assert window.evaluate_js("!LALPreview.current.menu.hidden")
+        key('Escape','Escape',27)
+        assert window.evaluate_js("LALPreview.current.menu.hidden && LALPreview.current.fullscreen"), 'one Escape must close only the menu'
+        check('In fullscreen, the first Escape closes the ⋯ menu and keeps fullscreen')
         browser_input('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'reduce'}]})
         assert window.evaluate_js("getComputedStyle(LALPreview.current.viewport).transitionDuration==='0s'")
         browser_input('Emulation.setEmulatedMedia',{'features':[]})
@@ -383,7 +388,7 @@ def verify():
         # Fast arrow-key browsing selects each card yet loads no viewer for the ones it passes.
         select(records[5]['asset_id'])
         wait(SETTLED,60)
-        plan=window.evaluate_js("(()=>{const cards=[...document.querySelectorAll('.card')];const i=Math.min(cards.findIndex(c=>c.dataset.id===%s),cards.length-9);cards[i].focus();return {start:i,count:cards.length,target:cards[i+8].dataset.id};})()" % json.dumps(records[5]['asset_id']))
+        plan=window.evaluate_js("(()=>{const cards=[...document.querySelectorAll('.card')];const i=Math.min(cards.findIndex(c=>c.dataset.id===%s),cards.length-10);cards[i].focus();return {start:i,count:cards.length,target:cards[i+8].dataset.id};})()" % json.dumps(records[5]['asset_id']))
         plan['selected_before']=window.evaluate_js('lal.state.library.selected')
         plan['focused']=window.evaluate_js('document.activeElement?.dataset?.id||document.activeElement?.tagName')
         report['browse_plan']=plan
@@ -391,8 +396,11 @@ def verify():
         # A mutation observer, not a timer: timers are throttled while the verify window is in the background.
         js("(()=>{window.browseSeen=new Set();window.browseWatch=new MutationObserver(()=>{const c=document.querySelector('.card[aria-pressed=true]');if(c)browseSeen.add(c.dataset.id)});browseWatch.observe(document.body,{subtree:true,attributes:true,attributeFilter:['aria-pressed']});return true})()")
         started=time.monotonic()
-        for _ in range(8):
+        # A pause after each key lets details load mid-browse; focus must stay on the cards throughout.
+        for index in range(8):
             key('ArrowRight','ArrowRight',39)
+            if index == 3: time.sleep(.2)  # under the 250 ms rest: details mount, no viewer starts
+            assert window.evaluate_js("Boolean(document.activeElement?.classList.contains('card'))"), window.evaluate_js('document.activeElement?.tagName+" "+document.activeElement?.className')
         report['browse_seconds_for_8_keys']=round(time.monotonic()-started,3)
         wait('lal.state.library.selected===%s && LALPreview.current?.item.assetId===%s' % (json.dumps(plan['target']),json.dumps(plan['target'])))
         wait(SETTLED,60)
@@ -402,6 +410,16 @@ def verify():
         report['live_ms_after_browse']=window.evaluate_js('LALPreview.current.liveMs')
         assert report['browse_selected_distinct']>=6, report['browse_selected_distinct']
         assert report['browse_viewers']['prepared']<=1 and report['browse_viewers']['frames']<=1, report['browse_viewers']
+        # Once the detail has loaded, focus stays on the card, so the next arrow keeps browsing.
+        wait('Boolean(lal.state.library.detail?.result)')
+        time.sleep(.3)
+        assert window.evaluate_js('document.activeElement?.dataset?.id')==plan['target'], window.evaluate_js('document.activeElement?.tagName+" "+document.activeElement?.className')
+        following=window.evaluate_js("(()=>{const cards=[...document.querySelectorAll('.card')];return cards[cards.findIndex(c=>c.dataset.id===%s)+1].dataset.id})()" % json.dumps(plan['target']))
+        key('ArrowRight','ArrowRight',39)
+        wait('lal.state.library.selected===%s && Boolean(lal.state.library.detail?.result)' % json.dumps(following))
+        time.sleep(.3)
+        assert window.evaluate_js('document.activeElement?.dataset?.id')==following
+        check('Focus stays on the results after an arrow selection settles, so browsing continues')
         capture('11-after-browse.png')
         check('Fast arrow presses select each card yet load at most one viewer, where browsing rests')
         report['status']='passed'

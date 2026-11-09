@@ -70,7 +70,10 @@ window.LALPreview = (() => {
       this.warning = make('p', undefined, 'model-warning'); this.warning.hidden = true;
       this.warning.setAttribute('role','status');
       this.dialog.append(header, this.stage, this.warning);
+      // show() runs the dialog focusing steps; a new selection must leave focus where browsing put it.
+      const previous = document.activeElement;
       container.append(this.dialog); this.dialog.show();
+      if (previous && previous !== document.body && previous.isConnected) previous.focus({preventScroll: true});
       this.dialog.addEventListener('cancel', event => { event.preventDefault(); if (this.fullscreen) this.exitFullscreen(); });
       this.dialog.addEventListener('keydown', event => {
         if (event.key === 'Escape' && !this.menu.hidden) { event.preventDefault(); this.closeMenu(true); }
@@ -255,7 +258,10 @@ window.LALPreview = (() => {
       } else if (message.type === 'fault') await this.fault(message.reason);
       else if (message.type === 'interacted') { if (!this.hint.hidden || !hintSeen) this.retireHint(); }
       else if (message.type === 'search') { if (!this.fullscreen) this.item.onSearch?.(); }
-      else if (message.type === 'escape') { if (this.fullscreen) this.exitFullscreen(); else this.item.onEscape?.(); }
+      else if (message.type === 'escape') {
+        if (!this.menu.hidden) this.closeMenu(false);
+        else if (this.fullscreen) this.exitFullscreen(); else this.item.onEscape?.();
+      }
       else if (message.type === 'command-done') { this.requests.get(message.request)?.(); this.requests.delete(message.request); }
     }
     async command(action, value) {
