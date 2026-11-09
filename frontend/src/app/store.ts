@@ -246,6 +246,8 @@ export interface AppState {
   create: CreateRequest | null;
   knownTags: Json[];
   inspector: { open: boolean; width: number; sections: Record<InspectorSection, boolean> };
+  /** The live 3D view's first-use hint was shown and retired; it never shows again. */
+  previewHintSeen: boolean;
   sourcesView: SourcesView;
   /** The processing queue (decision 0023); null until first loaded. */
   queue: Json | null;
@@ -322,6 +324,7 @@ let state: AppState = {
   collections: { items: [], total: 0, loading: false, loaded: false, error: null, query: "" },
   selection: { active: false, ids: [], anchor: null }, menu: null, confirm: null, create: null, knownTags: [],
   inspector: { open: false, width: boot.inspector_width, sections: { ...CLOSED_SECTIONS, ...boot.inspector_sections } },
+  previewHintSeen: boot.preview_hint_seen === true,
   sourcesView: emptySourcesView(),
   queue: null,
   sources: [], globalScan: null, sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
@@ -688,6 +691,11 @@ export function setInspectorSection(name: InspectorSection, open: boolean) {
     sectionsPending = {};
     void api().save_interface_settings(null, null, patch).catch(() => {});
   }, 250);
+}
+export function markPreviewHintSeen() {
+  if (state.previewHintSeen) return;
+  setState({ previewHintSeen: true });
+  void api().save_interface_settings(null, null, null, true).catch(() => {});
 }
 let widthTimer: ReturnType<typeof setTimeout> | undefined;
 export function setInspectorWidth(width: number, persist = false) {

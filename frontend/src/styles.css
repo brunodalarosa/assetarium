@@ -409,69 +409,9 @@
   }
 }
 
-/* Interactive 3D preview (ui/interactive-preview.js renders these classes). */
+/* Live 3D preview (ui/interactive-preview.js renders these classes): the still, then the live view over it. */
 .interactive-preview {
   display: block;
-}
-.preview-still {
-  display: grid;
-  gap: 10px;
-}
-.preview-launch {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 100%;
-  min-height: 220px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 14px;
-  background: var(--thumb);
-  color: var(--muted-fg);
-}
-.preview-launch img {
-  display: block;
-  width: 100%;
-  max-height: 320px;
-  object-fit: contain;
-}
-.preview-launch-label {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  color: var(--fg);
-  font-size: 12px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.preview-launch:hover .preview-launch-label,
-.preview-launch:focus-visible .preview-launch-label {
-  opacity: 1;
-}
-.preview-launch:disabled {
-  cursor: default;
-}
-.preview-launch:disabled .preview-launch-label {
-  display: none;
-}
-.preview-open-fullscreen {
-  display: none;
-}
-.preview-availability {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--fault-fg);
-  overflow-wrap: anywhere;
-}
-.preview-availability:empty {
-  display: none;
 }
 .model-preview {
   position: relative;
@@ -481,11 +421,9 @@
   width: 100%;
   max-width: none;
   max-height: none;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
+  border: 0;
+  background: transparent;
   color: inherit;
-  overflow: hidden;
 }
 .model-preview:not([open]) {
   display: none;
@@ -493,47 +431,301 @@
 .model-preview[open] {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.model-preview-header {
+  display: none;
+}
+.model-stage {
+  position: relative;
+  height: 300px;
+  min-height: 220px;
+  border-radius: 14px;
+  background: var(--thumb);
+  overflow: hidden;
+  isolation: isolate;
+}
+.preview-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 0.22s ease-out;
+}
+.preview-still.placeholder {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted-fg);
+}
+.model-viewport {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease-out;
+}
+.model-viewport iframe {
+  display: block;
+  position: absolute;
+  inset: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+}
+/* The crossfade: the live view fades in over the still, which then steps aside. */
+.model-stage.live .model-viewport {
+  opacity: 1;
+  pointer-events: auto;
+}
+.model-stage.live .preview-still {
+  opacity: 0;
 }
 .model-preview button,
 .model-preview select {
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  font: inherit;
+  color: var(--fg);
+}
+.model-corner {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+}
+.model-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  cursor: pointer;
+}
+.model-icon:hover:not(:disabled),
+.model-icon[aria-expanded="true"] {
+  background: var(--surface);
+}
+.model-icon:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.model-preview button:focus-visible,
+.model-preview select:focus-visible,
+.model-edges input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.model-views {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+}
+.model-views button {
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted-fg);
+  cursor: pointer;
+}
+.model-views button:hover:not(:disabled) {
+  color: var(--fg);
+}
+.model-views button[aria-pressed="true"] {
   background: var(--surface);
   color: var(--fg);
-  font: inherit;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+}
+.model-views button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.model-menu {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  z-index: 3;
+  display: grid;
+  gap: 8px;
+  width: min(220px, calc(100% - 16px));
+  max-height: calc(100% - 52px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+}
+.model-menu[hidden] {
+  display: none;
+}
+.model-menu-actions {
+  display: flex;
+  gap: 6px;
+}
+.model-menu-actions button {
+  flex: 1;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
   font-size: 12px;
+  cursor: pointer;
 }
-.model-preview select {
-  border-radius: 10px;
-  padding-right: 6px;
-}
-.model-preview button:hover:not(:disabled) {
+.model-menu-actions button:hover:not(:disabled) {
   background: var(--surface-2);
 }
-.model-preview button:disabled,
-.model-preview select:disabled {
-  opacity: 0.5;
-}
-.model-preview-header {
-  padding: 10px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-.model-preview-heading {
-  display: flex;
+.model-menu label {
+  display: grid;
+  grid-template-columns: 74px 1fr;
   align-items: center;
   gap: 8px;
+  font-size: 11.5px;
+  color: var(--muted-fg);
+}
+.model-menu select {
   min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
 }
-.model-preview-heading h3 {
+.model-menu .model-edges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  font-size: 12px;
+}
+.model-edges input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.model-status {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 16px);
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted-fg);
+  overflow-wrap: anywhere;
+}
+.model-status[hidden] {
+  display: none;
+}
+/* Notes and faults sit above the view buttons so neither hides the other. */
+.model-status.note,
+.model-status.fault {
+  left: 8px;
+  right: auto;
+  bottom: 44px;
+}
+.model-status.fault {
+  background: var(--fault-bg);
+  color: var(--fault-fg);
+}
+.model-status .search-spinner {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.model-status button {
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+.model-status.fault button {
+  color: inherit;
+  text-decoration: underline;
+}
+.model-hint {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 2;
+  max-width: calc(100% - 128px);
   margin: 0;
-  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--fg) 78%, transparent);
+  color: var(--bg);
+  font-size: 11.5px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.model-hint[hidden] {
+  display: none;
+}
+.model-warning {
+  margin: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--warning-bg);
+  color: var(--warning-fg);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-height: 120px;
+  overflow: auto;
+}
+.model-warning[hidden] {
+  display: none;
+}
+.model-fullscreen[open] {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 12px 20px 20px;
+  width: 100vw;
+  height: 100dvh;
+  border-radius: 0;
+  background: var(--bg);
+}
+.model-fullscreen::backdrop {
+  background: var(--bg);
+}
+.model-fullscreen .model-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.model-fullscreen .model-preview-header h3 {
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -545,144 +737,16 @@
   background: var(--surface-2);
   border-radius: 6px;
 }
-.model-preview-actions {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.model-viewport {
-  position: relative;
-  height: 300px;
-  min-height: 220px;
-  background: var(--thumb);
-  isolation: isolate;
-  overflow: hidden;
-}
-.model-viewport iframe {
-  display: block;
-  position: absolute;
-  inset: 0;
-  border: 0;
-  width: 100%;
-  height: 100%;
-  background: var(--thumb);
-}
-.model-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 20px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--muted-fg);
-  background: color-mix(in srgb, var(--thumb) 94%, transparent);
-}
-.model-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 6px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-}
-.model-toolbar label {
-  margin-left: auto;
-}
-.model-toolbar label,
-.model-settings label {
-  font-size: 11px;
-  color: var(--muted-fg);
-  display: grid;
-  gap: 4px;
-}
-.model-options {
-  margin: 0 12px 8px;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-}
-.model-options > summary {
-  font-size: 12px;
-  font-weight: 500;
-  min-height: 28px;
-}
-.model-settings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 8px 0;
-}
-.model-settings label {
-  flex: 1 1 110px;
-}
-.model-settings .model-edges {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-}
-.model-edges input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary);
-}
-.model-help,
-.model-summary {
-  margin: 0;
-  padding: 0 12px 10px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--muted-fg);
-}
-.model-summary:empty {
-  display: none;
-}
-.model-warning {
-  margin: 0 12px 10px;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--warning-bg);
-  color: var(--warning-fg);
-  font-size: 12px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  max-height: 120px;
-  overflow: auto;
-}
-.model-fullscreen[open] {
-  position: fixed;
-  inset: 0;
-  margin: 0;
-  width: 100vw;
-  height: 100dvh;
-  max-height: none;
-  max-width: none;
-  border: 0;
-  border-radius: 0;
-}
-.model-fullscreen::backdrop {
-  background: var(--bg);
-}
-.model-fullscreen .model-preview-header {
-  padding: 14px 20px;
-  flex-shrink: 0;
-}
-.model-fullscreen .model-viewport {
+.model-fullscreen .model-stage {
   height: auto;
   flex: 1 1 0;
   min-height: 120px;
 }
-.model-fullscreen .model-toolbar {
-  padding: 10px 20px;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.model-fullscreen .model-settings {
-  max-height: 140px;
-  overflow: auto;
+@media (prefers-reduced-motion: reduce) {
+  .preview-still,
+  .model-viewport {
+    transition: none;
+  }
 }
 
 /* Image viewer stage. */
@@ -708,7 +772,7 @@
 
 @media (forced-colors: active) {
   .search-surface,
-  .model-preview,
+  .model-stage,
   .model-warning {
     border: 1px solid CanvasText;
   }

@@ -1,4 +1,4 @@
-"""Actual WebView2 preview/navigation checks with tiny synthetic model sources."""
+"""Actual WebView2 live 3D preview checks with tiny synthetic model sources."""
 import argparse
 import base64
 from copy import deepcopy
@@ -35,7 +35,7 @@ if not args.real_assets:
     fixture.mkdir(parents=True, exist_ok=False)
     config, backend, records = indexed.__wrapped__(fixture)
     record = deepcopy(records[0])
-    record['display_name'] = 'Caf\u00e9 \u2014 carr\u00e9 \u25c7 \u5de5\u5177'
+    record['display_name'] = 'Café — carré ◇ 工具'
     record['pack_id'] = 'kenney_even'
     source = config.source_file(record['files'][0]['path'])
     source.write_text('mtllib preview.mtl\nv -1 0 -1\nv 1 0 -1\nv 0 2 0\nv 0 0 1\n'
@@ -76,12 +76,34 @@ if not args.real_assets:
     record['previews'] = [{'path':'data/'+png.name,'sha256':file_hash(png),'view_label':'three_quarter'}]
     update(config,record)
     image = base64.b64encode(png.read_bytes()).decode()
+    # A BLEND-only asset: the viewer cannot open it, so the panel shows renders and says why.
+    blend = deepcopy(records[4])
+    blend_file = config.source_file(blend['files'][0]['path']).with_suffix('.blend')
+    blend_file.write_bytes(b'BLENDER-v300 synthetic; never opened by the viewer')
+    blend['files'] = [{'path':blend_file.relative_to(config.source_root).as_posix(),'format':'blend',
+                       'sha256':file_hash(blend_file),'availability':'available'}]
+    blend['dependencies'] = []
+    update(config,blend)
+    # A valid OBJ padded past the 16 MiB auto-load cap with comment lines.
+    large = deepcopy(records[3])
+    large_file = config.source_file(large['files'][0]['path'])
+    with large_file.open('w') as stream:
+        stream.write('v -1 0 -1\nv 1 0 -1\nv 0 2 0\nv 0 0 1\nf 1 3 2\nf 1 2 4\nf 2 3 4\nf 3 1 4\n')
+        line = '#' + 'x' * 1022 + '\n'
+        for _ in range(17 * 1024):
+            stream.write(line)
+    large['files'] = [dict(large['files'][0],sha256=file_hash(large_file))]
+    large['dependencies'] = []
+    large['technical']['inspected_sha256'] = file_hash(large_file)
+    update(config,large)
 else:
     from local_asset_library.config import load_project_config
     from local_asset_library.membership import records as library_records
+    from local_asset_library.settings import interface_settings
     config = load_project_config(ROOT)
     records = library_records(config)
     image = None
+    hint_before = interface_settings(config)['preview_hint_seen']
 
 
 
@@ -121,7 +143,7 @@ def wait(expression, timeout=30):
     try:
         ui.js('until(()=>(%s),%d)' % (expression, timeout * 1000), timeout + 5)
     except RuntimeError as exc:
-        detail = window.evaluate_js("({error:lal.state.search.error,warning:LALPreview.current?.warning.textContent,loading:LALPreview.current?.loadingText})")
+        detail = window.evaluate_js("({error:lal.state.search.error,status:LALPreview.current?.status.textContent,warning:LALPreview.current?.warning.textContent,loading:LALPreview.current?.loadingText})")
         raise RuntimeError('UI condition timed out: '+expression+' '+json.dumps(detail)) from exc
 
 
@@ -157,6 +179,15 @@ def browser_input(method, parameters):
     assert done.wait(15) and not errors, errors
 
 
+def key(name, code, vk, modifiers=0):
+    browser_input('Input.dispatchKeyEvent',dict(type='keyDown',key=name,code=code,windowsVirtualKeyCode=vk,modifiers=modifiers))
+    browser_input('Input.dispatchKeyEvent',dict(type='keyUp',key=name,code=code,windowsVirtualKeyCode=vk))
+
+
+def stats():
+    return window.evaluate_js('({...LALPreview.stats})')
+
+
 def changed_pixels(before,after):
     rect=window.evaluate_js('(()=>{const r=LALPreview.current.viewport.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,dpr:devicePixelRatio};})()')
     # Native captures use device pixels; WebView2 input coordinates use CSS pixels.
@@ -165,38 +196,70 @@ def changed_pixels(before,after):
     return sum(1 for r,g,b in diff.get_flattened_data() if max(r,g,b)>25)
 
 
+SETTLED = 'Boolean(LALPreview.current?.ready || LALPreview.current?.retainedFault || (LALPreview.current && !LALPreview.current.loadingText && !LALPreview.current.status.hidden))'
+
+
 def verify():
     if args.real_assets:
         return verify_real()
     try:
         ui.wait_ready()
+        # The fixture has no registered sources, so setup opens; it owns the window until closed.
+        js("(async()=>{if(lal.state.setup.open)lal.closeSetup();await until(()=>!lal.state.setup.open);return true})()")
         js("(async()=>{await lal.submitSearch();await until(()=>lal.state.library.items.length===40);lal.closeDetail('library');lal.setInspectorOpen(true);await until(()=>$('detail'));return true})()")
-        assert js("$('page-info').textContent") == '1\u201340 of 40'
+        assert js("$('page-info').textContent") == '1–40 of 40'
         assert js("$('detail').querySelector('.detail-empty h2').textContent") == 'No asset selected'
-        assert ' \u00b7 ' in js('lal.state.coverage')
+        assert ' · ' in js('lal.state.coverage')
         capture('00-library-text.png')
         identifier=json.dumps(record['asset_id'])
+        # The still shows at once and the live view loads by itself, without a click.
+        bridge.unblock.clear(); bridge.delay=True
         select(record['asset_id'])
         assert js("$('detail').querySelector('.detail-header h2').textContent") == record['display_name']
-        assert js("document.querySelector('#inspector .close-detail').getAttribute('aria-label')") == 'Hide asset inspection'
-        assert js("$('detail').querySelector('.pack').textContent") == 'Kenney \u00b7 even'
-        window.evaluate_js("LALPreview.current.launch.click()")
+        assert js("$('detail').querySelector('.pack').textContent") == 'Kenney · even'
+        assert window.evaluate_js("Boolean(LALPreview.current.still.src) && !LALPreview.current.stage.classList.contains('live')")
+        assert not window.evaluate_js("[...document.querySelectorAll('#detail button')].some(b=>/interactive 3D|Back to image/.test(b.textContent))")
+        assert not window.evaluate_js("Boolean($('detail-view'))")
         wait("Boolean(LALPreview.current.loadingText)")
-        capture('01-loading.png')
+        capture('01-still-then-loading.png')
+        bridge.delay=False; bridge.unblock.set()
         wait('Boolean(LALPreview.current?.ready)',60)
-        assert '4 triangles' in window.evaluate_js('LALPreview.current.summary.textContent')
+        wait("getComputedStyle(LALPreview.current.viewport).opacity==='1'")
+        assert window.evaluate_js('LALPreview.current.summary.triangles')==4
         assert window.evaluate_js('LALPreview.current.fileReads')==3
-        assert not window.evaluate_js('LALPreview.current.warning.hidden===false')
-        report['inline_frame']=window.evaluate_js("({sandbox:LALPreview.current.frame.getAttribute('sandbox'),source:LALPreview.current.manifest.source_name,summary:LALPreview.current.summary.textContent})")
+        assert window.evaluate_js('LALPreview.current.warning.hidden')
+        report['live_ms_obj_with_held_prepare']=window.evaluate_js('LALPreview.current.liveMs')
+        report['inline_frame']=window.evaluate_js("({sandbox:LALPreview.current.frame.getAttribute('sandbox'),source:LALPreview.current.manifest.source_name})")
         assert report['inline_frame']['sandbox']=='allow-scripts'
-        capture('02-inline.png')
-        check('Inline textured OBJ loads with MTL and texture dependencies')
+        assert not window.evaluate_js('LALPreview.current.hint.hidden')
+        capture('02-live-inline.png')
+        check('Selecting shows the still at once, then the live OBJ (MTL + texture) crossfades in without a click')
+        check('The first live view shows the controls hint')
+        # View buttons move the live camera; nothing reloads.
         window.evaluate_js('window.originalPreviewFrame=LALPreview.current.frame;window.originalSession=LALPreview.current.session')
+        before=capture('02a-before-top.png')
+        window.evaluate_js("LALPreview.current.viewButtons[3].click()")
+        wait("LALPreview.current.viewButtons[3].getAttribute('aria-pressed')==='true'")
+        top=capture('02b-top.png')
+        report['top_changed_pixels']=changed_pixels(before,top)
+        assert report['top_changed_pixels']>300
+        assert window.evaluate_js('originalPreviewFrame===LALPreview.current.frame && LALPreview.current.fileReads===3')
+        assert window.evaluate_js("lal.state.library.detail.view")=='three_quarter'
+        check('View buttons move the live camera without reloading the model or the inspection')
+        window.evaluate_js("LALPreview.current.more.click()")
+        assert window.evaluate_js("!LALPreview.current.menu.hidden && document.activeElement===LALPreview.current.menuControls[0]")
+        capture('02c-menu.png')
+        key('Escape','Escape',27)
+        assert window.evaluate_js("LALPreview.current.menu.hidden && document.activeElement===LALPreview.current.more")
+        assert window.evaluate_js('lal.state.inspector.open')
+        check('The canvas menu opens on its first control and Escape closes it without hiding the inspector')
         js('(async()=>{await LALPreview.current.enterFullscreen();return true;})()')
-        wait('LALPreview.current.fullscreen && !LALPreview.current.loadingText')
+        wait('LALPreview.current.fullscreen')
         assert window.evaluate_js('originalPreviewFrame===LALPreview.current.frame && originalSession===LALPreview.current.session')
         assert window.evaluate_js('LALPreview.current.fileReads')==3
         assert window.evaluate_js('LALPreview.current.dialog.getBoundingClientRect().width>=innerWidth-2')
+        window.evaluate_js("LALPreview.current.viewButtons[0].click()")
+        time.sleep(.3)
         full_image=capture('03-fullscreen.png')
         # A real rendered red model must occupy pixels, beyond DOM/loader success.
         rendered=Image.open(full_image).convert('RGB')
@@ -212,88 +275,153 @@ def verify():
         rotated=capture('03a-rotated.png')
         report['rotation_changed_pixels']=changed_pixels(full_image,rotated)
         assert report['rotation_changed_pixels']>1000
+        wait('LALPreview.current.hint.hidden')
+        assert bridge.interface_settings()['preview_hint_seen'] is True
+        check('The hint retires (first gesture or 8 s) and is remembered app-wide')
         browser_input('Input.dispatchMouseEvent',dict(type='mouseWheel',**rect,deltaY=-180,deltaX=0))
         zoomed=capture('03b-zoomed.png')
         report['zoom_changed_pixels']=changed_pixels(rotated,zoomed)
         assert report['zoom_changed_pixels']>1000
-        browser_input('Input.dispatchKeyEvent',dict(type='keyDown',key='ArrowLeft',code='ArrowLeft',windowsVirtualKeyCode=37))
-        browser_input('Input.dispatchKeyEvent',dict(type='keyUp',key='ArrowLeft',code='ArrowLeft',windowsVirtualKeyCode=37))
+        key('ArrowLeft','ArrowLeft',37)
         keyboard=capture('03c-keyboard-orbit.png')
         report['keyboard_changed_pixels']=changed_pixels(zoomed,keyboard)
         assert report['keyboard_changed_pixels']>500
         check('Native mouse drag, wheel zoom and keyboard orbit change the rendered model')
         window.evaluate_js('LALPreview.current.full.focus()')
         for _ in range(12):
-            browser_input('Input.dispatchKeyEvent',dict(type='keyDown',key='Tab',code='Tab',windowsVirtualKeyCode=9))
-            browser_input('Input.dispatchKeyEvent',dict(type='keyUp',key='Tab',code='Tab',windowsVirtualKeyCode=9))
-            assert window.evaluate_js('LALPreview.current.dialog.contains(document.activeElement)'), window.evaluate_js(
+            key('Tab','Tab',9)
+            # Wrapping past the modal's last control leaves the document briefly (body); it never reaches inert content.
+            assert window.evaluate_js('LALPreview.current.dialog.contains(document.activeElement)||document.activeElement===document.body'), window.evaluate_js(
                 "(()=>{const a=document.activeElement;return a?a.tagName+'#'+a.id+'.'+a.className+' '+(a.getAttribute('aria-label')||a.textContent.slice(0,40)):'none'})()")
+        window.evaluate_js("LALPreview.current.more.click()")
+        assert window.evaluate_js("!LALPreview.current.menu.hidden")
+        key('Escape','Escape',27)
+        assert window.evaluate_js("LALPreview.current.menu.hidden && LALPreview.current.fullscreen"), 'one Escape must close only the menu'
+        check('In fullscreen, the first Escape closes the ⋯ menu and keeps fullscreen')
         browser_input('Emulation.setEmulatedMedia',{'features':[{'name':'prefers-reduced-motion','value':'reduce'}]})
-        assert window.evaluate_js("getComputedStyle(LALPreview.current.spinner).animationName==='none'")
+        assert window.evaluate_js("getComputedStyle(LALPreview.current.viewport).transitionDuration==='0s'")
         browser_input('Emulation.setEmulatedMedia',{'features':[]})
-        check('Fullscreen contains keyboard focus and the loading indicator respects reduced motion')
-        for action,value in [('view','front'),('projection','orthographic'),('edges',True),('background','dark'),('up','Z'),('navigation','free')]:
+        check('Fullscreen contains keyboard focus and the crossfade respects reduced motion')
+        for action,value in [('view','front'),('projection','orthographic'),('edges',True),('background','dark'),('up','Z'),('navigation','free'),('fit',None),('reset',None)]:
             js(f"(async()=>{{await LALPreview.current.command({json.dumps(action)},{json.dumps(value)});return true;}})()")
-            assert window.evaluate_js('LALPreview.current.ready && !LALPreview.current.loadingText')
+            assert window.evaluate_js('LALPreview.current.ready && !LALPreview.current.retainedFault')
         capture('04-display-options.png')
-        check('Upstream view, projection, edges, background, up-axis and navigation controls respond')
+        check('View, projection, edges, background, up-axis, navigation, fit and reset respond')
         window.resize(720,820)
         wait('innerWidth<740')
         wait('LALPreview.current.viewport.clientWidth>650')
         capture('05-narrow-fullscreen.png')
         assert not window.evaluate_js('document.documentElement.scrollWidth>innerWidth+1')
-        js('(async()=>{await LALPreview.current.exitFullscreen();return true;})()')
+        window.evaluate_js("LALPreview.current.dialog.dispatchEvent(new Event('cancel',{cancelable:true}))")
+        wait('!LALPreview.current.fullscreen')
         assert window.evaluate_js('originalPreviewFrame===LALPreview.current.frame && LALPreview.current.ready')
         assert window.evaluate_js('document.activeElement===LALPreview.current.full')
-        check('Narrow fullscreen layout and return focus work without reimporting')
+        check('Escape leaves fullscreen and returns focus without reimporting')
         js("(async()=>{await LALPreview.current.acknowledge('focus');return true;})()")
-        browser_input('Input.dispatchKeyEvent',dict(type='keyDown',key='f',code='KeyF',windowsVirtualKeyCode=70,modifiers=2))
-        browser_input('Input.dispatchKeyEvent',dict(type='keyUp',key='f',code='KeyF',windowsVirtualKeyCode=70))
+        key('f','KeyF',70,2)
         wait("document.activeElement===$('query')")
         assert window.evaluate_js('originalPreviewFrame===LALPreview.current.frame && LALPreview.current.ready')
         check('Ctrl+F returns from the inline canvas to search without reloading the model')
-        js('(async()=>{await LALPreview.current.enterFullscreen();return true;})()')
-        window.evaluate_js("LALPreview.current.dialog.dispatchEvent(new Event('cancel',{cancelable:true}))")
-        wait('!LALPreview.current.fullscreen && !LALPreview.current.loadingText')
-        window.evaluate_js('LALPreview.current.back.click()')
+        window.evaluate_js('LALPreview.pause()')
         wait('!document.querySelector(".model-viewport iframe")')
         assert not bridge._interactive_preview.tickets
-        check('Escape exits fullscreen; Back to image releases the frame and file ticket')
+        assert 'paused' in window.evaluate_js('LALPreview.current.status.textContent')
+        check('Pausing (page change, hidden panel) releases the frame and file ticket and says so')
         # A different selected export must load that source, never silently reuse OBJ.
         select(record['asset_id'],'glb')
-        window.evaluate_js('LALPreview.current.launchFull.click()')
         wait('Boolean(LALPreview.current?.ready)',60)
         assert window.evaluate_js('LALPreview.current.manifest.format')=='glb'
         assert window.evaluate_js('LALPreview.current.fileReads')==1
+        report['live_ms_glb']=window.evaluate_js('LALPreview.current.liveMs')
         capture('06-glb.png')
         check('GLB source selection loads offline with the bundled decoder and environment')
-        window.evaluate_js('LALPreview.current.back.click()')
-        bridge.delay=True
-        window.evaluate_js('LALPreview.current.launchFull.click()')
-        wait('LALPreview.current.fullscreen && Boolean(LALPreview.current.loadingText)')
+        select(record['asset_id'],'obj')
+        wait('Boolean(LALPreview.current?.ready)',60)
+        report['live_ms_obj']=window.evaluate_js('LALPreview.current.liveMs')
+        bridge.unblock.clear(); bridge.delay=True
+        select(record['asset_id'],'glb')
+        wait('Boolean(LALPreview.current.loadingText)')
+        js('(async()=>{await LALPreview.current.enterFullscreen();return true;})()')
         capture('07-fullscreen-loading.png')
         js(f"(async()=>{{await lal.selectAsset('library',{json.dumps(records[1]['asset_id'])});return true;}})()")
-        bridge.unblock.set()
+        bridge.delay=False; bridge.unblock.set()
         wait('LALPreview.current.item.assetId!=='+identifier)
         time.sleep(.3)
-        assert not window.evaluate_js('Boolean(document.querySelector(".model-viewport iframe"))')
         assert not window.evaluate_js('Boolean(document.querySelector("dialog:modal"))')
+        assert all(v['asset_id']!=record['asset_id'] for v in bridge._interactive_preview.tickets.values())
         check('Leaving during a delayed fullscreen load ignores obsolete results')
-        bridge.delay=False
         select(records[2]['asset_id'])
-        window.evaluate_js('LALPreview.current.launch.click()')
         wait('Boolean(LALPreview.current.retainedFault)',45)
-        assert 'meshes' in window.evaluate_js('LALPreview.current.warning.textContent').lower()
-        assert window.evaluate_js('LALPreview.current.full.disabled && !LALPreview.current.overlay.hidden')
+        assert window.evaluate_js("LALPreview.current.status.classList.contains('fault') && !LALPreview.current.status.hidden")
+        report['fault_status']=window.evaluate_js('LALPreview.current.status.textContent')
         capture('08-retained-fault.png')
         faults_before=bridge._interactive_preview.fault_path.read_text()
-        bad_id=json.dumps(records[2]['asset_id'])
+        select(records[1]['asset_id'])
         select(records[2]['asset_id'])
-        window.evaluate_js('LALPreview.current.launch.click()')
         wait('Boolean(LALPreview.current.retainedFault)')
         assert not window.evaluate_js('Boolean(LALPreview.current.frame)')
         assert bridge._interactive_preview.fault_path.read_text()==faults_before
-        check('Unusable geometry records a separate fault while keeping asset detail available')
+        check('A load fault shows its reason over the still and is recorded once, never retried')
+        # A format the viewer cannot open shows renders and says so; the view buttons switch stills.
+        before=stats()
+        select(blend['asset_id'])
+        time.sleep(.5)
+        assert 'isn’t available for .blend' in window.evaluate_js('LALPreview.current.status.textContent')
+        assert window.evaluate_js('LALPreview.current.viewButtons[3].disabled && LALPreview.current.more.disabled')
+        assert stats()==before
+        capture('09-blend-renders.png')
+        window.evaluate_js("LALPreview.current.viewButtons[1].click()")
+        wait("lal.state.library.detail.view==='front' && LALPreview.current?.item.view==='front'")
+        assert window.evaluate_js("LALPreview.current.viewButtons[1].getAttribute('aria-pressed')")=='true'
+        check('BLEND shows renders with a visible reason; view buttons switch the stills; no viewer is loaded')
+        # Over the auto-load cap: nothing is read until the owner clicks.
+        select(large['asset_id'])
+        wait("LALPreview.current.status.textContent.includes('Large model')")
+        assert not window.evaluate_js('Boolean(LALPreview.current.frame)') and window.evaluate_js('LALPreview.current.fileReads')==0
+        assert all(v['asset_id']!=large['asset_id'] for v in bridge._interactive_preview.tickets.values())
+        capture('10-large-model.png')
+        window.evaluate_js("LALPreview.current.status.querySelector('button').click()")
+        wait('Boolean(LALPreview.current?.ready)',90)
+        report['live_ms_large_after_click']=window.evaluate_js('LALPreview.current.liveMs')
+        report['large_bytes']=window.evaluate_js('LALPreview.current.manifest.total_bytes')
+        check('A model over the 16 MiB cap shows "Large model · click to load" and loads on click')
+        # Fast arrow-key browsing selects each card yet loads no viewer for the ones it passes.
+        select(records[5]['asset_id'])
+        wait(SETTLED,60)
+        plan=window.evaluate_js("(()=>{const cards=[...document.querySelectorAll('.card')];const i=Math.min(cards.findIndex(c=>c.dataset.id===%s),cards.length-10);cards[i].focus();return {start:i,count:cards.length,target:cards[i+8].dataset.id};})()" % json.dumps(records[5]['asset_id']))
+        plan['selected_before']=window.evaluate_js('lal.state.library.selected')
+        plan['focused']=window.evaluate_js('document.activeElement?.dataset?.id||document.activeElement?.tagName')
+        report['browse_plan']=plan
+        before=stats()
+        # A mutation observer, not a timer: timers are throttled while the verify window is in the background.
+        js("(()=>{window.browseSeen=new Set();window.browseWatch=new MutationObserver(()=>{const c=document.querySelector('.card[aria-pressed=true]');if(c)browseSeen.add(c.dataset.id)});browseWatch.observe(document.body,{subtree:true,attributes:true,attributeFilter:['aria-pressed']});return true})()")
+        started=time.monotonic()
+        # A pause after each key lets details load mid-browse; focus must stay on the cards throughout.
+        for index in range(8):
+            key('ArrowRight','ArrowRight',39)
+            if index == 3: time.sleep(.2)  # under the 250 ms rest: details mount, no viewer starts
+            assert window.evaluate_js("Boolean(document.activeElement?.classList.contains('card'))"), window.evaluate_js('document.activeElement?.tagName+" "+document.activeElement?.className')
+        report['browse_seconds_for_8_keys']=round(time.monotonic()-started,3)
+        wait('lal.state.library.selected===%s && LALPreview.current?.item.assetId===%s' % (json.dumps(plan['target']),json.dumps(plan['target'])))
+        wait(SETTLED,60)
+        report['browse_selected_distinct']=window.evaluate_js('(browseWatch.disconnect(),browseSeen.size)')
+        after=stats()
+        report['browse_viewers']={'prepared':after['prepared']-before['prepared'],'frames':after['frames']-before['frames']}
+        report['live_ms_after_browse']=window.evaluate_js('LALPreview.current.liveMs')
+        assert report['browse_selected_distinct']>=6, report['browse_selected_distinct']
+        assert report['browse_viewers']['prepared']<=1 and report['browse_viewers']['frames']<=1, report['browse_viewers']
+        # Once the detail has loaded, focus stays on the card, so the next arrow keeps browsing.
+        wait('Boolean(lal.state.library.detail?.result)')
+        time.sleep(.3)
+        assert window.evaluate_js('document.activeElement?.dataset?.id')==plan['target'], window.evaluate_js('document.activeElement?.tagName+" "+document.activeElement?.className')
+        following=window.evaluate_js("(()=>{const cards=[...document.querySelectorAll('.card')];return cards[cards.findIndex(c=>c.dataset.id===%s)+1].dataset.id})()" % json.dumps(plan['target']))
+        key('ArrowRight','ArrowRight',39)
+        wait('lal.state.library.selected===%s && Boolean(lal.state.library.detail?.result)' % json.dumps(following))
+        time.sleep(.3)
+        assert window.evaluate_js('document.activeElement?.dataset?.id')==following
+        check('Focus stays on the results after an arrow selection settles, so browsing continues')
+        capture('11-after-browse.png')
+        check('Fast arrow presses select each card yet load at most one viewer, where browsing rests')
         report['status']='passed'
     except Exception as exc:
         report.update(status='faulty',reason=str(exc),traceback=traceback.format_exc())
@@ -310,19 +438,19 @@ def verify_real():
     try:
         ui.wait_ready(45)
         js("(async()=>{await lal.submitSearch();await until(()=>lal.state.library.items.length>0);return true})()")
+        # One asset per viewer format in whatever library is configured, plus its biggest package.
         targets=[]
-        def choose(pack=None,name=None,fmt='glb',repair=False):
-            item=next(r for r in records if (not pack or r['pack_id']==pack)
-                and (not name or r['display_name']==name)
-                and (not repair or r.get('texture_repair'))
-                and any(f['format']==fmt for f in r['files']))
-            targets.append((item,fmt))
-        choose('City_Kit_Commercial','building-d','glb')
-        choose('kenney_food-kit','apple','obj')
-        choose('craftpix-free-packs',fmt='fbx',repair=True)
-        choose('synty-part1',fmt='fbx',repair=True)
-        choose(fmt='dae')
-        choose(fmt='stl')
+        for fmt in ('glb','gltf','fbx','obj','dae','stl'):
+            item=next((r for r in records if r.get('availability')=='available'
+                       and any(f['format']==fmt for f in r['files'])),None)
+            if item: targets.append((item,fmt))
+        def size(item,fmt):
+            entry=next(f for f in item['files'] if f['format']==fmt)
+            paths=[entry['path']]+[d['path'] for d in item.get('dependencies',[]) if d.get('path')]
+            return sum(config.source_file(p).stat().st_size for p in paths if config.source_file(p).exists())
+        candidates=[(r,f['format']) for r in records if r.get('availability')=='available'
+                    for f in r['files'][:1] if f['format'] in ('glb','gltf','fbx','obj','dae','stl')]
+        if candidates: targets.append(max(candidates,key=lambda pair:size(*pair)))
         protected={}
         for item,fmt in targets:
             for entry in item['files']+item.get('dependencies',[]):
@@ -332,13 +460,11 @@ def verify_real():
         report['assets']=[]
         for index,(item,fmt) in enumerate(targets):
             select(item['asset_id'],fmt)
-            window.evaluate_js('LALPreview.current.launchFull.click()')
-            wait('Boolean(LALPreview.current?.ready || LALPreview.current?.retainedFault)',60)
-            result=window.evaluate_js("({ready:LALPreview.current.ready,fault:LALPreview.current.retainedFault,summary:LALPreview.current.summary.textContent,source:LALPreview.current.manifest?.source_name,files:LALPreview.current.fileReads})")
+            wait(SETTLED,60)
+            result=window.evaluate_js("({ready:LALPreview.current.ready,fault:LALPreview.current.retainedFault,status:LALPreview.current.status.textContent,summary:LALPreview.current.summary,source:LALPreview.current.manifest?.source_name,files:LALPreview.current.fileReads,live_ms:LALPreview.current.liveMs})")
             result.update(asset_id=item['asset_id'],name=item['display_name'],pack=item['pack_id'],format=fmt)
             report['assets'].append(result)
             capture(f'real-{index+1:02}-{fmt}.png')
-            window.evaluate_js('LALPreview.current.back.click()')
         changed=[path for path,before in protected.items() if file_hash(Path(path))!=before]
         assert not changed, changed
         report['unchanged_original_files']=len(protected)
@@ -348,6 +474,9 @@ def verify_real():
     except Exception as exc:
         report.update(status='faulty',reason=str(exc),traceback=traceback.format_exc())
     finally:
+        # The run may retire the first-use hint; the owner's own preference is put back.
+        from local_asset_library.settings import save_interface_settings
+        save_interface_settings(config, preview_hint_seen=hint_before)
         (OUT/'verification.json').write_text(json.dumps(report,indent=2)+'\n')
         bridge._close()
         window.destroy()

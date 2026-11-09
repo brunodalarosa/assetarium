@@ -2,7 +2,7 @@
 // The frame has an opaque origin, no desktop bridge, no network, and one model.
 // Removing it also removes upstream document listeners and pending imports.
 let session = null, viewer = null, loader = null, model = null, ready = false;
-let modelFiles = [], sourceName = '', initialCamera = null;
+let modelFiles = [], sourceName = '', initialCamera = null, initialView = 'three_quarter', background = 'studio', interacted = false;
 const canvas = document.getElementById('model');
 function send(type, data = {}) {
   parent.postMessage({kind: 'lal-3d', session, type, ...data}, '*');
@@ -16,17 +16,16 @@ function resize() {
 }
 function sphere() { return viewer.GetBoundingSphere(() => true); }
 function fit() { viewer.FitSphereToWindow(sphere(), false); }
+// The Blender still directions (render_math.VIEWS, Z-up) turned Y-up, so the live view lines up with the still.
 function direction(name) {
-  const directions = {front:[0,0,1], back:[0,0,-1], right:[1,0,0], left:[-1,0,0],
-                      top:[0,1,0], bottom:[0,-1,0], isometric:[1,0.75,1]};
+  const directions = {three_quarter:[1,0.9,1], front:[0,0.25,1], side:[1,0.25,0], top:[0,1,0]};
   const d = directions[name];
   if (!d) throw Error('Unknown camera view');
   const current = viewer.GetCamera();
   const center = current.center.Clone();
   const distance = OV.CoordDistance3D(current.eye, current.center);
   const eye = OV.AddCoord3D(center, new OV.Coord3D(...d).Normalize().MultiplyScalar(distance));
-  const up = name === 'top' ? new OV.Coord3D(0,0,-1) :
-             name === 'bottom' ? new OV.Coord3D(0,0,1) : new OV.Coord3D(0,1,0);
+  const up = name === 'top' ? new OV.Coord3D(0,0,-1) : new OV.Coord3D(0,1,0);
   viewer.SetCamera(new OV.Camera(eye, center, up, current.fov));
   fit();
 }
@@ -35,7 +34,7 @@ async function load() {
     progress('Preparing 3D preview…');
     viewer = new OV.Viewer();
     viewer.Init(canvas);
-    viewer.SetBackgroundColor(new OV.RGBAColor(233,235,229,255));
+    setBackground(background);
     viewer.SetEnvironmentMapSettings(new OV.EnvironmentSettings(environmentMap, false));
     resize();
     loader = new OV.ThreeModelLoader();
@@ -73,6 +72,7 @@ async function load() {
           viewer.AdjustClippingPlanesToSphere(bounds);
           viewer.SetUpVector(OV.Direction.Y, false);
           fit();
+          direction(initialView);
           initialCamera = viewer.GetCamera().Clone();
           ready = true;
           modelFiles = [];
@@ -84,6 +84,10 @@ async function load() {
       onLoadError: error => reportError(error.message || `Online 3D Viewer could not read this source (error ${error.code}).`)
     });
   } catch (error) { reportError(error); }
+}
+function setBackground(value) {
+  const color = value === 'dark' ? [51,57,55] : value === 'white' ? [255,255,255] : [233,235,229];
+  viewer.SetBackgroundColor(new OV.RGBAColor(...color,255));
 }
 function command(action, value) {
   if (action === 'resize') { resize(); return; }
@@ -98,10 +102,7 @@ function command(action, value) {
     case 'edges': viewer.SetEdgeSettings(new OV.EdgeSettings(value, new OV.RGBColor(60,71,66), 25)); break;
     case 'navigation': viewer.SetNavigationMode(value === 'free' ? OV.NavigationMode.FreeOrbit : OV.NavigationMode.FixedUpVector); break;
     case 'up': viewer.SetUpVector(OV.Direction[value], false); fit(); break;
-    case 'background': {
-      const color = value === 'dark' ? [51,57,55] : value === 'white' ? [255,255,255] : [233,235,229];
-      viewer.SetBackgroundColor(new OV.RGBAColor(...color,255)); break;
-    }
+    case 'background': setBackground(value); break;
     default: throw Error('Unknown viewer action');
   }
 }
@@ -111,6 +112,8 @@ window.addEventListener('message', async event => {
   if (message.type === 'init' && session === null) {
     session = message.session;
     sourceName = message.sourceName;
+    if (['three_quarter','front','side','top'].includes(message.view)) initialView = message.view;
+    if (['studio','white','dark'].includes(message.background)) background = message.background;
     let parentAccess = false;
     try { parentAccess = Boolean(parent.document); } catch (_) { /* Opaque origin is expected. */ }
     send('ready',{desktopBridge:Boolean(window.pywebview?.api),parentAccess});
@@ -130,7 +133,10 @@ window.addEventListener('message', async event => {
 });
 // Upstream mouse navigation prevents mousedown's default action. Focus on the
 // earlier pointer event so keyboard controls work immediately after dragging.
-canvas.addEventListener('pointerdown', () => canvas.focus());
+// The first gesture tells the app the controls were found, which retires the first-use hint.
+function touched() { if (!interacted && ready) { interacted = true; send('interacted'); } }
+canvas.addEventListener('pointerdown', () => { canvas.focus(); touched(); });
+canvas.addEventListener('wheel', touched, {passive: true});
 canvas.addEventListener('keydown', event => {
   if (event.ctrlKey && event.key.toLowerCase() === 'f') {
     send('search'); event.preventDefault(); return;
@@ -151,7 +157,7 @@ canvas.addEventListener('keydown', event => {
   else if (event.key.toLowerCase() === 'f') command('fit');
   else if (event.key.toLowerCase() === 'r') command('reset');
   else handled = false;
-  if (handled) event.preventDefault();
+  if (handled) { event.preventDefault(); touched(); }
 });
 canvas.addEventListener('dblclick', () => { if (ready) fit(); });
 canvas.addEventListener('webglcontextlost', event => {

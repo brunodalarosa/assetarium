@@ -332,15 +332,17 @@ def interface_settings(config):
     sections = sections if isinstance(sections, dict) else {}
     return {'status': 'ready', 'appearance': appearance if appearance in APPEARANCES else 'system',
             'inspector_width': width if type(width) is int and low <= width <= high else default,
-            'inspector_sections': {name: sections.get(name) is True for name in INSPECTOR_SECTIONS}}
+            'inspector_sections': {name: sections.get(name) is True for name in INSPECTOR_SECTIONS},
+            'preview_hint_seen': value.get('preview_hint_seen') is True}
 
 
-def save_interface_settings(config, appearance=None, inspector_width=None, inspector_sections=None):
+def save_interface_settings(config, appearance=None, inspector_width=None, inspector_sections=None,
+                            preview_hint_seen=None):
     with _interface_lock:
-        return _save_interface_settings(config, appearance, inspector_width, inspector_sections)
+        return _save_interface_settings(config, appearance, inspector_width, inspector_sections, preview_hint_seen)
 
 
-def _save_interface_settings(config, appearance, inspector_width, inspector_sections):
+def _save_interface_settings(config, appearance, inspector_width, inspector_sections, preview_hint_seen):
     current = interface_settings(config)
     if appearance is not None:
         if appearance not in APPEARANCES:
@@ -357,7 +359,13 @@ def _save_interface_settings(config, appearance, inspector_width, inspector_sect
                 name not in INSPECTOR_SECTIONS or type(open_) is not bool for name, open_ in inspector_sections.items()):
             raise ConfigError('Inspector sections must map ' + ', '.join(INSPECTOR_SECTIONS) + ' to open or closed')
         current['inspector_sections'] = dict(current['inspector_sections'], **inspector_sections)
+    if preview_hint_seen is not None:
+        # The live 3D view's first-use hint shows once; it is never shown again after this.
+        if type(preview_hint_seen) is not bool:
+            raise ConfigError('The 3D preview hint state must be true or false')
+        current['preview_hint_seen'] = preview_hint_seen
     atomic_json(interface_path(config), {'schema_version': 1, 'appearance': current['appearance'],
                                          'inspector_width': current['inspector_width'],
-                                         'inspector_sections': current['inspector_sections']})
+                                         'inspector_sections': current['inspector_sections'],
+                                         'preview_hint_seen': current['preview_hint_seen']})
     return dict(current, status='saved')

@@ -1,9 +1,11 @@
-# Interactive 3D preview
+# Live 3D preview
 
-The inspection card's image opens an interactive preview using the selected
-source format. **Open fullscreen** opens it across the app window, rather
-than launching another application or entering operating-system fullscreen.
-The original image, view choices and inspection evidence remain available.
+Selecting a model shows its still render at once. When the selection rests for
+about 250 ms, the live view of the selected source format loads behind the
+still and crossfades in; no click is needed. Browsing quickly (arrow keys or
+clicks) never loads a viewer for an asset it passes. **Fullscreen** opens the
+same view across the app window, rather than launching another application or
+entering operating-system fullscreen.
 
 Library, Search and Collections use the same resolved asset, selected source format and inspection revision.
 If the library changes during loading, **Refresh inspection** loads current details. A changed view is not
@@ -11,21 +13,38 @@ an asset failure; genuine file/import failures remain recorded with their eviden
 
 ## Interaction
 
-- Drag to rotate; right-drag or Shift-drag to pan; scroll or pinch to zoom.
-- Use Fit, Reset view and zoom buttons without relying on gestures.
-- Choose isometric, front, back, left, right, top or bottom view presets.
-- Display options provides perspective/orthographic projection, studio/white/dark
-  backgrounds, edge display, X/Y/Z up-axis and upright/free-orbit navigation.
+- Drag to rotate; right-drag or Shift-drag to pan; scroll or pinch to zoom;
+  double-click fits the model.
+- **3/4 · Front · Side · Top** on the canvas move the camera to the same angles
+  as the still renders. Before the live view is up they switch the stills
+  (there is no top still, so Top waits for the live view).
+- The corner icons: **?** shows the controls (also shown once, the first time a
+  live view appears), **Fullscreen**, and **⋯** with Fit, Reset view,
+  perspective/orthographic projection, studio/white/dark background,
+  upright/free-orbit navigation, X/Y/Z up axis and edges. The background starts
+  dark in the dark theme.
 - When the canvas has focus, arrows rotate, Shift + arrows pan, +/− zoom,
   F fits and R resets the view. Tab moves between controls.
-- Fullscreen retains the same frame, camera and loaded model. Escape exits
-  fullscreen first; Back to image releases the frame and its file ticket.
+- Fullscreen keeps the same frame, camera and loaded model. Escape closes the ⋯
+  menu, then leaves fullscreen.
 
-Loading indicators cover file verification/delivery, import, material/geometry
-preparation, display changes and fullscreen transitions. Closing an inspection,
-switching asset/source/view, or visiting Settings/report pages releases the
-frame. Late results cannot replace the newer selection. Loading can be left
-without waiting for completion. No automatic rotation or animation starts.
+A small **Loading 3D…** chip shows while files are verified and imported; the
+still stays visible underneath. Switching asset or source, closing the
+inspection or visiting another page releases the frame; a released view says
+**Live 3D paused · Load**. Late results cannot replace the newer selection. No
+automatic rotation or animation starts.
+
+## When there is no live view
+
+The canvas always says why, over the still:
+
+- **Live 3D isn’t available for .blend · showing renders**: the viewer can't open
+  that format; choose another source format if the asset has one.
+- **Large model · 17.0 MiB · Click to load**: packages over 16 MiB wait for a
+  click, so browsing never reads them. The viewer refuses packages over
+  128 MiB even on a click.
+- **Live 3D unavailable: <reason>**: a load fault, recorded once with its
+  evidence and never retried automatically.
 
 ## Formats and evidence
 

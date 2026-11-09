@@ -9,7 +9,7 @@ import type { Json } from "../app/api";
 import { display, formatLabel, packName, plural, VIEWS } from "../app/format";
 import {
   activeGridId, assetTags, type GridId, gridApi, copyText, getState, type InspectorSection, packProfileAction, saveAssetTags, selectAsset,
-  pushToast, setCollectionItem, startSelection, turnFormatOn,
+  markPreviewHintSeen, pushToast, setCollectionItem, startSelection, turnFormatOn,
   setInspectorOpen, setInspectorSection, setInspectorWidth, useApp,
 } from "../app/store";
 import { FolderPanel } from "./FolderPanel";
@@ -227,7 +227,11 @@ function ModelPreview({ grid, assetId, result, view }: { grid: GridId; assetId: 
     // The preview appends its still and dialog; each mount starts from an empty container.
     container.replaceChildren();
     window.LALPreview.mount(container, {
-      assetId, name, sourceFormat: p.selected_source?.format, version,
+      assetId, name, sourceFormat: p.selected_source?.format, version, view,
+      hintSeen: getState().previewHintSeen, onHintSeen: markPreviewHintSeen,
+      // Before the live view loads, the view buttons switch the Blender stills.
+      onView: (next: string) => void selectAsset(grid, assetId, p.selected_source?.format ?? null, next, false),
+      onEscape: () => { setInspectorOpen(false); document.getElementById("toggle-inspector")?.focus(); },
       onRefresh: () => void selectAsset(grid, assetId, p.selected_source?.format ?? null, view, false, true),
       onSearch: () => document.getElementById({ library: "query", source: "source-grid", collection: "collection-query" }[grid])?.focus(),
       image: result.image, imageAlt: `${name} — ${VIEWS[view] || view} view`,
@@ -243,7 +247,6 @@ function ModelPreview({ grid, assetId, result, view }: { grid: GridId; assetId: 
 
 function Preview({ grid, result, assetId, format, view }: { grid: GridId; result: Json; assetId: string; format: string | null; view: string }) {
   const p = result.payload, info = p.presentation || {}, t = info.technical || {};
-  const context = useApp((s) => s.context);
   const formats: string[] = info.formats || [];
   const formatValue = format || p.selected_source?.format || formats[0] || "";
   const prefix = { library: "", source: "source-", collection: "collection-" }[grid];
@@ -268,15 +271,11 @@ function Preview({ grid, result, assetId, format, view }: { grid: GridId; result
       </>
     );
   }
-  const views: string[] = (context?.views as string[] | undefined)?.filter((v) => v !== "image") || ["three_quarter", "front", "side"];
+  // The view buttons and display options sit on the canvas (ui/interactive-preview.js).
   return (
     <>
       <ModelPreview grid={grid} assetId={assetId} result={result} view={view} />
-      <div className={cn("detail-controls grid gap-3", formats.length > 1 && "grid-cols-2")}>
-        {formatSelect(view)}
-        <SelectField id={prefix + "detail-view"} label="Preview view" value={view} onChange={(value) => void selectAsset(grid, assetId, format, value, false)} options={views.map((v): [string, string] => [v, VIEWS[v] || v])} />
-      </div>
-      <Button variant="secondary" className="w-full" disabled={!p.selected_source?.format} onClick={() => void window.LALPreview.current?.start(false)}>Open interactive 3D preview</Button>
+      {formatSelect(view)}
     </>
   );
 }
@@ -731,8 +730,12 @@ function DetailBody({ grid }: { grid: GridId }) {
   const focusToken = detail?.focusToken ?? 0;
   const hasResult = Boolean(detail?.result);
   const waiting = useShownWhile(Boolean(detail && !detail.result && !detail.error && !detail.unavailable));
+  // Focus follows only a selection that asked for it (a new token); arrow browsing keeps focus on the cards.
+  const focused = useRef(0);
   useEffect(() => {
-    if (focusToken && hasResult) headingRef.current?.focus();
+    if (!focusToken || !hasResult || focused.current === focusToken) return;
+    focused.current = focusToken;
+    headingRef.current?.focus();
   }, [focusToken, hasResult]);
   if (!detail)
     return (

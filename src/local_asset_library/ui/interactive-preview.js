@@ -1,153 +1,217 @@
 'use strict';
 // The app owns navigation and file authorization; Online 3D Viewer owns the 3D.
+// The still shows at once; the live view loads only after the selection rests, so browsing passes no viewers.
 window.LALPreview = (() => {
-  let active = null, shellPromise = null, sequence = 0;
+  let active = null, shellPromise = null, sequence = 0, hintSeen = false;
+  const stats = {prepared: 0, frames: 0};
   const supported = new Set(['glb','gltf','fbx','obj','dae','stl']);
+  const AUTO_DELAY = 250, AUTO_BYTES = 16 * 1024 * 1024;
+  const VIEWS = [['three_quarter','3/4'],['front','Front'],['side','Side'],['top','Top']];
+  const HINT = 'Drag to rotate · right-drag to pan · scroll to zoom · double-click to fit · R resets';
+  // Static Lucide outlines; no caller data reaches innerHTML.
+  const ICONS = {
+    expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+    shrink: '<path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/>',
+    more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+    help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+  };
   const make = (tag, text, className) => {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = text;
     if (className) element.className = className;
     return element;
   };
+  const icon = name => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
   const paint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const mib = bytes => (bytes / 1048576).toFixed(1) + ' MiB';
 
   class Preview {
     constructor(container, item, api) {
       this.container = container; this.item = item; this.api = api;
       this.serial = 0; this.frame = null; this.ticket = null; this.ready = false;
       this.fullscreen = false; this.closed = false; this.retainedFault = null;
-      this.requests = new Map(); this.fileReads = 0;
+      this.requests = new Map(); this.fileReads = 0; this.selectedAt = performance.now(); this.liveMs = null;
+      this.view = VIEWS.some(([v]) => v === item.view) ? item.view : 'three_quarter';
+      hintSeen = hintSeen || item.hintSeen === true;
+      this.background = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'studio';
       container.classList.add('interactive-preview');
-      this.still = make('div', undefined, 'preview-still');
-      this.launch = make('button', undefined, 'preview-launch');
-      this.launch.type = 'button';
-      this.launch.setAttribute('aria-label', 'Explore ' + item.name + ' in 3D');
-      if (item.image) {
-        const image = make('img'); image.src = 'data:image/png;base64,' + item.image;
-        image.alt = item.imageAlt; this.launch.append(image);
-      } else this.launch.append(make('span', item.imageReason || 'Still image unavailable', 'placeholder'));
-      this.launch.append(make('span', '↻ Explore in 3D', 'preview-launch-label'));
-      this.launch.onclick = () => this.start(false);
-      this.launchFull = this.button('Open fullscreen', () => this.start(true));
-      this.launchFull.classList.add('preview-open-fullscreen');
-      this.note = make('p', undefined, 'preview-availability');
-      this.note.setAttribute('role','status');
-      this.still.append(this.launch, this.launchFull, this.note);
-      container.append(this.still);
       this.dialog = make('dialog', undefined, 'model-preview');
-      const labelId = 'model-preview-title-' + (++sequence);
-      this.dialog.setAttribute('aria-labelledby', labelId);
+      this.dialog.setAttribute('aria-label', item.name + ' preview');
+      // The header only shows in fullscreen, where the inspector's own title is hidden.
       const header = make('div', undefined, 'model-preview-header');
-      const title = make('h3', item.name); title.id = labelId;
-      const source = make('span', item.sourceFormat?.toUpperCase() || '', 'preview-format');
-      const heading = make('div', undefined, 'model-preview-heading'); heading.append(title, source);
-      const actions = make('div', undefined, 'model-preview-actions');
-      this.back = this.button('Back to image', () => this.stop());
-      this.refresh = this.button('Refresh inspection', () => { this.stop(); this.item.onRefresh?.(); });
-      this.refresh.hidden = true;
-      this.full = this.button('Fullscreen', () => this.toggleFullscreen());
-      actions.append(this.refresh, this.back, this.full); header.append(heading, actions);
+      const title = make('h3', item.name);
+      const format = make('span', item.sourceFormat?.toUpperCase() || '', 'preview-format');
+      header.append(title, format);
+      this.stage = make('div', undefined, 'model-stage');
+      if (item.image) {
+        this.still = make('img', undefined, 'preview-still');
+        this.still.src = 'data:image/png;base64,' + item.image; this.still.alt = item.imageAlt;
+      } else this.still = make('span', item.imageReason || 'Still image unavailable', 'preview-still placeholder');
       this.viewport = make('div', undefined, 'model-viewport');
-      this.overlay = make('div', undefined, 'model-loading');
-      this.overlay.setAttribute('role','status'); this.overlay.setAttribute('aria-live','polite');
-      this.spinner = make('span', undefined, 'search-spinner'); this.overlay.append(this.spinner);
-      this.loadingLabel = make('span','Preparing 3D preview…'); this.overlay.append(this.loadingLabel);
-      this.viewport.append(this.overlay);
-      this.tools = make('div', undefined, 'model-toolbar'); this.controls = [];
-      this.tools.setAttribute('aria-label','3D preview controls');
-      this.tools.append(this.control('Fit', 'fit'), this.control('Reset view', 'reset'),
-        this.control('−', 'zoom', -0.15, 'Zoom out'), this.control('+', 'zoom', 0.15, 'Zoom in'));
-      this.tools.append(this.select('View preset', [['isometric','Isometric'],['front','Front'],['back','Back'],
-        ['left','Left'],['right','Right'],['top','Top'],['bottom','Bottom']], 'view'));
-      const options = make('details',undefined,'model-options');
-      options.append(make('summary','Display options'));
-      const settings = make('div',undefined,'model-settings');
-      settings.append(this.select('Projection',[['perspective','Perspective'],['orthographic','Orthographic']],'projection'),
-        this.select('Background',[['studio','Studio'],['white','White'],['dark','Dark']],'background'),
-        this.select('Navigation',[['upright','Keep upright'],['free','Free orbit']],'navigation'),
-        this.select('Up axis',[['Y','Y'],['Z','Z'],['X','X']],'up'));
-      const edgeLabel = make('label',undefined,'model-edges'), edges = make('input');
-      edges.type = 'checkbox'; edges.onchange = () => this.command('edges', edges.checked, 'Preparing edges…');
-      this.controls.push(edges); edgeLabel.append(edges,document.createTextNode('Show edges')); settings.append(edgeLabel);
-      options.append(settings);
-      this.help = make('p','Drag to rotate · right-drag to pan · scroll to zoom. Keyboard: arrows rotate, Shift + arrows pan, + / − zoom, F fits, R resets.','model-help');
-      this.summary = make('p',undefined,'model-summary'); this.summary.setAttribute('role','status');
-      this.warning = make('p',undefined,'model-warning'); this.warning.hidden = true; this.warning.setAttribute('role','status');
-      this.dialog.append(header,this.viewport,this.tools,options,this.help,this.summary,this.warning);
-      container.append(this.dialog);
-      this.dialog.addEventListener('cancel', event => {
-        event.preventDefault(); if (this.fullscreen) this.exitFullscreen(); else this.stop();
+      this.status = make('div', undefined, 'model-status');
+      this.status.setAttribute('role','status'); this.status.setAttribute('aria-live','polite');
+      this.status.hidden = true;
+      this.hint = make('p', HINT, 'model-hint'); this.hint.hidden = true;
+      const corner = make('div', undefined, 'model-corner');
+      this.helpButton = this.iconButton('help', '3D controls: ' + HINT, () => this.showHint(this.hint.hidden, false));
+      this.full = this.iconButton('expand', 'Fullscreen', () => this.toggleFullscreen());
+      this.full.classList.add('model-fullscreen-button');
+      this.more = this.iconButton('more', 'Display options', () => this.toggleMenu());
+      this.more.setAttribute('aria-haspopup','true'); this.more.setAttribute('aria-expanded','false');
+      corner.append(this.helpButton, this.full, this.more);
+      this.menu = this.buildMenu();
+      this.views = make('div', undefined, 'model-views');
+      this.views.setAttribute('role','group'); this.views.setAttribute('aria-label','View');
+      this.viewButtons = VIEWS.map(([name, label]) => {
+        const button = make('button', label); button.type = 'button'; button.dataset.view = name;
+        button.onclick = () => this.chooseView(name); this.views.append(button); return button;
       });
+      this.stage.append(this.still, this.viewport, this.status, this.hint, corner, this.menu, this.views);
+      this.warning = make('p', undefined, 'model-warning'); this.warning.hidden = true;
+      this.warning.setAttribute('role','status');
+      this.dialog.append(header, this.stage, this.warning);
+      // show() runs the dialog focusing steps; a new selection must leave focus where browsing put it.
+      const previous = document.activeElement;
+      container.append(this.dialog); this.dialog.show();
+      if (previous && previous !== document.body && previous.isConnected) previous.focus({preventScroll: true});
+      this.dialog.addEventListener('cancel', event => { event.preventDefault(); if (this.fullscreen) this.exitFullscreen(); });
+      this.dialog.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !this.menu.hidden) { event.preventDefault(); this.closeMenu(true); }
+      });
+      this.onOutside = event => { if (!this.menu.hidden && !this.menu.contains(event.target) && !this.more.contains(event.target)) this.closeMenu(false); };
+      document.addEventListener('pointerdown', this.onOutside, true);
       this.onMessage = event => this.message(event);
       window.addEventListener('message', this.onMessage);
       this.resizeObserver = new ResizeObserver(() => this.send('command',{action:'resize'}));
       this.resizeObserver.observe(this.viewport);
-      if (!item.sourceFormat || !supported.has(item.sourceFormat)) {
-        this.launch.disabled = this.launchFull.disabled = true;
-        this.note.textContent = item.sourceFormat ? `3D preview is unavailable for ${item.sourceFormat.toUpperCase()}. Choose a supported source format.` : 'No verified source is available for 3D preview.';
+      this.available = Boolean(item.sourceFormat && supported.has(item.sourceFormat));
+      this.setControls(false); this.markView();
+      if (!this.available) this.say(item.sourceFormat
+        ? `Live 3D isn’t available for .${item.sourceFormat} · showing renders`
+        : 'No verified source is available for live 3D · showing renders', 'note');
+      // Only a selection that rests loads a viewer; dispose() cancels this for every asset browsing passes.
+      else this.autoTimer = setTimeout(() => this.start({auto: true}), AUTO_DELAY);
+    }
+    iconButton(name, label, action) {
+      const button = make('button', undefined, 'model-icon'); button.type = 'button';
+      button.innerHTML = icon(name); button.setAttribute('aria-label', label); button.title = label;
+      button.onclick = action; return button;
+    }
+    buildMenu() {
+      const menu = make('div', undefined, 'model-menu'); menu.hidden = true;
+      menu.setAttribute('role','group'); menu.setAttribute('aria-label','Display options');
+      this.menuControls = [];
+      const actions = make('div', undefined, 'model-menu-actions');
+      for (const [label, action] of [['Fit', 'fit'], ['Reset view', 'reset']]) {
+        const button = make('button', label); button.type = 'button'; button.dataset.action = action;
+        button.onclick = () => this.command(action); this.menuControls.push(button); actions.append(button);
       }
-      this.setControls(false);
+      menu.append(actions,
+        this.select('Projection',[['perspective','Perspective'],['orthographic','Orthographic']],'projection'),
+        this.select('Background',[['studio','Studio'],['white','White'],['dark','Dark']],'background', this.background),
+        this.select('Navigation',[['upright','Keep upright'],['free','Free orbit']],'navigation'),
+        this.select('Up axis',[['Y','Y'],['Z','Z'],['X','X']],'up'));
+      const edgeLabel = make('label',undefined,'model-edges'), edges = make('input');
+      edges.type = 'checkbox'; edges.onchange = () => this.command('edges', edges.checked);
+      this.menuControls.push(edges); edgeLabel.append(edges, document.createTextNode('Show edges')); menu.append(edgeLabel);
+      return menu;
     }
-    button(label, action) { const b = make('button',label); b.type = 'button'; b.onclick = action; return b; }
-    control(label, action, value, accessibleName) {
-      const button = this.button(label, () => this.command(action, value));
-      button.dataset.action = action;
-      if (accessibleName) button.setAttribute('aria-label',accessibleName);
-      this.controls.push(button); return button;
-    }
-    select(label, options, action) {
+    select(label, options, action, value) {
       const wrapper = make('label',label), select = make('select');
       select.dataset.action = action;
-      for (const [value,text] of options) { const option = make('option',text); option.value = value; select.append(option); }
+      for (const [v,text] of options) { const option = make('option',text); option.value = v; select.append(option); }
+      select.dataset.initial = value || options[0][0]; select.value = select.dataset.initial;
       select.onchange = () => this.command(action, select.value);
-      this.controls.push(select); wrapper.append(select); return wrapper;
+      this.menuControls.push(select); wrapper.append(select); return wrapper;
     }
-    setControls(enabled) { for (const control of this.controls) control.disabled = !enabled; }
-    loading(message) {
-      this.loadingText = message;
-      this.overlay.hidden = !message;
-      this.loadingLabel.textContent = message || '';
-      this.viewport.setAttribute('aria-busy',String(Boolean(message)));
+    setControls(enabled) {
+      for (const control of this.menuControls) control.disabled = !enabled;
+      this.more.disabled = !enabled;
+      this.more.title = enabled ? 'Display options' : 'Display options are available once the live view loads';
+      if (!enabled) this.closeMenu(false);
+      // Before the live view, 3/4 · Front · Side switch the stills; there is no top still.
+      const top = this.viewButtons[3];
+      top.disabled = !enabled; top.title = enabled ? '' : 'Top is available in the live view';
+    }
+    markView() { for (const b of this.viewButtons) b.setAttribute('aria-pressed', String(b.dataset.view === this.view)); }
+    chooseView(name) {
+      if (this.ready) { this.view = name; this.markView(); this.command('view', name); return; }
+      if (name !== 'top' && name !== this.view) this.item.onView?.(name);
+    }
+    toggleMenu() { if (this.menu.hidden) this.openMenu(); else this.closeMenu(true); }
+    openMenu() {
+      if (!this.ready) return;
+      if (!this.hint.hidden) this.retireHint();  // Opening the menu shows the controls were found.
+      this.menu.hidden = false; this.more.setAttribute('aria-expanded','true');
+      this.menuControls[0].focus();
+    }
+    closeMenu(focus) {
+      if (this.menu.hidden) return;
+      this.menu.hidden = true; this.more.setAttribute('aria-expanded','false');
+      if (focus) this.more.focus();
+    }
+    say(text, tone, action) {
+      this.status.replaceChildren(); this.status.className = 'model-status' + (tone ? ' ' + tone : '');
+      this.status.hidden = !text;
+      if (!text) return;
+      if (tone === 'loading') this.status.append(make('span', undefined, 'search-spinner'));
+      this.status.append(make('span', text));
+      if (action) {
+        const button = make('button', action.label); button.type = 'button'; button.onclick = action.run;
+        this.status.append(button);
+      }
+    }
+    loading(message) { this.loadingText = message; this.say(message, message ? 'loading' : null); }
+    showHint(show, remember) {
+      clearTimeout(this.hintTimer);
+      this.hint.hidden = !show;
+      this.helpButton.setAttribute('aria-expanded', String(show));
+      if (show && remember) this.hintTimer = setTimeout(() => this.retireHint(), 8000);
+    }
+    retireHint() {
+      this.showHint(false, false);
+      if (!hintSeen) { hintSeen = true; this.item.onHintSeen?.(); }
     }
     send(type, data = {}, transfer = []) {
       this.frame?.contentWindow?.postMessage({kind:'lal-3d',session:this.session,type,...data},'*',transfer);
     }
-    async start(fullscreen) {
-      if (this.retainedFault || this.closed || this.launch.disabled) return;
+    async start({auto = false, fullscreen = false} = {}) {
+      clearTimeout(this.autoTimer); this.autoTimer = null;
+      if (this.retainedFault || this.closed || !this.available) return;
       if (this.frame || this.loadingText) { if (fullscreen && !this.fullscreen) await this.enterFullscreen(); return; }
       const serial = ++this.serial;
-      this.still.hidden = true; this.dialog.show();
       this.ready = false; this.setControls(false); this.warning.hidden = true;
-      this.full.disabled = false; this.spinner.hidden = false; this.overlay.classList.remove('model-load-fault');
-      for (const control of this.controls) {
-        if (control.tagName === 'SELECT') control.selectedIndex = 0;
-        if (control.type === 'checkbox') control.checked = false;
-      }
-      this.summary.textContent = ''; this.loading('Preparing local files…');
-      this.refresh.hidden = true;
+      this.loading('Loading 3D…');
       if (fullscreen) await this.enterFullscreen();
-      else this.back.focus();
       this.timer = setTimeout(() => this.fault('Interactive preview exceeded the 90-second loading limit.'),90000);
       try {
-        await paint();
         if (!shellPromise) shellPromise = this.api.preview_shell().then(result => {
           if (result.status !== 'ready') throw Error(result.reason || 'Viewer resources are unavailable.');
           return result.html;
         });
+        stats.prepared++;
         const [manifest, html] = await Promise.all([
           this.api.preview_prepare(this.item.assetId,this.item.sourceFormat,this.item.version),shellPromise]);
         if (this.serial !== serial || this.closed) { if (manifest.ticket) this.api.preview_release(manifest.ticket); return; }
         if (manifest.status !== 'ready') { this.fail(manifest.reason || '3D preview is unavailable.',manifest.retained === true,manifest.status === 'stale'); return; }
+        if (auto && manifest.total_bytes > AUTO_BYTES) {
+          // Large packages wait for a click: nothing is read until the owner asks.
+          this.api.preview_release(manifest.ticket).catch(() => {});
+          ++this.serial; clearTimeout(this.timer); this.loadingText = null;
+          this.say('Large model · ' + mib(manifest.total_bytes), 'note', {label: 'Click to load', run: () => this.start()});
+          return;
+        }
         this.ticket = manifest.ticket; this.manifest = manifest;
         this.session = String(++sequence) + '-' + Math.random().toString(36).slice(2);
-        const frame = make('iframe'); frame.title = this.item.name + ' — interactive 3D preview';
+        const frame = make('iframe'); frame.title = this.item.name + ' — live 3D view';
         frame.setAttribute('sandbox','allow-scripts'); frame.setAttribute('referrerpolicy','no-referrer');
         this.frame = frame; this.frameReady = new Promise(resolve => this.resolveFrame = resolve);
+        stats.frames++;
         frame.srcdoc = html; this.viewport.prepend(frame);
         await this.frameReady;
         for (let i=0; i<manifest.files.length; i++) {
           if (this.serial !== serial || this.closed || !this.frame) return;
-          this.loading(`Loading local files ${i+1} / ${manifest.files.length}…`);
+          if (manifest.files.length > 1) this.loading(`Loading 3D · file ${i+1} of ${manifest.files.length}…`);
           const file = await this.api.preview_file(this.ticket,i); this.fileReads++;
           if (this.serial !== serial || this.closed || !this.frame) return;
           if (file.status !== 'ready') { this.fail(file.reason || 'A source file is unavailable.',file.retained === true,file.status === 'stale'); return; }
@@ -162,23 +226,27 @@ window.LALPreview = (() => {
           }
           this.send('file',{aliases:manifest.files[i].aliases,buffer:bytes.buffer},[bytes.buffer]);
         }
-        this.loading('Importing model…'); await paint(); this.send('load');
+        this.loading('Loading 3D…'); this.send('load');
       } catch (error) { if (this.serial === serial && !this.closed) await this.fault(error.message); }
     }
     async message(event) {
       if (event.source !== this.frame?.contentWindow || event.data?.kind !== 'lal-3d') return;
       const message = event.data;
-      if (message.type === 'boot') { this.send('init',{sourceName:this.manifest.source_name}); return; }
+      if (message.type === 'boot') {
+        this.send('init',{sourceName:this.manifest.source_name, view:this.view, background:this.background}); return;
+      }
       if (message.session !== this.session) return;
       if (message.type === 'ready') {
         if (message.desktopBridge || message.parentAccess) { await this.fault('The 3D frame could not be isolated from the desktop interface.'); return; }
         this.resolveFrame?.(); this.resolveFrame = null;
       }
-      else if (message.type === 'progress') this.loading(message.message);
+      else if (message.type === 'progress') { if (this.loadingText) this.loading('Loading 3D · ' + message.message.replace(/…$/, '').toLowerCase() + '…'); }
       else if (message.type === 'loaded') {
         clearTimeout(this.timer); this.ready = true; this.loading(null); this.setControls(true);
-        const stats = message.summary;
-        this.summary.textContent = `Preview geometry · ${stats.triangles.toLocaleString()} triangles · ${stats.meshes.toLocaleString()} meshes · ${stats.materials.toLocaleString()} materials`;
+        this.liveMs = Math.round(performance.now() - this.selectedAt);
+        this.summary = message.summary;
+        this.stage.classList.add('live');
+        if (!hintSeen) this.showHint(true, true);
         if (message.missing?.length) {
           const reason = 'Some referenced files could not be loaded: ' + message.missing.join(', ');
           this.warning.textContent = reason + '. Available geometry is shown; this is a partial preview.';
@@ -188,21 +256,23 @@ window.LALPreview = (() => {
           catch (error) { this.warning.textContent += ' Could not save fault evidence: ' + error.message; }
         }
       } else if (message.type === 'fault') await this.fault(message.reason);
+      else if (message.type === 'interacted') { if (!this.hint.hidden || !hintSeen) this.retireHint(); }
       else if (message.type === 'search') { if (!this.fullscreen) this.item.onSearch?.(); }
-      else if (message.type === 'escape') { if (this.fullscreen) this.exitFullscreen(); else this.stop(); }
+      else if (message.type === 'escape') {
+        if (!this.menu.hidden) this.closeMenu(false);
+        else if (this.fullscreen) this.exitFullscreen(); else this.item.onEscape?.();
+      }
       else if (message.type === 'command-done') { this.requests.get(message.request)?.(); this.requests.delete(message.request); }
     }
-    async command(action, value, message = 'Updating preview…') {
+    async command(action, value) {
       if (!this.ready || !this.frame) return;
       if (action === 'reset') {
-        this.dialog.querySelector('select[data-action=view]').value = 'isometric';
-        this.dialog.querySelector('select[data-action=up]').value = 'Y';
+        this.view = this.item.view && VIEWS.some(([v]) => v === this.item.view) ? this.item.view : 'three_quarter';
+        this.markView();
+        for (const select of this.menu.querySelectorAll('select[data-action=up]')) select.value = 'Y';
       }
-      this.setControls(false); this.loading(message);
-      await paint();
       try { await this.acknowledge(action,value); }
-      catch (error) { await this.fault(error.message); return; }
-      if (this.ready) { this.loading(null); this.setControls(true); }
+      catch (error) { await this.fault(error.message); }
     }
     acknowledge(action,value) {
       if (!this.frame) return Promise.resolve();
@@ -215,83 +285,82 @@ window.LALPreview = (() => {
     }
     async enterFullscreen() {
       if (this.fullscreen || this.closed) return;
-      this.returnFocus = this.full;
       this.fullscreen = true; this.dialog.close(); this.dialog.classList.add('model-fullscreen');
-      this.dialog.showModal(); this.full.textContent = 'Exit fullscreen';
+      this.dialog.showModal(); this.setFullIcon();
       this.previousOverflow = document.documentElement.style.overflow;
       document.documentElement.style.overflow = 'hidden';
-      const serial = this.serial, previous = this.loadingText;
-      this.loading('Opening fullscreen…'); this.full.focus();
+      this.full.focus();
       await paint();
-      if (!this.fullscreen || this.closed || serial !== this.serial) return;
+      if (!this.fullscreen || this.closed) return;
       try { await this.acknowledge('resize'); }
-      catch (error) { await this.fault(error.message); return; }
-      this.loading(this.ready ? null : previous || 'Preparing local files…');
+      catch (error) { await this.fault(error.message); }
     }
     async exitFullscreen() {
       if (!this.fullscreen) return;
+      this.closeMenu(false);
       this.fullscreen = false; this.dialog.close(); this.dialog.classList.remove('model-fullscreen');
-      this.dialog.show(); this.full.textContent = 'Fullscreen';
+      this.dialog.show(); this.setFullIcon();
       document.documentElement.style.overflow = this.previousOverflow || '';
-      if (this.retainedFault && !this.ready) { this.full.disabled = true; this.back.focus(); return; }
-      const serial = this.serial, previous = this.loadingText;
-      this.loading('Returning to inspection…');
+      this.full.focus();
       await paint();
-      if (this.closed || this.fullscreen || serial !== this.serial) return;
+      if (this.closed || this.fullscreen) return;
       try { await this.acknowledge('resize'); }
-      catch (error) { await this.fault(error.message); return; }
-      this.loading(this.ready ? null : previous || 'Preparing 3D preview…');
-      if (this.returnFocus?.isConnected && this.dialog.contains(this.returnFocus)) this.returnFocus.focus();
-      else this.full.focus();
+      catch (error) { await this.fault(error.message); }
+    }
+    setFullIcon() {
+      const label = this.fullscreen ? 'Exit fullscreen' : 'Fullscreen';
+      this.full.innerHTML = icon(this.fullscreen ? 'shrink' : 'expand');
+      this.full.setAttribute('aria-label', label); this.full.title = label;
     }
     toggleFullscreen() { if (this.fullscreen) return this.exitFullscreen(); return this.enterFullscreen(); }
-    fail(reason, retained = true, stale = false) {
-      ++this.serial; clearTimeout(this.timer); this.retainedFault = retained ? reason : null;
-      this.ready = false; this.setControls(false); this.loading(null);
-      this.warning.textContent = reason + (retained ? ' Recorded failure; no automatic retry.' : '');
-      this.warning.hidden = false; this.summary.textContent = 'The existing image and source evidence remain available.';
-      this.refresh.hidden = !stale || !this.item.onRefresh;
-      this.overlay.hidden = false; this.spinner.hidden = true; this.overlay.classList.add('model-load-fault');
-      this.loadingLabel.textContent = stale ? 'The library changed. Refresh inspection to load the current asset.' : '3D preview unavailable. ' + reason + ' Use Back to image to continue.';
-      this.full.disabled = !this.fullscreen;
-      this.frame?.remove(); this.frame = null;
+    release(keepTicket = false) {
+      ++this.serial; clearTimeout(this.timer); clearTimeout(this.autoTimer);
+      this.frame?.remove(); this.frame = null; this.stage.classList.remove('live');
       this.resolveFrame?.(); this.resolveFrame = null;
       for (const resolve of this.requests.values()) resolve(); this.requests.clear();
+      if (this.ticket && !keepTicket) this.api.preview_release(this.ticket).catch(() => {});
+      this.ticket = null; this.ready = false; this.loadingText = null; this.setControls(false); this.showHint(false, false);
+    }
+    fail(reason, retained = true, stale = false, keepTicket = false) {
+      this.release(keepTicket);
+      this.retainedFault = retained ? reason : null;
+      if (stale) this.say('The library changed.', 'fault', this.item.onRefresh && {label: 'Refresh', run: () => this.item.onRefresh()});
+      else this.say(`Live 3D unavailable: ${reason}${retained ? ' Recorded; no automatic retry.' : ''} Showing renders.`, 'fault');
     }
     async fault(reason) {
       if (this.closed || (this.retainedFault && !this.ready)) return;
       this.retainedFault = reason;
       const ticket = this.ticket;
-      this.fail(reason);
-      if (ticket) {
-        try { await this.api.preview_fault(ticket,reason.slice(0,1200)); }
-        catch (error) { this.warning.textContent += ' Could not save fault evidence: ' + error.message; }
-      }
+      // The ticket identifies the inputs the fault is recorded against; release it only after recording.
+      this.fail(reason, true, false, true);
+      if (!ticket) return;
+      let saved;
+      try { saved = await this.api.preview_fault(ticket,reason.slice(0,1200)); }
+      catch (error) { saved = {status: 'faulty', reason: error.message}; }
+      this.api.preview_release(ticket).catch(() => {});
+      if (saved?.status !== 'faulty' || saved.channel === 'interactive_preview') return;
+      if (!this.closed) this.say(this.status.textContent + ' Could not save fault evidence: ' + (saved.reason || 'unknown error'), 'fault');
     }
-    stop(focus = true) {
-      ++this.serial; clearTimeout(this.timer);
-      if (this.fullscreen) document.documentElement.style.overflow = this.previousOverflow || '';
-      this.fullscreen = false; this.dialog.close(); this.dialog.classList.remove('model-fullscreen');
-      this.full.textContent = 'Fullscreen'; this.frame?.remove(); this.frame = null;
-      this.resolveFrame?.(); this.resolveFrame = null;
-      for (const resolve of this.requests.values()) resolve(); this.requests.clear();
-      if (this.ticket) this.api.preview_release(this.ticket).catch(() => {});
-      this.ticket = null; this.ready = false; this.loading(null); this.still.hidden = false;
-      if (this.retainedFault) {
-        this.note.textContent = this.retainedFault + ' Recorded 3D preview failure; the existing image is retained.';
-        this.launch.disabled = this.launchFull.disabled = true;
-      }
-      if (focus) this.launch.disabled ? this.container.closest('.detail-body')?.querySelector('.close-detail')?.focus() : this.launch.focus();
+    // Leaving the page or hiding the panel releases the viewer; the still stays with a way back.
+    stop() {
+      if (this.fullscreen) { document.documentElement.style.overflow = this.previousOverflow || ''; this.fullscreen = false;
+        this.dialog.close(); this.dialog.classList.remove('model-fullscreen'); this.dialog.show(); this.setFullIcon(); }
+      const wasLive = this.frame || this.loadingText || this.autoTimer;
+      this.release();
+      if (wasLive && this.available && !this.retainedFault && !this.closed) this.say('Live 3D paused', 'note', {label: 'Load', run: () => this.start()});
     }
     dispose() {
-      this.stop(false); this.closed = true; this.resizeObserver.disconnect();
+      this.closed = true; this.stop(); this.resizeObserver.disconnect();
       window.removeEventListener('message',this.onMessage);
+      document.removeEventListener('pointerdown', this.onOutside, true);
     }
   }
   return {
     mount(container, item, api) { active?.dispose(); active = new Preview(container,item,api); return active; },
     dispose() { active?.dispose(); active = null; },
-    pause() { active?.stop(false); },
-    get current() { return active; }
+    pause() { active?.stop(); },
+    get current() { return active; },
+    stats,
+    AUTO_BYTES,
   };
 })();
