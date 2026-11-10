@@ -6,7 +6,7 @@ from local_asset_library.library_migration import LEGACY_METADATA_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = ('src/local_asset_library/library_migration.py', 'scripts/migrate-library.py', 'scripts/check-rekey.py',
-           'docs/history/', 'scripts/historical/', 'CHANGELOG.md', '.gitignore',
+           'docs/history/', 'CHANGELOG.md', '.gitignore',
            'Assetarium KnowledgeBase/Decisions/')  # Decisions are dated owner records; 0023 replaces the folder.
 
 
