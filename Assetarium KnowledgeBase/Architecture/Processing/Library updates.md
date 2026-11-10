@@ -2,216 +2,135 @@
 tags: [architecture]
 parent: "[Architecture](../Architecture.md)"
 status: draft
-verified:
-branch:
+verified: 2026-11-10
+branch: feature/audit-simplify
 level: macro
-code: [incremental.py, source_operations.py, scripts/library-batch.py, publication.py]
+code: [sources.py, incremental.py, processing_queue.py, source_operations.py, library_index.py, publication.py, gpu_queue.py, scripts/library-batch.py]
 ---
 # Library updates and processing
 
-Up: [Architecture](../Architecture.md) · Down: [Stage ledger and fingerprints](../../Notebook/Processing/Stage%20ledger%20and%20fingerprints.md) · Where in code: [Processing](../../Notebook/Processing/Processing.md). Moved from `docs/library-updates.md` on 2026-10-28; its step 8 and KayKit sections are history.
+> How a file in a library folder becomes a searchable, published asset: scan, queue, stages, publication.
+> Rewritten on 2026-11-10 as the current flow; the pilot-era operations and budgets it used to list are in
+> git (commit `af02e91`).
 
-Current workflow: **Settings → Asset sources** controls directories and live
-enabled-source membership. The app scans enabled sources on opening; reopening
-or toggling a source checks changes during a session (decision 0027). **Asset
-processing** offers **Process assets** for each source with pending work
-(inspection/previews and search vectors; descriptions are optional and run
-separately with **Generate descriptions** on the same page,
-[decision 0033](../../Decisions/0033-descriptions-and-engines.md)), a
-processing/publication progress bar, and graceful **Cancel**. The pending
-state clears after a scan verifies that no actionable work remains and current
-results are published. Retained failures appear in the **Importing failures
-report** on Asset processing, a list of original paths, instead of keeping work pending.
-Generated results live in the central library store, never in asset folders (decision 0032).
-See [asset sources](../../../docs/asset-sources.md) for storage, cancellation and fault rules.
+Up: [Architecture](../Architecture.md) · Down: [Stage ledger and fingerprints](../../Notebook/Processing/Stage%20ledger%20and%20fingerprints.md),
+[Processing queue](../../Notebook/Processing/Processing%20queue.md) · Where in code: [Processing](../../Notebook/Processing/Processing.md) ·
+User guide: [Library](../../../docs/asset-sources.md), [CLI](../../../docs/cli.md).
 
-**Settings → General → Formats to process** limits new processing batches to
-enabled FBX, glTF/GLB and OBJ files. Scanning still inventories every supported
-format; each source displays counts by format. All three options start enabled.
-Uncheck all to pause processing. Existing results, search vectors and recorded
-failures remain preserved; formats excluded by the selection create no new
-actionable processing work. See [processing formats](../../../docs/asset-sources.md#processing-formats).
+## The flow
 
-**Settings → General → Rendering** shows what renders previews now and why: the device
-(CPU or a graphics card) and how many renders run at a time in Blender processes that stay
-open between assets. A short speed test with synthetic shapes picks both; it runs at the start
-of a Process assets when Blender or the devices changed, or with **Test again**. Limits for the
-device, renders at a time and memory never make rendering slower; finished previews stay valid
-when they change. Cancel and closing the app finish the running renders; a stopped run resumes
-([decision 0034](../../Decisions/0034-rendering.md)).
-
-**Settings → General → Description batch size** (1, 2, 4 or 8; default 8) sets how
-many assets share one description model call. Larger is faster and uses more GPU
-memory. Changing it never re-queues finished descriptions. Running out of GPU
-memory stops the description run with that message and leaves the batch pending
-([decision 0033](../../Decisions/0033-descriptions-and-engines.md)).
-
-For current command-line operation, `library-batch.py scan` checks enabled sources,
-`library-batch.py status` reports their state, and
-`library-batch.py process --source KEY` starts processing and automatic publication
-for that source. These operations reuse existing offline runtimes. Source settings
-replace the historical pack allowlist; the existing storage budget still applies.
-
-The [shared asset foundation](../Sources%20and%20Catalog/Catalog%20contract.md#expansion-step-1-shared-asset-foundation)
-adds type-aware stages and backward-compatible schema-2 candidate catalogs.
-Existing publications are not bulk-converted. Ordinary 3D IDs, generated results,
-overlays and fingerprints remain unchanged; explicit child identities share source
-files without copies. Its PNG adapter is a synthetic foundation proof, without
-real image-source enrollment or captioning. Audio/child media adapters remain
-unsupported. Coverage adds counts by asset type. Shared desktop/MCP services
-accept `asset_type` filters; complete image browsing belongs to expansion step 2.
-
-## Manual operations
-
-Run from this repository, using the existing base interpreter:
-
-```powershell
-.\.venv\Scripts\python.exe scripts/library-batch.py scan --dry-run
-.\.venv\Scripts\python.exe scripts/library-batch.py scan
-.\.venv\Scripts\python.exe scripts/library-batch.py process --dry-run
-.\.venv\Scripts\python.exe scripts/library-batch.py process --batch-size 50
-.\.venv\Scripts\python.exe scripts/library-batch.py refresh --dry-run
-.\.venv\Scripts\python.exe scripts/library-batch.py refresh
-.\.venv\Scripts\python.exe scripts/library-batch.py status
-.\.venv\Scripts\python.exe scripts/library-status.py
+```
+        library folder (read only)
+                  │
+                  ▼
+        scan: inventory, records       (1)
+                  │
+                  ▼
+        queue: owner or agent asks     (2)
+                  │
+                  ▼
+        inspection and previews        (3)
+                  │
+                  ▼
+        search vectors                 (4)
+                  │
+                  ▼
+        publish a new generation       (5)
+                  │
+                  ▼
+        search, detail, MCP
 ```
 
-For the approved City Kit import, leave description generation for a later run:
+1. **Scan.** Every enabled library folder is scanned in the background at launch and when it is added or
+   toggled. A scan stats files, hashes and parses only what changed, recognizes assets it has seen before,
+   and never runs Blender or a model ([decision 0027](../../Decisions/0027-saved-catalog-first-and-fast-scan.md)).
+2. **Queue.** Processing never starts by itself. **Make previews** and **Generate descriptions** are queue
+   items for a library folder, a pack, a folder or picked assets; the scope is resolved when the item starts.
+   One item runs at a time, previews before descriptions; closing the app stops the queue and the next start
+   offers to continue ([decision 0032](../../Decisions/0032-library-store-and-queue.md)).
+3. **Inspection and previews.** 3D models render in parallel kept-open Blender processes
+   ([decision 0034](../../Decisions/0034-rendering.md)); images are decoded without Blender
+   ([Catalog contract](../Sources%20and%20Catalog/Catalog%20contract.md#images)).
+4. **Search vectors.** Each view gets an image vector; a valid description adds a description vector
+   ([Embedding contract](../Search/Embedding%20contract.md)).
+5. **Publish.** The working catalog and index are verified and copied into a new immutable generation, and
+   one manifest switches to it.
 
-```powershell
-.\.venv\Scripts\python.exe scripts/library-batch.py process --skip-captions --batch-size 25 --peak-reserve-mib 500
-```
+**Descriptions are a separate, optional run** (step 2's second item kind): they describe assets whose
+previews exist, add description vectors and publish again. A missing or failed description is never import
+work or an import failure ([decision 0033](../../Decisions/0033-descriptions-and-engines.md)).
 
-This runs inspection/renders and available image embeddings, then publishes the
-catalog/index. It never starts the caption runtime. Ungenerated descriptions are
-`pending`, and their text vectors are deferred without failed jobs or an endless
-processing loop. Image embeddings remain usable as partial results. The peak
-reserve is checked before processing and enforced after each batch/publication;
-it cannot exceed the existing approved budget. Normal processing keeps its
-default 2 GiB reserve and includes caption generation. Later explicit caption
-processing makes these text inputs eligible automatically; unchanged actual
-failures still require owner-authorized retries.
+## What decides whether work is pending
 
-The app exposes Check changes, Scan, Process pending, Publish ready work, Status
-and Refresh published view. A started background operation returns immediately;
-coverage updates as batches checkpoint. Operation logs/results/faults are under
-`data/library/operations/`; detailed stage receipts are under
-`data/library/batches/`. Use the coordinator for writes; its operation lease
-prevents overlapping GUI/CLI writers. The lower-level CLI stage commands are
-internal bounded workers used by that coordinator.
+Each stage result is keyed by a fingerprint of its inputs, never by a location
+([decision 0028](../../Decisions/0028-result-identity.md)):
 
-Scan stages an inventory and merges downstream results instead of replacing
-them. It compares two complete read-only inventories before changing working
-data. Dry runs summarize work without inference. Process uses prepared runtime
-wrappers with `--locked --no-sync --offline`; no dependencies or weights are
-installed. It preserves successful earlier results and existing caption faults.
+| Stage | Key covers |
+| --- | --- |
+| Inspection (3D) | The chosen file and its dependencies by content, render resolution, worker code, Blender identity |
+| Inspection (image) | File contents, model-input policy, pixel-producing code |
+| Description | The rendered views by content, model revision, backend, runtime lock, prompt |
+| Description vector | The effective description text |
+| Image vector | The verified view bytes |
 
-Process checkpoints each inspection/caption and each vector. Repeat the explicit
-operation after interruption to resume running/pending jobs. Completed matching
-jobs and unchanged failed/unsupported jobs are retained. New content/contracts
-create new stage inputs; changing severity, approval, GUI settings or storage
-budgets does not regenerate assets. Caption generation uses one attempt; an
-invalid response is recorded as failed without an automatic corrective retry.
+- A record whose key already has a finished result adopts it: a duplicate, a moved file or a folder added
+  around others renders nothing.
+- A finished job with unchanged inputs is kept. So is a **failed or unsupported** one: an unchanged fault is
+  never retried by itself. The owner asks for a recheck
+  ([decision 0020](../../Decisions/0020-alternate-file-faults-and-recheck.md)).
+- New content or a new contract makes a new job. Changing severity, approvals, format toggles, render limits,
+  batch size or the storage budget re-queues nothing.
+- Each inspection, description and vector is checkpointed as it finishes, so an interrupted run resumes.
 
-An unchanged actual asset fault requires explicit owner authorization for repair
-or retry. This coordinator deliberately has no blanket retry-faults switch.
-Application/test-harness defects may be fixed normally. Originals and previous
-reports are never edited to make a fault disappear.
+## Settings that shape a run
 
-## Identity, overlays and stage inputs
+All under **Settings → General**; none deletes results or retries faults.
 
-IDs bind source collection, pack and relative logical identity. Renames are
-deletion plus addition; identical bytes or names do not prove identical geometry.
-Deleted IDs disappear from active membership/index. Historical jobs, original
-results and owner correction files remain retained. No owner approval or overlay
-is transferred to a newly renamed ID automatically.
+- **Formats Assetarium uses**: one toggle per 3D and image format. Assets only in formats that are off are
+  hidden and counted, and create no work ([decision 0030](../../Decisions/0030-counted-exclusions.md)).
+- **Rendering**: the device and how many renders run at once, picked by a short speed test on synthetic
+  shapes; the owner's limits never make it slower.
+- **Description batch size** (1, 2, 4 or 8; default 8): how many assets share one model call. Running out of
+  GPU memory stops the run with that message and leaves the batch pending.
+- **Storage budget**: processing asks before it would pass it. It is a limit, not permission to delete.
 
-Record a new AI caption review on working membership with the existing writer:
+## Publication and who serves what
 
-```powershell
-.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/record_caption_review.py library --notes data/review-input.json
-```
+Processing writes a working catalog and index while search keeps serving the previous immutable generation.
+Publishing checks membership, SQLite integrity, vector checksums and the current file, description and view
+inputs, copies the matching pair into a new generation, and switches one manifest atomically. A failure
+leaves the previous generation active. Each request pins one generation; a publication that changes nothing
+keeps its version. Old generations are pruned by the retention rule
+([decision 0006](../../Decisions/0006-retention.md)), and rollback means switching to a kept generation,
+never editing a published database.
 
-Review inputs contain a `scope` and an `assets` object keyed by configured IDs;
-each asset uses `findings` with `severity`, `evidence` and `reason` as described in
-`KnowledgeBase/Architecture/Processing/Caption severity.md`. The writer verifies canonical results and image hashes,
-saves original provenance before changing working metadata, preserves owner states
-and never reruns a model. Publish explicitly afterward. Published catalogs are
-immutable; old stage writers cannot replace them in place.
+The owner's description corrections (`data/captions/corrections/<asset-id>.json`) survive scans and
+processing byte for byte. A changed effective description invalidates its description vector; approvals,
+notes, warnings and suggested uses alone do not.
 
-Owner correction files remain under `data/captions/corrections/<asset-id>.json`.
-Their bytes and owner states survive scan/process. Generated observations,
-suggestions and measured facts stay separate. An effective description change
-invalidates its text vector; owner approval, notes/warnings and suggested uses
-alone do not. Corrupt overlays stay visible and cannot manufacture a successful
-caption from failed generation.
+## One GPU job at a time
 
-Inspection inputs bind selected source/dependencies, actual bytes, resolution,
-renderer code and installed Blender identity. Caption inputs bind rendered
-pixels/views, model revision, inference backend, runtime lock and prompt. Text
-vectors bind effective visual-description content; image vectors bind verified
-view inputs. The shared model/runtime/vector contract remains enforced.
+`gpu_queue.lease` serializes model work across processes: a processing batch waits a bounded time for the
+lease, a search waits five seconds and then answers that the queue is busy. Browsing, keyword search and
+detail never need it. The search worker gives up its model as soon as a batch asks
+([Search embedders](../../Notebook/Search/Search%20embedders.md)). A second lease keeps two writers (app, CLI,
+agent) from running operations on the same library at once.
 
-## Publication and inference ownership
+## Faults
 
-Processing uses a working catalog/index while search serves an immutable previous
-generation. Publish verifies membership, SQLite integrity, vector checksums and
-current source/description/view inputs, copies a matching pair into a new
-generation, then atomically switches one manifest. Requests pin that generation;
-old snapshots remain intact. A no-change publication keeps its version. The app
-polls lightweight publication/coverage state, clears obsolete presentation faults
-and rejects thumbnail/detail requests for an older version. Live owner overlays
-are checked against vectors; changed content requires explicit processing before
-publishing again.
+An asset that fails is marked, its reason and evidence are kept, usable partial results stay, and the run
+moves on (`AGENTS.md` → Fault handling). Failures are listed under **Recorded failures** on Asset processing,
+apart from pending work. Originals and earlier reports are never edited to make a fault disappear.
 
-Cross-process inference leases serialize batch models and cooperating search
-workers. A search worker keeps its model warm for up to sixty idle seconds and
-unloads promptly when a batch or another worker requests its lease. Batch inference waits up to 15 seconds; searches wait up to
-five seconds, then return a clear busy state. Browse/keyword/detail remain usable.
-No unrelated process is stopped. Workers started before this update must be
-restarted to participate in the new membership/publication/lease behavior.
+## From a terminal
 
-## Storage and evidence
+The owner CLI (`scripts/local-assets.ps1` / `.sh`) calls the same backend as the app: `previews`, `describe`,
+`queue …`, `process`, `cancel` ([CLI](../../../docs/cli.md#processing)). `scripts/library-batch.py`
+(`scan`, `process`, `refresh`, `status`, with `--source`, `--dry-run`, `--batch-size`, `--skip-captions`,
+`--peak-reserve-mib`) is the coordinator those commands start; it takes storage receipts before and after a
+run and stops if growth passes its reserve. Stage reports are written under `library/batches/` and operation
+logs under `library/operations/` in each folder's working data. Runs use the prepared runtimes with
+`--locked --no-sync --offline`; nothing is installed or downloaded.
 
-The October 14 approved full-library ceiling is 10 GiB unique allocated project storage,
-with up to 3 GiB additional peak allocation for the import and overnight run combined.
-The import reserves 2 GiB and the overnight run reserves 1 GiB. External read-only originals/shared
-weights are excluded. The older 20 GiB allowance is not authorization. Fresh
-base-Python receipts precede bulk work, follow each batch and follow final
-publication. Processing stops if measured growth exceeds its budget, preserving
-all results/evidence. No runtime, model, original asset copy or blanket cleanup
-is introduced.
-
-Coverage separates pack membership; inventory/inspection/previews/caption/vector
-states; retained partial results; source/stage faults; caption notes/warnings;
-and pending AI/owner reviews. Unreviewed new captions have no accuracy approval.
-Successful import/inference/retrieval and automated/native GUI checks are
-technical evidence, separate from owner relevance, usability, accessibility and
-artistic acceptance. Historical delivery results and limitations are summarized in
-`docs/history/progress-2026-10.md`; the original Step 8 verification report has been retired.
-
-The separately approved October 14 texture repair run has a 2 GiB growth limit
-and the same 10 GiB total ceiling. It uses hash-bound library overrides and
-publisher material lists; originals and unrelated faults remain unchanged.
-See texture repairs (`docs/texture-repairs.md`, removed 2026-10-28; in git history at `b57bade`) for scoped operations and evidence.
-
-## KayKit detail and preview corrections
-
-The desktop uses the shared verified source/preview retrieval path and attaches
-its complete presentation evidence separately from the bounded agent metadata
-response. Large optional agent metadata is explicitly reported as partial rather
-than hiding an otherwise complete source/dependency package. Required source and
-dependency evidence is never trimmed to claim usability.
-
-An absent preview that has never been generated is pending, not a retained
-preview failure. If its format is disabled for processing, it is shown as
-excluded instead; previously generated previews remain usable. Missing or stale expected previews, recorded inspection failures
-and actual renderer errors remain faults. Still-image availability is separate
-from the interactive viewer's verified source package.
-
-Caption prompt v4 reinforces the existing JSON schema and the separation between
-observations and suggestions. It does not relax validation or invalidate
-completed v1-v3 descriptions. The explicitly authorized KayKit retry makes one
-new attempt for each of the 85 failed glTF captions, retaining old attempts and
-owner review states. Any remaining failures require another explicit retry
-request; a later routine processing run does not retry unchanged failures.
+Recording an AI review of descriptions uses `scripts/record_caption_review.py`
+([Caption severity](Caption%20severity.md)); it never reruns a model.

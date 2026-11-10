@@ -22,7 +22,8 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
   claims nobody could verify are marked *(unverified)*.
 - The "why" (constraints, decisions, history, what was tried) is the most valuable part, and mostly
   comes from people and history: capture it, and link the decision that made it binding.
-- Docs moved from `docs/` on 2026-10-28 keep their original text and are `draft` until reviewed.
+- The contracts were rewritten on 2026-11-10 as current truth (their step-by-step pilot history is in git at
+  commit `af02e91`). They were checked against the code by an agent and stay `draft` until the owner reads them.
 
 ## Docs
 
@@ -53,6 +54,6 @@ Roughly by how long the system takes to understand, longest first:
 4. [Search ranking](Search/Search%20ranking.md): channels, weighted RRF, bounded shortlists and
    response caps (system).
 5. [Setup](Setup%20and%20Engines/Setup.md): `setup_core` shared by the wizard, the CLI and the
-   agent session (system; decision 0031).
+   agent tools (system; decision 0031).
 6. [Collections and tags](Desktop%20App/Collections%20and%20tags.md): owner data, leases, agent
    writes, exports (system; decision 0036).
