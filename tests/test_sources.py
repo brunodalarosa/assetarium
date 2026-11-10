@@ -69,7 +69,7 @@ def failed_caption(work, record):
 
 
 def failed_previews(work, record):
-    # An import failure; description failures are not (decision 0008).
+    # An import failure; description failures are not (decision 0033).
     record['processing'].update(previews='failed')
     record['stage_faults'] = {'previews': {'status': 'failed', 'error': 'Synthetic retained fault'}}
     update_record(work, record)
@@ -229,7 +229,7 @@ def test_independent_roots_and_source_owned_results(managed):
     assert len(records(config))==6
     r=records(work)[0]
     preview=config.output_path('data',r['previews'][0]['path'][5:])
-    # Results live in the central library store, never in the asset folder (decision 0023).
+    # Results live in the central library store, never in the asset folder (decision 0032).
     assert preview.is_relative_to(config.library_store()) and not preview.is_relative_to(Path(one['path']))
     assert config.source_file(r['files'][0]['path']).parent==Path(one['path'])
     assert not sources.source_status(config,one)['needs_processing']
@@ -276,7 +276,7 @@ def test_scan_add_change_remove_and_card_until_published(managed):
     new.unlink()
     sources.scan_source(config,one)
     assert len(records(config))==2
-    # Working data lives in the library store; the folder holds only its originals (decision 0023).
+    # Working data lives in the library store; the folder holds only its originals (decision 0032).
     assert sources.bound(config,one).metadata_root.is_dir() and not [p for p in Path(one['path']).iterdir() if p.is_dir()]
 
 

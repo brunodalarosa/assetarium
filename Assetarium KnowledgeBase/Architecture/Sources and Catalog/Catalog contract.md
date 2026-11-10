@@ -103,7 +103,7 @@ image-pack browsing. Their processing honors the existing empty-format pause;
 model format preferences do not select an image subtype. Step 2 must add image
 enrollment and its processing preference/UI deliberately.
 
-Decisions 0007-0008 remain binding. Process assets excludes caption generation;
+Decision 0033 remain binding. Process assets excludes caption generation;
 Generate descriptions remains the separate source operation. Missing/failed
 model descriptions and description vectors never become import work/failures
 when direct image vectors succeeded. Original description failures remain in
@@ -144,7 +144,7 @@ reads as follows. Images are first-class **generic images** in sources that opt
 in, with measured facts, derived display/model inputs, optional descriptions and
 the same retrieval as models.
 
-**Enrollment.** Every supported type is always enrolled (decision 0023); the
+**Enrollment.** Every supported type is always enrolled (decision 0032); the
 per-source `import_types` choice (`["model_3d"]` by default, `["model_3d", "image"]` with
 **Include 2D images**) is history, imported once by the library migration. Existing sources keep their bytes and
 records unchanged. In an image-enabled source the scanner (no decoding) makes
@@ -215,7 +215,7 @@ already-prepared inputs.
 
 **Stages.** Images now have the caption stage (`applicable_stages` returns all
 stages). Process assets runs image inspection and image vectors; Generate
-descriptions describes images whose model input exists (decisions 0007-0008
+descriptions describes images whose model input exists (decision 0033
 unchanged). An unchanged re-enrolled asset resumes from its published record,
 and a ledger-complete inspection whose record lost its result is inspected
 again instead of being recorded as corrupt output.

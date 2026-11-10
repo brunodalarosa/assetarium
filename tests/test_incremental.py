@@ -30,7 +30,7 @@ def library(tmp_path):
     for pack in ('one', 'two'):
         (source / pack).mkdir()
         for i in range(3):
-            # Distinct bytes: equal inputs share one result (decision 0023), which test_result_store covers.
+            # Distinct bytes: equal inputs share one result (decision 0028), which test_result_store covers.
             (source / pack / f'item{i}.obj').write_text(f'# {pack} {i}\nv 0 0 0\nv 1 0 0\nv 0 1 0\nf 1 2 3\n')
     for path in ('src/local_asset_library/blender_worker.py', 'src/local_asset_library/render_math.py',
                  'src/local_asset_library/caption_backend.py', 'src/local_asset_library/caption_batching.py', 'runtime/caption/uv.lock', 'prompts/caption-v2.txt', 'prompts/caption-v3.txt', 'prompts/caption-v4.txt'):

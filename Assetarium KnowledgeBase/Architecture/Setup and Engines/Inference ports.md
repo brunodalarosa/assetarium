@@ -53,7 +53,7 @@ On purpose, and listed so a later change knows about them:
 
 - `incremental.caption_input` knows the built-in engine's fingerprint inputs
   (`caption_backend.py`, `caption_batching.py`, the caption lock): they are frozen
-  evidence of every finished description (decision 0007).
+  evidence of every finished description (decision 0028).
 - `captions.infer_captions` still accepts a bare `QwenBackend` (`scripts/benchmark-caption-batching.py`
   and tests use it).
 - `scripts/asset-worker.py` hosts the EmbeddingGemma runtime (`runtime_contract`, its

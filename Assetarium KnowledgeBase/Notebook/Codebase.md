@@ -90,7 +90,7 @@ read it first. Up: [Notebook](Notebook.md).
 - **Before renaming anything, check whether the file is hashed into a fingerprint.** Editing
   `caption_backend.py`, `caption_batching.py`, `engine_server.py`, the Blender workers
   (`blender_worker.py`, `render_math.py`, repair workers) or a `runtime/*/uv.lock` sends finished
-  descriptions or inspections back to pending (`incremental.py`, decision 0022). Search-index
+  descriptions or inspections back to pending (`incremental.py`, decision 0028). Search-index
   metadata names are not fingerprint inputs: vector reuse keys on each vector's own fingerprint.
 - The pilot-era and one-time scripts (`scripts/historical/`) were removed in November 2026: they needed
   the original owner's data and called code removed since. Run them from commit `af02e91` or earlier.

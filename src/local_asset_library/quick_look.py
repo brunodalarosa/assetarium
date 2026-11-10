@@ -1,4 +1,4 @@
-"""Quick look: a names-only walk of a folder for the Add library folder wizard (decisions 0023, 0024).
+"""Quick look: a names-only walk of a folder for the Add library folder wizard (decisions 0032, 0035).
 
 It reads folder and file names only (no hashing, no file contents, nothing written into the folder), so the wizard
 can show the tree filling in within seconds and say which packs look fine and which need a structure. Once the folder

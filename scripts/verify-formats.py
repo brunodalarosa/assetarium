@@ -1,4 +1,4 @@
-"""Verify Formats Assetarium uses (decision 0026) in the real WebView2 shell with a synthetic library.
+"""Verify Formats Assetarium uses (decision 0031) in the real WebView2 shell with a synthetic library.
 
 A library folder holds an OBJ, an FBX-only model, a PNG image and a JPEG image. Settings → General shows the 3D and
 image toggles with the texture note; turning FBX and JPEG off and saving hides those assets from the Library (one

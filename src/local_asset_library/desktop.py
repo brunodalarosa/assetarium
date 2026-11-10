@@ -106,7 +106,7 @@ class DesktopBridge:
                 logging.exception('Launch audit retention fault')
         self._loop.call_soon(lambda: self._loop.run_in_executor(None, retain_runs))
         if self._prestart_worker:
-            # Libraries only (decision 0005); the model still loads on the first semantic search.
+            # Libraries only (the Search embedders note); the model still loads on the first semantic search.
             self._loop.call_soon(lambda: self._loop.create_task(self._gateway.prestart()))
         self._ready.set()
         self._loop.run_forever()
@@ -191,7 +191,7 @@ class DesktopBridge:
                                         caption_batch_size, descriptions_enabled, description_engine, description_server,
                                         search_device, 'user', search_threads, image_formats, guarded=False))
 
-    # Rendering (decision 0022): device, parallel renders and memory; the speed test runs as an operation.
+    # Rendering (decision 0034): device, parallel renders and memory; the speed test runs as an operation.
     def render_settings(self):
         from .render_devices import summary
         return self._wait(self._present(summary, self._config, guarded=False))
@@ -212,7 +212,7 @@ class DesktopBridge:
         return self._wait(self._present(self._search_check, action, guarded=False))
 
     def _search_check(self, action):
-        """Run check (decision 0026): start it, or read whether it passed, runs or failed (for Settings and setup)."""
+        """Run check (decision 0031): start it, or read whether it passed, runs or failed (for Settings and setup)."""
         from . import engines
         from .source_operations import operation_status
         if action == 'start':
@@ -238,7 +238,7 @@ class DesktopBridge:
             raise ConfigError('Unknown render test action')
         return self._start_source_operation('render-test', None)
 
-    # Setup wizard (decision 0014): thin calls into setup_core; nothing here starts at launch.
+    # Setup wizard (decision 0031): thin calls into setup_core; nothing here starts at launch.
     def setup_state(self):
         from .setup_core import setup_state
         return self._wait(self._present(setup_state, self._config, guarded=False))
@@ -280,7 +280,7 @@ class DesktopBridge:
         from .setup_core import skip_setup
         return self._wait(self._present(skip_setup, self._config, guarded=False))
 
-    # Agent setup (decisions 0016, 0024): only the user decides a proposal; there is no session to open.
+    # Agent setup (decisions 0029, 0031): only the user decides a proposal; there is no session to open.
     def agent_setup_state(self):
         from .setup_agent import app_state
         return self._wait(self._present(app_state, self._config, guarded=False))
@@ -369,7 +369,7 @@ class DesktopBridge:
             return cancel(sources.bound(self._config, sources.get_source(self._config, key)) if key else self._config)
         raise ConfigError('Unknown asset source action')
 
-    # The Asset sources tab (decision 0023): library folders → bundles → packs → folders, read from saved data.
+    # The Asset sources tab (decision 0032): library folders → bundles → packs → folders, read from saved data.
     def library_tree(self):
         from .library_view import tree
         return self._wait(self._present(tree, self._config, guarded=False, shared=True))
@@ -399,7 +399,7 @@ class DesktopBridge:
             return {'status': 'faulty', 'reason': 'No cover image'}
         return {'status': 'ready', 'image': base64.b64encode(png_bytes(thumbnail(decode(path, fmt)[0])[0])).decode('ascii')}
 
-    # The processing queue (decision 0023).
+    # The processing queue (decision 0032).
     def _close_question(self):
         """What the close dialog says while an item is processing; None lets the window close."""
         from .processing_queue import running_item
@@ -493,7 +493,7 @@ class DesktopBridge:
         record_change(self._config, key, path, {'by': 'owner'})
         return self._start_source_operation('scan', key)
 
-    # Pack profiles (decision 0024): a pack's rules, versions, signals and effect; apply, revert, review, export.
+    # Pack profiles (decision 0035): a pack's rules, versions, signals and effect; apply, revert, review, export.
     def pack_profile(self, key, pack):
         return self._wait(self._present(self._pack_profile, key, pack, guarded=False, shared=True))
 
@@ -534,7 +534,7 @@ class DesktopBridge:
             result['operation'] = self._start_source_operation('scan', key)
         return result
 
-    # Agent activity and proposals (decision 0024): the feed from the MCP call logs; the owner decides proposals.
+    # Agent activity and proposals (decision 0029): the feed from the MCP call logs; the owner decides proposals.
     def agent_activity(self, since=None):
         return self._wait(self._present(self._agent_activity, since, guarded=False, shared=True))
 
@@ -567,7 +567,7 @@ class DesktopBridge:
         result['operations'] = [self._start_source_operation('scan', key) for key in result['rescan']]
         return result
 
-    # Add library folder (decision 0024): a names-only quick look, then add, keep the names and scan.
+    # Add library folder (decision 0035): a names-only quick look, then add, keep the names and scan.
     def quick_look_start(self, directory):
         from .quick_look import start
         from .sources import Covered
@@ -704,7 +704,7 @@ class DesktopBridge:
         if not self._config.sources_registry:
             raise ConfigError('Configure asset sources before using source settings')
         getattr(sources, name)(self._config, key, *args)
-        if name in {'decide_export', 'forget_export'}:  # Export answers belong to the pack holding them (decision 0024).
+        if name in {'decide_export', 'forget_export'}:  # Export answers belong to the pack holding them (decision 0035).
             from .pack_profiles import record_change
             anchor = next((d['anchor'] for d in sources.export_decisions(sources.bound(self._config, sources.get_source(self._config, key)))
                            if d['id'] == args[0]), '')
@@ -872,7 +872,7 @@ class DesktopBridge:
         # Do not call a public bridge parameter "arguments": it shadows JavaScript's arguments object.
         return self._wait(self._search(settings))
 
-    # Collections and tags are owner organization data (decision 0012); originals are never touched.
+    # Collections and tags are owner organization data (decision 0036); originals are never touched.
     def collections(self, query='', containing=None):
         from .asset_collections import summaries
         return self._wait(self._present(summaries, self._config, query, containing, guarded=False))

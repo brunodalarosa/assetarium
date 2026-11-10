@@ -144,7 +144,7 @@ export interface ConfirmRequest {
   /** Deletions are "danger" (the default); other confirmations are "neutral". */
   tone?: "danger" | "neutral";
 }
-/** The Asset sources tab (decision 0023): the tree, the shown folder and its filters. */
+/** The Asset sources tab (decision 0032): the tree, the shown folder and its filters. */
 export interface SourcesView {
   tree: Json | null;
   loading: boolean;
@@ -206,7 +206,7 @@ export interface SetupState {
   saving: boolean;
   result: Json | null;
   draft: SetupDraft;
-  /** Agent setup (decision 0016): the backend's panel state, shown once the user chose the agent path. */
+  /** Agent setup (decision 0031): the backend's panel state, shown once the user chose the agent path. */
   agent: Json | null;
   agentMode: boolean;
   agentBusy: string | null;
@@ -251,7 +251,7 @@ export interface AppState {
   /** The live 3D view's first-use hint was shown and retired; it never shows again. */
   previewHintSeen: boolean;
   sourcesView: SourcesView;
-  /** The processing queue (decision 0023); null until first loaded. */
+  /** The processing queue (decision 0032); null until first loaded. */
   queue: Json | null;
   sources: Json[];
   globalScan: Json | null;
@@ -263,17 +263,17 @@ export interface AppState {
   sourcesError: string | null;
   notifications: Json[];
   notificationsOpen: boolean;
-  /** What agents do (decision 0024): the live feed, who is connected and proposals waiting for the owner. */
+  /** What agents do (decision 0029): the live feed, who is connected and proposals waiting for the owner. */
   agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[];
     staged: Record<string, Record<number, RuleChoice>>; committing: string | null };
-  /** The Add library folder wizard (decision 0024). */
+  /** The Add library folder wizard (decision 0035). */
   addFolder: AddFolder;
   /** Practice results live in memory only until the results screen closes. */
   practiceResult: Json | null;
   toasts: Toast[];
   failures: { loading: boolean; assets: number; paths: string[]; unavailable: Json[]; error: string | null; loaded: boolean };
   general: { loading: boolean; busy: boolean; message: string; values: Json | null };
-  /** Rendering (decision 0022): device, renders at a time, memory and the speed test. */
+  /** Rendering (decision 0034): device, renders at a time, memory and the speed test. */
   render: { loading: boolean; busy: boolean; message: string; values: Json | null };
   setup: SetupState;
   /** Settings → General → Search: the installed-runtime checklist per search device (read only). */
@@ -1061,7 +1061,7 @@ export async function confirmForgetMissing(key: string, path = "", name = "this 
     pushToast({ tone: "fault", title: "Could not review missing entries", body: (error as Error).message });
   }
 }
-/** A pack's profile (decision 0024): its rules, versions and structure signals. */
+/** A pack's profile (decision 0035): its rules, versions and structure signals. */
 export async function loadPackProfile(key: string, pack: string) {
   const result = await api().pack_profile(key, pack);
   if (result.status === "faulty") throw Error(result.reason);
@@ -1098,7 +1098,7 @@ export async function pathAction(action: "reveal" | "open" | "copy", key: string
   }
 }
 /* --------------------------- add library folder ---------------------------- */
-// Decision 0024: a names-only quick look first (seconds), then the owner chooses who finishes the structure.
+// Decision 0035: a names-only quick look first (seconds), then the owner chooses who finishes the structure.
 
 export type AddFolder = { open: boolean; step: "look" | "found" | "agent" | "done"; job: string | null; look: Json | null; key: string | null;
   name: string; prompt: string; copiedAt: number | null; signals: Json | null; error: string | null; busy: boolean;
@@ -1202,7 +1202,7 @@ export async function libraryCover(key: string, relative: string): Promise<strin
     return null;
   }
 }
-/** Make previews for a folder, pack or picked assets: it starts at once or waits in line (decision 0023). */
+/** Make previews for a folder, pack or picked assets: it starts at once or waits in line (decision 0032). */
 export async function makePreviews(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
   return queueAction("previews", scope, count);
 }
@@ -1380,7 +1380,7 @@ export async function saveGeneralSettings(budget: string, formats: string[], bat
           : `Saved. Every format is off, so nothing is shown or processed. Turning formats back on brings assets back with their results.${searched}`,
       },
     });
-    // Formats decide what the Library shows (decision 0026): refresh it now, not on the next poll.
+    // Formats decide what the Library shows (decision 0030): refresh it now, not on the next poll.
     await Promise.all([loadSources(), loadRenderSettings(), loadLibraryTree()]);
     if (state.sourcesView.key) void refreshFolder();
   } catch (error) {
@@ -1427,7 +1427,7 @@ export async function renderTest(action: "start" | "cancel") {
 }
 
 /* ---------------------------------- setup -------------------------------- */
-// The setup wizard (decision 0014). setup_core decides and validates; this only
+// The setup wizard (decision 0031). setup_core decides and validates; this only
 // keeps the draft the user is editing and calls the bridge on explicit actions.
 
 function patchSetup(patch: Partial<SetupState> | ((current: SetupState) => Partial<SetupState>)) {
@@ -1464,7 +1464,7 @@ function savedDraft(info: Json): SetupDraft {
   };
 }
 /** Reads what is installed for each search device; never installs or starts the model. */
-/** The search check (decision 0026): start it, or read whether it passed, runs or failed. */
+/** The search check (decision 0031): start it, or read whether it passed, runs or failed. */
 export async function searchCheck(action: "start" | "status"): Promise<Json> {
   try {
     return await api().search_check(action);
@@ -1557,7 +1557,7 @@ export async function chooseBlenderExecutable() {
   await checkBlender(result.path);
 }
 /* ------------------------- blender installation ------------------------ */
-// Settings → General → Blender installation: the wizard's Blender step on its own (decision 0014).
+// Settings → General → Blender installation: the wizard's Blender step on its own (decision 0031).
 
 function patchBlender(patch: Partial<BlenderState> | ((current: BlenderState) => Partial<BlenderState>)) {
   setState((s) => ({ blender: { ...s.blender, ...(typeof patch === "function" ? patch(s.blender) : patch) } }));
@@ -1658,7 +1658,7 @@ export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   if (!skipped.has("descriptions"))
     Object.assign(choices, { descriptions_enabled: draft.descriptionsEnabled, description_engine: draft.engine, description_server: { url: draft.serverUrl, model: draft.serverModel }, search_device: draft.searchDevice });
   if (!skipped.has("batch") && setupStepNeeded("batch", draft)) choices.caption_batch_size = draft.batch;
-  if (draft.includeSamples) choices.include_samples = true;  // Decision 0026: the built-in samples, checked by default.
+  if (draft.includeSamples) choices.include_samples = true;  // Decision 0031: the built-in samples, checked by default.
   return choices;
 }
 const STEP_FIELDS: Record<string, (keyof SetupDraft)[]> = {
@@ -1700,7 +1700,7 @@ export function finishSetup(next: "sources" | "close") {
 }
 
 /* ------------------------------- agent setup ------------------------------ */
-// Decisions 0016 and 0024: agents may apply setup values at any time (labeled and noticed);
+// Decisions 0029 and 0031: agents may apply setup values at any time (labeled and noticed);
 // a proposed Blender applies only on the user's Apply. This presents its state.
 
 export async function loadAgentSetup() {
@@ -1709,7 +1709,7 @@ export async function loadAgentSetup() {
   patchSetup({ agent });
   return agent;
 }
-/** Show how to connect an agent; there is no session to open (decision 0024). */
+/** Show how to connect an agent; there is no session to open (decision 0029). */
 export async function startAgentSetup() {
   patchSetup({ agentMode: true, error: null });
   await loadAgentSetup();
@@ -1911,7 +1911,7 @@ export function activities(ready: boolean, sources: Json[], worker: string, prev
 }
 
 /* ------------------------------- collections ------------------------------ */
-// Collections are owner organization data (decision 0012). The backend resolves
+// Collections are owner organization data (decision 0036). The backend resolves
 // membership and availability; these actions present it and keep views current.
 
 let collectionsGeneration = 0;
@@ -2197,7 +2197,7 @@ export function closeMenu() {
 export function askConfirm(request: ConfirmRequest) {
   setState({ confirm: request, menu: null });
 }
-/** Closing while assets are processing asks first; the backend's closing guard calls this (decision 0023). */
+/** Closing while assets are processing asks first; the backend's closing guard calls this (decision 0032). */
 export function askClose(question: { title: string; body: string }) {
   askConfirm({ tone: "neutral", title: question.title, body: question.body, confirmLabel: "Stop & close", cancelLabel: "Keep open", icon: "stop",
     run: () => api().stop_and_close() });
@@ -2320,7 +2320,7 @@ export async function exportCollection(id: string, kind: "json" | "png" | "md" |
 
 let toastId = 0;
 /* ----------------------------- agent activity ----------------------------- */
-// Decision 0024: every agent call becomes a line here; rules that need no scan apply at once with Undo,
+// Decision 0029: every agent call becomes a line here; rules that need no scan apply at once with Undo,
 // the others wait as proposals for the owner's Apply.
 
 let agentLoading = false;

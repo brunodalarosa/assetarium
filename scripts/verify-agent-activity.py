@@ -1,4 +1,4 @@
-"""Verify Agent activity and pack proposals (decision 0024) in the real WebView2 shell with a synthetic pack.
+"""Verify Agent activity and pack proposals (decision 0029) in the real WebView2 shell with a synthetic pack.
 
 An in-process MCP gateway plays the agent (the same Gateway.call path a STDIO client uses, so every call lands in
 data/mcp/runs/<run>/calls.jsonl): say, get_pack_outline, an instant proposal (applied at once, Undo in a toast and the

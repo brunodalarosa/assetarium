@@ -1,4 +1,4 @@
-"""Parallel kept-open Blender processes for inspection renders (decision 0022).
+"""Parallel kept-open Blender processes for inspection renders (decision 0034).
 
 Each slot runs one Blender at a time and gives every job a fresh factory session, so results
 match one process per asset. A timeout or crash fails only that job; the slot starts a new

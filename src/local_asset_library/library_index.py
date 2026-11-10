@@ -31,7 +31,7 @@ def index_library(config, backend=None, limit=1000, dry_run=False, description_o
     formats = used_formats(config)
     selected = [record for record in inventory if processing_eligible(record, formats)]
     from .variant_groups import shared_map
-    shared = shared_map(config)  # Variants embed their group's description with their own value (decision 0024).
+    shared = shared_map(config)  # Variants embed their group's description with their own value (decision 0035).
     with closing(index_database(config, readonly=dry_run)) as db:
         metadata = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
         capability = json.loads(config.output_path("data", "embeddings/capability.json").read_text(encoding="utf-8"))

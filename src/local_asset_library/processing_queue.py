@@ -1,4 +1,4 @@
-"""The implicit processing queue (decision 0023): Make previews and Generate descriptions wait in line.
+"""The implicit processing queue (decision 0032): Make previews and Generate descriptions wait in line.
 
 An item names an action and a scope (a folder or pack of a library folder, or picked assets). The scope is
 resolved when the item starts: "whatever there still lacks previews". Previews always run ahead of

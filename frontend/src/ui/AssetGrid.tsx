@@ -11,7 +11,7 @@ import { getState, type GridId, openAssetMenu, pathAction, pickAsset, requestThu
 /** A library pack is an object on the Asset sources tab ({name}); elsewhere a folder key. */
 const packLabel = (item: Json) => (item.pack && typeof item.pack === "object" ? item.pack.name : packName(item.pack));
 
-/** Work states (decision 0023), each with a shape and a label so color is never the only signal. */
+/** Work states (decision 0032), each with a shape and a label so color is never the only signal. */
 const STATE: Record<string, { icon: typeof Clock; label: string }> = {
   no_previews: { icon: Clock, label: "No previews yet" }, queued: { icon: Clock, label: "Queued" }, running: { icon: Loader, label: "Making previews" },
   blocked: { icon: Ban, label: "Blocked" }, failed: { icon: CircleAlert, label: "Recorded failure" }, missing: { icon: Unlink, label: "Missing" },
@@ -78,7 +78,7 @@ function badges(item: Json, thumb?: Thumb) {
 }
 
 function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId; item: Json; selected: string | null; index: number }) {
-  // A variant group is one card (decision 0024): chips pick the variant shown; hovering a chip previews it.
+  // A variant group is one card (decision 0035): chips pick the variant shown; hovering a chip previews it.
   const variants: Json[] = card.variants || [];
   const [shown, setShown] = useState<string>(card.asset_id);
   const [peek, setPeek] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-"""The Asset sources tab's data: folders, packs, work states, blocked work and missing assets (decision 0023)."""
+"""The Asset sources tab's data: folders, packs, work states, blocked work and missing assets (decision 0032)."""
 from pathlib import Path
 
 from test_sources import managed, ready_source  # noqa: F401 -- fixtures

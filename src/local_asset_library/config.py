@@ -77,7 +77,7 @@ class Config:
     library_root: Path | None = None
 
     def library_store(self) -> Path:
-        """The central library store (decision 0023): ``[storage].library``, else ignored ``data/library-store``."""
+        """The central library store (decision 0032): ``[storage].library``, else ignored ``data/library-store``."""
         return self.library_root or self.storage_root("data") / "library-store"
 
     def source_directory(self, relative: str) -> Path:

@@ -175,7 +175,7 @@ class Gateway:
                 'worker_fault':self.worker_fault,'closed':True}),encoding='utf-8')
 
     async def start_worker(self):
-        """Start the private worker; it loads libraries only, never the model (decision 0005)."""
+        """Start the private worker; it loads libraries only, never the model (the Search embedders note)."""
         self.loop = asyncio.get_running_loop()
         if self.closing:
             raise ConfigError('Gateway is closing; no new worker can start')

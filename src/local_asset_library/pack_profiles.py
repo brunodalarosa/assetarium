@@ -1,4 +1,4 @@
-"""Pack profiles: every answer about one pack's structure as one versioned set of rules (decisions 0023, 0024).
+"""Pack profiles: every answer about one pack's structure as one versioned set of rules (decisions 0032, 0035).
 
 A profile is not a new store. Its rules are the owner's (or an approved agent's) answers that already steer scans and
 views (packs, names, image kinds, exclusions, export groups, the texture folder) plus variant rules, scoped to one pack

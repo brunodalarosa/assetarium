@@ -1,4 +1,4 @@
-"""What an image is: a model texture, a material texture or a 2D image (decision 0023).
+"""What an image is: a model texture, a material texture or a 2D image (decision 0032).
 
 Layered evidence, each recorded as ``{value, basis, evidence}`` like ``image_catalog.suggested_purpose``, never
 a bare fact: model references (glTF, OBJ/MTL, FBX names) and Blender's texture list make a model texture (a

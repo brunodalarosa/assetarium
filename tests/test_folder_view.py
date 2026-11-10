@@ -1,4 +1,4 @@
-"""Folder views: the Asset sources and processing tabs read bounded rows, never whole records (decision 0023)."""
+"""Folder views: the Asset sources and processing tabs read bounded rows, never whole records (decision 0032)."""
 import asyncio
 from contextlib import closing
 import json

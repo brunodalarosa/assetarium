@@ -26,7 +26,7 @@ under `runtime/mcp/`. Semantic queries start one persistent private subprocess
 using the existing `.venv-embedding`, unchanged model/backend/lock/index
 contracts, offline weights and CUDA BF16. The worker only embeds the query text
 or reference image; the server verifies, scores and fuses rankings in-process
-(decision 0005). Its output is private JSON IPC with progress heartbeats; all
+(the Search embedders note). Its output is private JSON IPC with progress heartbeats; all
 diagnostics use stderr. The MCP server starts the worker on its first semantic
 query; only the desktop app pre-starts it. There is no automatic fallback/restart after a failed
 worker, model initialization, or unchanged failed query.

@@ -39,7 +39,7 @@ def inspection_input(config, record, content_only=False, recorded=None):
         raise ConfigError('No decodable image file is recorded for this asset')
     source = min(available, key=lambda f: (PREFERENCE.index(image_format(f['path'])), f['path']))
     reason = 'Preferred raster export' if source['format'] != 'svg' else 'Self-contained SVG export'
-    # Content, never the path (decision 0023): a moved or duplicated image keeps its derived images.
+    # Content, never the path (decision 0028): a moved or duplicated image keeps its derived images.
     value = {'adapter': VERSION, 'files': sorted(f['sha256'] for f in record['files'] if f['availability'] == 'available'),
              'format': source['format'], 'sha256': source['sha256']}
     if content_only:
@@ -111,7 +111,7 @@ def run(config, record, fingerprint):
     if inspection_input(config, record, recorded=fingerprint)[3] != fingerprint:
         raise ConfigError('Image source changed during inspection')
     from .image_kinds import pixel_evidence, refine
-    # Pixel hints (normal map, seamless, cutout) decide the kind of an image nothing else classified (decision 0023).
+    # Pixel hints (normal map, seamless, cutout) decide the kind of an image nothing else classified (decision 0032).
     metadata = dict(record.get('type_metadata') or {}, pixel_kind=pixel_evidence(rgba))
     if metadata.get('image_kind'):
         metadata['image_kind'] = refine(metadata['image_kind'], metadata['pixel_kind'])

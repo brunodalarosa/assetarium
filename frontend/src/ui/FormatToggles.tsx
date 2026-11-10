@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/beui/checkbox";
 
-// Formats Assetarium uses (decision 0026): one toggle each; assets only in formats that are off are hidden everywhere.
+// Formats Assetarium uses (decision 0030): one toggle each; assets only in formats that are off are hidden everywhere.
 export const MODEL_FORMATS: [string, string, string][] = [
   ["fbx", "FBX", "Rigs and animation; common in Unity and Unreal."],
   ["gltf", "glTF / GLB", "Open format with PBR materials, rigs and animation."],

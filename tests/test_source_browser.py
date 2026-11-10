@@ -103,7 +103,7 @@ def test_faulty_saved_assets_remain_visible_with_inspection_evidence(managed):
     _, _, contents = browser(config)
     record = sources.read_records(sources.bound(config, one))[0]
     config.source_file(record['files'][0]['path']).unlink()
-    # Discovery makes the vanished asset Missing (decision 0023): kept with its last record until forgotten.
+    # Discovery makes the vanished asset Missing (decision 0032): kept with its last record until forgotten.
     sources.scan_source(config, one)
     from local_asset_library.library_view import folder_items, unavailable
     assert record['asset_id'] not in {i.get('asset_id') for i in folder_items(config, one['key'])['items']}

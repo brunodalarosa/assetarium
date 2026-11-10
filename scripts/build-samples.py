@@ -1,4 +1,4 @@
-"""Build Assetarium's built-in sample assets and the search check images (decision 0026). Run inside Blender:
+"""Build Assetarium's built-in sample assets and the search check images (decision 0031). Run inside Blender:
 
     blender --background --factory-startup --python scripts/build-samples.py
 

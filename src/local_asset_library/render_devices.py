@@ -1,4 +1,4 @@
-"""Render devices and the speed test that picks device and parallel renders (decision 0022).
+"""Render devices and the speed test that picks device and parallel renders (decision 0034).
 
 The test renders synthetic shapes (never library assets) with the real worker in kept-open
 Blender processes, 1, 2, 4, 6 and 8 at a time per device, within the cores and memory free, and

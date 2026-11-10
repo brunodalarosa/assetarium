@@ -13,14 +13,12 @@ library. How agents reach it is the [MCP](../MCP/MCP.md) area. Up: [Notebook](..
 
 - [Retrieval](Retrieval.md): `SearchEngine`, channels and fusion, filters, bounded shortlists.
 - [Hash reuse and caches](Hash%20reuse%20and%20caches.md): why reads are fast without dropping verification.
-- [Search embedders](Search%20embedders.md) *(gap)*: EmbeddingGemma on CUDA or the CPU, the private
-  worker, threads and the speed test (`embedding_backend.py`, `embedding_cpu.py`, `search_speed.py`).
+- [Search embedders](Search%20embedders.md): EmbeddingGemma on CUDA or the CPU and the private worker
+  that returns vectors (`scripts/asset-worker.py`, `embedding_backend.py`, `embedding_cpu.py`).
 
 ## Read first
 
 - [Embedding contract](../../Architecture/Search/Embedding%20contract.md) and the frozen
   evaluation (history: from the original pilot) in [`docs/evaluation/`](../../../docs/evaluation/README.md).
-- Decisions: [0003](../../Decisions/0003-per-publication-read-caches.md),
-  [0028](../../Decisions/0028-result-identity.md),
-  [0005](../../Decisions/0005-embedding-worker-and-prestart.md),
+- Decisions: [0028](../../Decisions/0028-result-identity.md),
   [0018](../../Decisions/0018-cpu-search-embedder.md).

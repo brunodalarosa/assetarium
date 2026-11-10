@@ -183,7 +183,7 @@ def test_search_threads_setting(managed, capsys, monkeypatch):
 
 
 def test_library_packs_queue_and_forget_missing_from_a_terminal(managed, monkeypatch, capsys):
-    """The commands of decision 0023: the same backend calls as the Asset sources tab and the queue."""
+    """The commands of decision 0032: the same backend calls as the Asset sources tab and the queue."""
     from local_asset_library import library_view
     config, _, one, _ = managed
     monkeypatch.setattr(library_view, 'blockers', lambda config: {})

@@ -24,7 +24,7 @@ that holds all your packs); Assetarium finds the structure inside it:
   survive rescans, and **Rename** gives a pack a display name. Packs have no tags and are never added to
   collections.
 
-**Add library folder** opens a short wizard (decision 0024):
+**Add library folder** opens a short wizard (decision 0035):
 
 1. **Quick look.** Assetarium reads folder and file names only (no file contents, nothing written) and shows
    the tree filling in, with a pack badge on folders that carry a license, readme or preview.
@@ -73,7 +73,7 @@ Every supported type is always included: 3D models (FBX, glTF/GLB, OBJ, BLEND, S
 When the guess is wrong for a folder, **Treat images here as textures** or **as 2D assets** decides for it.
 
 Scans run in the background at startup, after you add a folder and after each change you make. They never
-run models or renders. Unchanged files reuse their verified hashes (decision 0004).
+run models or renders. Unchanged files reuse their verified hashes (decision 0028).
 
 ## Identity: moves, copies and edits
 
@@ -165,7 +165,7 @@ assets. They start at once or wait in line on **Asset processing**:
 
 - What an item covers is decided when it starts: "whatever in this pack still lacks previews".
 - Previews always run before descriptions; otherwise items run in your order (move or remove them in **Up next**).
-- One job at a time; renders use the parallel Blender processes of decision 0022.
+- One job at a time; renders use the parallel Blender processes of decision 0034.
 - Under about 10 minutes a job starts on the click. From 10 to 30 minutes it starts with an **Undo** toast.
   Longer jobs, or jobs that would reach the storage budget, ask first with an estimate (counts, a time range,
   disk). The estimate comes from the render speed test and recent runs; without either it says
@@ -206,8 +206,8 @@ previews and search right away; remove it like any library folder.
 
 ## Descriptions
 
-Descriptions are optional (decision 0008). Assets are searchable by name and image as soon as their previews
-are made; descriptions add a third signal. Description runs write in batches (decision 0007), build their
+Descriptions are optional (decision 0033). Assets are searchable by name and image as soon as their previews
+are made; descriptions add a third signal. Description runs write in batches (decision 0033), build their
 search vectors and publish. Recorded description failures are kept and not retried; a cancelled run still
 publishes what it finished. Notifications (the bell) report descriptions ready to generate and each run's outcome.
 

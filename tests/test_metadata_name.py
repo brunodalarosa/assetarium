@@ -6,7 +6,7 @@ from local_asset_library.config import LEGACY_METADATA_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWED = ('src/local_asset_library/config.py', 'docs/history/', 'CHANGELOG.md', '.gitignore',
-           'Assetarium KnowledgeBase/Decisions/')  # Decisions are dated owner records; 0023 replaces the folder.
+           'Assetarium KnowledgeBase/Decisions/')  # Decisions are dated owner records; 0032 replaces the folder.
 
 
 def test_the_old_folder_name_appears_only_in_the_migration_and_history():

@@ -65,7 +65,7 @@ def sibling_path(original, target):
 
 def portable(recipe, base):
     """A shared texture recipe as an input key sees it: provider paths relative to the model and no folder IDs, so
-    joining split projects under one library folder keeps the key (decision 0023: keyed by inputs, not places)."""
+    joining split projects under one library folder keeps the key (decision 0028: keyed by inputs, not places)."""
     from .result_store import relative_to
     if not recipe or recipe.get('kind') != 'shared_dependency_paths':
         return recipe

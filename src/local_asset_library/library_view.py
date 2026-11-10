@@ -1,4 +1,4 @@
-"""The Asset sources tab: library folders → bundles → packs → folders, with work states (decision 0023).
+"""The Asset sources tab: library folders → bundles → packs → folders, with work states (decision 0032).
 
 Read only. Built from each folder's working catalog and inventory (never a scan), cached by their identity.
 Each asset has one work state (no previews yet, queued, running, ready, blocked, failed, missing, excluded)
@@ -245,7 +245,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     new = _new_ids(config, source)
     state, state_params, reason, reason_params = state_sql(blockers(config))
     where, params = asset_scope_sql(path)
-    where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0026).
+    where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0030).
     if filters.get('types'):
         where += f" AND kind IN ({','.join('?' * len(filters['types']))})"
         params += list(filters['types'])
@@ -365,7 +365,7 @@ def locate(config, asset_id):
 
 
 def record_visit(config, key):
-    """The owner looked at this folder: its "+N new" counts from now (decision 0023 open point: resets on visit)."""
+    """The owner looked at this folder: its "+N new" counts from now (decision 0032 open point: resets on visit)."""
     from .library_store import now, save_answer
     from .sources import get_source
     source = get_source(config, key)

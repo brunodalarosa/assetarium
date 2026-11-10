@@ -13,7 +13,7 @@ Up: [Architecture](../Architecture.md) · Down: [Stage ledger and fingerprints](
 
 Current workflow: **Settings → Asset sources** controls directories and live
 enabled-source membership. The app scans enabled sources on opening; reopening
-or toggling a source checks changes during a session (decision 0002). **Asset
+or toggling a source checks changes during a session (decision 0027). **Asset
 processing** offers **Process assets** for each source with pending work
 (inspection/previews and search vectors; descriptions are optional and run
 separately with **Generate descriptions** on the same page,
@@ -22,7 +22,7 @@ processing/publication progress bar, and graceful **Cancel**. The pending
 state clears after a scan verifies that no actionable work remains and current
 results are published. Retained failures appear in the **Importing failures
 report** on Asset processing, a list of original paths, instead of keeping work pending.
-Generated results live in the central library store, never in asset folders (decision 0023).
+Generated results live in the central library store, never in asset folders (decision 0032).
 See [asset sources](../../../docs/asset-sources.md) for storage, cancellation and fault rules.
 
 **Settings → General → Formats to process** limits new processing batches to

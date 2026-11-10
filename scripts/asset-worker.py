@@ -1,6 +1,6 @@
 """Private persistent embedding worker; its stdout is JSON IPC, never diagnostics.
 
-The worker only turns text or an image into a vector (decision 0005). Catalog,
+The worker only turns text or an image into a vector (the Search embedders note). Catalog,
 verification and ranking stay in the calling process. It may start when the app
 opens: libraries load immediately, while the model loads, behind the GPU lease,
 only for the first embedding request and unloads after ten idle minutes.

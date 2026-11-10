@@ -1,4 +1,4 @@
-"""What agents do in Assetarium, as short sentences for the app's Agent activity drawer (decision 0024).
+"""What agents do in Assetarium, as short sentences for the app's Agent activity drawer (decision 0029).
 
 The feed is read from the audit log every MCP server already writes (``data/mcp/runs/<run>/calls.jsonl``), so it
 shows what happened even when a model says nothing; the ``say`` tool adds the agent's own lines. Reads are bounded:

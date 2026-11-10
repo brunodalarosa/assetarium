@@ -1,4 +1,4 @@
-"""Record the search check (decisions 0018 and 0026) from a terminal; the app runs the same check with Run check.
+"""Record the search check (decisions 0018 and 0031) from a terminal; the app runs the same check with Run check.
 
 It runs on two built-in sample images (local_asset_library.search_check), never library assets, and writes only
 data/embeddings/capability.json. Run it again after changing the search device.

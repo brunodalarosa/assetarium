@@ -67,7 +67,7 @@ SVG display rasters and thumbnails are presentation, never extra vectors. A
 reference query on an image asset uses that same `model_input` file, so query and
 index preparation are identical. Images also get a description vector once a
 valid description exists; a missing or failed one leaves only that channel
-(decision 0008).
+(decision 0033).
 
 All vectors retain 768 dimensions and are checked for finite, nonzero output,
 converted to FP32 and L2 normalized. Stored vectors must already be unit length;

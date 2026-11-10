@@ -1,7 +1,7 @@
 """Read-only detail, card images and 3D previews of one library folder's assets, through the desktop services.
 
 It reads the folder's working catalog when there is one, so the Asset sources tab shows assets without previews
-yet and results not published yet (decision 0023); search keeps reading the published library.
+yet and results not published yet (decision 0032); search keeps reading the published library.
 """
 from .config import ConfigError
 from .desktop_service import DesktopService

@@ -1,4 +1,4 @@
-"""Verify Settings → General → Rendering (decision 0022) in the real WebView2 shell with synthetic sources.
+"""Verify Settings → General → Rendering (decision 0034) in the real WebView2 shell with synthetic sources.
 
 Checks that the card explains what renders now and why, lists the saved speed test, saves the
 device, renders-at-a-time and memory limits with the form (and keeps them after reopening), shows

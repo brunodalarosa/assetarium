@@ -1,4 +1,4 @@
-"""Optional descriptions: notices, the per-source describe run and the bridge (decision 0008)."""
+"""Optional descriptions: notices, the per-source describe run and the bridge (decision 0033)."""
 from collections import Counter
 import json
 from types import SimpleNamespace

@@ -75,7 +75,7 @@ SCHEMAS = {
     "tag_assets": {"type": "object", "required": ["asset_ids"], "additionalProperties": False, "properties": {
         "asset_ids": ASSET_IDS, "add": {**TAG_LIST, "description": "Owner tags to add (shared app-wide, not per collection)."},
         "remove": {**TAG_LIST, "description": "Owner tags to remove."}}},
-    # Setup (decisions 0016, 0024): writes are recorded as the agent's and noticed; Blender is only proposed.
+    # Setup (decisions 0029, 0031): writes are recorded as the agent's and noticed; Blender is only proposed.
     "get_setup_status": {"type": "object", "additionalProperties": False, "properties": {}},
     "validate_blender": {"type": "object", "additionalProperties": False, "properties": {
         "path": {"type": "string", "maxLength": 1024, "description": "Absolute path of a file named blender.exe (Windows) or blender; "
@@ -118,7 +118,7 @@ SCHEMAS = {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},
     "finish_setup": {"type": "object", "additionalProperties": False, "properties": {}}}
 from .pack_agent import SCHEMAS as PACK_SCHEMAS, TOOLS as PACK_TOOLS, WRITE as PACK_WRITE  # noqa: E402
-SCHEMAS.update(PACK_SCHEMAS)  # Pack structure tools (decision 0024): paged outlines, profiles, proposals.
+SCHEMAS.update(PACK_SCHEMAS)  # Pack structure tools (decision 0035): paged outlines, profiles, proposals.
 WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup", *PACK_WRITE}
 SETUP_TOOLS = {"get_setup_status", "validate_blender", "verify_weights", "apply_setup", "propose_setup", "finish_setup"}
 COLLECTION_MEANING = ("A collection is a named, owner-organized bundle of asset IDs, not an asset. Members keep their files "
@@ -427,7 +427,7 @@ class AssetService:
             raise ConfigError("Dependency count exceeds 64; cannot return an incomplete usable package")
         from .packs import fields
         payload = {"asset_id": record["asset_id"], "name": record["display_name"], "pack": record["pack_id"],
-                   **fields(self.config, record),  # The detected pack inside the library folder (decision 0023).
+                   **fields(self.config, record),  # The detected pack inside the library folder (decision 0032).
                    'asset_type': record.get('asset_type', 'model_3d'), 'parent_asset_id': record.get('parent_asset_id'),
                    "availability": "available", "status": "available", "usable": True,
                    "selected_source": result["selected_source"], "dependencies": deps,
@@ -449,7 +449,7 @@ class AssetService:
         from .variant_groups import membership
         group = membership(self.config, record)
         shared = None
-        if group:  # One of several variants (decision 0024): every member, and whose description it shares.
+        if group:  # One of several variants (decision 0035): every member, and whose description it shares.
             payload['variant'] = group['value']
             payload['variants'] = [{'asset_id': v['asset_id'], 'name': v['name'], 'variant': v['value']} for v in group['variants']]
             if group['shared'] and record.get('description') is None and group['representative']['asset_id'] != record['asset_id']:

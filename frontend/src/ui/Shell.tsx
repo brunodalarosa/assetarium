@@ -166,7 +166,7 @@ export function TopBar() {
   );
 }
 
-/** Work stopped when the app last closed: one quiet line on every page until Continue (decision 0023). */
+/** Work stopped when the app last closed: one quiet line on every page until Continue (decision 0032). */
 export function StoppedBanner() {
   const count = useApp((s) => (s.queue?.paused && s.queue?.stopped_on_close) || 0);
   const page = useApp((s) => s.history[s.historyIndex].page);

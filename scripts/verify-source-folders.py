@@ -75,7 +75,7 @@ window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 ui = Harness(window, OUT, report)
-KIT = "document.querySelector('#folder-panel')"  # The library folder's panel on the Asset sources tab (decision 0023).
+KIT = "document.querySelector('#folder-panel')"  # The library folder's panel on the Asset sources tab (decision 0032).
 IDLE = "lal.state.sources.find(s=>s.key==='kit')&&!['queued','running','cancelling'].includes((lal.state.sources.find(s=>s.key==='kit').operation||{}).status)"
 
 

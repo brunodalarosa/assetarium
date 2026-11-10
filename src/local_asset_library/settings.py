@@ -9,7 +9,7 @@ from .publication import atomic_json, read_json
 GIB = 1024**3
 MAX_BUDGET_GIB = 1048576
 PROCESSING_FORMATS = ('fbx', 'gltf', 'obj')
-# Standalone image formats Assetarium can use; each is its own toggle (decision 0026). Textures follow their models.
+# Standalone image formats Assetarium can use; each is its own toggle (decision 0031). Textures follow their models.
 IMAGE_FORMATS = ('png', 'jpeg', 'svg', 'webp', 'tga', 'tiff', 'bmp', 'gif', 'avif')
 ALIASES = {'glb': 'gltf', 'jpg': 'jpeg', 'tif': 'tiff'}
 CAPTION_BATCH_SIZES = (1, 2, 4, 8)
@@ -43,7 +43,7 @@ def image_formats(config):
 
 
 def used_formats(config):
-    """Every format Assetarium uses: the 3D formats and the standalone image formats that are on (decision 0026)."""
+    """Every format Assetarium uses: the 3D formats and the standalone image formats that are on (decision 0031)."""
     return processing_formats(config) + image_formats(config)
 
 
@@ -92,7 +92,7 @@ def validate_descriptions_enabled(value):
 
 
 def descriptions_enabled(config):
-    """Optional descriptions (decision 0014); off never deletes, hides or re-queues existing ones."""
+    """Optional descriptions (decision 0033); off never deletes, hides or re-queues existing ones."""
     return validate_descriptions_enabled(_saved(config).get('descriptions_enabled', True))
 
 
@@ -143,7 +143,7 @@ def validate_search_threads(value, available=None):
 
 
 def search_threads(config):
-    """CPU threads for search data (decision 0022); unset is automatic: the speed test's choice."""
+    """CPU threads for search data (decision 0034); unset is automatic: the speed test's choice."""
     value = _saved(config).get('search_threads')
     return value if type(value) is int and value >= 1 else None
 

@@ -22,7 +22,7 @@ assets, and how each source's results combine into one read-only catalog. Up: [N
 
 - User guide: [Asset sources](../../../docs/asset-sources.md).
 - Contract: [Catalog contract](../../Architecture/Sources%20and%20Catalog/Catalog%20contract.md).
-- Decisions: [0002](../../Decisions/0002-startup-scan-and-change-detection.md) (startup scan, change
+- Decisions: [0027](../../Decisions/0027-saved-catalog-first-and-fast-scan.md) (startup scan, change
   detection), [0028](../../Decisions/0028-result-identity.md) (hash reuse),
   [0019](../../Decisions/0019-source-folders-and-export-variants.md) (excluded folders, export
   variants), [0020](../../Decisions/0020-alternate-file-faults-and-recheck.md) (alternate file

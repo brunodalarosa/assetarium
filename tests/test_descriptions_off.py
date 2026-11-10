@@ -1,4 +1,4 @@
-"""Descriptions turned off (decision 0014): enforced by the backend, and nothing existing is lost."""
+"""Descriptions turned off (decision 0033): enforced by the backend, and nothing existing is lost."""
 import json
 from types import SimpleNamespace
 

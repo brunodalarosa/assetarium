@@ -1,4 +1,4 @@
-"""Packs and bundles detected from folder structure, never from publisher names (decisions 0019, 0023).
+"""Packs and bundles detected from folder structure, never from publisher names (decisions 0019, 0032).
 
 A pack is the folder closest to the assets that carries pack markers (a license, a readme, a preview image,
 internet shortcuts, a versioned name). A folder whose children hold packs is a bundle. Without markers, the

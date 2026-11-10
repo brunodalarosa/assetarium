@@ -73,7 +73,7 @@ def test_scan_and_live_status_count_all_formats_without_creating_work(managed):
     catalog_file = working(scoped).output_path('data', 'catalog.sqlite')
     before = (status_file.read_bytes(), catalog_file.read_bytes())
     revision = sources.revision(config)
-    select(config, [], [])  # Every format off is the paused state (decision 0026).
+    select(config, [], [])  # Every format off is the paused state (decision 0031).
     paused = sources.source_status(config, one)
     assert paused['processing_paused'] and not paused['needs_processing'] and paused['pending'] == 0
     assert paused['format_counts'] == scanned['format_counts']
@@ -198,7 +198,7 @@ def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(mana
     update_record(work, row)
     before = sources.importing_failures(config)
     assert before['assets'] == 1
-    select(config, [], [])  # Every format off is the paused state (decision 0026).
+    select(config, [], [])  # Every format off is the paused state (decision 0031).
     monkeypatch.setattr(source_operations.subprocess, 'Popen', lambda *a, **kw: pytest.fail('No formats should start no worker'))
     with pytest.raises(ConfigError, match='paused'):
         source_operations.start(config, 'process', one['key'])

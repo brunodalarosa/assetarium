@@ -106,7 +106,7 @@ def verify():
         js("['file','image','record'].forEach(n=>lal.setInspectorSection(n,true))")
         browse('image')
         wait("[...$('grid').querySelectorAll('.card')].length===12")
-        assert names() == sorted(['arrow', 'arrow', 'bare', 'banner', 'blink', 'box', 'copy', 'damaged', 'glow', 'linked', 'potion', 'wood']), names()  # wood: a material texture (decision 0023)
+        assert names() == sorted(['arrow', 'arrow', 'bare', 'banner', 'blink', 'box', 'copy', 'damaged', 'glow', 'linked', 'potion', 'wood']), names()  # wood: a material texture (decision 0032)
         assert js("[...$('grid').querySelectorAll('.badges .type')].length===12")
         scroll_cards()
         wait("[...$('grid').querySelectorAll('.thumb img')].length===9")
@@ -171,7 +171,7 @@ def verify():
         browse(query='arrow')
         wait("$('grid').querySelectorAll('.card').length===2")
         report['checks'].append('Keyword search finds both arrow images by name')
-        # Every image is enrolled (decision 0023); the Asset sources tab filters them by kind.
+        # Every image is enrolled (decision 0032); the Asset sources tab filters them by kind.
         js(f"(async()=>{{$('nav-sources').click();await until(()=>lal.state.sourcesView.tree);lal.openSources({json.dumps(source['key'])},'');return true}})()")
         wait("$('type-image')&&lal.state.source.items.length>0")
         js("$('type-image').click()")

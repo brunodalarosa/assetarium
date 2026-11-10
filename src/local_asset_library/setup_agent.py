@@ -1,4 +1,4 @@
-"""Agent-assisted setup through MCP (decisions 0016, 0024); wraps setup_core, which keeps every setup rule.
+"""Agent-assisted setup through MCP (decisions 0029, 0031); wraps setup_core, which keeps every setup rule.
 
 There is no session gate: a connected agent may apply the low-risk values (recorded as set by the agent, with a
 notice the user can act on) at any time. The Blender path, the one executable setup saves, is only ever proposed
@@ -96,12 +96,12 @@ def _change(config, update):
 # ---------------------------- agent changes ---------------------------------
 
 def notice_id(now=None):
-    """Agent setup changes of one day share one notice (decision 0016, as updated by decision 0024)."""
+    """Agent setup changes of one day share one notice (decision 0029)."""
     return 'agent-' + (now or clock()).strftime('%Y%m%d')
 
 
 def agent_change(config, now=None):
-    """No session gate (decision 0024): every tool is available; what it may do is decided by its tier."""
+    """No session gate (decision 0029): every tool is available; what it may do is decided by its tier."""
     return {'id': notice_id(now)}
 
 
@@ -150,7 +150,7 @@ def apply_setup(config, args, now=None):
         answers = answers_checked(args['answers'])
         if answers.get('samples'):
             from .sources import include_samples
-            samples = include_samples(config)  # Decision 0026: the same built-in samples the wizard offers.
+            samples = include_samples(config)  # Decision 0031: the same built-in samples the wizard offers.
         derived, implied = setup_core.settings_from_answers({k: v for k, v in answers.items() if k != 'samples'}, environment(config))
         implied = [item for item in implied if item['key'] not in values]
         values = {**derived, **values}
@@ -455,7 +455,7 @@ def found_lines(env, blender, checks):
 
 
 def status(config, now=None):
-    """What an agent needs to finish setup, and nothing more (decision 0016). The safe checks are done here."""
+    """What an agent needs to finish setup, and nothing more (decision 0031). The safe checks are done here."""
     from . import setup_core
     from .settings import general_settings
     env, blender, state = environment(config), setup_core.blender_report(config), setup_core.setup_state(config)

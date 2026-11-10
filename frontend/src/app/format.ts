@@ -124,7 +124,7 @@ export function notificationContent(item: Json): { tone: Tone; title: string; bo
 }
 export const notificationKey = (item: Json) => item.id + "@" + item.created_utc;
 
-/* Setup and Settings → General share this copy (decision 0014). */
+/* Setup and Settings → General share this copy (decision 0031). */
 export const BUDGET_HELP =
   "The budget caps the disk space Assetarium itself uses: everything in its folder (code, Python environments and caches, project-local models, generated data, logs and scratch) plus the library store that holds every preview, description and search result, wherever it is, counting hard-linked files once. Your original assets and models in a shared folder outside Assetarium don’t count. Make previews and Generate descriptions measure before they start and after each stage; at the budget they stop and keep finished work. One stage can go past it before the run stops.";
 export const DESCRIPTIONS_OFF =

@@ -1,6 +1,6 @@
 """Library folders, their working data in the library store and the combined read-only catalog.
 
-Nothing is written into a library folder (decision 0023). Each folder's working data lives in the store
+Nothing is written into a library folder (decision 0032). Each folder's working data lives in the store
 under ``folders/<id>/``; results keyed by inputs are shared by the whole store. Logical data/ paths are
 retained in records, and only this resolver translates them to store directories.
 """
@@ -90,7 +90,7 @@ def _validate_directory(config, value, require_exists=True):
     if require_exists and not resolved.is_dir():
         raise ConfigError("Asset source directory is unavailable")
     if resolved == samples_folder(config):
-        return resolved  # The one folder inside Assetarium that may be a library folder: its tracked samples (decision 0026).
+        return resolved  # The one folder inside Assetarium that may be a library folder: its tracked samples (decision 0031).
     for other in (config.project_root, config.models_root, config.library_root):
         if other and (resolved.is_relative_to(other) or other.is_relative_to(resolved)):
             raise ConfigError("Library folders must not overlap Assetarium, its library store or shared models")
@@ -309,7 +309,7 @@ def generated_path(config, relative):
         return None
     from .result_store import shared_area
     if shared_area(relative):
-        # Results keyed by inputs belong to the whole library store, whichever folder an asset is in (decision 0023).
+        # Results keyed by inputs belong to the whole library store, whichever folder an asset is in (decision 0028).
         return _inside(config.library_store(), relative)
     if config.metadata_root:
         root = config.metadata_root
@@ -406,7 +406,7 @@ def add(config, directory):
 
 def carry_settings(settings, child_settings, child, prefix):
     """A replaced folder's exclusions, export decisions and texture folder, rewritten under ``prefix`` into the
-    settings of the folder added around it (decision 0023: its answers stay attached to its folders). The new
+    settings of the folder added around it (decision 0032: its answers stay attached to its folders). The new
     folder's own answer wins a conflict; each conflict is returned as a note."""
     from .catalog import digest
     under = lambda path: f'{prefix}/{path}' if path else prefix
@@ -484,7 +484,7 @@ def read_records(config):
 def import_outcome(record, embedding_failed=None):
     """Classify saved import attempts without retrying retained faults.
 
-    Descriptions are optional extra data (decision 0008): a pending or failed
+    Descriptions are optional extra data (decision 0033): a pending or failed
     caption is neither import work nor an import failure. A failed prerequisite
     blocks its dependent stages. Scanning changed source files resets durable
     stage states to pending. ``embedding_failed`` reports image-vector faults.
@@ -607,7 +607,7 @@ def source_status(config, source):
         status = dict(status, **read_json(fault_path), needs_processing=True)
     answered = {d['id'] for d in export_decisions(scoped)}  # Hidden at once; the rescan the answer starts confirms it.
     status['export_suggestions'] = [s for s in status.get('export_suggestions', []) if s['id'] not in answered]
-    # Offline: the folder cannot be reached (a removed drive); its results and collection entries stay (decision 0023).
+    # Offline: the folder cannot be reached (a removed drive); its results and collection entries stay (decision 0032).
     status['offline'] = not Path(source['path']).is_dir()
     return {**source, **status,
             'exclusions': excluded_folders(scoped), 'export_decisions': export_decisions(scoped),
@@ -786,7 +786,7 @@ def scan_source(config, source, progress=None):
     previous = read_records(work) or read_records(scoped)
     from . import library_store
     for child in library_store.replaced(config, source["id"]):
-        # A folder this one was added around: its records carry over with their results (decision 0023).
+        # A folder this one was added around: its records carry over with their results (decision 0032).
         prefix = Path(child["path"]).relative_to(Path(source["path"])).as_posix()
         child_scoped = bound(config, child)
         mine = {r["asset_id"] for r in previous}

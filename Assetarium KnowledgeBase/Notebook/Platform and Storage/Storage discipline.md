@@ -9,7 +9,7 @@ branch:
 
 Hub: [Platform and Storage](Platform%20and%20Storage.md). Moved from `docs/storage.md` on 2026-10-28; the binding rules are in `AGENTS.md` → Storage discipline.
 
-Generated asset results live in the library store (decision 0023), by default the ignored
+Generated asset results live in the library store (decision 0032), by default the ignored
 `data/library-store/`. Processing and migration receipts measure unique allocation across this
 project **and** the store when it lives elsewhere, deduplicating file identities.
 The standalone `storage-report.py` still reports just the selected project root;
@@ -50,7 +50,7 @@ pytest/verification folders in `scratch/` are removed only by the explicit
 two-step `scripts/cleanup-scratch.py --plan` / `--apply PLAN`.
 
 `cache/file-hashes.sqlite` records verified hashes by file identity for every LAL
-process (decision 0004); its size grows with the number of files ever hashed (tens of
+process (decision 0028); its size grows with the number of files ever hashed (tens of
 MB for a large library). It holds no evidence: deleting it only makes the next scan or
 search re-hash files once. Tests and synthetic verify scripts use their own records
 (`tests/conftest.py`, `gui_harness.isolate_hash_cache` → `scratch/hash-cache/`). With the

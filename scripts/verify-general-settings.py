@@ -74,7 +74,7 @@ def verify():
         ui.wait_ready(extra='lal.state.sources.length===2')
         ui.js("$('nav-settings').click()")
         wait("$('general-panel')&&!$('general-panel').hidden&&$('storage-budget')&&!$('storage-budget').disabled&&$('storage-budget').value==='10'")
-        assert ui.js("!$('asset-sources-panel')&&!document.querySelector('#settings-view [role=tablist]')")  # General only (decision 0023).
+        assert ui.js("!$('asset-sources-panel')&&!document.querySelector('#settings-view [role=tablist]')")  # General only (decision 0032).
         assert not settings_path(config).exists()
         assert ui.js("[...$('processing-format').querySelectorAll('[role=checkbox]')].every(box=>box.getAttribute('aria-checked')==='true')")
         assert ui.js("$('caption-batch-size').dataset.value==='8'&&!$('caption-batch-size').querySelector('[aria-haspopup=listbox]').disabled")
@@ -102,7 +102,7 @@ def verify():
         ui.js("(async()=>{$('nav-home').click();await until(()=>$('library-view'));$('nav-settings').click();return true})()")
         wait("$('storage-budget')&&$('storage-budget').value==='24'&&!$('storage-budget').disabled&&$('caption-batch-size').dataset.value==='4'")
         assert ui.js("['gltf','fbx','obj'].map(f=>$('processing-format-'+f).getAttribute('aria-checked')).join()==='true,false,false'")
-        # Every format off (3D and images, decision 0026) is the paused state: nothing is shown or processed.
+        # Every format off (3D and images, decision 0031) is the paused state: nothing is shown or processed.
         ui.js("(async()=>{$('processing-format-gltf').click();['png','jpeg','svg','webp','tga','tiff','bmp','gif','avif'].forEach(f=>$('image-format-'+f).click());await frame();$('save-general-settings').click();return true})()")
         wait("$('general-settings-message').textContent.includes('Every format is off')")
         wait("lal.state.sources.every(source=>source.processing_paused&&!source.needs_processing)")

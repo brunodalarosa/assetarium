@@ -7,7 +7,7 @@ branch: feature/library-view
 ---
 # Processing queue
 
-Hub: [Processing](Processing.md). Make previews and Generate descriptions as queue items (decision 0023).
+Hub: [Processing](Processing.md). Make previews and Generate descriptions as queue items (decision 0032).
 Start at `processing_queue.add` and `processing_queue.advance`.
 
 ## How it works
@@ -31,7 +31,7 @@ Start at `processing_queue.add` and `processing_queue.advance`.
   measurement); `place` then reports `pending`, so the inspector keeps Update search instead of losing the update.
 - `scripts/source-operation.py` calls `advance` when **any** operation ends (scans and speed tests too), so an
   item whose start found its folder busy (`start` returned `busy`) never stalls.
-- **The open app owns the queue** (decision 0023, November 4, 2026). `DesktopBridge` calls `claim` at startup
+- **The open app owns the queue** (decision 0032, November 4, 2026). `DesktopBridge` calls `claim` at startup
   (previous owner dead without `closing` = a crash: its items go to Recent as `stopped` with the log name) and
   `release` in `_close` (cancel the running item, put it back as `waiting`, mark every item `stopped_on_close`,
   pause, `owner.closing`). `advance` passes the live owner pid to `start(owner=…)`; the worker gets `--owner`

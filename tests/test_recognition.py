@@ -1,4 +1,4 @@
-"""Identity by recognition (decision 0023): IDs are assigned once and kept through moves and reorganizations."""
+"""Identity by recognition (decision 0032): IDs are assigned once and kept through moves and reorganizations."""
 import json
 from pathlib import Path
 import shutil

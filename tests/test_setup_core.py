@@ -1,4 +1,4 @@
-"""Setup rules (decision 0014): environment report, Blender checks and writer, first-run rule, setup record."""
+"""Setup rules (decision 0031): environment report, Blender checks and writer, first-run rule, setup record."""
 import json
 import os
 from pathlib import Path
@@ -214,9 +214,6 @@ def test_first_run_matrix(tmp_path):
     setup_core.setup_path(config).unlink()
     atomic_json(settings_path(config), {'schema_version': 1})
     assert setup_core.first_run(config)['existing']['settings'] and not setup_core.first_run(config)['fresh']
-    settings_path(config).unlink()
-    atomic_json(config.sources_registry, {'schema_version': 1, 'sources': [{'key': 'x'}]})
-    assert setup_core.first_run(config)['existing']['sources'] and not setup_core.first_run(config)['fresh']
 
 
 def test_existing_sources_are_never_ambushed(tmp_path):

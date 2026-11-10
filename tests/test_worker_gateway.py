@@ -1,4 +1,4 @@
-"""The embedding worker only returns vectors; ranking stays in the caller (decision 0005)."""
+"""The embedding worker only returns vectors; ranking stays in the caller (the Search embedders note)."""
 import asyncio
 import sys
 

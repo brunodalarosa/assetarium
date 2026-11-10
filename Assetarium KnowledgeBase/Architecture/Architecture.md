@@ -49,10 +49,10 @@ Roughly by how long the system takes to understand, longest first:
 2. [Publication and generations](Sources%20and%20Catalog/Publication%20and%20generations.md): per-source
    publications, the combined catalog and index, pinned generations, retention (system).
 3. [Parallel rendering](Processing/Parallel%20rendering.md): kept-open Blender hosts, devices,
-   the speed test (system; decision 0022 holds most of it today).
+   the speed test (system; decision 0034 holds most of it today).
 4. [Search ranking](Search/Search%20ranking.md): channels, weighted RRF, bounded shortlists and
    response caps (system).
 5. [Setup](Setup%20and%20Engines/Setup.md): `setup_core` shared by the wizard, the CLI and the
-   agent session (system; decisions 0014 and 0016).
+   agent session (system; decision 0031).
 6. [Collections and tags](Desktop%20App/Collections%20and%20tags.md): owner data, leases, agent
-   writes, exports (system; decision 0012).
+   writes, exports (system; decision 0036).

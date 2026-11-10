@@ -37,7 +37,7 @@ Read-only investigation may prepare this checkpoint. Confirm it again if the sco
 | Existing repository | this checkout |
 | This reference | `KnowledgeBase/Architecture/Roadmap/Expansion plan.md` |
 | Source originals | Existing configured source roots; read only |
-| Generated results | The library store (`[storage].library`, decision 0023) |
+| Generated results | The library store (`[storage].library`, decision 0032) |
 | Combined indexes, caches, settings, reports | Existing project-local configured storage |
 | Shared model revisions | Configured `[storage].models` |
 | Implementation agent | Scoped implementation, migrations, verification, receipts, and handoff |
@@ -50,7 +50,7 @@ Preserve the existing project and neighboring projects. Do not recreate the repo
 Read-only planning inspection on October 18, 2026 found:
 
 - The catalog and processing pipeline are centered on logical 3D models. Inventory recognizes texture and preview images, but generic images are not yet first-class searchable assets. Format-selection settings are also model-oriented.
-- The current pipeline has inspection, caption, and embedding stages, with immutable publication generations, source-side generated results, owner overlays, fault records, and shared desktop/MCP retrieval. Under decisions 0007-0008, **Process assets** performs inspection/previews and image search vectors, then publishes; optional **Generate descriptions** separately batches missing descriptions, builds description vectors, then publishes. Importing never generates descriptions.
+- The current pipeline has inspection, caption, and embedding stages, with immutable publication generations, source-side generated results, owner overlays, fault records, and shared desktop/MCP retrieval. Under decision 0033, **Process assets** performs inspection/previews and image search vectors, then publishes; optional **Generate descriptions** separately batches missing descriptions, builds description vectors, then publishes. Importing never generates descriptions.
 - `blender_worker.py` enumerates armatures/actions and explicitly does not play or behaviorally validate them. Enumeration is not animation support.
 - Captioning uses `Qwen/Qwen3-VL-2B-Instruct`, pinned in `docs/caption-model.json`. The active adapter consumes actual images. Video support advertised by the publisher has not been validated in Assetarium.
 - Embeddings use `google/embeddinggemma-2`, pinned in `docs/embedding-model.json`, with normalized 768-dimensional vectors. `embedding_backend.py` explicitly disables audio using `audio_config=None`; its current contract accepts text and image only.
@@ -160,7 +160,7 @@ Done when: a user can select a sheet, inspect known frames, play a defined seque
 
 ### Step 4 - Textures and material sets
 
-> **Draft change for owner review (asset library rework, decision 0023, D15):** individual texture records exist
+> **Draft change for owner review (asset library rework, decision 0032, D15):** individual texture records exist
 > now: images are classified as model textures, **material textures** (browsable, found by name) or 2D
 > images. This step covers only linked **material sets** on top of them.
 

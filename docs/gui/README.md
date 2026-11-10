@@ -233,7 +233,7 @@ the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones 
 Closing the app while work runs asks first; **Stop & close** stops it at once, and the next start shows
 "2 items stopped when you closed Assetarium" with **Continue** (after a crash the items go to Recent with
 **Show log** instead). **Running** shows progress, **Cancel**
-(the running renders finish and are saved first; decision 0022) and a live log with copy buttons on errors
+(the running renders finish and are saved first; decision 0034) and a live log with copy buttons on errors
 and warnings. **Blocked** groups work that can't run here by reason, with the fix and how many assets it
 unblocks; it is never offered as something to process. **Recorded failures** groups faults by stage and
 reason with **Copy**, **Recheck…** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md))
@@ -315,7 +315,7 @@ built-in sample images: setup runs it after Save, **Run check** runs it once the
 installed, and Make previews runs it by itself when it is missing.
 
 Enabled library folders are scanned at startup; the app watches cheap file stamps every
-1.5 s and reloads library or folder data only when one changes (decision 0002).
+1.5 s and reloads library or folder data only when one changes (decision 0027).
 Processing never starts automatically.
 
 **Keyboard.** Tab/Shift+Tab move between controls, arrows/Home/End move within

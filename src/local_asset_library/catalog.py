@@ -176,7 +176,7 @@ def walk_source(config, progress=None, phase='Checking files'):
                 if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                     raise ConfigError(f"Source changed while hashing: {relative}")
                 row.update(size=after.st_size, mtime_ns=after.st_mtime_ns)
-                # The shared record lets runtime checks reuse scan hashes (decision 0004).
+                # The shared record lets runtime checks reuse scan hashes (decision 0028).
                 if shared == hash_cache.file_identity(source):
                     hash_cache.store(source, shared, row["sha256"])
                 next_cache[relative] = {"identity": identity, "sha256": row["sha256"]}

@@ -36,7 +36,7 @@ _blender_runtime = {}
 _catalog = threading.RLock()
 GPU_WAIT = 30  # Seconds GPU renders wait for another GPU job, like the other GPU stages.
 # blender_worker.py edits whose CPU renders are proven identical (scripts/check-render-stability.py), mapped
-# to the hash finished inspections recorded, so an equivalent edit never re-queues them (decision 0022).
+# to the hash finished inspections recorded, so an equivalent edit never re-queues them (decision 0028).
 EQUIVALENT_WORKERS = {
     '69520d2225259116d055fb94d8c4948b5bb8e020773b3e9889885632dee6f690':  # Render device from the job (LF)
         'ba0252a27ec2cff5957dace405ad91d6a9d83cd868da797700433d9aa5ecc014',
@@ -117,7 +117,7 @@ def checkpoint(db, identifier, stage, fingerprint, status, evidence):
 
 
 def inspection_input(config, record, resolution=640, content_only=False, formats=None, recorded=None):
-    """(asset, source, reason, key): the key hashes content, relative dependency paths, settings and code (decision 0023)."""
+    """(asset, source, reason, key): the key hashes content, relative dependency paths, settings and code (decision 0028)."""
     from .asset_structure import asset_type
     if asset_type(record) == 'image':
         from .image_inspection import inspection_input as image_input
@@ -205,7 +205,7 @@ def default_prompt_version(record):
 
 
 def caption_views(config, record):
-    """Caption inputs by view content (decision 0023): a view's path is where it is stored, not what the model sees."""
+    """Caption inputs by view content (decision 0028): a view's path is where it is stored, not what the model sees."""
     return [{"sha256": p.get("sha256"), "view_label": p.get("view_label"), "actual": s.get("current_sha256", "unreadable" if "error" in s else None)}
             for s in input_state(config, record) for p in [s["preview"]]]
 
@@ -214,8 +214,8 @@ def caption_input(config, record, prompt_version=None, generation=None, recorded
     # Model/runtime contracts and prompt affect inference. Severity/owner review do not.
     # Completed captions retain their generation prompt and mode for cache validation;
     # adopting a new default is not a request to regenerate existing results.
-    # The built-in engine's fingerprint inputs are frozen evidence (decision 0007), so this
-    # function knows them; other engines contribute their identity and adapter (decision 0015).
+    # The built-in engine's fingerprint inputs are frozen evidence (decision 0028), so this
+    # function knows them; other engines contribute their identity and adapter (decision 0033).
     from .caption_batching import MODE, POLICY
     from . import engine_server
     provenance = (record.get('caption_provenance') or {}) if record['processing'].get('caption') == 'complete' else {}
@@ -390,7 +390,7 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
             _blender_runtime[key] = discover_blender(config)
         blender, runtime = _blender_runtime[key]
     from .result_store import adopt, result_path
-    relative = result_path('inspection', fingerprint)  # Keyed by inputs: duplicates share it (decision 0023).
+    relative = result_path('inspection', fingerprint)  # Keyed by inputs: duplicates share it (decision 0028).
     output = config.output_path("data", relative)
     root = config.library_store() if config.sources_registry else config.storage_root('data')
     job = {"schema_version": 1, "project_root": str(config.project_root), "source_root": str(config.source_root),

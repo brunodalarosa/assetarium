@@ -125,7 +125,7 @@ the background when it opens; the worker loads its Python libraries only (no
 model, no GPU). The first semantic query loads the model (offline shared weights
 in `[storage].models`), and the worker unloads it after ten idle minutes
 or when a processing batch needs the GPU. The worker only returns query vectors:
-vectors, verification and ranking stay in the app process (decision 0005).
+vectors, verification and ranking stay in the app process (the Search embedders note).
 Heartbeats every five seconds separate a slow first load from a stopped worker,
 which is retained as a fault after 90 silent seconds. MCP and other
 GUI instances have their own workers and can contend for GPU memory. This app

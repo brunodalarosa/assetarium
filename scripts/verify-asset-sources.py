@@ -1,4 +1,4 @@
-"""Verify the Asset sources tab and the processing queue (decision 0023) in the real WebView2 shell.
+"""Verify the Asset sources tab and the processing queue (decision 0032) in the real WebView2 shell.
 
 Synthetic library folders only: a kit with duplicate export folders, a pack with a license and a preview, loose
 images. Checks the rail item, the tree (packs, coverage, keyboard), cards in their work states, the folder panel

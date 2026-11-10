@@ -31,7 +31,7 @@ Binding: [decision 0032](../../Decisions/0032-library-store-and-queue.md).
   content as a present asset is a duplicate with its own formula ID. Vanished assets become
   Missing with a record snapshot until `forget_missing`. Every non-trivial recognition is in the
   `recognition` table (`library_store.history`).
-- **Fast scans** (decision 0027): the walk reuses hashes by stat identity (decision 0004); what a
+- **Fast scans** (decision 0027): the walk reuses hashes by stat identity (decision 0028); what a
   file's bytes say (FBX texture names, glTF/OBJ/MTL/DAE references) comes from
   `parse_cache.py` (`parse-cache.sqlite` in the store), keyed by SHA-256, the parser kind (which
   includes the file extension: the same bytes as `.glb` and `.gltf` parse differently) and the

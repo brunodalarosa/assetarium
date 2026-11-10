@@ -453,7 +453,7 @@ def scope(config, filters):
 
 
 def matches(record, filters, allowed=None, formats=None):
-    """``formats`` (settings.used_formats) hides assets whose formats are all off (decision 0026); None keeps every one."""
+    """``formats`` (settings.used_formats) hides assets whose formats are all off (decision 0030); None keeps every one."""
     if allowed is not None and record["asset_id"] not in allowed:
         return False
     if formats is not None:
@@ -618,7 +618,7 @@ class SearchEngine:
                         selected.append(row)
                         values.append(position)
                     except (OSError, ValueError) as exc:
-                        # Descriptions are optional (decision 0008): a stale or invalid one
+                        # Descriptions are optional (decision 0033): a stale or invalid one
                         # only leaves its channel; the asset still ranks by image and keyword.
                         if channel != "description":
                             excluded.append({"asset_id": row[1], "channel": channel, "reason": str(exc)})

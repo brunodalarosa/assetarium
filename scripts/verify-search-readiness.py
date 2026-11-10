@@ -2,7 +2,7 @@
 
 A `.venv-embedding` holding only the base project (what a wrapper sync without --project leaves)
 must give a search error naming the install command, start no worker and keep no fault; Settings →
-General → Search lists it as missing with the command, Run check (the search check, decision 0026) explains
+General → Search lists it as missing with the command, Run check (the search check, decision 0031) explains
 that it needs the runtime, and Check again sees it fixed. Writes
 data/gui/<run-name>/verification.json.
 """
@@ -83,7 +83,7 @@ def verify():
                      f"&&{CHECK}.textContent.includes('Runs once the search runtime and model above are installed')")
         ui.capture('02b-search-check-waits-for-runtime.png')
         report['checks'].append('The search check is never a command; while the runtime is missing it offers no button that '
-                                'could only fail, and says what it waits for (design principle P3, decision 0026)')
+                                'could only fail, and says what it waits for (design principle P3, decision 0031)')
         install('torch', '2.10.0+cu128')
         install('sentence_transformers', '6.1.0')
         ui.js("$('search-readiness-check').click()")

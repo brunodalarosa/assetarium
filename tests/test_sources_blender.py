@@ -27,7 +27,7 @@ def test_blender_renders_into_the_job_output_root_and_preserves_original(small_f
     assert result['status']=='complete' and len(result['previews'])>=3
     assert result['source_path']=='source-key/cube.obj'
     assert source.read_bytes()==before
-    # Nothing is written into the source (decision 0023): an output root inside it is refused.
+    # Nothing is written into the source (decision 0032): an output root inside it is refused.
     inside=config.source_root/'generated';output=inside/'inspection/fixture';output.mkdir(parents=True)
     completed=render(config,inside,output,source)
     assert completed['returncode']!=0 and 'Invalid output boundary' in completed['output']

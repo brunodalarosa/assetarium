@@ -1,4 +1,4 @@
-"""Real WebView2 check of agent setup (decisions 0016, 0024) with a real STDIO MCP client, on an isolated fresh project.
+"""Real WebView2 check of agent setup (decisions 0029, 0031) with a real STDIO MCP client, on an isolated fresh project.
 
 The app shows both setup paths; Set up with my agent shows the panel (no session to open) and it waits; a
 synthetic Claude Code entry for a deleted copy is named with its fix, and Check again confirms the repair; a
@@ -166,7 +166,7 @@ def verify():
         report['checks']['status_carries_the_guide_and_only_the_users_questions'] = True
         applied, error = agent.call('apply_setup', {'answers': {'engines': ['godot'], 'descriptions': False, 'storage_gib': 30, 'samples': True}})
         assert not error and applied['status'] == 'applied' and applied['settings']['processing_formats'] == ['gltf'], applied
-        assert applied['samples']['status'] == 'added', applied  # The user said yes to the built-in samples (decision 0026).
+        assert applied['samples']['status'] == 'added', applied  # The user said yes to the built-in samples (decision 0031).
         report['checks']['agent_adds_the_samples_when_the_user_says_yes'] = True
         wait("$('agent-values').querySelector('[data-key=processing_formats] [data-set-by=agent]')", 15)
         ui.check('agent_values_appear_live_with_attribution', """(async()=>({formats:$('agent-values').querySelector('[data-key=processing_formats]').textContent.includes('glTF'),

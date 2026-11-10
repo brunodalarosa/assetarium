@@ -1,4 +1,4 @@
-"""Verify variant groups and pack profiles (decision 0024) in the real WebView2 shell with a synthetic pack.
+"""Verify variant groups and pack profiles (decision 0035) in the real WebView2 shell with a synthetic pack.
 
 Checks one card per variant group with its corner badge and chips, that a chip switches the card, the inspector's
 variant picker and "Generate separate descriptions for each variant" switch (saved as a pack profile rule), the pack's

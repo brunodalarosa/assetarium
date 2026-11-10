@@ -172,7 +172,7 @@ function Empty() {
   );
 }
 
-/** Browse by place (decision 0023): library folders → bundles → packs → folders, with the shared grid and inspector. */
+/** Browse by place (decision 0032): library folders → bundles → packs → folders, with the shared grid and inspector. */
 export function AssetSources() {
   const tree = useApp((s) => s.sourcesView.tree);
   const loading = useApp((s) => s.sourcesView.loading);

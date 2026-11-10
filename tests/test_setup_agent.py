@@ -1,4 +1,4 @@
-"""Agent setup through MCP (decisions 0016, 0024): no session gate, proposals, degraded mode, connection records, notices, bounds."""
+"""Agent setup through MCP (decisions 0029, 0031): no session gate, proposals, degraded mode, connection records, notices, bounds."""
 import asyncio
 from datetime import datetime, timedelta, timezone
 import json
@@ -76,7 +76,7 @@ def test_setup_tools_are_declared_described_and_annotated():
 
 
 def test_writes_need_no_session_and_one_notice_collects_a_day(project, blender):
-    # Decision 0024 replaced the session gate with tiers: applying is recorded and noticed, Blender is only proposed.
+    # Decision 0029 replaced the session gate with tiers: applying is recorded and noticed, Blender is only proposed.
     assert call(project, 'apply_setup', {'storage_budget_gib': 20})[0]['status'] == 'applied'
     CLOCK[0] = START + timedelta(hours=1)
     assert call(project, 'apply_setup', {'storage_budget_gib': 30})[0]['status'] == 'applied'

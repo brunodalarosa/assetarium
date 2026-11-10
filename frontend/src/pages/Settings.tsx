@@ -84,7 +84,7 @@ interface RenderDraft {
   memory: string;
 }
 
-/** Device, renders at a time and memory (decision 0022); saved with the form, the speed test starts here. */
+/** Device, renders at a time and memory (decision 0034); saved with the form, the speed test starts here. */
 function Rendering({ draft, onDraft, disabled }: { draft: RenderDraft; onDraft: (draft: RenderDraft) => void; disabled: boolean }) {
   const render = useApp((s) => s.render);
   const values = render.values;
@@ -120,7 +120,7 @@ function Rendering({ draft, onDraft, disabled }: { draft: RenderDraft; onDraft: 
 
 const CHECK_STATUS: Record<string, string> = { passed: "Ready.", warning: "Works, with a warning.", failed: "This executable can’t be used.", cancelled: "Check cancelled." };
 
-/** The saved Blender, its check, and the wizard's Blender step to change it (decision 0014). */
+/** The saved Blender, its check, and the wizard's Blender step to change it (decision 0031). */
 function BlenderInstallation() {
   const b = useApp((s) => s.blender);
   const report = b.report;
@@ -187,7 +187,7 @@ function SpeedTestLink({ running }: { running?: boolean }) {
   );
 }
 
-/** One test for the render device, renders at a time and, on the CPU, search data threads (decision 0022). */
+/** One test for the render device, renders at a time and, on the CPU, search data threads (decision 0034). */
 function SpeedTest() {
   const render = useApp((s) => s.render);
   const values = render.values;
@@ -351,7 +351,7 @@ export function Settings({ tab = "general" }: { tab?: SettingsTab }) {
     <div id="settings-view" className="h-full overflow-y-auto overscroll-contain px-8 pb-12 scroll-thin">
       <div className="mx-auto grid max-w-[1120px] gap-6">
         <h1 id="settings-title" tabIndex={-1} className="text-[26px] font-semibold outline-none">Settings</h1>
-        {/* General is the only section: library folders live in the Asset sources tab (decision 0023). */}
+        {/* General is the only section: library folders live in the Asset sources tab (decision 0032). */}
         <section id="general-panel" aria-labelledby="settings-title" data-tab={tab}><General /></section>
       </div>
     </div>

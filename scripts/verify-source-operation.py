@@ -71,7 +71,7 @@ try:
     stopped=wait_operation(True);report['cancelled_operation']=stopped
     assert stopped['status']=='cancelled',stopped
     with closing(sqlite3.connect(scoped.output_path('data','library/jobs.sqlite'))) as db:
-        # Parallel renders (decision 0022): every running inspection finishes and is checkpointed.
+        # Parallel renders (decision 0034): every running inspection finishes and is checkpointed.
         assert db.execute("SELECT count(*) FROM jobs WHERE stage='inspection' AND status='complete'").fetchone()[0]>=1
         assert db.execute("SELECT count(*) FROM jobs WHERE stage='inspection' AND status='running'").fetchone()[0]==0
     report['checks'].append('Cancel finishes the running inspections and saves their checkpoints')

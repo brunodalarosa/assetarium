@@ -1,4 +1,4 @@
-"""CPU threads for search data (decision 0022): a short speed test, the owner's setting, the count used.
+"""CPU threads for search data (decision 0034): a short speed test, the owner's setting, the count used.
 
 The test embeds six synthetic images (never library previews; the model's fixed image token budget
 makes cost independent of content) with the already loaded CPU embedder at the physical core count,

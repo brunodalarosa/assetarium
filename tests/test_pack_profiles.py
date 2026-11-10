@@ -1,4 +1,4 @@
-"""Pack profiles: a pack's answers as one versioned rule set, its effect, its signals and its file (decision 0024)."""
+"""Pack profiles: a pack's answers as one versioned rule set, its effect, its signals and its file (decision 0035)."""
 from contextlib import closing
 import json
 from pathlib import Path

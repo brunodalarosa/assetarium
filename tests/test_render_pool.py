@@ -1,4 +1,4 @@
-"""Parallel kept-open Blender renders: planning limits, slot faults, parallel processing (decision 0022)."""
+"""Parallel kept-open Blender renders: planning limits, slot faults, parallel processing (decision 0034)."""
 from contextlib import closing
 import hashlib
 import json
