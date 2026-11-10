@@ -770,12 +770,15 @@ class DesktopBridge:
                 return {'status': 'invalid', 'reason': str(exc)}
         if saved['status'] == 'unchanged' or not saved['key']:
             return saved
-        from .processing_queue import add
+        from .processing_queue import add, mark_search_pending
         try:
+            # Marked first: until an update finishes, the inspector offers Update search (queued, declined or faulty).
+            mark_search_pending(self._config, saved['key'], saved['asset_id'])
             search = add(self._config, 'descriptions', {'key': saved['key'], 'asset_ids': [saved['asset_id']], 'mode': 'edited'})
         except ConfigError as exc:  # The edit stays saved; the inspector shows that search still uses the earlier text.
             search = {'status': 'faulty', 'reason': str(exc)}
-        return {**saved, 'search': {k: search.get(k) for k in ('status', 'title', 'body', 'reason')}}
+        # A ``confirm`` (storage budget, no measurement yet) queued nothing: the inspector asks with these details.
+        return {**saved, 'search': {k: search.get(k) for k in ('status', 'title', 'body', 'reason', 'confirm_label')}}
 
     def thumbnail(self, asset_id, expected_version=None):
         return self._wait(self._present(self._service.thumbnail, asset_id, expected_version))

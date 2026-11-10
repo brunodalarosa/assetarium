@@ -1239,7 +1239,8 @@ export async function makeDescriptions(scope: { key: string; path?: string; asse
 /** The inspector's description action for one asset: Generate (none), Try again (failed) or Update search (edited). */
 export async function describeAsset(id: GridId, edit: Json, mode: "generate" | "retry" | "edited" = "generate") {
   // The description line shows where the work stands, so only a refusal gets a toast.
-  const result = await queueAction("descriptions", { key: edit.key, asset_ids: [edit.asset_id], ...(mode === "generate" ? {} : { mode }) }, 1, false, true);
+  const result = await queueAction("descriptions", { key: edit.key, asset_ids: [edit.asset_id], ...(mode === "generate" ? {} : { mode }) }, 1, false, true,
+    () => refreshDescription(id));  // A confirmed add: the line follows the work it queued.
   await refreshDescription(id);
   return result;
 }
@@ -1265,12 +1266,17 @@ export async function refreshDescription(id: GridId = activeGridId()) {
 function describingShown() {
   const detail = state[activeGridId()].detail;
   const work = (detail?.description || detail?.result?.payload?.presentation)?.description_edit?.work;
-  return Boolean(work && work.status !== "faulty");
+  return Boolean(work && work.status !== "faulty" && work.status !== "pending");
 }
 /** Save the owner's corrected description; search follows through a queued update (re-embed, publish). */
 export async function editDescription(id: GridId, assetId: string, fields: Json): Promise<Json> {
   const result = await api().edit_description(assetId, fields);
-  if (result.status === "saved") {
+  if (result.status === "saved" && result.search?.status === "confirm") {
+    // Nothing was queued yet (storage budget or no measurement): ask with the estimate; Not now keeps Update search.
+    const search = result.search, scope = { key: result.key, asset_ids: [result.asset_id], mode: "edited" };
+    askConfirm({ title: search.title, body: search.body, confirmLabel: search.confirm_label, cancelLabel: "Not now", tone: "neutral",
+      run: async () => { await queueAction("descriptions", scope, 1, true, true); await refreshDescription(id); } });
+  } else if (result.status === "saved") {
     const search = result.search || {};
     pushToast(search.status === "faulty"
       ? { tone: "warning", title: "Description saved", body: "Search still uses the earlier text: " + search.reason }
@@ -1285,14 +1291,16 @@ export async function openDescriptionSetup() {
   if (!state.setup.open) await openSetup();
   await changeSetupStep("descriptions");
 }
-export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false, quiet = false): Promise<Json> {
+/** ``confirmedThen`` runs after a confirmed add (the caller already returned when the dialog opened). */
+export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false, quiet = false,
+                                  confirmedThen?: () => unknown): Promise<Json> {
   try {
     const result = await api().queue_add(action, scope, confirmed);
     if (result.status === "faulty") throw Error(result.reason);
     if (result.status === "confirm") {
       // Over 30 minutes, or the storage budget would be reached: ask first with the estimate.
       askConfirm({ title: result.title, body: result.body, confirmLabel: result.confirm_label, tone: "neutral",
-        run: () => queueAction(action, scope, count, true, quiet) });
+        run: async () => { await queueAction(action, scope, count, true, quiet); await confirmedThen?.(); } });
       return result;
     }
     const undo = result.undo ? [{ label: "Undo", run: () => void api().queue_remove(result.item.id).then(loadQueue) }] : undefined;

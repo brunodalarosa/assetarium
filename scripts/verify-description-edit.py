@@ -3,7 +3,8 @@
 Synthetic models only, no model or GPU: queued work is recorded instead of spawned (operation state written by the
 script), and "descriptions set up" is switched by the script. Covers generated (Edit, the Generated tooltip naming
 the model), the edit form (prose first, More details folded, a rule the edit breaks shown inline), edited (label,
-Show original, the search update waiting, running, failed with Update search, then done), none (Generate
+Show original, the search update waiting, running, failed with Update search, then done; a declined confirmation
+keeps Update search until an update finishes), none (Generate
 description → queued in line → running), failed (reason, Try again), not set up (Set up descriptions opens the
 setup wizard's descriptions step), no owner-review or approval wording, and no card "Review" chip.
 Evidence: data/gui/<run-name>/.
@@ -99,6 +100,7 @@ def capture(name):
     ui.capture(name)
 
 NEW = 'A blue wooden barrel with dark iron hoops, a round lid and a short spout near the bottom edge.'
+NEW2 = 'A blue wooden barrel with dark iron hoops, a round lid and a brass spout near the bottom edge.'
 DROPPED = ['Owner review', 'Review pending', 'Artistic suitability', 'Approve', 'Approved', ' AI ']
 SECTION = "$('detail').querySelector('.inspector-description')"
 STATE = f"{SECTION}?.dataset.state"
@@ -171,6 +173,32 @@ def verify():
         finish()
         check('search_update_done', f"""(async()=>{{await lal.refreshDescription('library');await until(()=>!{SECTION}.querySelector('.search-update'));
           return {{edited:{STATE}==='edited',text:{SECTION}.querySelector('.description-text').textContent==={json.dumps(NEW)}}}}})()""")
+
+        # The update asks first (storage budget, no measurement yet); Not now queues nothing and keeps Update search.
+        measured = processing_queue.unmeasured
+        processing_queue.unmeasured = lambda value: True
+        check('declined_confirmation_keeps_update_search', f"""(async()=>{{{BUTTON}('Edit').click();await until(()=>$('description-edit'));
+          typeArea($('description-edit'),{json.dumps(NEW2)});await frame();
+          const told=()=>lal.state.toasts.filter(t=>/in the background/.test(t.body||'')).length,before=told();
+          [...{SECTION}.querySelectorAll('button')].find(b=>b.textContent==='Save').click();
+          await until(()=>document.getElementById('confirm-dialog')?.open);await frame();
+          const asked={{title:$('confirm-title').textContent.startsWith('Update search for an edited description'),later:$('confirm-cancel').textContent==='Not now',
+            noBackgroundToast:told()===before}};
+          $('confirm-cancel').click();await until(()=>!document.getElementById('confirm-dialog').open);
+          await lal.refreshDescription('library');await until(()=>{SECTION}.querySelector('.search-update')?.dataset.status==='pending');await frame();const s={SECTION};
+          return {{...asked,line:s.textContent.includes('Search still uses the earlier text until you update it'),action:!!{BUTTON}('Update search'),
+            notFault:!s.querySelector('.search-update .text-warning'),text:s.querySelector('.description-text').textContent==={json.dumps(NEW2)}}}}})()""")
+        capture('04b-search-update-not-queued.png')
+        assert len(started) == 2, started
+        check('update_search_asks_then_runs', f"""(async()=>{{{BUTTON}('Update search').click();await until(()=>document.getElementById('confirm-dialog')?.open);
+          $('confirm-accept').click();await until(()=>{SECTION}.querySelector('.search-update')?.dataset.status==='running');return true}})()""")
+        assert len(started) == 3 and started[-1]['mode'] == 'edited', started
+        processing_queue.unmeasured = measured
+        finish()
+        check('pending_clears_when_the_update_finishes', f"""(async()=>{{await lal.refreshDescription('library');await until(()=>!{SECTION}.querySelector('.search-update'));
+          return {STATE}==='edited'}})()""")
+        assert not processing_queue.load(config)['search_pending']
+        report['checks']['search_pending_cleared'] = True
 
         select(NONE)
         check('none_offers_generate', f"""(()=>({{state:{STATE}==='none',line:{SECTION}.textContent.includes('No description yet'),

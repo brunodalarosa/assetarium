@@ -226,3 +226,64 @@ def test_editing_a_shared_variant_description_edits_its_group(managed, monkeypat
     assert saved['asset_id'] == ids['Car_A'] and saved['shared_variants'] == 2
     assert observations(work, detail(work, ids['Car_A']))['description'] == NEW
     assert overlay_for(work, detail(work, ids['Car_B']))[0]['description'] == {}  # The variant has no text of its own.
+
+
+def bridge_edit(config, identifier, fields):
+    """The bridge's save-then-queue step without a window (``DesktopBridge._edit_description``)."""
+    import threading
+    from types import SimpleNamespace
+    from local_asset_library.desktop import DesktopBridge
+    bridge = SimpleNamespace(_config=config, _service=DesktopService(config), _presentation_lock=threading.Lock())
+    return DesktopBridge._edit_description(bridge, identifier, fields)
+
+
+def test_a_declined_search_update_stays_offered_until_one_finishes(fake_start, monkeypatch):
+    config, one, work, record, started = fake_start
+    identifier = record['asset_id']
+    monkeypatch.setattr(queue, 'unmeasured', lambda value: True)  # The storage budget or no measurement: ask first.
+    saved = bridge_edit(config, identifier, {'description': NEW})
+    assert saved['status'] == 'saved' and saved['search']['status'] == 'confirm' and saved['search']['confirm_label']
+    assert not started and not queue.load(config)['items']
+    # Declined (or never answered): the inspector still offers Update search, as work to start, not a fault.
+    assert queue.place(config, one['key'], [identifier]) == {'status': 'pending', 'mode': 'edited'}
+    assert bridge_edit(config, identifier, {'description': NEW})['status'] == 'unchanged'
+    assert queue.place(config, one['key'], [identifier])['status'] == 'pending'
+    queue.add(config, 'descriptions', {'key': one['key'], 'asset_ids': [identifier], 'mode': 'edited'}, confirmed=True)
+    assert queue.place(config, one['key'], [identifier])['status'] == 'running'
+    status = source_operations.operation_status(sources.bound(config, one))
+    status.update(status='complete')  # The update finished: search reads the edit now.
+    queue.advance(config)
+    assert queue.place(config, one['key'], [identifier]) is None and not queue.load(config)['search_pending']
+
+
+def test_a_search_update_that_did_not_finish_keeps_the_edit_pending(fake_start):
+    config, one, work, record, started = fake_start
+    identifier = record['asset_id']
+    assert bridge_edit(config, identifier, {'description': NEW})['search']['status'] == 'started'
+    source_operations.operation_status(sources.bound(config, one)).update(status='cancelled')
+    queue.advance(config)
+    assert queue.place(config, one['key'], [identifier])['status'] == 'faulty'
+    assert identifier in queue.load(config)['search_pending']
+
+
+def test_a_try_again_that_fails_again_is_reported_as_a_failure(described, monkeypatch):
+    from test_sources import failed_caption
+    from local_asset_library import notifications
+    config, backend, one, work, record = described
+    identifier = record['asset_id']
+    failed_caption(work, record)
+    scoped = sources.bound(config, one)
+    source_operations.state(scoped, token='retry-1', operation='describe', mode='retry', asset_ids=[identifier])
+
+    def run_stages(config, source, scoped, token, operation, base):
+        process(scoped, 'caption', 6, backend=BatchBackend(['{}']), asset_ids={identifier}, retry={identifier})
+        return True
+    monkeypatch.setattr(source_operations, 'run_stages', run_stages)
+    monkeypatch.setattr(source_operations, 'storage_base', lambda config, token: 0)
+    monkeypatch.setattr(source_operations, 'publish_and_verify', lambda *args: None)
+    source_operations.describe_source(config, one, 'retry-1')
+    assert detail(working(scoped), identifier)['processing']['caption'] == 'failed'
+    status = source_operations.operation_status(scoped)
+    assert status['status'] == 'complete_with_faults'
+    report = next(i for i in notifications.load(config)['items'] if i['id'] == 'report-retry-1')
+    assert (report['outcome'], report['written'], report['failed']) == ('complete_with_failures', 0, 1)

@@ -387,10 +387,18 @@ function DescriptionState({ grid, edit, image, processed }: { grid: GridId; edit
   }
 }
 
-/** Where the search update after an edit stands; one that did not finish offers to run it again. */
+/** Where the search update after an edit stands; one that did not finish, or was never queued, offers to run it. */
 function SearchUpdate({ grid, edit }: { grid: GridId; edit: Json }) {
   const work = edit.work;
   if (!work || work.mode !== "edited") return null;
+  if (work.status === "pending")
+    // Saved, but nothing is queued (the confirmation was declined): not a fault, just work still to start.
+    return (
+      <div className="search-update grid justify-items-start gap-2" data-status="pending">
+        <p className="flex items-center gap-2 text-[12px] text-muted-foreground"><Clock className="size-3.5" aria-hidden />Search still uses the earlier text until you update it.</p>
+        <Button variant="secondary" className="h-8 px-3 text-[12px]" onClick={() => void describeAsset(grid, edit, "edited")}>Update search</Button>
+      </div>
+    );
   if (work.status === "faulty")
     return (
       <div className="search-update grid justify-items-start gap-2" data-status="faulty">

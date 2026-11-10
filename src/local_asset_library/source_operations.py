@@ -498,6 +498,14 @@ def description_counts(scoped):
     return Counter(description_state(r) for r in read_records(working(scoped)) if processing_eligible(r, formats))
 
 
+def failed_again(scoped, asset_ids):
+    """The named assets whose description is still a recorded failure (after a finished Try again run)."""
+    from .incremental import working
+    from .sources import description_state
+    named = set(asset_ids)
+    return {r['asset_id'] for r in read_records(working(scoped)) if r['asset_id'] in named and description_state(r) == 'failed'}
+
+
 DESCRIBE_END = {'complete': ('complete', 'Descriptions generated and published'),
                 'complete_with_failures': ('complete_with_faults', 'Descriptions generated; some failed and were recorded'),
                 'cancelled': ('cancelled', 'Cancelled; finished descriptions are published'),
@@ -538,6 +546,9 @@ def describe_source(config, source, token):
         return
     after = description_counts(scoped)
     failed = max(0, after['failed'] - before['failed'])
+    if outcome is None and operation_status(scoped).get('mode') == 'retry':
+        # A Try again that fails once more was already counted as failed before the run: count it again here.
+        failed += len(failed_again(scoped, operation_status(scoped).get('asset_ids') or []))
     outcome = outcome or ('complete_with_failures' if failed else 'complete')
     notify_report(config, source, token, outcome, written=max(0, after['complete'] - before['complete']),
                   failed=failed, remaining=after['missing'], reason=reason,

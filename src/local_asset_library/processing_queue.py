@@ -46,6 +46,7 @@ def load(config):
     value.setdefault('items', [])
     value.setdefault('recent', [])
     value.setdefault('paused', False)
+    value.setdefault('search_pending', {})  # Asset ID → {key, utc}: an owner edit search does not read yet.
     value.pop('overnight', None)  # The overnight hold was removed; a queue saved with it loads unchanged otherwise.
     return value
 
@@ -291,6 +292,10 @@ def _finish_running(config, queue):
             continue
         outcome = status.get('status') if status.get('token') == item.get('token') else 'interrupted'
         queue['items'].remove(item)
+        if outcome == 'complete' and item['scope'].get('mode') == 'edited':
+            for asset_id in item['scope']['asset_ids']:  # Search reads the edit now, unless it was saved after the start.
+                if queue['search_pending'].get(asset_id, {}).get('utc', '') <= item.get('started_utc', ''):
+                    queue['search_pending'].pop(asset_id, None)
         queue['recent'] = ([{**item, 'status': outcome, 'finished_utc': now(), 'phase': status.get('phase'),
                              'reason': status.get('reason'), 'faults': status.get('faults')}] + queue['recent'])[:RECENT]
         changed = True
@@ -530,9 +535,19 @@ def state(config):
             'blocked': blocked_groups(config), 'failures': failures(config), 'recent': queue['recent']}
 
 
+def mark_search_pending(config, key, asset_id):
+    """An owner edit was saved: search keeps the earlier text until a search update for it finishes, so the
+    inspector can offer Update search even when the update was never queued (a declined confirmation, a fault)."""
+    with _locked(config):
+        queue = load(config)
+        queue['search_pending'][asset_id] = {'key': key, 'utc': now()}
+        save(config, queue)
+
+
 def place(config, key, asset_ids):
     """Where description work for these assets stands: running, waiting (with its place) or, for an owner edit's
-    search update, the newest one that did not finish. None when no item concerns them. Read only."""
+    search update, the newest one that did not finish, else ``pending`` while no update is queued for a saved edit.
+    None when nothing concerns them. Read only."""
     from .folder_view import Reading, connect
     from .library_view import _current
     from .source_operations import RUNNING, operation_status
@@ -573,4 +588,6 @@ def place(config, key, asset_ids):
     last = next((i for i in queue['recent'] if i['scope'].get('mode') == 'edited' and concerns(i)), None)
     if last and last['status'] != 'complete':
         return {'status': 'faulty', 'mode': 'edited', 'reason': last.get('reason') or last.get('phase') or 'The search update did not finish'}
+    if any(queue['search_pending'].get(i, {}).get('key') == key for i in asset_ids):
+        return {'status': 'pending', 'mode': 'edited'}  # Saved, but no search update is queued for it.
     return None

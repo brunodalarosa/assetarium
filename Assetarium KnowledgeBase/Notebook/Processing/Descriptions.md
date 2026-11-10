@@ -26,7 +26,8 @@ rendered previews by Qwen3-VL (or an experimental local model server). Start at
   the description vector's input digest; the edit's queue item (`mode: 'edited'`) runs only the embeddings stage
   and publishes. A variant sharing its group's description edits the representative's overlay.
 - **Try again** (`mode: 'retry'`) is the owner's explicit request for one named asset: `incremental.process(retry=…)`
-  ignores that asset's kept caption fault once; a second failure is recorded and kept.
+  ignores that asset's kept caption fault once; a second failure is recorded and kept. Its run was already counted
+  as failed, so `describe_source` adds the named assets still failed (`failed_again`) to the report's failures.
 - Caption severity (`caption_quality.py`) is stored separately from immutable generation and review
   evidence: `clear`, `review_note`, `warning` or `fault`.
 
