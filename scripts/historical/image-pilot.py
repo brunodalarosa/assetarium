@@ -14,7 +14,7 @@ from local_asset_library import sources
 from local_asset_library.config import load_project_config
 from local_asset_library.source_operations import operation_status, start
 
-KENNEY = Path(r'C:/Users/backup pc/Documents/General game assets/Kenney Game Assets All-in-1 3.7.0')
+KENNEY = Path(r'<home>/Documents/General game assets/Kenney Game Assets All-in-1 3.7.0')
 PILOT = [KENNEY / 'Icons/Game Icons/PNG', KENNEY / '2D assets/Tiny Dungeon/Tiles', KENNEY / 'Icons/Board Game Icons/Vector/Icons']
 ACTIVE = {'queued', 'scanning', 'processing', 'publishing', 'cancelling', 'verifying'}
 

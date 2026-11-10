@@ -59,7 +59,7 @@ Step 8 applies the same classification to configured library membership. The
 forty-asset classifications above remain historical evidence; newly generated
 captions await review and do not inherit an approval or a clear visual review.
 Expanded coverage and pending reviews are reported separately in
-`docs/step8-verification.json`.
+the Step 8 verification receipt (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published).
 Intentionally ungenerated descriptions have `processing.caption=pending` and
 null description/provenance. They remain eligible for a later generation run;
 this state does not downgrade failed, partially generated, or unusable captions.

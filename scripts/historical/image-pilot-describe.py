@@ -18,7 +18,7 @@ from local_asset_library.gpu_queue import lease
 from local_asset_library.incremental import working
 from local_asset_library.membership import records
 
-KENNEY = Path(r'C:/Users/backup pc/Documents/General game assets/Kenney Game Assets All-in-1 3.7.0')
+KENNEY = Path(r'<home>/Documents/General game assets/Kenney Game Assets All-in-1 3.7.0')
 # Stratified: tiny pixel art, white and black transparent icons (with scale/colour duplicates),
 # and self-contained SVGs without a declared canvas. Fixed before any description exists.
 EVALUATION = {

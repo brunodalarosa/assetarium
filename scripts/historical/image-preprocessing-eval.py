@@ -13,7 +13,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'src'))
-KENNEY = Path(r'C:/Users/backup pc/Documents/General game assets/Kenney Game Assets All-in-1 3.7.0')
+KENNEY = Path(r'<home>/Documents/General game assets/Kenney Game Assets All-in-1 3.7.0')
 FOLDERS = {'game-icons': KENNEY / 'Icons/Game Icons/PNG', 'tiny-dungeon': KENNEY / '2D assets/Tiny Dungeon/Tiles',
            'board-game-icons': KENNEY / 'Icons/Board Game Icons/Vector/Icons'}
 CANDIDATES = ('a', 'b', 'c')

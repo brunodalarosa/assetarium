@@ -27,7 +27,7 @@ if client=='codex':
              '-c','mcp_servers.node_repl.enabled=false','-c','mcp_servers.gimp.enabled=false',
              '-c','mcp_servers.blender.enabled=false','-o',str(manifest),prompt]
 else:
-    base=Path(r'C:\BrunoOS\OpenCode-local-agent')
+    base=Path(r'<workspace>\OpenCode-local-agent')
     env.update(XDG_DATA_HOME=str(base/'OpenCodeData/data'),XDG_CONFIG_HOME=str(base/'OpenCodeData/config'),
         XDG_CACHE_HOME=str(base/'OpenCodeData/cache'),XDG_STATE_HOME=str(base/'OpenCodeData/state'),
         OPENCODE_CONFIG=str(base/'outputs/opencode-local.json'),OPENCODE_DISABLE_MODELS_FETCH='1',

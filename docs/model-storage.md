@@ -3,15 +3,15 @@
 Models load from `[storage].models`: the project `models/` folder by default, or any
 existing shared directory set in `config.local.toml`. Each model lives in
 `<models>/<folder>/<revision>` (`qwen3-vl-2b/89644892…`, `embeddinggemma-2/914f7f89…`).
-The rest of this page records the original development machine's layout.
+The rest of this page describes a shared models directory outside the repository.
 
-On October 11, 2026, Bruno approved moving both AI models directly into
-`C:\BrunoOS\Local-models` so other projects can reuse the same files.
+On October 11, 2026, Bruno approved moving both AI models directly into a shared
+`<models>` directory (`[storage].models`) so other projects can reuse the same files.
 
 | Model | Directory |
 | --- | --- |
-| Qwen3-VL-2B-Instruct | `C:\BrunoOS\Local-models\qwen3-vl-2b\89644892e4d85e24eaac8bacfd4f463576704203` |
-| EmbeddingGemma 2 | `C:\BrunoOS\Local-models\embeddinggemma-2\914f7f89142e33e77833254d9c9b90c3cef7303b` |
+| Qwen3-VL-2B-Instruct | `<models>\qwen3-vl-2b\89644892e4d85e24eaac8bacfd4f463576704203` |
+| EmbeddingGemma 2 | `<models>\embeddinggemma-2\914f7f89142e33e77833254d9c9b90c3cef7303b` |
 
 Use these revision directories as local model paths from other compatible
 Transformers/SentenceTransformers projects. They are original model folders,

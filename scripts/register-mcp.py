@@ -3,7 +3,7 @@
 --opencode-config PATH also registers with that OpenCode config (omitted: OpenCode is skipped).
 --snippets-only writes this checkout's client snippets under ignored data/mcp/clients/ and edits
 no client configuration. The tracked docs/mcp/clients/ files are neutral examples; the older
-docs/mcp/codex-setup.toml and opencode-setup.json are kept as recorded evidence.
+recorded registrations are kept locally by the owner, not published.
 """
 import argparse
 from pathlib import Path
