@@ -92,7 +92,7 @@ inspector, a tooltip or an expanded row.
   left it out. It became **Format off** (`settings.format_off`) with **Turn FBX on**. Under the hiding rule it
   leaves the views, is counted and is re-inspected from its OBJ on the next Make previews:
   *"15 hidden until previews from OBJ are made · Make previews"* (decision 0030; not built yet).
-- Closing the app while work runs says so and asks; the next start says what stopped (decision 0023).
+- Closing the app while work runs says so and asks; the next start says what stopped (decision 0032).
 
 ## P6 — Agents first, in the open
 
