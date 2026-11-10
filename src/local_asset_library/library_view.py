@@ -176,8 +176,7 @@ def folder_tree(config, source, blocked=None):
 
 
 def tree(config):
-    """Every library folder with its tree, what needs the owner, and the migration notice."""
-    from .library_migration import needed
+    """Every library folder with its tree and what needs the owner."""
     from .library_store import missing_count, revision
     from .sources import registry, source_status
     folders, blocked = [], blockers(config)
@@ -198,10 +197,9 @@ def tree(config):
                         'texture_suggestion': status.get('texture_suggestion'), 'texture_folder': status.get('texture_folder'),
                         'scan_fault': status.get('scan_fault'), 'operation': status.get('operation'),
                         'scanned_utc': status.get('scanned_utc')})
-    migration = needed(config)
-    return {'status': 'ready', 'folders': folders, 'migration': migration, 'blockers': list(blocked.values()),
+    return {'status': 'ready', 'folders': folders, 'blockers': list(blocked.values()),
             'types': [{'id': i, 'label': label} for i, label in TYPES],
-            'attention': bool(migration.get('needed') or any(f['attention'] for f in folders))}
+            'attention': any(f['attention'] for f in folders)}
 
 
 ITEM = 'asset_id, name, kind, state, reason, folder, formats, has_preview, path, description, warning'

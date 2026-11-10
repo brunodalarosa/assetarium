@@ -42,7 +42,7 @@ export function Rail() {
   const canBack = useApp((s) => s.historyIndex > 0);
   const canForward = useApp((s) => s.historyIndex < s.history.length - 1);
   const attention = useApp(processingAttention);
-  // The folder dot means the owner must act (offline, an answer to give, files missing, a migration); work has its own dot.
+  // The folder dot means the owner must act (offline, an answer to give, files missing); work has its own dot.
   const owner = useApp((s) => Boolean(s.sourcesView.tree?.attention));
   return (
     <nav aria-label="Main" className="flex w-24 shrink-0 flex-col items-center bg-rail pt-4 pb-5">

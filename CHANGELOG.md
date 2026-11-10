@@ -51,6 +51,9 @@ All notable changes to Assetarium are listed here. The project follows
 - **Overnight descriptions runner**: `Generate overnight descriptions.cmd`, `scripts/overnight-descriptions.py`
   and its guide. Descriptions run from **Generate descriptions** in the app or `local-assets describe`; run
   folders already under `data/overnight-descriptions/` are left as they are.
+- **Migration from 0.1.0**: `scripts/migrate-library.py`, `scripts/check-rekey.py` and the app's "move your
+  results" notice. 0.2.0 is a fresh start; a 0.1.0 generated folder inside a library folder is still never
+  scanned as assets. Upgrades are supported from 0.2.0 on.
 - **Unused code**: the frozen-benchmark arithmetic (`evaluation.py`), the pilot review-page checker
   (`caption_review.py`), the never-called schema 1 → 2 catalog migration (`catalog_migration.py`) and the desktop
   bridge's unused `source_browse` call. Nothing the app, the CLI or the MCP server does changes.

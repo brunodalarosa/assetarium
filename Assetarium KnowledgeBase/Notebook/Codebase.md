@@ -41,7 +41,6 @@ read it first. Up: [Notebook](Notebook.md).
   and `agent_practice_assets` (Try your agent), `transient` (practice log/cache isolation), `image_kinds` (model texture, material texture or 2D
   image), `library_view` (the Asset sources tab's tree, states and folder contents), `folder_view`
   (the small per-catalog views those tabs read instead of whole records),
-  `library_migration` (the one-time move into the store; the only code naming the old folder),
   `source_operations`, `source_storage`, `source_browser`, `catalog`,
   `asset_structure`, `image_catalog`, `membership`, `recheck`, `texture_folders`. The October 14
   migration script was removed in November 2026; in git history at commit `af02e91`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).

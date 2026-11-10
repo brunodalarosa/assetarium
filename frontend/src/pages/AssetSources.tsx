@@ -1,11 +1,11 @@
-import { Box, Copy, FolderOpen, FolderPlus, Grid2x2, Image as ImageIcon, LayoutList, Layers, Package } from "lucide-react";
+import { Box, FolderOpen, FolderPlus, Grid2x2, Image as ImageIcon, LayoutList, Layers, Package } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import {
-  copyText, libraryCover, loadFolderItems, makePreviews, navigate, openFolderMenu, pathAction, type SourcesView, setSourcesFilter, startAddFolder, useApp,
+  libraryCover, loadFolderItems, makePreviews, navigate, openFolderMenu, pathAction, type SourcesView, setSourcesFilter, startAddFolder, useApp,
 } from "../app/store";
 import { AssetGrid } from "../ui/AssetGrid";
 import { FolderTree } from "../ui/FolderTree";
@@ -61,17 +61,6 @@ function Notices() {
   if (!tree) return null;
   return (
     <>
-      {tree.migration?.needed && (
-        <Banner tone="info">
-          <span id="migration-notice" className="grid gap-1.5">
-            <span>Your previews and descriptions are still in the old per-folder data, shown read only. Move them into the library store once; nothing renders or is described again. Close the app, then run:</span>
-            <span className="flex flex-wrap items-center gap-2">
-              <code className="rounded-md bg-surface px-2 py-1 font-mono text-[12px]">{tree.migration.command}</code>
-              <Button variant="quiet" className="h-7 px-2" onClick={() => void copyText(tree.migration.command, "Command copied")}><Copy className="size-3.5" aria-hidden />Copy</Button>
-            </span>
-          </span>
-        </Banner>
-      )}
       {(tree.blockers || []).length > 0 && (
         <Banner tone="warning" className="py-2.5 text-[12.5px]">
           <span id="blockers" className="grid gap-1">

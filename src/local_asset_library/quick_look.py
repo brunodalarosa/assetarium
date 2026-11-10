@@ -39,7 +39,7 @@ def start(config, directory):
 
 
 def _run(job, root):
-    from .library_migration import LEGACY_METADATA_DIR
+    from .config import LEGACY_METADATA_DIR
     from .packs import markers
     paths = []
     try:

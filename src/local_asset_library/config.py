@@ -37,6 +37,8 @@ def _relative(value: str) -> Path:
 
 
 _REPARSE_POINT = 0x400
+# The generated folder Assetarium 0.1.0 kept inside each library folder. It is never scanned or read as originals.
+LEGACY_METADATA_DIR = "metadata-lal"
 
 
 def _inside(root: Path, relative: str) -> Path:
@@ -119,7 +121,6 @@ class Config:
         if self.sources_registry:
             root = self.source_directory(relative)
             parts = relative.replace("\\", "/").split("/", 1)
-            from .library_migration import LEGACY_METADATA_DIR
             if len(parts) != 2 or LEGACY_METADATA_DIR in (p.casefold() for p in Path(parts[1]).parts):
                 raise ConfigError("Generated metadata is not an original asset")
             target = _inside(root, parts[1])

@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [result_store.py, result_store.adopt, result_store.reattach, result_store.first_sight_key, library_migration.rekey, scripts/check-rekey.py, incremental.ledger, incremental.checkpoint, incremental.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.prompt_hash, incremental.EQUIVALENT_WORKERS, incremental.process, incremental.publish, retrieval.recorded_contract, publication.line_ending_hashes, scripts/check-render-stability.py, scripts/check-engine-stability.py]
+code: [result_store.py, result_store.adopt, result_store.reattach, result_store.first_sight_key, incremental.ledger, incremental.checkpoint, incremental.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.prompt_hash, incremental.EQUIVALENT_WORKERS, incremental.process, incremental.publish, retrieval.recorded_contract, publication.line_ending_hashes, scripts/check-render-stability.py, scripts/check-engine-stability.py]
 verified: 2026-10-30
 branch: feature/library-view
 ---
@@ -37,11 +37,10 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
 
 ## Rules
 
-- **A fingerprint-definition change re-keys, never re-queues.** `library_migration.rekey` recomputes
-  the old fingerprint (kept verbatim as `legacy_*` in `library_migration.py`), and only a row it still
-  matches gets the new key; stale rows keep theirs and stay pending, but a stale *failed* row still gets its
-  `fault_content` translated, or the unchanged fault would look changed and be retried. `scripts/check-rekey.py` proves it on
-  copies of the ledgers (receipt `data/evidence/rekey/rekey-proof-20261030.json`: nothing newly pending).
+- **A fingerprint-definition change re-keys, never re-queues** (decision 0028). No re-keying code exists right
+  now: the one for the 0.1.0 → store move left with that move in November 2026 (commit `af02e91` has it). What it taught: recompute the old fingerprint verbatim, give the new key only to a
+  row the old one still matches, leave stale rows pending, and translate a stale *failed* row's `fault_content`
+  or the unchanged fault looks changed and is retried. Prove it on copies of the ledgers before shipping.
 
 - **Editing a fingerprinted file re-queues every finished result that depends on it.** That covers
   `blender_worker.py`, `render_math.py`, the repair workers, caption code and prompts, the embedding

@@ -483,8 +483,7 @@ def _registered(config):
         value = registry(config)
     except (OSError, ValueError, KeyError, TypeError):
         return True  # A registry that exists but cannot be read is not a fresh install.
-    from .library_migration import _legacy_registry
-    return bool(value['sources'] or value.get('detached') or _legacy_registry(config))  # Or an install awaiting migration.
+    return bool(value['sources'] or value.get('detached'))
 
 
 def engine_hints(value):

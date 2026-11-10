@@ -3,7 +3,7 @@ tags: [decision]
 decided: 2026-11-07
 area: Sources and Catalog
 replaces: [0023]
-code: [library_store.py, result_store.py, library_migration.py, processing_queue.py, sources.py, asset_structure.py]
+code: [library_store.py, result_store.py, processing_queue.py, sources.py, asset_structure.py]
 ---
 # 0032 — Library store, packs and the processing queue
 
@@ -29,9 +29,9 @@ is included; processing runs from one queue.
 - **Missing and offline.** An unreachable library folder is Offline; vanished files are Missing. Their results and
   collection entries are kept until the owner chooses **Forget missing**. Results nothing points to are removed
   only by an explicit owner action.
-- **One-time migration.** The old per-folder `metadata-lal/` results were re-keyed into the store without
-  re-rendering or regenerating anything. Removing the old folders is a separate, interactive, owner-only step
-  after a verified import. No code keeps the old name except the migration.
+- **No migration from 0.1.0.** 0.2.0 is a fresh start: the old per-folder `metadata-lal/` results are not
+  imported, and such a folder is never scanned or read as originals. Upgrades are supported from 0.2.0 on
+  ([Status](../Status.md): safe upgrades).
 
 ## Library folders, bundles and packs
 
@@ -73,3 +73,7 @@ keep theirs, and makes the storage budget the only limit.
 - Scans never run models. Processing starts only from the owner or a connected agent.
 - Faults stay visible with their evidence and are never retried automatically.
 - Missing results are kept until the owner forgets them; unreferenced results go only by explicit action.
+
+## Changes
+
+- 2026-11-10: the one-time migration from 0.1.0 is no longer offered and its code was removed (owner: 0.2.0 is a fresh start; migrations are supported from 0.2.0 on).

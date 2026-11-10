@@ -223,7 +223,7 @@ switch, **Rescan**, **Remove…**, **Forget missing**, duplicate-export answers,
 shows any file or folder in Explorer; Ctrl/Shift-click picks cards; right-click menus offer only what can
 resolve the shown state. The header sorts the tree and filters by type and status. **Add library folder**
 refuses a folder inside a library folder (**Show it**) and replaces library folders inside a new one. The
-rail dot means you must act (a folder offline, an answer to give, files missing, the one-time migration).
+rail dot means you must act (a folder offline, an answer to give, files missing).
 Search results gain **Show in pack**. See [asset sources](../asset-sources.md).
 
 **Asset processing** is the queue. **Make previews** and **Generate descriptions** (from the Library

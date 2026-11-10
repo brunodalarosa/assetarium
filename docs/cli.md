@@ -82,22 +82,6 @@ is kept; a second Ctrl+C only stops watching while the cancel completes. The wor
 so closing the terminal does not stop it; `--follow` reattaches. Recorded failures are never retried by
 these commands.
 
-## The one-time library migration
-
-Results from before the library store live in a `metadata` folder inside each old source. Move them into
-the store once, with the app and MCP servers closed (base runtime; nothing renders or is described again):
-
-```powershell
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets" --apply
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --remove-old
-```
-
-The first run is a dry run that writes a plan to `data/library/migration/`; `--apply` asks for a typed `yes`,
-imports, verifies and writes a receipt, printing progress; run `--apply` again after a fault to import the
-folders that failed and check unverified ones again; `--remove-old` deletes only verified old folders, asking for each.
-See [Library](asset-sources.md#moving-results-into-the-library-store).
-
 `process --stage inspection|caption|embeddings` is the existing stage-level
 maintenance command (used by `library-batch.py`) and is unchanged.
 

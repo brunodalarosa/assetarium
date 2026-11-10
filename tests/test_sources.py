@@ -233,7 +233,7 @@ def test_independent_roots_and_source_owned_results(managed):
     assert preview.is_relative_to(config.library_store()) and not preview.is_relative_to(Path(one['path']))
     assert config.source_file(r['files'][0]['path']).parent==Path(one['path'])
     assert not sources.source_status(config,one)['needs_processing']
-    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    from local_asset_library.config import LEGACY_METADATA_DIR
     with pytest.raises(ConfigError):config.source_file(one['key']+'/'+LEGACY_METADATA_DIR+'/source.json')
 
 
@@ -317,8 +317,8 @@ def test_empty_source_and_metadata_are_excluded_from_scans(managed,tmp_path):
     config,_,_,_=managed
     root=tmp_path/'empty-source';root.mkdir()
     source=sources.add(config,str(root))
-    from local_asset_library.library_migration import LEGACY_METADATA_DIR
-    (root/LEGACY_METADATA_DIR).mkdir()  # An old generated folder awaiting migration is never scanned.
+    from local_asset_library.config import LEGACY_METADATA_DIR
+    (root/LEGACY_METADATA_DIR).mkdir()  # A 0.1.0 generated folder is never scanned.
     (root/LEGACY_METADATA_DIR/'invented.obj').write_text('not an original')
     result=sources.scan_source(config,source)
     assert result['assets']==0 and not result['needs_processing']

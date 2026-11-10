@@ -242,37 +242,11 @@ The storage budget in **Settings → General** (10 GiB until you save one) caps 
 the project folder and the library store, counting hard-linked files once. Original assets and shared models
 don't count. Jobs measure before they start and between stages; at the budget they stop and keep finished work.
 
-## Moving results into the library store
+## Installs from before the library store
 
-An install from before the library store kept results in a generated folder inside each source. Until they
-are moved, the app shows a notice with the command and keeps showing your last published search, read only.
-Close the app and MCP servers, then run (base runtime; same arguments with `./scripts/uv.sh` on Linux):
-
-```powershell
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
-```
-
-This **dry run** finds every old folder at any depth (`--search PATH` adds places to look, for example a drive
-your library moved to) and writes a plan to `data/library/migration/plan-<time>.json`: assets and finished
-results per folder, sources relinked after a move (matched by their saved identity), folders whose identity
-two copies share (refused), images newly included and, for sources that imported only some formats, the
-folders proposed as exclusions so nothing new floods in. Review it, then add `--apply`:
-
-- It asks for a typed `yes` (no bypass), checks the app and MCP servers are closed, and saves storage receipts
-  before and after.
-- Results are copied, never moved: immutable files are hard-linked on the same drive. Each finished result is
-  re-keyed by its inputs, so **nothing renders or is described again**; a result that was already out of date
-  stays pending, as before.
-- Every asset keeps its ID. Old sources inside a `--library-folder` become part of it.
-- Models that borrowed textures from another old source keep them when both join one library folder (see
-  [Shared texture dependencies](dependency-path-overrides.md)).
-- It rescans without models and checks that every published asset is present and nothing newly pending, then
-  writes `data/library/migration/<time>.json`. A fault stops only its own folder. A folder is imported once.
-- It prints what it is doing with the elapsed time. Importing is quick; the final rescan of each library folder
-  takes longest, since it reads every file of the folder (later scans reuse those hashes).
-- **Run `--apply` again after a fault.** The new plan lists the folders that failed as `ready` (they join the
-  library folder that now contains them) and folders whose check found unexpected work as `recheck`: their kept
-  copy of the old ledger is re-keyed again and only rows untouched since the import are updated.
+Assetarium 0.1.0 kept results in a generated folder inside each library folder. 0.2.0 starts fresh: it does not
+read or import that folder, and never scans it as assets. Add your library folders again and process them;
+the old generated folders can be deleted by hand. Upgrades from 0.2.0 onwards keep your results.
 
 `--remove-old` then deletes the old generated folders whose import a receipt verified, asking for each one.
 

@@ -39,8 +39,8 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 
 - **Safe upgrades, second part** (store coordinator, backups, recovery UI, skipped-release tests) gates the
   first release that changes a store format, likely 0.3.0 with audio. That release raises the
-  format number and ships the migration. `scripts/migrate-library.py` (0.1.0 → store) is not a
-  supported path.
+  format number and ships the migration. 0.1.0 installs are not migrated: the 0.1.0 → store code was removed
+  in November 2026.
 - **Asset library rework (decision 0023), provisional choices:** a pack without a preview image shows a
   package glyph as its cover; "+N new" resets when you leave a library folder; the 10- and
   30-minute thresholds are constants (`processing_queue.QUICK`, `LONG`). Roadmap step 4 now covers

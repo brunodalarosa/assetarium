@@ -110,7 +110,7 @@ class SharedDependencies:
         folder, such as a pack's sub-packs sharing a core pack's textures); the nearest level with a match wins."""
         from .sources import bound, registry
         from .captions import file_hash
-        from .library_migration import LEGACY_METADATA_DIR
+        from .config import LEGACY_METADATA_DIR
         key, *parts = original.split('/')
         source = next((s for s in registry(self.config)['sources'] if s['key'] == key and s['enabled']), None)
         if source is None:

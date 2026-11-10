@@ -173,7 +173,7 @@ def validate_exclusion(pattern):
         raise ConfigError('Enter a folder name or a path inside the source')
     value = pattern.strip().replace('\\', '/').strip('/')
     parts = value.split('/')
-    from .library_migration import LEGACY_METADATA_DIR
+    from .config import LEGACY_METADATA_DIR
     if (not value or len(value) > 200 or any(ord(c) < 32 for c in value) or ':' in value
             or any(part in {'', '.', '..'} for part in parts) or value.casefold() == LEGACY_METADATA_DIR):
         raise ConfigError('Enter a folder name like "Unity*" or a path inside the source like "Models/Unity FBX"')
@@ -308,17 +308,9 @@ def generated_path(config, relative):
     if relative in SHARED_DATA:
         return None
     from .result_store import shared_area
-    from .library_migration import LEGACY_METADATA_DIR
-    # An old generated folder read by the one-time migration holds its results too.
-    legacy = config.metadata_root and config.metadata_root.name.casefold() == LEGACY_METADATA_DIR
-    if shared_area(relative) and not legacy:
+    if shared_area(relative):
         # Results keyed by inputs belong to the whole library store, whichever folder an asset is in (decision 0023).
-        target = _inside(config.library_store(), relative)
-        if not config.source_key and not target.exists():
-            from .library_migration import legacy_path
-            # Before the one-time migration, the last published search still shows its previews, read only.
-            return legacy_path(config, relative) or target
-        return target
+        return _inside(config.library_store(), relative)
     if config.metadata_root:
         root = config.metadata_root
         # The source root and its metadata directory are revalidated for every
@@ -376,7 +368,7 @@ class Covered(ConfigError):
 def add(config, directory):
     """Add a library folder. Inside one is refused; around some, it replaces them and keeps their assets' IDs."""
     from .gpu_queue import lease
-    from .library_migration import LEGACY_METADATA_DIR
+    from .config import LEGACY_METADATA_DIR
     from . import library_store
     with lease(config, "source-settings", resource="sources"):
         root = validate_directory(config, directory)
@@ -692,10 +684,6 @@ def _format_status(scoped, formats, signature):
 def visible(config, records):
     if not config.sources_registry or config.source_key:
         return records
-    if not registry(config)['sources']:
-        from .library_migration import needed
-        if needed(config)['needed']:
-            return records  # Before the one-time migration: the last published search stays usable, read only.
     allowed = {}
     for source in registry(config)["sources"]:
         if not source["enabled"]:

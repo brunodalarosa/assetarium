@@ -1,7 +1,7 @@
 ---
 area: Sources and Catalog
 tags: [system]
-code: [sources.registry, sources.add, sources.Covered, sources.scan_source, sources.aggregate, sources.generated_path, sources.bound, sources.importing_failures, folder_view.py, folder_view.connect, library_store.py, library_store.recognize, result_store.py, result_store.reattach, source_operations.py, library_migration.py, catalog.walk_source, hash_cache.py, library_policy.DEFAULT_BUDGET, library_policy.LEGACY]
+code: [sources.registry, sources.add, sources.Covered, sources.scan_source, sources.aggregate, sources.generated_path, sources.bound, sources.importing_failures, folder_view.py, folder_view.connect, library_store.py, library_store.recognize, result_store.py, result_store.reattach, source_operations.py, catalog.walk_source, hash_cache.py, library_policy.DEFAULT_BUDGET, library_policy.LEGACY]
 verified: 2026-10-31
 branch: feature/library-view
 ---
@@ -61,8 +61,8 @@ Binding: [decision 0032](../../Decisions/0032-library-store-and-queue.md).
   output root inside the source.
 - Folders must not overlap each other, the project, the library store or shared models; links are
   rejected (`sources.validate_directory`).
-- An old generated folder (`library_migration.LEGACY_METADATA_DIR`) is never scanned or read as an
-  original; only `library_migration.py` names it (`tests/test_metadata_name.py`).
+- A 0.1.0 generated folder (`config.LEGACY_METADATA_DIR`) is never scanned or read as an
+  original; only `config.py` names it (`tests/test_metadata_name.py`).
 - **Processing never starts from a scan**; Make previews and Generate descriptions are always explicit actions.
 
 - **Folder views** (`folder_view.py`): the Asset sources tab, the processing queue (`resolve`, `failures`,
@@ -91,11 +91,6 @@ Binding: [decision 0032](../../Decisions/0032-library-store-and-queue.md).
 - Missing assets keep their whole saved record in `library.sqlite`; lists use
   `library_store.missing_list` / `missing_count`, which never parse it.
 
-- The old-folder migration (`library_migration.apply`) computes old fingerprints and per-folder keys under
-  `_old_world`, a view of the old source registry: once folders are joined, a model's provider is no longer a
-  library folder, yet its old key still needs it. Its check (`verify`) measures only active folders; a
-  `replaced` folder has no assets of its own. A rerun joins faulty folders into an existing library folder and
-  re-checks `unverified` ones from `absorbed/<id>/jobs.sqlite`.
 - Kept IDs need not match the `asset_id(pack, locator)` formula; `asset_structure.validate_record` checks
   only the format.
 

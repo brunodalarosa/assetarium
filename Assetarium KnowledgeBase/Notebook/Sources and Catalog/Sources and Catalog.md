@@ -1,7 +1,7 @@
 ---
 area: Sources and Catalog
 tags: [hub]
-code: [sources.py, library_store.py, packs.py, image_kinds.py, library_view.py, library_migration.py, source_operations.py, catalog.py, membership.py, publication.py, library_policy.py]
+code: [sources.py, library_store.py, packs.py, image_kinds.py, library_view.py, source_operations.py, catalog.py, membership.py, publication.py, library_policy.py]
 ---
 # Sources and Catalog
 

@@ -397,7 +397,7 @@ def run_inspection(config, record, fingerprint, resolution=640, timeout=180, for
         "asset_id": record["asset_id"], "source_path": source["path"], "format": source["format"],
         "source_sha256": source["sha256"], "output": str(output), "resolution": resolution, "output_root": str(root)}
     if config.source_key:
-        from .library_migration import LEGACY_METADATA_DIR
+        from .config import LEGACY_METADATA_DIR
         job.update(source_prefix=config.source_key, excluded_dirs=[LEGACY_METADATA_DIR])
     from . import render_pool
     device = render_pool.job_device(config)
