@@ -51,7 +51,7 @@ verification used fresh installed CLI sessions with the same active configuratio
 
 ```powershell
 $env:PYTHONPATH = Join-Path (Get-Location) 'src'
-& '.\.venv-mcp\Scripts\python.exe' -m pytest tests\test_mcp_assets.py tests\test_retrieval.py tests\test_evaluation.py --basetemp scratch\pytest-mcp-new-run
+& '.\.venv-mcp\Scripts\python.exe' -m pytest tests\test_mcp_assets.py tests\test_retrieval.py --basetemp scratch\pytest-mcp-new-run
 & '.\.venv-mcp\Scripts\python.exe' scripts\verify-mcp.py --run-name unique-run-name
 ```
 
@@ -63,7 +63,7 @@ initial harness incorrectly matched a Windows environment-launcher PID to its
 child Python PID; original faulty evidence is preserved. The corrected harness
 identifies the new audit directory instead.
 
-`scripts/historical/verify-agent-workflow.py codex|opencode` (original development machine only) performs one bounded real-client
+`verify-agent-workflow.py codex|opencode` (original development machine only; removed in November 2026; in git history at tag `v0.2.0`) performed one bounded real-client
 selection workflow and saves events/stderr plus final manifest in
 `data/exports/<client>-selection.json`. It runs installed clients as verification
 targets, without delegation/subagents. It never changes the persistent model or

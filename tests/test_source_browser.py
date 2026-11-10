@@ -114,7 +114,7 @@ def test_source_bridge_routes_the_existing_services(managed):
     sources.set_enabled(config, one['key'], False)
     bridge = DesktopBridge(config)
     try:
-        page = bridge.source_browse(one['key'])
+        page = bridge._source_browser.call('browse', one['key'], 0, 40)
         identifier = page['items'][0]['asset_id']
         assert bridge.source_thumbnail(one['key'], identifier, page['generation'])['image']
         assert bridge.source_asset(one['key'], identifier, 'obj', 'front', page['generation'])['image']

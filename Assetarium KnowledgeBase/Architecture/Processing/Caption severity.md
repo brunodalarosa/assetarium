@@ -5,7 +5,7 @@ status: draft
 verified:
 branch:
 level: system
-code: [caption_quality.py, caption_review.py, scripts/record_caption_review.py]
+code: [caption_quality.py, scripts/record_caption_review.py]
 ---
 # Caption severity in the desktop app and agent results
 
@@ -87,9 +87,8 @@ strings are accepted as unclassified warnings, rather than automatically becomin
 `fault` severity or approve owner review. Generated review pages use the same
 classification when showing notes, warnings and real caption failures.
 
-The review-page checker validates current severity banners and can still verify
-preserved historical pages under an explicit historical format. It saves a new
-receipt instead of overwriting the Step 4 receipt. Future measurement summaries
+The review-page checker (`caption_review.py`) served the pilot review pages only and was
+removed in November 2026 (git history at tag `v0.2.0`). Future measurement summaries
 use `caption_quality_counts` and `visual_review_findings_assets`; the presence of
 a review finding is no longer reported as a faulty asset.
 

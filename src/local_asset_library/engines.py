@@ -6,7 +6,6 @@ import Torch, load a model, contact a server or start a process.
 """
 import json
 import os
-from pathlib import Path
 
 from .config import ConfigError, venv_python
 

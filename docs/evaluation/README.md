@@ -5,8 +5,8 @@ Status: provisional relevance labels; owner review and pilot expansion decision 
 > **Historical.** This status describes the frozen pilot benchmark when it was recorded.
 > The owner later approved expanding beyond the pilot; the current library and its
 > operations are described in [Library updates](../../Assetarium%20KnowledgeBase/Architecture/Processing/Library%20updates.md) and
-> [current status](../../Assetarium%20KnowledgeBase/Status.md). The tools that reproduce this benchmark are in
-> [`scripts/historical/`](../../scripts/historical/README.md).
+> [current status](../../Assetarium%20KnowledgeBase/Status.md). The tools that reproduce this benchmark were
+> removed in November 2026; the commands below run only from a checkout of tag `v0.2.0` or earlier.
 
 The evaluation uses the existing 40-asset pilot, 39 description vectors and 169
 individual image-view vectors. Nothing is recaptioned, reindexed or processed

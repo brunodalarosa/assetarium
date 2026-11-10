@@ -106,7 +106,7 @@ batch and after publication. Current measured coverage, retained storage and
 runtime evidence are summarized in `docs/history/progress-2026-10.md`; the original Step 8
 verification report has been retired. Historical 20 GiB estimates are not a current allowance.
 
-The approved one-time `scripts/historical/reduce-storage.py` operation consolidates only
+The approved one-time `reduce-storage.py` operation (removed in November 2026; in git history at tag `v0.2.0`) consolidated only
 matching files of at least 1 MiB in the two installed `torch/lib` directories.
 It checks SHA-256 before and after creating each link, uses atomic replacement,
 and preserves the original duplicate until the replacement is ready. It records
@@ -121,7 +121,7 @@ is the corrected baseline. Those partial reports are preserved.
 
 The first consolidation found DLLs loaded by the active connector worker and
 retained its successful links and fault evidence. After explicit owner approval
-to retry, `scripts/historical/retry-storage-links.py` used the loaded embedding libraries as
+to retry, `retry-storage-links.py` (same history) used the loaded embedding libraries as
 the canonical files and replaced the idle caption copies instead. It verified
 every SHA-256, removed only superseded temporary links after successful replacement,
 and retained the initial fault receipt. No running worker had to be stopped.

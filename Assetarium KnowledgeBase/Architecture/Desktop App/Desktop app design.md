@@ -49,8 +49,8 @@ block of `styles.css`), so a slow answer never looks like an empty or broken vie
   readers get the same status text as before (`aria-busy`, live regions, hidden
   "Loading …" labels). Reduced motion keeps ghosts static and stops every loop.
 
-Native check: `scripts/verify-loading-states.py --run-name <unique-name>` holds
-bridge calls in the page and captures each state in both themes.
+There is no native check for these states at the moment: `scripts/verify-loading-states.py` predated the
+rebuilt Asset processing tab and was removed (git history at tag `v0.2.0`).
 
 ## UI text encoding checks
 

@@ -729,9 +729,6 @@ class DesktopBridge:
     def browse(self, filters=None, offset=0, page_size=40):
         return self._wait(self._present(self._service.browse, filters, offset, page_size))
 
-    def source_browse(self, key, offset=0, page_size=40):
-        return self._wait(self._present(self._source_browser.call, 'browse', key, offset, page_size))
-
     def source_asset(self, key, asset_id, source_format=None, preview_view='three_quarter', expected_version=None):
         return self._wait(self._present(self._source_browser.call, 'asset', key,
                                       asset_id, source_format, preview_view, expected_version))

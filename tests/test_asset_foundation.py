@@ -13,11 +13,9 @@ from PIL import Image
 
 from test_retrieval import SyntheticBackend
 from test_incremental import library, ready
-from local_asset_library import catalog, catalog_migration, incremental, notifications
+from local_asset_library import catalog, incremental, notifications
 from local_asset_library.settings import used_formats
-from local_asset_library.asset_structure import (
-    child_id, new_record, new_subasset, structure, upgrade_record, validate_collection,
-)
+from local_asset_library.asset_structure import child_id, new_record, new_subasset, structure, upgrade_record
 from local_asset_library.config import Config, ConfigError
 from local_asset_library.desktop_service import DesktopService
 from local_asset_library.library_cache import library_records
@@ -25,7 +23,6 @@ from local_asset_library.library_index import index_library
 from local_asset_library.membership import records
 from local_asset_library.mcp_assets import AssetService, validate
 from local_asset_library.publication import verified_hash
-from local_asset_library.retrieval import source_check
 from local_asset_library.sources import description_state, import_outcome, processing_summary, write_catalog, write_membership
 
 
@@ -56,19 +53,6 @@ def replace_records(config, values):
     work = incremental.working(config)
     os.replace(target.output_path('data', 'catalog.sqlite'), work.output_path('data', 'catalog.sqlite'))
     write_membership(work, values)
-
-
-def make_v1(config):
-    """Old table layout and records, without depending on a saved real catalog."""
-    path = config.output_path('data', 'catalog.sqlite')
-    with closing(sqlite3.connect(path)) as db, db:
-        db.execute('ALTER TABLE files RENAME TO files_new')
-        db.execute('CREATE TABLE files (path TEXT PRIMARY KEY, asset_id TEXT NOT NULL REFERENCES assets(asset_id), '
-                   'format TEXT NOT NULL, sha256 TEXT, availability TEXT NOT NULL)')
-        db.execute('INSERT INTO files SELECT * FROM files_new')
-        db.execute('DROP TABLE files_new')
-        db.execute('PRAGMA user_version=1')
-        db.execute("UPDATE metadata SET value='1' WHERE key='schema_version'")
 
 
 def test_identity_sharing_relationships_and_unknown_metadata(media):
@@ -275,50 +259,6 @@ def test_model_description_failures_stay_optional_after_schema_upgrade(library, 
     else:
         status = {'id': 's', 'key': 'one', 'name': 'One', 'enabled': True, 'scanned': True, **summary}
         assert notifications.reconcile(config, [status])['items'][0]['missing'] == 6
-
-
-def test_old_catalog_migration_preserves_outputs_ids_overlay_and_fingerprints(library):
-    config, backend = library
-    work = ready(config)
-    item = records(work)[0]
-    item['unknown_future_field'] = {'preserved': True}
-    item['owner_overlay'] = {'original': 'not interpreted by migration'}
-    incremental.update_record(work, item)
-    make_v1(work)
-    before = records(work)
-    fingerprints = [(source_check(work, r), incremental.inspection_input(work, r)[3]) for r in before]
-    original_id = before[0]['asset_id']
-    result = catalog_migration.migrate_working_catalog(work, 2 * 1024**2)
-    assert result['status'] == 'complete'
-    after = records(work)
-    assert before[0]['asset_id'] == after[0]['asset_id'] == original_id
-    for old, new in zip(before, after):
-        assert all(new[key] == value for key, value in old.items() if key != 'schema_version')
-        assert new['schema_version'] == 2
-    assert fingerprints == [(source_check(work, r), incremental.inspection_input(work, r)[3]) for r in after]
-    assert catalog_migration.migrate_working_catalog(work, 1)['status'] == 'unchanged'
-    with pytest.raises(ConfigError, match='working'):
-        catalog_migration.migrate_working_catalog(config, 2 * 1024**2)
-
-
-def test_migration_budget_and_failed_replacement_preserve_original(library, monkeypatch):
-    config, _ = library
-    work = incremental.working(config)
-    make_v1(work)
-    original = verified_hash(work.output_path('data', 'catalog.sqlite'), fresh=True)
-    with pytest.raises(ConfigError, match='reserve'):
-        catalog_migration.migrate_working_catalog(work, 1)
-    def fail_replace(*_):
-        raise OSError('Synthetic interrupted switch')
-    monkeypatch.setattr(catalog_migration.os, 'replace', fail_replace)
-    # atomic_json also uses os.replace: allow its receipts, interrupt only the DB switch.
-    monkeypatch.setattr(catalog_migration, 'atomic_json', lambda path, value: catalog.save_json(path, value))
-    with pytest.raises(OSError, match='interrupted'):
-        catalog_migration.migrate_working_catalog(work, 2 * 1024**2)
-    assert verified_hash(work.output_path('data', 'catalog.sqlite'), fresh=True) == original
-    assert list(work.output_path('data', 'catalog.sqlite').parent.glob('migration-*.sqlite'))
-    receipts = list(config.output_path('data', 'library/migrations').glob('*.json'))
-    assert json.loads(receipts[0].read_text())['status'] == 'failed'
 
 
 def test_schema_and_bounded_api_reject_unknown_values(media):

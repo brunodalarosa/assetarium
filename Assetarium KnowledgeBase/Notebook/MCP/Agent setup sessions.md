@@ -28,7 +28,7 @@ Decision: [0031](../../Decisions/0031-setup.md).
 - Tools are gated by tier, not by a session: read, apply and undo (recorded as the agent's, one
   `setup_changed` notice per day via `notice_id`), propose (the user applies), run (`validate_blender`).
 - Values the agent applies are recorded as set by the agent. The Blender path is only ever a
-  **proposal** (`PROPOSAL_STATES`: pending, applied, rejected, superseded, failed) that the user
+  **proposal** (pending, applied, rejected, superseded or failed) that the user
   applies after a fresh check in their own process.
 - While running, a server keeps `data/mcp/connections/<pid>.json`; the app shows "connected" only
   while that process is alive. There is no network listener, and the app never hosts the server.

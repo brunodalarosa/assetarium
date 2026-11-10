@@ -8,7 +8,6 @@ as faults, and a receipt is written under ``data/maintenance/``.
 """
 from datetime import datetime, timezone
 import json
-from pathlib import Path
 import re
 import uuid
 

@@ -2,7 +2,6 @@
 import base64
 import hashlib
 from io import BytesIO
-import json
 import re
 
 from .catalog import detail, encoded, relevant_license_evidence

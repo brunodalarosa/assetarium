@@ -75,12 +75,6 @@ def test_an_item_that_found_its_folder_busy_starts_when_that_operation_ends(fake
     assert len(started) == 1 and queue.state(config)['running']
 
 
-def test_every_operation_starts_the_next_item_when_it_ends():
-    script = (Path(__file__).parents[1] / 'scripts/source-operation.py').read_text(encoding='utf-8')
-    hook = script[script.index('    finally:'):]
-    assert 'advance(config)' in hook and 'args.operation' not in hook.split('advance(config)')[0]
-
-
 def test_a_leftover_queue_is_paused_after_a_restart_until_resumed(fake):
     config, one, two, started, finish, _ = fake
     queue.add(config, 'previews', {'key': one['key']})

@@ -49,7 +49,7 @@ def main() -> int:
     try:
         config = load_config(args.config, root)
         if config.sources_registry:
-            from .sources import registry, bound, get_source, source_status, source_statuses, scan_source, aggregate
+            from .sources import registry, bound, get_source, source_statuses, scan_source, aggregate
             source = get_source(config, args.asset_source) if args.asset_source else None
             if args.command in {'scan','status','refresh'}:
                 if args.dry_run:

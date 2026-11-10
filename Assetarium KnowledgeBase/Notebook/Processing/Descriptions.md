@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [captions.py, captions.save_edit, caption_backend.QwenBackend, caption_batching.py, caption_quality.py, caption_review.py, overnight.py, engines.description_engine, incremental.run_captions, scripts/record_caption_review.py, prompts]
+code: [captions.py, captions.save_edit, caption_backend.QwenBackend, caption_batching.py, caption_quality.py, overnight.py, engines.description_engine, incremental.run_captions, scripts/record_caption_review.py, prompts]
 verified: 2026-10-28
 branch: feature/library-view
 ---

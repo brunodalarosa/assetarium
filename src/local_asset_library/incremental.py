@@ -10,7 +10,6 @@ import json
 import os
 from pathlib import Path
 import posixpath
-import shutil
 import sqlite3
 import threading
 import time

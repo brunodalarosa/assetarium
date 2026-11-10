@@ -5,27 +5,13 @@ import sys
 import pytest
 
 from local_asset_library.config import Config, ConfigError
-from local_asset_library.inspection import choose_source, reuse_result, run_process, validate_result
+from local_asset_library.inspection import choose_source, run_process, validate_result
 from local_asset_library.render_math import duplicate_faces, framing
 
 
 def test_duplicate_faces_use_positions_without_merging_nearby_geometry():
     vertices = [(0,0,0), (1,0,0), (0,1,0), (0,0,0), (1,0,0), (0,1,0), (0,1,0.000001)]
     assert duplicate_faces(vertices, [(0,1,2), (5,4,3), (0,1,6)]) == 1
-
-
-@pytest.mark.parametrize("run", [
-    {"status": "failed", "errors": ["timeout"]},
-    {"status": "unsupported"},
-    {"status": "failed", "errors": ["off-frame render"]},
-    {"status": "complete", "source_faults": [{"kind": "geometry"}]},
-    {"status": "complete", "source_faults": [{"kind": "other definition of faulty"}]},
-])
-def test_faults_are_retained_without_automatic_retries(run):
-    record = {"inspection_run": {**run, "fingerprint": "same"}}
-    assert reuse_result(record, "same")
-    assert not reuse_result(record, "same", retry_faults=True)
-    assert not reuse_result(record, "changed")
 
 
 @pytest.mark.parametrize("minimum,maximum", [((-1,-2,-3),(1,2,3)), ((100,200,300),(100.01,240,300.01)), ((0,0,0),(1000,0.001,0.001))])

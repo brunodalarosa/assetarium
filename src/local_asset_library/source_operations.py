@@ -4,16 +4,14 @@ from dataclasses import replace
 import json
 import logging
 import os
-from pathlib import Path
 import sqlite3
 import signal
 import subprocess
-import sys
 import threading
 import time
 import uuid
 
-from .config import ConfigError, load_config, runtime_command, venv_python, with_saved_blender
+from .config import ConfigError, runtime_command, venv_python, with_saved_blender
 from .publication import atomic_json, read_json, read_only
 from .sources import (registry, get_source, bound, now, source_status, scan_source,
                       aggregate, read_records, write_membership)
@@ -583,7 +581,6 @@ def ensure_search_check(config, scoped, token, backend=None):
 
 def worker_stage(config, source, stage, token):
     from .incremental import process
-    from .library_index import index_library
     from .incremental import working
     scoped = bound(config, source)
     from .settings import used_formats

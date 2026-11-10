@@ -118,17 +118,6 @@ def test_future_review_preserves_severity_without_recorded_classification(tmp_pa
     assert quality["status"] == severity and quality["classification"] == "recorded"
     assert not quality["caption_faulty"] and supplied == before
     assert item["caption_provenance"]["visual_faults"][0]["owner_review"] == "pending"
-    from local_asset_library import caption_review
-    from unittest.mock import patch
-    page = tmp_path / "review.html"
-    page.write_text('<p>' + item['asset_id'] + ' — complete </p>', encoding="utf-8")
-    with patch.object(caption_review, "detail", return_value=item):
-        caption_review.highlight_faults(config, page, [item])
-    rendered = page.read_text(encoding="utf-8")
-    assert ("Caption warning" if severity == "warning" else "Caption review note") in rendered
-    assert "faulty" not in rendered and "&lt;script&gt;" in rendered and "<script>" not in rendered
-    counts = caption_review.check_severity_banners(config, rendered, [item])
-    assert counts["format"] == "current" and counts["caption_banner_counts"][severity] == 1
 
 
 def test_future_legacy_review_is_a_warning_and_processing_failure_stays_fault(tmp_path):

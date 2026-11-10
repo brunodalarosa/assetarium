@@ -119,20 +119,9 @@ list/detail/search and `initialize` do not upgrade catalogs. Fresh candidate
 catalogs use SQLite schema 2; normal scans retain unchanged legacy record bytes
 and do not regenerate results just to add structure fields.
 
-`catalog_migration.migrate_working_catalog(config, max_additional_bytes)` is an
-explicit working-data operation for use under the coordinator's existing writer
-lease. It refuses active-generation targets and unknown versions. Before copying,
-it requires an explicit budget and free-space reserve of three catalog sizes
-plus 64 KiB for the candidate, journal and expansion. It copies through SQLite
-backup, converts the child file table and JSON structure, checks relationships,
-integrity and foreign keys, verifies that the old working file has not changed,
-then replaces only that working catalog. The index, jobs, originals, owner files
-and active manifest are untouched. Already-v2 working catalogs are a no-op.
-Receipts and failed candidates are retained under the source/project's existing
-generated storage (`library/migrations/` and the working catalog directory).
-An interrupted switch leaves the old working file and active publication usable;
-the retained candidate can be inspected before an explicit retry. No automatic
-retry or evidence cleanup is introduced.
+The explicit schema 1 → 2 working-catalog migration (`catalog_migration.py`) was never called by the app and
+was removed in November 2026: 0.2.0, the first supported upgrade baseline, already writes schema 2. It is in
+git history at tag `v0.2.0`.
 
 Publication validates the complete candidate relationships as well as existing
 membership, vector and input checks, copies the matching catalog/index into a new

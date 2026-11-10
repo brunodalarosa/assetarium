@@ -19,7 +19,6 @@ from .publication import atomic_json, read_json
 from .settings import SETTING_KEYS
 
 SERVER_NAME = 'local_asset_library'
-PROPOSAL_STATES = ('pending', 'applied', 'rejected', 'superseded', 'failed')
 APPLY_KEYS = ('storage_budget_gib', 'processing_formats', 'caption_batch_size', 'descriptions_enabled',
               'description_engine', 'description_server', 'search_device', 'engine_hint', 'answers', 'image_formats')
 LABELS = {'storage_budget_gib': 'storage budget', 'processing_formats': 'formats', 'image_formats': 'image formats', 'caption_batch_size': 'batch size',

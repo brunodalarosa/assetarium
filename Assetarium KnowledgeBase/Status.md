@@ -66,6 +66,6 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 
 Everyday entry points: `local-assets` (`scripts/local-assets.ps1` / `.sh`), `check-config`,
 `doctor`, `scripts/smoke-headless.py`, the `scripts/verify-*.py` synthetic checks and the
-pytest suite. Tools that reproduce the original pilot, benchmark or one-time migrations
-are in [`scripts/historical/`](../scripts/historical/README.md); they need the original
-owner's data and are not general tools.
+pytest suite. The tools that reproduced the original pilot, benchmark and one-time migrations
+were removed in November 2026 (they needed the original owner's data and code that no longer
+exists); they are in git history at tag `v0.2.0` under `scripts/historical/`.

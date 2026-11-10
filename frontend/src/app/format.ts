@@ -82,45 +82,6 @@ export function describeActive(source: Json) {
   return source.operation?.operation === "describe" && operationActive(source.operation);
 }
 
-export function sourceMessage(source: Json) {
-  if (source.scan_fault) return source.scan_fault;
-  if (source.processing_paused) return "Processing paused. Select formats in Settings → General to resume.";
-  if (!source.scanned) return "Waiting for the source scan. Assets must be processed before they appear in searches.";
-  if (source.needs_processing) return `${source.pending || 0} ${(source.pending || 0) === 1 ? "asset needs" : "assets need"} processing or publication.`;
-  if (source.failed) return "Import finished. Recorded failures are listed in the importing failures report.";
-  if (source.skipped_formats && source.eligible_assets === 0) return "No assets match the selected processing formats. Existing results remain available.";
-  if (source.skipped_formats) return "Selected formats are up to date. Other assets remain scanned and saved.";
-  return "Up to date and published.";
-}
-
-export function descriptionSummary(source: Json) {
-  const d = source.descriptions;
-  if (!d) return "Description counts appear after scanning.";
-  const parts = [
-    d.complete && plural(d.complete, "description", "descriptions") + " written",
-    d.missing && `${Number(d.missing).toLocaleString()} missing`,
-    d.failed && `${Number(d.failed).toLocaleString()} failed`,
-  ].filter(Boolean);
-  return parts.length ? parts.join(" · ") : d.unavailable ? "Descriptions can be generated after assets are processed." : "No assets to describe.";
-}
-
-export function descriptionBlocked(source: Json) {
-  const d = source.descriptions || {};
-  if (!source.enabled) return "Include this library folder in search in Library to generate descriptions.";
-  if (source.processing_paused) return "Processing is paused. Select formats in Settings → General to generate descriptions.";
-  if (operationActive(source.operation)) return "Available when the current operation for this source finishes.";
-  if (!d.missing) return d.failed ? "Nothing left to generate. Failed descriptions are recorded and not retried." : "Nothing to generate right now.";
-  return "";
-}
-
-export const DESCRIBE_RESULTS: Record<string, string> = {
-  complete: "Last run finished.",
-  complete_with_faults: "Last run finished; some descriptions failed and were recorded.",
-  cancelled: "Last run was cancelled; finished descriptions were published.",
-  faulty: "Last run stopped.",
-  interrupted: "Last run was interrupted.",
-};
-
 export type Tone = "info" | "success" | "warning" | "fault";
 export function notificationContent(item: Json): { tone: Tone; title: string; body: string } {
   if (item.kind === "collection_changed")

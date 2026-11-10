@@ -18,7 +18,7 @@ from urllib.parse import unquote, urlsplit
 import xml.etree.ElementTree as ET
 import zipfile
 
-from .config import Config, ConfigError
+from .config import ConfigError
 from . import hash_cache
 from .publication import pinned_config, read_only
 

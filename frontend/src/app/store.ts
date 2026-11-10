@@ -4,7 +4,7 @@
 // notifications and processing: this file only presents its answers.
 import { useSyncExternalStore } from "react";
 import { type AssetApi, type Bridge, type Json, libraryApi, sourceApi } from "./api";
-import { describeActive, notificationContent, notificationKey, operationActive, plural, progressInfo, type Tone } from "./format";
+import { notificationContent, notificationKey, operationActive, plural, progressInfo, type Tone } from "./format";
 
 export type Page = "home" | "collections" | "collection" | "processing" | "settings" | "sources";
 export type SettingsTab = "general";
@@ -1025,7 +1025,6 @@ export function pickAsset(assetId: string, range: boolean) {
     return { picked: v.picked.includes(assetId) ? v.picked.filter((id) => id !== assetId) : [...v.picked, assetId], pickAnchor: assetId };
   });
 }
-export const clearPicked = () => patchSources({ picked: [], pickAnchor: null });
 /** Folder and pack answers (Make this a pack, Merge, image kinds, exclusions, Forget missing); most rescan. */
 export async function folderAction(action: string, key: string, path = "", value: Json = null) {
   try {
@@ -1096,32 +1095,6 @@ export async function pathAction(action: "reveal" | "open" | "copy", key: string
     if (action === "copy") pushToast({ tone: "info", title: "Path copied", body: "" });
   } catch (error) {
     pushToast({ tone: "fault", title: action === "reveal" ? "Could not show it in Explorer" : action === "open" ? "Could not open it" : "Could not copy the path", body: (error as Error).message });
-  }
-}
-/** Add a library folder; one inside a library folder is refused, with Show it. One around library folders replaces them. */
-export async function addLibraryFolder(directory: string) {
-  try {
-    const result = await api().source_action("add", null, directory, null);
-    if (result.status === "faulty") {
-      if (result.covered_by) {
-        const key = result.covered_by as string;
-        pushToast({ tone: "info", title: "Already covered", body: result.reason, actions: [{ label: "Show it", run: () => openSources(key, "") }] });
-        return result;
-      }
-      throw Error(result.reason);
-    }
-    const replaced: string[] = result.replaced || [];
-    pushToast({ tone: "success", title: "Library folder added", body: replaced.length
-      ? `It replaces ${replaced.join(", ")}; their assets keep their IDs and results. Scanning now; nothing is processed until you ask.`
-      : "Scanning now; nothing is processed until you ask." });
-    await loadSources();
-    await loadLibraryTree();
-    const added = (state.sourcesView.tree?.folders || []).find((f: Json) => f.path.toLowerCase() === directory.toLowerCase().replace(/[\\/]+$/, ""));
-    openSources(added?.key ?? state.sourcesView.key ?? undefined, "");
-    return result;
-  } catch (error) {
-    pushToast({ tone: "fault", title: "Folder not added", body: (error as Error).message });
-    return { status: "faulty", reason: (error as Error).message };
   }
 }
 /* --------------------------- add library folder ---------------------------- */
@@ -1675,15 +1648,6 @@ export async function checkServer(url: string, model: string): Promise<Json> {
     return { status: "faulty", reason: (error as Error).message };
   }
 }
-export async function testSetupServer() {
-  const { serverUrl, serverModel } = state.setup.draft;
-  patchSetup({ testing: true, server: null });
-  const server = await checkServer(serverUrl, serverModel);
-  patchSetup((s) => ({
-    testing: false, server,
-    draft: server.status === "connected" && !s.draft.serverModel && server.models.length === 1 ? { ...s.draft, serverModel: server.models[0] } : s.draft,
-  }));
-}
 /** The choices as setup_core.save_setup expects them; skipped steps keep their saved values. */
 export function setupChoices(draft: SetupDraft = state.setup.draft): Json {
   const skipped = new Set(draft.skipped);
@@ -1906,7 +1870,6 @@ export async function notificationAction(action: string, item: Json) {
   }
   if (action === "dismiss") return saveNotification("dismiss", item.id);
 }
-export const runningDescriptions = (s: AppState = state) => s.sources.filter(describeActive);
 export const processingAttention = (s: AppState) =>
   operationActive(s.globalScan) || s.sources.some((source) => source.needs_processing || source.scan_fault || operationActive(source.operation));
 

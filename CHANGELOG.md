@@ -43,6 +43,14 @@ All notable changes to Assetarium are listed here. The project follows
 - **Pilot-only CLI commands**: `pilot`, `inspect --phase` and `review-sheet`, with their `--selection`, `--phase`,
   `--timeout` and `--retry-faults` options. They only worked on the original 40-asset pilot data. Libraries no
   longer fall back to `data/pilot/selection-manifest.json` when `data/library/membership.json` is missing.
+- **Pilot-era and one-time scripts**: `scripts/historical/` and eight one-time check scripts in `scripts/`
+  (`publish_embedding_evidence.py`, `summarize-agent-evidence.py`, `preservation-dry-run.py`,
+  `verify-source-preservation.py`, `verify-model-relocation.py`, `verify-asset-foundation.py`,
+  `verify-library-nochange.py` and the stale `verify-loading-states.py`). They needed the original owner's data
+  or code that no longer exists; they stay in git history at tag `v0.2.0`.
+- **Unused code**: the frozen-benchmark arithmetic (`evaluation.py`), the pilot review-page checker
+  (`caption_review.py`), the never-called schema 1 → 2 catalog migration (`catalog_migration.py`) and the desktop
+  bridge's unused `source_browse` call. Nothing the app, the CLI or the MCP server does changes.
 
 ## [0.2.0] — 2026-11-05
 
