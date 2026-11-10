@@ -68,4 +68,4 @@ Everyday entry points: `local-assets` (`scripts/local-assets.ps1` / `.sh`), `che
 `doctor`, `scripts/smoke-headless.py`, the `scripts/verify-*.py` synthetic checks and the
 pytest suite. The tools that reproduced the original pilot, benchmark and one-time migrations
 were removed in November 2026 (they needed the original owner's data and code that no longer
-exists); they are in git history at tag `v0.2.0` under `scripts/historical/`.
+exists); they are in git history at commit `af02e91` under `scripts/historical/`.

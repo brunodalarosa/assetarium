@@ -49,6 +49,12 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **Three GUI verify scripts fail on `develop`**: `verify-gui` and `verify-library-retrieval` expect an
   MCP tool list that predates the pack tools, and `verify-library-gui --synthetic` fails its arrow-key
   card focus check. Tracked in the owner's task notes. Seen: 2026-11-07
+- **`verify-asset-sources.py` fails on `develop`**: it times out waiting for `LALPreview.current.refresh` to
+  show, after the tree and folder-card steps pass. Seen: 2026-11-09
+- **A git worktree has no `.venv*` or `node_modules`**: the wrappers point at environments inside the
+  checkout they are in. Tests ran with the main checkout's `.venv-mcp` interpreter and `PYTHONPATH` set to
+  the worktree's `src`; the frontend build needed a temporary `node_modules` link, removed afterwards.
+  Seen: 2026-11-09
 
 ## Codebase-wide
 

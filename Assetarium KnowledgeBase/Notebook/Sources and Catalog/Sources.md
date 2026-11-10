@@ -111,7 +111,7 @@ Binding: [decision 0032](../../Decisions/0032-library-store-and-queue.md).
   files exist (OBJ's existing-file `mtllib` choice, a parse stopped by a bad `mtllib` line) is
   decided at replay in `catalog.dependencies`. A read failure (`ConfigError`, `OSError`) is never cached.
 - The October 14, 2026 move from one combined root to sources is history:
-  `source_migration.py` (removed in November 2026; in git history at tag `v0.2.0`; receipts under `data/library/source-migration/`).
+  `source_migration.py` (removed in November 2026; in git history at commit `af02e91`; receipts under `data/library/source-migration/`).
 
 ## Related
 

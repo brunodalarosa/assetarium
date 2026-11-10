@@ -26,6 +26,10 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
 
 ## Gotchas
 
+- **Every `store.ts` export is reachable as `window.lal.<name>`** (`frontend/src/main.tsx`), from verify
+  scripts and from `desktop.py` (`askClose`). "No importer in `frontend/src`" does not mean unused: search
+  `scripts/` and `src/` for the name too.
+
 - **Routes are not in `location.hash`.** Wait on `lal.state.history[lal.state.historyIndex].page` (for example `'sources'`) to see where `navigate` went.
 
 - **A restart can be simulated.** Set a flag (`window.__beforeRestart=true`), call

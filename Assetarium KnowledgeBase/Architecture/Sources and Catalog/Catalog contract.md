@@ -121,7 +121,7 @@ and do not regenerate results just to add structure fields.
 
 The explicit schema 1 → 2 working-catalog migration (`catalog_migration.py`) was never called by the app and
 was removed in November 2026: 0.2.0, the first supported upgrade baseline, already writes schema 2. It is in
-git history at tag `v0.2.0`.
+git history at commit `af02e91`.
 
 Publication validates the complete candidate relationships as well as existing
 membership, vector and input checks, copies the matching catalog/index into a new

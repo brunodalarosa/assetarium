@@ -106,7 +106,7 @@ batch and after publication. Current measured coverage, retained storage and
 runtime evidence are summarized in `docs/history/progress-2026-10.md`; the original Step 8
 verification report has been retired. Historical 20 GiB estimates are not a current allowance.
 
-The approved one-time `reduce-storage.py` operation (removed in November 2026; in git history at tag `v0.2.0`) consolidated only
+The approved one-time `reduce-storage.py` operation (removed in November 2026; in git history at commit `af02e91`) consolidated only
 matching files of at least 1 MiB in the two installed `torch/lib` directories.
 It checks SHA-256 before and after creating each link, uses atomic replacement,
 and preserves the original duplicate until the replacement is ready. It records

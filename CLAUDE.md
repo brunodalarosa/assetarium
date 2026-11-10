@@ -23,7 +23,7 @@ inspects and renders them in Blender, writes local visual descriptions
 search/detail through a STDIO MCP server and a pywebview/WebView2 desktop app.
 Original asset files are never written. Owner: Bruno (visual approval,
 relevance judgments, expansion decisions). Being prepared for open source. Scripts tied to
-the original pilot/library or one-time operations were removed; they are in git history at tag `v0.2.0`.
+the original pilot/library or one-time operations were removed; they are in git history at commit `af02e91`.
 
 ## Runtimes — always use the wrappers (PowerShell, from the repo root)
 

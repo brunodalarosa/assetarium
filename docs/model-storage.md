@@ -36,6 +36,6 @@ its original paths and byte counts as snapshots of earlier runs.
 Local evidence is under `data/model-relocation/`: `move.json` preserves every
 before/after file hash, and `embedding.json` / `caption.json` record new smoke
 checks without overwriting original caption/index/capability evidence.
-`relocate-models.ps1` was a one-time migration (removed in November 2026; in git history at tag `v0.2.0`), not a startup step.
+`relocate-models.ps1` was a one-time migration (removed in November 2026; in git history at commit `af02e91`), not a startup step.
 It refused to merge or overwrite existing destinations. Smoke checks similarly
 refuse to replace existing receipts or automatically retry faults.

@@ -47,6 +47,13 @@ method is callable from the page as `window.pywebview.api.<name>`. Types for the
   and `watchChanges` reloads the tree and the shown folder during scans only when the sources revision moves
   (`onlyScans`); identical answers keep their state, so cards don't re-render. Proof: `scripts/verify-quiet-startup.py`.
 
+## Gotchas
+
+- **Eight bridge names are built at run time.** `sourceApi` in `frontend/src/app/api.ts` calls
+  `bridge["source_" + name]` (asset, thumbnail, image_view, reveal and the four `preview_*` calls), so a text
+  search for `source_thumbnail` finds no caller, and pytest passes without them. Run a `verify-*.py` check
+  before deleting a `DesktopBridge` method.
+
 ## Related
 
 [Frontend build](Frontend%20build.md) · [Desktop app design](../../Architecture/Desktop%20App/Desktop%20app%20design.md).

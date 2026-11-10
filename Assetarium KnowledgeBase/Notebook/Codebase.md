@@ -44,7 +44,7 @@ read it first. Up: [Notebook](Notebook.md).
   `library_migration` (the one-time move into the store; the only code naming the old folder),
   `source_operations`, `source_storage`, `source_browser`, `catalog`,
   `asset_structure`, `image_catalog`, `membership`, `recheck`, `texture_folders`. The October 14
-  migration script was removed in November 2026; in git history at tag `v0.2.0`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
+  migration script was removed in November 2026; in git history at commit `af02e91`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
 - **Processing:** `incremental` (stage ledger and publication), `result_store` (results keyed by
   inputs, the result index, reuse for duplicates and moved files), `processing_queue` (Make
   previews / Generate descriptions queue), `inspection`, `blender_worker`,
@@ -94,4 +94,4 @@ read it first. Up: [Notebook](Notebook.md).
   descriptions or inspections back to pending (`incremental.py`, decision 0022). Search-index
   metadata names are not fingerprint inputs: vector reuse keys on each vector's own fingerprint.
 - The pilot-era and one-time scripts (`scripts/historical/`) were removed in November 2026: they needed
-  the original owner's data and called code removed since. Run them from tag `v0.2.0` or earlier.
+  the original owner's data and called code removed since. Run them from commit `af02e91` or earlier.

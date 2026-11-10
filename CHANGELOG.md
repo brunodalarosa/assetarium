@@ -47,7 +47,7 @@ All notable changes to Assetarium are listed here. The project follows
   (`publish_embedding_evidence.py`, `summarize-agent-evidence.py`, `preservation-dry-run.py`,
   `verify-source-preservation.py`, `verify-model-relocation.py`, `verify-asset-foundation.py`,
   `verify-library-nochange.py` and the stale `verify-loading-states.py`). They needed the original owner's data
-  or code that no longer exists; they stay in git history at tag `v0.2.0`.
+  or code that no longer exists; they stay in git history at commit `af02e91`.
 - **Unused code**: the frozen-benchmark arithmetic (`evaluation.py`), the pilot review-page checker
   (`caption_review.py`), the never-called schema 1 → 2 catalog migration (`catalog_migration.py`) and the desktop
   bridge's unused `source_browse` call. Nothing the app, the CLI or the MCP server does changes.

@@ -88,7 +88,7 @@ strings are accepted as unclassified warnings, rather than automatically becomin
 classification when showing notes, warnings and real caption failures.
 
 The review-page checker (`caption_review.py`) served the pilot review pages only and was
-removed in November 2026 (git history at tag `v0.2.0`). Future measurement summaries
+removed in November 2026 (git history at commit `af02e91`). Future measurement summaries
 use `caption_quality_counts` and `visual_review_findings_assets`; the presence of
 a review finding is no longer reported as a faulty asset.
 

@@ -50,7 +50,7 @@ block of `styles.css`), so a slow answer never looks like an empty or broken vie
   "Loading …" labels). Reduced motion keeps ghosts static and stops every loop.
 
 There is no native check for these states at the moment: `scripts/verify-loading-states.py` predated the
-rebuilt Asset processing tab and was removed (git history at tag `v0.2.0`).
+rebuilt Asset processing tab and was removed (git history at commit `af02e91`).
 
 ## UI text encoding checks
 

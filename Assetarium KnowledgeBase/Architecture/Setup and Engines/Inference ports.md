@@ -60,4 +60,4 @@ On purpose, and listed so a later change knows about them:
   library pre-load); it builds the embedder through `engines.embedder`.
 - Evidence and maintenance scripts build Qwen or EmbeddingGemma directly:
   `benchmark-caption-batching.py`, `measure_embedding_search.py`, `prepare_*_model.py`. The ones tied to
-  the original pilot or library were removed in November 2026; in git history at tag `v0.2.0`.
+  the original pilot or library were removed in November 2026; in git history at commit `af02e91`.
