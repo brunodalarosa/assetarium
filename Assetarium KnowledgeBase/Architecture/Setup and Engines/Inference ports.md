@@ -10,7 +10,7 @@ branch:
 # Inference ports
 
 > Model inference is the only part of Assetarium built as ports and adapters: the caption stage,
-> overnight runs, indexing and search depend on two small contracts, and `engines.py` is the only
+> indexing and search depend on two small contracts, and `engines.py` is the only
 > place that picks the adapter. Refactors must keep fingerprints, proven with
 > `scripts/check-engine-stability.py --compare`.
 

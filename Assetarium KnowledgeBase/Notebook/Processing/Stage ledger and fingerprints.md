@@ -64,8 +64,6 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
   For search the recorded value is the search check's receipt, or else the published index's
   contract: vectors from another checkout's generated data with no receipt used to fail every query
   with "Query/index embedding contract mismatch" (fixed October 30, 2026).
-- Editing `incremental.py`, `overnight.py` or `library_index.py` changes the overnight code
-  contract: an overnight run planned before the edit refuses to continue.
 
 ## Friction and improvements
 

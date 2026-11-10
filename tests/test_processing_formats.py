@@ -9,7 +9,6 @@ import pytest
 
 from test_incremental import library, ready
 from test_sources import managed, ready_source
-from test_overnight import overnight
 from local_asset_library import sources, source_operations, incremental
 from local_asset_library.catalog import detail
 from local_asset_library.config import ConfigError
@@ -210,14 +209,3 @@ def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(mana
     monkeypatch.setattr(source_operations, 'scan_source', lambda *a: pytest.fail('Paused processing should not scan or load a runtime'))
     source_operations.process_source(config, one, 'paused-test')
     assert 'paused' in states[-1]['phase']
-
-
-def test_overnight_selection_and_previously_planned_tasks_obey_formats(overnight):
-    from local_asset_library.overnight import plan, create_run, caption_batch, outcomes
-    config, _, _ = overnight
-    run = create_run(config)
-    assert plan(config)['selected'] == 2
-    select(config, ['gltf'])
-    assert plan(config)['selected'] == 0
-    caption_batch(config, run, lambda *a: pytest.fail('Disabled sources should load no caption model'))
-    assert {result['status'] for result in outcomes(config, run).values()} == {'skipped'}

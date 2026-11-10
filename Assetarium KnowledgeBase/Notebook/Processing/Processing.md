@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [hub]
-code: [incremental.py, inspection.py, render_pool.py, captions.py, library_index.py, gpu_queue.py, overnight.py, scripts/library-batch.py]
+code: [incremental.py, inspection.py, render_pool.py, captions.py, library_index.py, gpu_queue.py, scripts/library-batch.py]
 ---
 # Processing
 
@@ -15,10 +15,10 @@ descriptions, search vectors, then publication. Up: [Notebook](../Notebook.md).
 - [Blender rendering](Blender%20rendering.md): workers, the kept-open render pool, devices and the speed test.
 - [Shared texture dependencies](Shared%20texture%20dependencies.md): cross-source texture paths,
   explicit overrides, texture repairs.
-- [Descriptions](Descriptions.md): Qwen3-VL captions, batching, caption severity, overnight runs.
+- [Descriptions](Descriptions.md): Qwen3-VL captions, batching, caption severity.
 - [GPU lease](GPU%20lease.md): one GPU job at a time across processes.
 - [Processing queue](Processing%20queue.md): Make previews and Generate descriptions as queue items
-  whose scope resolves at start; previews first, overnight hold, paused after a restart.
+  whose scope resolves at start; previews first, paused after a restart.
 - [Search vectors](Search%20vectors.md) *(gap)*: `library_index.py` vector jobs and the index contract.
 
 ## Read first

@@ -3,12 +3,10 @@ from copy import deepcopy
 import pytest
 
 from test_incremental import library, ready
-from test_overnight import overnight
 from local_asset_library.captions import file_hash
 from local_asset_library.incremental import inspection_input, working
 from local_asset_library.membership import records
 from local_asset_library.texture_repair import validate_recipe
-from local_asset_library.overnight import plan
 from local_asset_library.config import ConfigError
 from local_asset_library.incremental import update_record
 from local_asset_library.mcp_assets import AssetService
@@ -57,17 +55,6 @@ def test_override_cannot_cross_pack_or_escape_root(library):
     row['texture_repair']['bindings'][0]['path'] = '../escape.png'
     with pytest.raises(ConfigError):
         validate_recipe(config, row)
-
-
-def test_caption_allowlist_excludes_unrelated_failures(overnight):
-    config, work, _ = overnight
-    pending = plan(config)
-    target = pending['targets'][1]['asset_id']
-    result = plan(config, asset_ids=[target])
-    assert result['selected'] == 1 and result['targets'][0]['asset_id'] == target
-    assert plan(config, asset_ids=[])['selected'] == 0
-    with pytest.raises(ConfigError, match='unknown asset'):
-        plan(config, asset_ids=['asset_unknown'])
 
 
 def test_repaired_source_handoff_contains_verified_bindings_and_import_limit(library):

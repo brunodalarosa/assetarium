@@ -51,7 +51,7 @@ read it first. Up: [Notebook](Notebook.md).
   `blender_batch_worker`, `render_pool`, `render_devices`, `render_math`, `texture_repair`,
   `blender_repair_worker`, `blender_shared_dependency_worker`, `dependency_resolution`,
   `dependency_overrides`, `image_inspection`, `image_media`, `svg_worker`, `captions`,
-  `caption_backend`, `caption_batching`, `caption_quality`, `caption_review`, `overnight`,
+  `caption_backend`, `caption_batching`, `caption_quality`,
   `library_index`, `gpu_queue`. See [Processing](Processing/Processing.md).
 - **Search:** `retrieval`, `search_policy`, `library_cache`, `embedding_backend`, `embedding_cpu`,
   `search_speed`, `evaluation`. See [Search](Search/Search.md).

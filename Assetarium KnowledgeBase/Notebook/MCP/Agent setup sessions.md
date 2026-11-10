@@ -44,7 +44,7 @@ Decision: [0031](../../Decisions/0031-setup.md).
 ## Rules
 
 - **Weight manifests stay out of the model contracts.** `docs/caption-model.json` and
-  `docs/embedding-model.json` bytes feed the overnight contract, the embedding vector identity and the search
+  `docs/embedding-model.json` bytes feed the embedding vector identity and the search
   speed test, so the file lists for `verify_weights` live in `docs/*-model-files.json`.
 - **Register agents only from the real checkout.** A verify run's panel shows snippets with the
   scratch fixture's paths (`setup_agent.snippets`); one registered at user scope made every agent

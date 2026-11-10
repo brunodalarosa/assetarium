@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [captions.py, captions.save_edit, caption_backend.QwenBackend, caption_batching.py, caption_quality.py, overnight.py, engines.description_engine, incremental.run_captions, scripts/record_caption_review.py, prompts]
+code: [captions.py, captions.save_edit, caption_backend.QwenBackend, caption_batching.py, caption_quality.py, engines.description_engine, incremental.run_captions, scripts/record_caption_review.py, prompts]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -14,8 +14,8 @@ rendered previews by Qwen3-VL (or an experimental local model server). Start at
 
 ## How it works
 
-- Descriptions run only from **Generate descriptions** (per source) or an owner-started overnight run
-  (`overnight.py`); Process assets never writes them.
+- Descriptions run only from **Generate descriptions** (the queue in the app, or `local-assets` in a
+  terminal); Make previews never writes them. The separate overnight runner was removed in November 2026.
 - Batches default to 8 assets; finished ones are kept, and running out of GPU memory leaves the rest
   pending with a suggestion to lower the batch size.
 - The core parses and validates every engine's text, so every engine meets the same rules
@@ -52,4 +52,4 @@ rendered previews by Qwen3-VL (or an experimental local model server). Start at
 ## Related
 
 [Stage ledger and fingerprints](Stage%20ledger%20and%20fingerprints.md) · [GPU lease](GPU%20lease.md) ·
-`docs/caption-contract.md` · [Overnight descriptions](../../../docs/overnight-descriptions.md).
+`docs/caption-contract.md`.

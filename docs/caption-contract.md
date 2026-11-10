@@ -80,7 +80,7 @@ the stage fingerprint. This pilot cache does not implement full-library refresh.
 
 Qwen uses local files only, pinned revision and runtime lock, verified model file
 hashes, BF16 CUDA/SDPA, fixed seed per call, one beam and bounded output/time.
-Library and overnight processing generate several assets per call
+Library processing generates several assets per call
 (`caption_batching.py`, *Settings → General → Description batch size*, default 8;
 [decision 0007](../KnowledgeBase/Decisions/0007-batched-description-generation.md)). Each asset is
 still validated, saved and published on its own and records `generation_mode` and
