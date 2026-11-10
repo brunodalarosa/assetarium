@@ -14,6 +14,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src'))
 from local_asset_library.config import load_project_config
 from local_asset_library.desktop import DesktopBridge
+from local_asset_library.mcp_assets import MAX_LIMIT, SCHEMAS
 from local_asset_library.membership import records
 from local_asset_library.publication import generation
 parser=argparse.ArgumentParser();parser.add_argument('--run-name',required=True);parser.add_argument('--keyword-only',action='store_true');args=parser.parse_args()
@@ -46,7 +47,7 @@ report={'status':'running','generation':generation(config),'membership':len(reco
 try:
     send('initialize',{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'step8-shared-verifier','version':'1'}})
     send('notifications/initialized',notification=True)
-    assert {t['name'] for t in send('tools/list')['tools']}=={'search_assets','get_asset'}
+    assert {t['name'] for t in send('tools/list')['tools']}==set(SCHEMAS)
     cases=[{'query':'apple','mode':'keyword'}, {'query':'sedan sports','mode':'keyword'},
         {'query':'a small red apple fruit with a leaf'}, {'query':'a wooden chair with a curved back'},
         {'query':'a low-poly green tree','filters':{'pack':'quaternius_ultimate-nature-pack','format':'blend','max_triangles':5000,'rigged':False}},
@@ -54,7 +55,7 @@ try:
         {'query':'a red apple with a leaf','mode':'combined'},{'query':'a red apple with a leaf','mode':'description'}]
     if args.keyword_only:cases=cases[:2]
     else:
-        apple=next(r for r in records(config) if r['pack_id']=='kenney_food-kit' and r['display_name']=='apple')
+        apple=next(r for r in records(config) if r['display_name']=='apple')  # Any apple: pack IDs follow the folder structure.
         cases.append({'mode':'reference','reference_asset_id':apple['asset_id'],'reference_view':'three_quarter'})
     for case in cases:
         arguments={'mode':'keyword_description','filters':{},'limit':5,**case}
@@ -70,7 +71,7 @@ try:
             'gui_seconds':gui_seconds,'mcp_seconds':mcp_seconds,'characters':len(actual['content'][0]['text']),
             'truncated':payload['truncated'],'fault_count':payload['fault_count'],'whole_payload_equal':True})
         (out/'report.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
-    malformed=send('tools/call',{'name':'search_assets','arguments':{'query':'apple','limit':6}})
+    malformed=send('tools/call',{'name':'search_assets','arguments':{'query':'apple','limit':MAX_LIMIT+1}})
     assert malformed.get('isError')
     report['invalid_limit_rejected']=True
     if not args.keyword_only:

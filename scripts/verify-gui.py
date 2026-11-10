@@ -14,6 +14,7 @@ import traceback
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from local_asset_library.config import load_project_config
+from local_asset_library.mcp_assets import SCHEMAS
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -53,7 +54,7 @@ class Wire:
         self.send('initialize', {'protocolVersion': '2025-11-25', 'capabilities': {},
                                 'clientInfo': {'name': 'desktop-agreement-check', 'version': '1'}})
         self.send('notifications/initialized', notification=True)
-        assert {t['name'] for t in self.send('tools/list')['result']['tools']} == {'search_assets', 'get_asset', 'list_collections', 'get_collection', 'edit_collection', 'tag_assets'}
+        assert {t['name'] for t in self.send('tools/list')['result']['tools']} == set(SCHEMAS)  # Every registered tool is listed over the wire.
 
     def send(self, method, params=None, notification=False):
         message = {'jsonrpc': '2.0', 'method': method}

@@ -54,6 +54,8 @@ def verify():
     wire=None
     try:
         ui.wait_ready()
+        # A fixture with no library folder opens setup shortly after startup; while open it makes the page inert (no card takes focus).
+        js("(async()=>{await until(()=>lal.state.setup.open,3000).catch(()=>0);if(lal.state.setup.open)lal.closeSetup();await until(()=>!lal.state.setup.open);return true})()")
         js("(async()=>{await lal.submitSearch();return true})()")
         wait("lal.state.library.items.length===40&&$('grid').getAttribute('aria-busy')==='false'")
         wait("document.querySelectorAll('#grid .thumb img').length>0")
@@ -66,8 +68,8 @@ def verify():
         started=time.perf_counter();js("(async()=>{await lal.pageBrowse(1);return lal.state.library.items.map(x=>x.asset_id);})()")
         report['page_seconds']=time.perf_counter()-started
         assert js('lal.state.library.offset===40 && lal.state.library.items.length===40')
-        keyboard=js("(async()=>{await frame();const cards=[...$('grid').querySelectorAll('.card')];cards[0].focus();cards[0].dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));return document.activeElement===cards[1];})()")
-        assert keyboard
+        keyboard=js("(async()=>{await frame();const cards=[...$('grid').querySelectorAll('.card')];cards[0].focus();cards[0].dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));const a=document.activeElement;return {moved:a===cards[1],focus:a?.id||a?.tagName,inert:!!cards[0].closest('[inert]')};})()")
+        assert keyboard['moved'], keyboard
         js("lal.selectAsset('library',lal.state.library.items[0].asset_id,null,'three_quarter').then(()=>true)")
         selected=js('lal.state.library.selected')
         wait("Boolean($('detail').querySelector('h2'))")

@@ -247,10 +247,10 @@ def verify():
         check('The same OBJ renders in Library, Search and Collections using each resolved detail revision')
         ui.js("LALPreview.current.stop();window.fixturePrepare=LALPreview.current.api.preview_prepare;LALPreview.current.api.preview_prepare=()=>Promise.resolve({status:'stale',reason:'Library changed; refresh the inspection card.'})")
         ui.js("LALPreview.current.start(false)")
-        wait("LALPreview.current&&!LALPreview.current.refresh.hidden")
+        wait("LALPreview.current&&LALPreview.current.status.textContent.includes('The library changed.')&&LALPreview.current.status.querySelector('button')")  # The stale note carries Refresh.
         assert ui.js("!LALPreview.current.retainedFault&&!LALPreview.current.warning.textContent.includes('Recorded failure')")
-        ui.js("LALPreview.current.api.preview_prepare=fixturePrepare;LALPreview.current.refresh.click()")
-        wait("lal.state.collection.detail?.result&&LALPreview.current&&LALPreview.current.refresh.hidden")
+        ui.js("LALPreview.current.api.preview_prepare=fixturePrepare;LALPreview.current.status.querySelector('button').click()")
+        wait("lal.state.collection.detail?.result&&!lal.state.collection.detail.loading&&LALPreview.current&&!LALPreview.current.status.textContent.includes('The library changed.')")
         ui.js("LALPreview.current.start(false)")
         wait("LALPreview.current?.ready")
         check('A changed revision is refreshable, with no fake retained fault; Refresh loads a working current inspection')
