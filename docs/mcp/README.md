@@ -29,8 +29,8 @@ fills in this checkout's real paths, or run `python scripts/register-mcp.py --sn
 (writes ignored `data/mcp/clients/`). The tracked [`clients/`](clients/) files are neutral
 examples with a placeholder path. Do not wrap client startup in an installer. The entry
 point resolves its own repository/configuration regardless of client cwd.
-The registrations recorded on the original development machine are kept locally by
-the owner, not published; they were never setup files.
+The registration snippets recorded on the original development machine have been
+retired; use the current examples above.
 
 The server entry point cannot process assets, scan/update the catalog, load
 remote images, or import into Play Shapes. Existing generated captions and

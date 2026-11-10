@@ -4,8 +4,15 @@
 > journal from the first pilot to that date (newest first), kept as history. Evidence paths
 > point into the original owner's ignored `data/` folder. New work records its evidence in
 > pull request descriptions, user-visible changes in `CHANGELOG.md`, and lasting knowledge in
-> [`KnowledgeBase/`](../../KnowledgeBase/Home.md). Links were updated when files moved;
+> [the knowledge base](../../Assetarium%20KnowledgeBase/Home.md). Links were updated when files moved;
 > removed pilot reports are named with the commit that still has them.
+
+> Archive note, 2026-11-09: the machine-specific GUI, MCP client and Step 8 reports,
+> and the original Codex/OpenCode registration snippets, have been retired from the
+> repository. Their local archive copies were also discarded at the owner's request.
+> The dated results below remain historical records; those reports are no longer
+> available at their former paths. Current client setup examples are in
+> [`docs/mcp/clients/`](../mcp/clients/).
 
 ## October 28 — Descriptions are no longer rejected for wording, branch `bugfix/caption-wording-rejections`
 
@@ -570,7 +577,8 @@ pushed. See [decision 0016](../../KnowledgeBase/Decisions/0016-agent-setup.md).
   (interactive only). New user-invoked skill `skills/assetarium-setup/`; the
   `local-asset-library` skill no longer hardcodes this machine's root. `register-mcp.py
   --snippets-only` writes `docs/mcp/clients/` (every tool in `enabled_tools`,
-  `tool_timeout_sec = 180`); `codex-setup.toml` / `opencode-setup.json` are left as recorded.
+  `tool_timeout_sec = 180`); the original Codex/OpenCode registration snippets were
+  left as recorded at the time (since retired).
   **The owner's existing Codex config needs the five setup tool names added to
   `enabled_tools`.**
 - **Tests.** **613 passed, 2 skipped → 630 passed, 2 skipped**; real-Blender tests 5 ran.
@@ -878,7 +886,8 @@ pending; nothing is pushed and no PR is open.
   (no delete) and `tag_assets`; write tools are annotated non-read-only and
   destructive. `get_asset` adds `tags` and `collections`. Server instructions and
   `skills/local-asset-library/SKILL.md` explain that a collection is a bundle, not an
-  asset. `docs/mcp/codex-setup.toml` and `register-mcp.py` list the new tools; the
+  asset. The original Codex registration snippet (since retired) and `register-mcp.py`
+  listed the new tools; the
   owner's existing Codex entry needs those names added to `enabled_tools` by hand.
 - **Desktop.** Collections tab (cards with four covers and an Updated date, search
   over names and contents, New collection, right-click Open/Delete); collection view
@@ -2601,11 +2610,12 @@ README. Active clients were discovered and registered additively:
 Both original configurations were byte-copied before editing into
 `data/mcp/config-backups/20261011T222809658883Z/`. Before/after SHA-256 values,
 exact entries and restore paths are in ignored `data/mcp/registration.json` and
-versioned `docs/mcp/client-results.json`. Original backups and active parsed
+the original MCP client-results report (since retired). Original backups and active parsed
 settings were reverified: removing only this new server restores the original
 configuration objects exactly. Backups remain local/ignored because they may
-contain private settings. Restoration instructions and exact setup snippets are
-under `docs/mcp/`; no unrelated configuration was rewritten. Codex disabled
+contain private settings. Restoration instructions and exact setup snippets
+were recorded under `docs/mcp/` at the time (the original snippets have since been
+retired); no unrelated configuration was rewritten. Codex disabled
 other MCPs only in the verification invocation. OpenCode's one-run inline
 permission overlay allowed exactly the two read-only project tools; saved
 permissions/model settings were not changed.
@@ -2652,7 +2662,7 @@ backups were not returned to these models.
 
 Raw client events, stderr, process outcomes and prompts remain under
 `data/mcp/client-runs/`; independent server audits and PNGs under
-`data/mcp/runs/`. Versioned `docs/mcp/client-results.json` binds the actual audit,
+`data/mcp/runs/`. The original MCP client-results report (since retired) bound the actual audit,
 per-call counts/timing/bytes, usage, configuration backups and workflow status.
 
 ### Checks, faults and preservation
@@ -2768,7 +2778,8 @@ Launcher: `<repo>\Local Asset Library.vbs`. It invokes
 the existing MCP environment's console-free Python from any starting directory.
 It opens a normal Windows window; startup does not install, download, scan,
 render, caption, re-embed or update any asset data. Usage and ownership:
-[desktop guide](../gui/README.md); bounded results: [verification summary](../gui/verification.json).
+[desktop guide](../gui/README.md); bounded results are recorded below. The original
+GUI verification summary has since been retired.
 
 Added local bundled HTML/CSS/JavaScript, adaptive thumbnail grid, text search,
 verified filters, existing secondary modes and pilot-ID/view reference search.
@@ -2969,7 +2980,7 @@ Actual membership: **883 assets, eight packs**. Stage coverage: `{"inventory": {
 Vectors: `{"description": 514, "image": 3830}`. Caption quality: `{"clear": 484, "fault": 369, "warning": 14, "review_note": 16}`.
 Owner states: `{"pending": 883}`. Per-pack/stage counts, usable partial
 results, source faults, pending AI reviews, caption notes/warnings and failures
-are separately recorded in docs/step8-verification.json. Failed captions retain
+were separately recorded in the original Step 8 verification report (since retired). Failed captions retain
 raw canonical attempts and reasons; none were retried or manufactured.
 
 Actual stage batch durations (seconds): `{"caption": 8553.721718200191, "embeddings": 621.7863518999075, "inspection": 5037.390167300124}`. These exclude
@@ -2988,8 +2999,8 @@ passed**. Full original SHA-256/size/mtime and protected pilot
 field/image checks: **passed**, 4938
 source entries. No-change processing/publication: **passed**, no
 render/caption/embedding inference. Test receipt counts overlap and are not
-added as distinct tests. Exact receipts and remaining limits are versioned in
-docs/step8-verification.json.
+added as distinct tests. Exact receipts and remaining limits were recorded in
+the original Step 8 verification report (since retired).
 
 Application/check faults were corrected with their original receipts retained:
 native GUI membership lookup and narrow-header overflow; stable SQLite content
