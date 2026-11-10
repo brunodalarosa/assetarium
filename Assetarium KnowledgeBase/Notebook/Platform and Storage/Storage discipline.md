@@ -103,8 +103,8 @@ the configured membership; editing a plan or membership file is not approval
 for further expansion. Processing uses the existing four runtimes and shared
 models, with fresh base-Python receipts before bulk work, after each bounded
 batch and after publication. Current measured coverage, retained storage and
-runtime evidence are recorded in the Step 8 verification receipt (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published) and
-`docs/history/progress-2026-10.md`. Historical 20 GiB estimates are not a current allowance.
+runtime evidence are summarized in `docs/history/progress-2026-10.md`; the original Step 8
+verification report has been retired. Historical 20 GiB estimates are not a current allowance.
 
 The approved one-time `scripts/historical/reduce-storage.py` operation consolidates only
 matching files of at least 1 MiB in the two installed `torch/lib` directories.

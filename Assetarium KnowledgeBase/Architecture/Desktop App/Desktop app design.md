@@ -155,7 +155,7 @@ preview faults retain their existing presentation. See
 classification and verification evidence.
 
 Actual results, timings, storage and fault receipts are summarized in
-the GUI verification summary (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published) and the frozen [progress journal](../../../docs/history/progress-2026-10.md). Modest actual WebView2 captures are under
+the frozen [progress journal](../../../docs/history/progress-2026-10.md); the original GUI verification summary has been retired. Modest actual WebView2 captures are under
 `data/gui/final-window/`. Focused checks use synthetic fixtures; no real asset is
 damaged and no full preprocessing is repeated. Verification scripts refuse to
 overwrite prior runs; select a fresh `--run-name` for a deliberately requested check.

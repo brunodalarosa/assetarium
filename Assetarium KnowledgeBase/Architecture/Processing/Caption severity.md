@@ -58,8 +58,8 @@ The current processing rules in `AGENTS.md` apply this distinction to new assets
 Step 8 applies the same classification to configured library membership. The
 forty-asset classifications above remain historical evidence; newly generated
 captions await review and do not inherit an approval or a clear visual review.
-Expanded coverage and pending reviews are reported separately in
-the Step 8 verification receipt (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published).
+Historical expanded coverage and pending reviews are summarized in the frozen
+[progress journal](../../../docs/history/progress-2026-10.md); the original Step 8 verification report has been retired.
 Intentionally ungenerated descriptions have `processing.caption=pending` and
 null description/provenance. They remain eligible for a later generation run;
 this state does not downgrade failed, partially generated, or unusable captions.

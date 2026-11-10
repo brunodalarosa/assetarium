@@ -81,7 +81,7 @@ tool schemas, repeated context and images as accounted by that client. It cannot
 be used to claim retrieval-only token savings.
 
 
-See `docs/mcp/owner-review.json`, `preservation.json`, the client results (kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published) and
+See `docs/mcp/owner-review.json`, `preservation.json` and
 the [progress journal](../../../docs/history/progress-2026-10.md) for real outcomes and current limitations. Owner labels were
 validated and quality recomputed only from saved first-repeat rankings; frozen
 step 6 artifacts were preserved. The original bounded approval (history: the
@@ -98,8 +98,8 @@ are documented in [Library updates](../Processing/Library%20updates.md) and the 
 - The owner's client decision at the time was **Codex for now**; OpenCode work is on hold until
   the owner asks ([`client-decision.json`](../../../docs/mcp/client-decision.json), [progress journal](../../../docs/history/progress-2026-10.md)).
 - `register-mcp.py` discovered and preserved the client registrations on the original
-  development machine; those recorded snippets are kept locally by the owner under ignored `data/evidence/public-repo-cleanup/`, not published,
-  and were never current setup files. Official references read October 11, 2026:
+  development machine; the original client-results report and recorded registration snippets
+  have been retired. Current setup examples are in [`docs/mcp/clients/`](../../../docs/mcp/clients/). Official references read October 11, 2026:
   - [Codex MCP](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
   - [OpenCode MCP servers](https://opencode.ai/docs/mcp-servers/)
   - [OpenCode configuration precedence](https://opencode.ai/docs/config/)
