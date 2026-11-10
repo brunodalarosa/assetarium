@@ -166,8 +166,7 @@ processing of other items; never edit originals to resolve them.
   evidence that must be preserved. Keep fault records, reports, previews and usable
   partial results. Never recursively delete directories containing junctions or
   links without a reviewed containment check; never clear generic system caches.
-- Record cleanup targets, savings, verification and faults separately. The
-  one-time consolidation script refuses automatic reruns. See `Assetarium KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
+- Record cleanup targets, savings, verification and faults separately. See `Assetarium KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
 
 ## Versioning
 

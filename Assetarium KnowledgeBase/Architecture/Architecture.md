@@ -36,10 +36,9 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
 | [Desktop app design](Desktop%20App/Desktop%20app%20design.md) | Desktop App | system | draft |
 | [Design language](Desktop%20App/Design%20language.md) (design principles) | Desktop App | system | owner principles |
 | [Inference ports](Setup%20and%20Engines/Inference%20ports.md) | Setup and Engines | system | draft |
-| [Expansion plan](Roadmap/Expansion%20plan.md) and its [prompts](Roadmap/Prompts/01-asset-foundation.md) | Roadmap | macro | owner plan |
+| [Expansion plan](Roadmap/Expansion%20plan.md) | Roadmap | macro | owner plan |
 
-`docs/caption-contract.md` (the caption contract) stays in `docs/`, because
-`scripts/check-caption-classification.py` hashes that exact path.
+`docs/caption-contract.md` (the caption contract) stays in `docs/` with the other contracts code reads.
 
 ## Candidates
 

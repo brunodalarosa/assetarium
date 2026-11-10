@@ -61,45 +61,6 @@ real image-source enrollment or captioning. Audio/child media adapters remain
 unsupported. Coverage adds counts by asset type. Shared desktop/MCP services
 accept `asset_type` filters; complete image browsing belongs to expansion step 2.
 
-## Earlier Step 8 and import workflow (historical)
-
-The sections below retain the earlier operation/command evidence. Current
-decisions and the source workflow above take precedence, including startup scans,
-worker idle time and optional descriptions; historical commands do not authorize
-new processing or retries.
-
-The prepared Windows app and MCP server share explicitly configured membership,
-source/dependency checks, measured filters, ranking and response caps. Membership is
-the set of sources registered and enabled in Settings (`library_policy.py`). The original
-Step 8 approval — thirteen packs, initially 883 logical assets, maximum 1,901 after the
-separately approved City Kit and October 14 Synty/CraftPix additions — is kept as
-evidence in `docs/history/library-membership-2026-10-14.json` and is no longer read.
-Source packs and shared model revisions remain read only. Step 9 is optional;
-no classification or clustering is performed.
-
-The original Step 8 publication contained 883 inspected assets, 514 valid generated
-captions and 369 retained caption generation/schema failures. Image retrieval and
-usable previews remain available for partial results; new captions still await
-review. Historical coverage, resource measurements and verification are summarized in
-`docs/history/progress-2026-10.md`; the original Step 8 verification report has been retired.
-The City Kit addition publishes 964 assets, with its 81 new descriptions pending;
-see `docs/city-kits-import.md` (removed 2026-10-28; in git history at `b57bade`) for that import's preservation evidence.
-The October 14 Synty/CraftPix addition publishes 1,901 records: 937 new models,
-882 indexed preview images from 289 models, and 648 retained texture failures.
-See `docs/new-packs-import.md` (removed 2026-10-28; in git history at `b57bade`) for the separate fault, preview and preservation
-reports. The completed overnight run subsequently published 282 descriptions
-(265 CraftPix, 15 Generic, 2 Synty) and their search vectors. The other 655 new
-captions retain 648 source/preview blockers and 7 validation failures; no selected
-work remains unattempted. Repairs/retries and owner accuracy review are separate
-follow-up work, with all original evidence retained.
-
-Double-click `Local Asset Library.vbs`. Opening the app reads the published
-catalog/index and existing previews; it never installs, downloads, scans,
-processes or loads an inference model. Browse pages contain at most 40 cards.
-Thumbnails load near the viewport, with at most three requests in progress.
-Selection uses stable asset IDs across pages; filters and keyboard controls remain
-available. Processing coverage is separate from the currently published version.
-
 ## Manual operations
 
 Run from this repository, using the existing base interpreter:

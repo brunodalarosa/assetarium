@@ -26,7 +26,7 @@ area: Sources and Catalog
 
 **Why.** The 2026-11-04 launch scanned for 272 s (plus 222 s for one folder) on part of
 the library, re-parsing every model and walking every file twice to cover the rare launch
-where something changed. The full `D:\Game Assets` target is ~124,000 files and ~28,900
+where something changed. The full target library is ~124,000 files and ~28,900
 models, so the old design would cost tens of minutes per launch. The window already opens
 fast; a launcher would hide the wait, not remove it. Startup calls (`context`, `sources`,
 `tree`: ~22 s) are a separate cost handled on their own.

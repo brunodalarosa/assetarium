@@ -1,7 +1,7 @@
 ---
 area: Platform and Storage
 tags: [hub]
-code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, scripts/storage-report.py, retention.py, scripts/check-caption-classification.py]
+code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, scripts/storage-report.py, retention.py]
 ---
 # Platform and Storage
 
@@ -29,5 +29,4 @@ Up: [Notebook](../Notebook.md).
 ## Gotchas
 
 - Links into the vault from outside it must spell the folder `Assetarium%20KnowledgeBase/…`: a
-  plain space breaks Markdown links on GitHub. `docs/caption-contract.md` keeps the old
-  `KnowledgeBase/` path because `scripts/check-caption-classification.py` hashes its contents.
+  plain space breaks Markdown links on GitHub.

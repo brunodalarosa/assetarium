@@ -1,7 +1,7 @@
 ---
 area: MCP
 tags: [system]
-code: [setup_agent.status, setup_agent.ask_user, setup_agent.actions, setup_agent.GUIDE, setup_agent.verify_weights, setup_agent.agent_change, setup_agent.notice_id, setup_agent.PROPOSAL_STATES, setup_agent.connections, setup_agent.registrations, setup_core.settings_from_answers, setup_core.confirm_review, setup_core.undo_value, frontend/src/ui/AgentSetup.tsx, frontend/src/ui/SetupReport.tsx, skills/assetarium-setup/SKILL.md, scripts/verify-agent-setup-mcp.py, scripts/verify-agent-setup.py]
+code: [setup_agent.status, setup_agent.ask_user, setup_agent.actions, setup_agent.GUIDE, setup_agent.verify_weights, setup_agent.agent_change, setup_agent.notice_id, setup_agent.connections, setup_agent.registrations, setup_core.settings_from_answers, setup_core.confirm_review, setup_core.undo_value, frontend/src/ui/AgentSetup.tsx, frontend/src/ui/SetupReport.tsx, skills/assetarium-setup/SKILL.md, scripts/verify-agent-setup-mcp.py, scripts/verify-agent-setup.py]
 verified: 2026-11-01
 branch: bugfix/mcp-registration-check
 ---

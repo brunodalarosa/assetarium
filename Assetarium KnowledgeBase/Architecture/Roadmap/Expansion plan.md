@@ -9,7 +9,7 @@ branch:
 ---
 # Assetarium v2 expansion
 
-Up: [Architecture](../Architecture.md) · Status: [Status](../../Status.md). The owner's roadmap, moved from `docs/next version plan/` on 2026-10-28; execution prompts per milestone are in [Prompts](Prompts/01-asset-foundation.md).
+Up: [Architecture](../Architecture.md) · Status: [Status](../../Status.md). The owner's roadmap, moved from `docs/next version plan/` on 2026-10-28.
 
 Prepared October 18, 2026. Status: steps 1 and 2 approved and technically complete
 (step 2 on October 20, including SVG); owner acceptance of both remains pending.
@@ -36,7 +36,6 @@ Read-only investigation may prepare this checkpoint. Confirm it again if the sco
 | --- | --- |
 | Existing repository | this checkout |
 | This reference | `KnowledgeBase/Architecture/Roadmap/Expansion plan.md` |
-| Expansion launch prompts | `KnowledgeBase/Architecture/Roadmap/Prompts/01-asset-foundation.md` through `08-shaders.md` |
 | Source originals | Existing configured source roots; read only |
 | Generated results | The library store (`[storage].library`, decision 0023) |
 | Combined indexes, caches, settings, reports | Existing project-local configured storage |
@@ -118,16 +117,16 @@ Never silently reuse vectors across changed model/runtime/preprocessing contract
 
 ## Milestone sequence
 
-| Step | Deliverable | Prerequisites | Prompt |
-| --- | --- | --- | --- |
-| 1 | Shared asset structure and type-aware stage dispatch | Current implementation review | [01](Prompts/01-asset-foundation.md) |
-| 2 | Static sprites, icons, and images | 1 | [02](Prompts/02-static-2d-images.md) |
-| 3 | Sprite sheets, atlases, animated 2D | 2 | [03](Prompts/03-sprite-sheets-and-animation.md) |
-| 4 | Textures and material sets | 2; builds on 3's relationships where useful | [04](Prompts/04-textures-and-materials.md) |
-| 5 | Audio playback, metadata, direct audio search | 1 and established search/preview conventions from 2 | [05](Prompts/05-audio-playback-and-search.md) |
-| 6 | Evaluated audio descriptions | 5 | [06](Prompts/06-audio-descriptions.md) |
-| 7 | Selectable 3D animation clips | 1 and temporal/sub-asset conventions from 3 | [07](Prompts/07-3d-animation-clips.md) |
-| 8 | Shader catalog, then one engine preview adapter | 1-2; reuse relevant dependencies/temporal work from 4 and 7 | [08](Prompts/08-shaders.md) |
+| Step | Deliverable | Prerequisites |
+| --- | --- | --- |
+| 1 | Shared asset structure and type-aware stage dispatch | Current implementation review |
+| 2 | Static sprites, icons, and images | 1 |
+| 3 | Sprite sheets, atlases, animated 2D | 2 |
+| 4 | Textures and material sets | 2; builds on 3's relationships where useful |
+| 5 | Audio playback, metadata, direct audio search | 1 and established search/preview conventions from 2 |
+| 6 | Evaluated audio descriptions | 5 |
+| 7 | Selectable 3D animation clips | 1 and temporal/sub-asset conventions from 3 |
+| 8 | Shader catalog, then one engine preview adapter | 1-2; reuse relevant dependencies/temporal work from 4 and 7 |
 
 The recommended execution order is 1-8. Dependencies describe actual prerequisites, not permission to run independent work in parallel. Each stage includes its own app/MCP integration and evaluation; these are not postponed to a final integration phase.
 
@@ -163,7 +162,7 @@ Done when: a user can select a sheet, inspect known frames, play a defined seque
 
 > **Draft change for owner review (asset library rework, decision 0023, D15):** individual texture records exist
 > now: images are classified as model textures, **material textures** (browsable, found by name) or 2D
-> images. This step covers only linked **material sets** on top of them ([prompt](Prompts/04-textures-and-materials.md)).
+> images. This step covers only linked **material sets** on top of them.
 
 Support individual texture records and linked material sets. Record resolution, map role, color-space evidence, channel packing, tiling/scale evidence, normal convention, and dependency completeness. Keep unsupported/unknown details explicit. Use manifests or reviewed conventions for grouping; same-stem names alone are tentative evidence.
 

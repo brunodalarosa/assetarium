@@ -32,7 +32,7 @@ Install, use and operate the app: [README](../README.md) ·
 [Shared texture dependencies](../docs/dependency-path-overrides.md) ·
 [Shared model storage](../docs/model-storage.md) · [Linux](../docs/linux.md).
 Evidence and contracts that code reads stay in `docs/` as well: the `*.json` manifests,
-`docs/caption-contract.md`, `docs/evaluation/` and `docs/mcp/*.json` (hash-bound).
+`docs/caption-contract.md`, and the hash-bound `docs/evaluation/` and `docs/mcp/*.json`.
 History: [docs/history](../docs/history/README.md), including the frozen
 [progress journal](../docs/history/progress-2026-10.md).
 

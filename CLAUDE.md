@@ -141,5 +141,4 @@ Recent commits (`git log`) follow this shape; mirror it:
 `Assetarium KnowledgeBase/Status.md` (current status and open work) · `Assetarium KnowledgeBase/Home.md`
 (vault conventions and the list of user guides in `docs/`) · `Assetarium KnowledgeBase/Notebook/`
 (area hubs and system notes) · `Assetarium KnowledgeBase/Architecture/` (contracts, library updates,
-caption severity, the expansion roadmap) · `docs/caption-contract.md` (stays in `docs/`;
-a check script hashes its path) · `docs/history/` (frozen October 2026 journal).
+caption severity, the expansion roadmap) · `docs/caption-contract.md` · `docs/history/` (frozen October 2026 journal).

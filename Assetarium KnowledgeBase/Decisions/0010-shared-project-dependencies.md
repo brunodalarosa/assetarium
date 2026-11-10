@@ -31,8 +31,9 @@ renderer. The viewer and agent detail receive the same verified bindings. Origin
 asset bytes are never rewritten, and no shared model or original texture is copied
 into a cache. External consumers of originals must honor the returned bindings.
 
-**Amendment (owner-approved, October 30, 2026).** Split project fragments may also live side by side inside
-one library folder, as when old separate sources join a library folder added around them (decision 0023). When
+**Fragments inside one library folder.** Split project fragments may also live side by side inside
+one library folder, as when separate folders join a library folder added around them
+([decision 0032](0032-library-store-and-queue.md)). When
 no other library folder has the path, the same path inside a sibling folder of the same library folder is
 tried: exactly one folder differs (the fragment's own folder and its sibling), at least a folder and the file
 name follow it, and the nearest such level with a match wins. The same single-hash, conflict and validation
@@ -42,3 +43,8 @@ fragment keeps its finished renders.
 The path-resolution component is independent of named packs. Additional format
 adapters can use its validation, but this decision does not claim processing
 support for unimplemented formats or other missing resource kinds.
+
+## Changes
+
+- 2026-10-30: sibling fragments inside one library folder resolve the same way (owner-approved).
+- 2026-11-10: that addition is written into the decision text instead of standing as an amendment paragraph; no rule changed.
