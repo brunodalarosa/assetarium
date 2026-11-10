@@ -1,4 +1,4 @@
-"""Results keyed by their inputs, in the central library store (decision 0023).
+"""Results keyed by their inputs, in the central library store (decision 0028).
 
 A key hashes file content, dependency content with paths relative to the inspected file, settings and
 code, never an asset ID, pack or source-prefixed path. Duplicates share a result; a moved file keeps
@@ -42,13 +42,6 @@ def location_free(value, base, prefix):
     if isinstance(value, str) and prefix and value.startswith(prefix + '/'):
         return relative_to(base, value)
     return value
-
-
-def first_sight_key(config, record):
-    """The inspection key a not yet inspected copy of this asset has: without the textures Blender reported."""
-    from .incremental import inspection_input
-    fresh = dict(record, dependencies=[d for d in record.get('dependencies', []) if not d.get('inspection_version')])
-    return inspection_input(config, fresh)[3]
 
 
 def current_key(config, record, stage):

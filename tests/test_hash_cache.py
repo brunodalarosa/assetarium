@@ -1,4 +1,4 @@
-"""Stat-identity hash reuse never hides a content change (decision 0004)."""
+"""Stat-identity hash reuse never hides a content change (decision 0028)."""
 import hashlib
 import os
 

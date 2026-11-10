@@ -42,7 +42,7 @@ make one (Design language P1).
 
 ## Batching (built-in engine)
 
-- Generate descriptions and overnight runs describe several assets in one Qwen3-VL call (`caption_batching.py`).
+- Generate descriptions describes several assets in one Qwen3-VL call (`caption_batching.py`).
   Model, revision, prompt, image preparation, sampling, seed, the 1,100-token limit and the 120-second limit are
   the same as one at a time; sequences are left-padded.
 - **Batch size**: Settings → General → Description batch size, 1, 2, 4 or 8 (default 8; setup recommends it from
@@ -52,8 +52,7 @@ make one (Design language P1).
 - **Out of GPU memory** is a machine limit, not an asset fault: the run stops with "Not enough GPU memory for
   description batch size N. Lower it in Settings → General", nothing is recorded as failed and the assets stay
   pending. It is never turned into faults or an automatic smaller-batch retry.
-- **Cancel** waits for the current batch (about 15–20 s at size 8). An interrupted overnight batch records each of
-  its assets as interrupted (`inflight.json`) and does not generate them again in that run.
+- **Cancel** waits for the current batch (about 15–20 s at size 8).
 - Why: generation was limited by per-token overhead, not the GPU. A 20-asset benchmark measured 9.24 s per asset
   one at a time and 2.22 s at batch 8 (4.2×), 20/20 valid, 6.4 GB peak; the owner found the batched descriptions
   acceptable. The trade-off (wording depends on batch mates) is exception E2 in
@@ -93,3 +92,7 @@ OpenAI-compatible server is testable through the vendor-neutral llama.cpp Vulkan
 - Construct adapters only in `engines.py`. Keep model servers on this computer and server faults as machine stops.
 - Do not claim AMD support until it runs on AMD hardware. Caption quality rules were calibrated on Qwen: other
   models get their own review.
+
+## Changes
+
+- 2026-11-09: the separate overnight description runner was removed (owner: it is no longer part of the app); descriptions run only from Generate descriptions.

@@ -37,7 +37,7 @@ def supported_stage(record, stage):
 
 
 def description_supported(record):
-    # Material textures are found by name in v1 (decision 0023); they are not described.
+    # Material textures are found by name in v1 (decision 0032); they are not described.
     kind = ((record.get('type_metadata') or {}).get('image_kind') or {}).get('value')
     return asset_type(record) in ('model_3d', 'image') and supported_stage(record, 'caption') and kind != 'material_texture'
 
@@ -205,7 +205,7 @@ def validate_record(record):
     elif record.get('parent_asset_id') is not None:
         raise ConfigError('Parent linkage requires subasset-v1 identity')
     elif not re.fullmatch(ID_PATTERN, record['asset_id']):
-        # An ID is kept through moves and joined folders (decision 0023), so it need not match its formula any more.
+        # An ID is kept through moves and joined folders (decision 0032), so it need not match its formula any more.
         raise ConfigError('Asset identity is not an asset-v1 ID')
 
 

@@ -1,13 +1,12 @@
-"""No tracked file names the old per-source generated folder outside the migration and history (decision 0023)."""
+"""No tracked file names the 0.1.0 per-folder generated folder outside its one constant and history (decision 0032)."""
 from pathlib import Path
 import subprocess
 
-from local_asset_library.library_migration import LEGACY_METADATA_DIR
+from local_asset_library.config import LEGACY_METADATA_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED = ('src/local_asset_library/library_migration.py', 'scripts/migrate-library.py', 'scripts/check-rekey.py',
-           'docs/history/', 'scripts/historical/', 'CHANGELOG.md', '.gitignore',
-           'Assetarium KnowledgeBase/Decisions/')  # Decisions are dated owner records; 0023 replaces the folder.
+ALLOWED = ('src/local_asset_library/config.py', 'docs/history/', 'CHANGELOG.md', '.gitignore',
+           'Assetarium KnowledgeBase/Decisions/')  # Decisions are dated owner records; 0032 replaces the folder.
 
 
 def test_the_old_folder_name_appears_only_in_the_migration_and_history():
@@ -18,4 +17,4 @@ def test_the_old_folder_name_appears_only_in_the_migration_and_history():
             continue
         if LEGACY_METADATA_DIR.encode() in (ROOT / name).read_bytes():
             found.append(name)
-    assert not found, 'Use library_migration.LEGACY_METADATA_DIR or the library store instead: ' + ', '.join(found)
+    assert not found, 'Use config.LEGACY_METADATA_DIR or the library store instead: ' + ', '.join(found)

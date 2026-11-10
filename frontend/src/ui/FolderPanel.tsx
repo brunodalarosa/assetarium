@@ -144,7 +144,7 @@ export function SourceFolders({ source, busy }: { source: Json; busy: boolean })
 }
 
 
-/** One profile rule as a sentence (decision 0024); paths are inside the pack. */
+/** One profile rule as a sentence (decision 0035); paths are inside the pack. */
 export function ruleText(rule: Json): string {
   const at = (folder: string) => (folder ? `“${folder}”` : "the pack");
   switch (rule.kind) {
@@ -165,7 +165,7 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "warning" | "fau
   fine: { label: "Looks fine", tone: "neutral" }, suggestions: { label: "Has suggestions", tone: "neutral" }, needs_structure: { label: "Needs a structure", tone: "warning" },
 };
 
-/** A pack's profile: how detection reads it, the rules that steer it and every version (decision 0024). */
+/** A pack's profile: how detection reads it, the rules that steer it and every version (decision 0035). */
 function PackProfile({ folderKey, path, busy }: { folderKey: string; path: string; busy: boolean }) {
   const [profile, setProfile] = useState<Json | null>(null);
   const [error, setError] = useState<string | null>(null);

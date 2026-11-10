@@ -1,4 +1,4 @@
-"""Setup rules shared by the desktop wizard, the CLI and later the MCP tools (decision 0014).
+"""Setup rules shared by the desktop wizard, the CLI and later the MCP tools (decision 0031).
 
 Plain functions returning JSON-able dicts; no GUI imports. Setup records and
 validates choices only: it never downloads, installs, processes, renders or starts
@@ -409,7 +409,7 @@ def with_blender(text, path):
 
 
 def write_blender(config, path):
-    """Minimal, validated, atomic edit of ignored config.local.toml (decision 0001); created from the example."""
+    """Minimal, validated, atomic edit of ignored config.local.toml; created from the example."""
     target = config.project_root / 'config.local.toml'
     base = target if target.is_file() else config.project_root / 'config.example.toml'
     text = with_blender(base.read_bytes().decode('utf-8'), path)
@@ -483,8 +483,7 @@ def _registered(config):
         value = registry(config)
     except (OSError, ValueError, KeyError, TypeError):
         return True  # A registry that exists but cannot be read is not a fresh install.
-    from .library_migration import _legacy_registry
-    return bool(value['sources'] or value.get('detached') or _legacy_registry(config))  # Or an install awaiting migration.
+    return bool(value['sources'] or value.get('detached'))
 
 
 def engine_hints(value):
@@ -503,7 +502,7 @@ def hint_formats(hints):
 
 
 def settings_from_answers(answers, env):
-    """The user's answers to the agent setup questions → settings, each derived one with why (decision 0016).
+    """The user's answers to the agent setup questions → settings, each derived one with why (decision 0031).
 
     Only what is verifiable on this computer is derived: formats from the engines, the description engine and
     search device from the GPU, the batch size from its memory. The user's own choices pass through as given.

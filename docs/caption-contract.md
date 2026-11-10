@@ -36,7 +36,7 @@ for", "suitable for", "can be used"…) no longer rejects a usable description: 
 recorded in `caption_provenance.validation_notes` as a `review_note` with the phrase as
 evidence, shown with the other caption notes; reviews never replace these notes. The 35
 outputs the October 27 run rejected only for this wording were accepted as saved, without a
-new model run (`scripts/historical/revalidate-caption-wording.py`, provenance
+new model run (a one-time script, provenance
 `revalidation`). This validation cannot
 prove the semantic truth of a visually plausible statement. Review can flag
 incorrect components, overconfident materials and wrong identities even when
@@ -60,7 +60,7 @@ sizes and elapsed time are saved with each attempt.
 **2D images (expansion step 2)** use the separately versioned prompt
 `prompts/caption-image-v1.txt` (`prompt_version: image-v1`) with the same JSON
 fields and validator. The single input is the image's derived `model_input`
-PNG under project data (see the [catalog contract](../KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md)); its view
+PNG under project data (see the [catalog contract](../Assetarium%20KnowledgeBase/Architecture/Sources%20and%20Catalog/Catalog%20contract.md)); its view
 label tells the model which flat backdrop fills transparent pixels and that the
 backdrop is not part of the image. No filename, folder, pack or measured fact
 enters the prompt. The unchanged `caption_backend.py` preparation then applies
@@ -80,9 +80,9 @@ the stage fingerprint. This pilot cache does not implement full-library refresh.
 
 Qwen uses local files only, pinned revision and runtime lock, verified model file
 hashes, BF16 CUDA/SDPA, fixed seed per call, one beam and bounded output/time.
-Library and overnight processing generate several assets per call
+Library processing generates several assets per call
 (`caption_batching.py`, *Settings → General → Description batch size*, default 8;
-[decision 0007](../KnowledgeBase/Decisions/0007-batched-description-generation.md)). Each asset is
+[decision 0033](../Assetarium%20KnowledgeBase/Decisions/0033-descriptions-and-engines.md)). Each asset is
 still validated, saved and published on its own and records `generation_mode` and
 `batch` provenance. Completed results keep the fingerprint of the mode they were
 made with, so batching never regenerates them. Running out of GPU memory stops the

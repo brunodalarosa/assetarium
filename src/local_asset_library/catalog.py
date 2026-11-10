@@ -18,7 +18,7 @@ from urllib.parse import unquote, urlsplit
 import xml.etree.ElementTree as ET
 import zipfile
 
-from .config import Config, ConfigError
+from .config import ConfigError
 from . import hash_cache
 from .publication import pinned_config, read_only
 
@@ -126,7 +126,7 @@ def walk_source(config, progress=None, phase='Checking files'):
             cached = read_json(cache_path, SCAN_CACHE_LIMIT).get("files", {})
     next_cache = {}
     from .sources import excluded_folders
-    from .library_migration import LEGACY_METADATA_DIR
+    from .config import LEGACY_METADATA_DIR
     patterns = excluded_folders(config) if config.source_key else []
     def walk_error(exc):
         raise ConfigError("Source directory cannot be scanned: " + str(exc))
@@ -134,7 +134,7 @@ def walk_source(config, progress=None, phase='Checking files'):
         dirs.sort()
         for name in list(dirs):
             path = Path(directory) / name
-            if name.casefold() == LEGACY_METADATA_DIR:  # An old generated folder awaiting migration, never originals.
+            if name.casefold() == LEGACY_METADATA_DIR:  # A 0.1.0 generated folder, never originals.
                 dirs.remove(name)
                 continue
             folder = path.relative_to(config.source_root).as_posix()
@@ -176,7 +176,7 @@ def walk_source(config, progress=None, phase='Checking files'):
                 if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
                     raise ConfigError(f"Source changed while hashing: {relative}")
                 row.update(size=after.st_size, mtime_ns=after.st_mtime_ns)
-                # The shared record lets runtime checks reuse scan hashes (decision 0004).
+                # The shared record lets runtime checks reuse scan hashes (decision 0028).
                 if shared == hash_cache.file_identity(source):
                     hash_cache.store(source, shared, row["sha256"])
                 next_cache[relative] = {"identity": identity, "sha256": row["sha256"]}

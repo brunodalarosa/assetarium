@@ -209,7 +209,7 @@ function Done() {
   );
 }
 
-/** Add library folder (decision 0024): a quick look by names, what was found and why, then who finishes. */
+/** Add library folder (decision 0035): a quick look by names, what was found and why, then who finishes. */
 export function AddFolderWizard() {
   const add = useApp((s) => s.addFolder);
   const titleId = useId();

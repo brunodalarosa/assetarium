@@ -324,7 +324,7 @@ function Review() {
   );
 }
 
-/** Agents (MCP) are a core feature (decision 0026): the server is ready; connecting an agent is the owner's choice. */
+/** Agents (MCP) are a core feature (decision 0031): the server is ready; connecting an agent is the owner's choice. */
 function AgentStep() {
   const agent = useApp((s) => s.setup.agent);
   const [client, setClient] = useState<string>();
@@ -348,7 +348,7 @@ function AgentStep() {
   );
 }
 
-/** After Save: the one-time search check runs here, so search works without an extra step (decision 0026). */
+/** After Save: the one-time search check runs here, so search works without an extra step (decision 0031). */
 function SetupSearchCheck() {
   const [check, setCheck] = useState<Json>({ status: "starting" });
   useEffect(() => {

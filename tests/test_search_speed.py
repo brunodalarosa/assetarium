@@ -1,4 +1,4 @@
-"""CPU threads for search data: the speed test's choice, the owner's setting and the count used (decision 0022)."""
+"""CPU threads for search data: the speed test's choice, the owner's setting and the count used (decision 0034)."""
 import json
 from pathlib import Path
 

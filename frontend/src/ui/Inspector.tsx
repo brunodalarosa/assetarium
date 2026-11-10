@@ -836,7 +836,7 @@ function UnavailableDetail({ entry }: { entry: Json }) {
   );
 }
 
-/** A variant group (decision 0024): pick a variant, and choose whether its variants share one description. */
+/** A variant group (decision 0035): pick a variant, and choose whether its variants share one description. */
 function Variants({ grid, group, assetId }: { grid: GridId; group: Json; assetId: string }) {
   const [busy, setBusy] = useState(false);
   const toggle = async () => {

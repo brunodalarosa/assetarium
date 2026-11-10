@@ -9,7 +9,6 @@ import pytest
 
 from test_incremental import library, ready
 from test_sources import managed, ready_source
-from test_overnight import overnight
 from local_asset_library import sources, source_operations, incremental
 from local_asset_library.catalog import detail
 from local_asset_library.config import ConfigError
@@ -74,7 +73,7 @@ def test_scan_and_live_status_count_all_formats_without_creating_work(managed):
     catalog_file = working(scoped).output_path('data', 'catalog.sqlite')
     before = (status_file.read_bytes(), catalog_file.read_bytes())
     revision = sources.revision(config)
-    select(config, [], [])  # Every format off is the paused state (decision 0026).
+    select(config, [], [])  # Every format off is the paused state (decision 0031).
     paused = sources.source_status(config, one)
     assert paused['processing_paused'] and not paused['needs_processing'] and paused['pending'] == 0
     assert paused['format_counts'] == scanned['format_counts']
@@ -199,7 +198,7 @@ def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(mana
     update_record(work, row)
     before = sources.importing_failures(config)
     assert before['assets'] == 1
-    select(config, [], [])  # Every format off is the paused state (decision 0026).
+    select(config, [], [])  # Every format off is the paused state (decision 0031).
     monkeypatch.setattr(source_operations.subprocess, 'Popen', lambda *a, **kw: pytest.fail('No formats should start no worker'))
     with pytest.raises(ConfigError, match='paused'):
         source_operations.start(config, 'process', one['key'])
@@ -210,14 +209,3 @@ def test_pausing_preserves_failure_report_and_avoids_starting_source_worker(mana
     monkeypatch.setattr(source_operations, 'scan_source', lambda *a: pytest.fail('Paused processing should not scan or load a runtime'))
     source_operations.process_source(config, one, 'paused-test')
     assert 'paused' in states[-1]['phase']
-
-
-def test_overnight_selection_and_previously_planned_tasks_obey_formats(overnight):
-    from local_asset_library.overnight import plan, create_run, caption_batch, outcomes
-    config, _, _ = overnight
-    run = create_run(config)
-    assert plan(config)['selected'] == 2
-    select(config, ['gltf'])
-    assert plan(config)['selected'] == 0
-    caption_batch(config, run, lambda *a: pytest.fail('Disabled sources should load no caption model'))
-    assert {result['status'] for result in outcomes(config, run).values()} == {'skipped'}

@@ -23,5 +23,6 @@ write tools (collections, tags) and session-gated setup tools. The ranking itsel
 - Tool contract and client setup: [docs/mcp/README.md](../../../docs/mcp/README.md).
 - Agent skills shipped to users: `skills/local-asset-library/` (using the tools) and
   `skills/assetarium-setup/` (setup procedure).
-- Decisions: [0005](../../Decisions/0005-embedding-worker-and-prestart.md),
+- The worker: [Search embedders](../Search/Search%20embedders.md).
+- Decisions: [0029](../../Decisions/0029-agent-trust.md),
   [0036](../../Decisions/0036-collections-and-tags.md), [0031](../../Decisions/0031-setup.md).

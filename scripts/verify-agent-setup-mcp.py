@@ -1,10 +1,10 @@
-"""Real STDIO check of agent setup (decisions 0016, 0024) on an isolated empty project. Not evidence of agent use.
+"""Real STDIO check of agent setup (decisions 0029, 0031) on an isolated empty project. Not evidence of agent use.
 
 Copies this checkout's code into scratch/agent-setup-mcp/<run-name>/project and links the
 prepared mcp environment (nothing is installed; the owner's library and configuration are never
 touched). A scripted MCP client launches scripts/asset-mcp.py exactly as clients do and walks:
 a broken configuration (setup-only server), then the full flow on a valid empty project — no
-session gate (decision 0024), apply_setup, validate_blender (real Blender when
+session gate (decision 0029), apply_setup, validate_blender (real Blender when
 one is found; a non-Blender file is refused), propose → reject → propose → apply (the user's
 decisions call the backend in this process, as the app's buttons do), finish_setup, connection
 records and notices. Report: data/mcp/agent-setup/<run-name>/report.json

@@ -120,7 +120,7 @@ class DesktopService(AssetService):
         items = []
         allowed = scope(self.config, filters)
         from .settings import used_formats
-        formats = used_formats(self.config) if self.config.sources_registry else None  # Off formats are hidden (decision 0026).
+        formats = used_formats(self.config) if self.config.sources_registry else None  # Off formats are hidden (decision 0030).
         matching = [r for r in sorted(records, key=lambda r: (r['pack_id'], r['display_name'].casefold(), r['asset_id']))
                     if matches(r, filters, allowed, formats)]
         for record in matching[offset:offset + page_size]:
@@ -200,7 +200,7 @@ class DesktopService(AssetService):
         return preview,image
 
     def _original_thumbnail(self, record):
-        """A 2D image is seen from its original file, before any processing (decision 0023). Read only, bounded."""
+        """A 2D image is seen from its original file, before any processing (decision 0032). Read only, bounded."""
         import base64
         from .image_media import decode, image_format, png_bytes, thumbnail
         source=next((f for f in record['files'] if f.get('availability')=='available' and image_format(f['path'])),None)
@@ -265,7 +265,7 @@ class DesktopService(AssetService):
         group = membership(self.config, record)
         shared_from = None
         if group and group['shared'] and effective is None and group['representative']['asset_id'] != identifier:
-            try:  # A variant shows its group's description, labeled as shared (decision 0024).
+            try:  # A variant shows its group's description, labeled as shared (decision 0035).
                 effective = observations(self.config, self.record(group['representative']['asset_id']))
                 shared_from = group['representative']['name'] if effective else None
             except (OSError, ValueError, KeyError):

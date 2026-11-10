@@ -1,4 +1,4 @@
-"""Pack structure tools for agents (decision 0024): paged folder outlines, profiles, proposals and their decisions.
+"""Pack structure tools for agents (decision 0029): paged folder outlines, profiles, proposals and their decisions.
 
 Every response is bounded (``CAP`` characters, about 2,000 tokens) so a small local model can read a pack page by
 page: an outline shows one folder level with counts and collapsed names (``Car_11_{B,G,R}``, ``Rock_{01..20}``),

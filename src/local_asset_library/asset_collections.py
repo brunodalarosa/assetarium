@@ -1,4 +1,4 @@
-"""Owner collections: virtual bundles of assets from any source and of any type (decision 0012).
+"""Owner collections: virtual bundles of assets from any source and of any type (decision 0036).
 
 A collection keeps asset IDs with a per-collection label and notes; it never moves,
 copies or edits original files. The app and agent servers share one atomic JSON
@@ -337,7 +337,7 @@ def resolve(config, items, records=None, tags=None):
                          formats=sorted({f['format'] for f in record['files']}), processing=record.get('processing'))
             used = used_formats(config) if config.sources_registry else None
             if used is not None and not uses(kind_of(record), entry['formats'], used):
-                # Kept, never dropped: the owner turned its format off (decision 0026); turning it on brings it back.
+                # Kept, never dropped: the owner turned its format off (decision 0030); turning it on brings it back.
                 off = ', '.join(sorted({format_key(f).upper() for f in entry['formats']}))
                 entry['hidden_by_formats'] = f'Hidden: {off} is off in Settings → General → Formats'
         if identifier in records:

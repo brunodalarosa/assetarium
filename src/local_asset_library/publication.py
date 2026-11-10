@@ -83,7 +83,7 @@ def request_memo(key, compute):
 
 
 def verified_hash(path, fresh=False):
-    """SHA-256 reused while the file's stat identity is unchanged (decision 0004).
+    """SHA-256 reused while the file's stat identity is unchanged (decision 0028).
 
     ``fresh=True`` (and ``hash_cache.require_fresh()``) re-reads the bytes, for
     explicit audits and removal checks.

@@ -114,23 +114,3 @@ def test_successful_missing_stage_drops_current_fault_but_retains_history(librar
     with incremental.ledger(config) as db:
         assert db.execute("SELECT count(*) FROM history WHERE asset_id=? AND status='failed'",
                           (record['asset_id'],)).fetchone()[0] == 1
-
-
-def test_source_owned_caption_retry_keeps_its_evidence_reference(managed):
-    from local_asset_library.incremental import caption_input
-    from local_asset_library.overnight import run_path, apply_saved
-    from local_asset_library.membership import records
-    config, _, source, _ = managed
-    sources.scan_source(config, source)
-    scoped = sources.bound(config, source)
-    work = working(scoped)
-    record = records(work)[0]
-    identifier = '1' * 32
-    raw = run_path(scoped, identifier) / 'attempts' / (record['asset_id'] + '.json')
-    save_json(raw, {'status': 'failed', 'description': None, 'suggested_uses': [],
-                   'attempts': [{'error': 'Synthetic retained generation failure'}],
-                   'provenance': {'fingerprint': caption_input(work, record, prompt_version='v4')}})
-    result = apply_saved(scoped, identifier, record['asset_id'])
-    assert result['status'] == 'failed'
-    assert work.output_path('data', result['result_path'].removeprefix('data/')) == raw
-    assert raw.is_file()

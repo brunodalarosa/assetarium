@@ -1,4 +1,4 @@
-"""Proof that a blender_worker.py edit keeps finished inspections valid (decision 0022).
+"""Proof that a blender_worker.py edit keeps finished inspections valid (decision 0028).
 
 Read only for sources and the library. It (1) checks that every finished 3D inspection keeps its
 recorded fingerprint through ``EQUIVALENT_WORKERS``, and (2) renders a spread of finished assets

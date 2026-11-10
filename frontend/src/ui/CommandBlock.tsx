@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { copyText } from "../app/store";
 import { Button } from "./primitives";
 
-// Design principle P3 (decision 0025): a command is never typed by hand. A command found in backend text starts with
+// Design principle P3 (Design language): a command is never typed by hand. A command found in backend text starts with
 // a project script or the owner CLI and runs until a word that starts a new sentence ("Then", "Create"…).
 // tests/test_command_blocks.py reads this pattern and checks it against every backend message that carries a command.
 export const COMMAND_PATTERN = String.raw`(?:\.\\scripts\\|\./scripts/|local-assets )\S*(?: (?![A-Z][a-z])\S+)*`;

@@ -29,7 +29,7 @@ function PathCard({ icon, title, body, action }: { icon: ReactNode; title: strin
   );
 }
 
-/** Two equal ways to set up; a connected agent may set things up at any time (decision 0024), so nothing opens here. */
+/** Two equal ways to set up; a connected agent may set things up at any time (decision 0029), so nothing opens here. */
 export function SetupPaths() {
   const busy = useApp((s) => s.setup.agentBusy);
   return (

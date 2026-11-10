@@ -1,4 +1,4 @@
-"""App notifications; one small atomic JSON file (decisions 0008 and 0012).
+"""App notifications; one small atomic JSON file (decisions 0033 and 0036).
 
 Kinds: ``descriptions_ready`` (one per source, replaced by newer facts),
 ``descriptions_report`` (one per describe run, keyed by its operation token),
@@ -109,7 +109,7 @@ def forget_collection(config, collection_id):
 
 
 def notify_setup_change(config, session_id, changes, finished=False):
-    """Agent setup changes raise one notice per setup session, listing every value it changed (decision 0016)."""
+    """Agent setup changes raise one notice per setup session, listing every value it changed (decision 0031)."""
     def update(value):
         identifier = 'setup-' + session_id
         existing = next((item for item in value['items'] if item['id'] == identifier), None)

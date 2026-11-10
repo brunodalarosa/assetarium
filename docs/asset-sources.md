@@ -24,7 +24,7 @@ that holds all your packs); Assetarium finds the structure inside it:
   survive rescans, and **Rename** gives a pack a display name. Packs have no tags and are never added to
   collections.
 
-**Add library folder** opens a short wizard (decision 0024):
+**Add library folder** opens a short wizard (decision 0035):
 
 1. **Quick look.** Assetarium reads folder and file names only (no file contents, nothing written) and shows
    the tree filling in, with a pack badge on folders that carry a license, readme or preview.
@@ -73,7 +73,7 @@ Every supported type is always included: 3D models (FBX, glTF/GLB, OBJ, BLEND, S
 When the guess is wrong for a folder, **Treat images here as textures** or **as 2D assets** decides for it.
 
 Scans run in the background at startup, after you add a folder and after each change you make. They never
-run models or renders. Unchanged files reuse their verified hashes (decision 0004).
+run models or renders. Unchanged files reuse their verified hashes (decision 0028).
 
 ## Identity: moves, copies and edits
 
@@ -165,7 +165,7 @@ assets. They start at once or wait in line on **Asset processing**:
 
 - What an item covers is decided when it starts: "whatever in this pack still lacks previews".
 - Previews always run before descriptions; otherwise items run in your order (move or remove them in **Up next**).
-- One job at a time; renders use the parallel Blender processes of decision 0022.
+- One job at a time; renders use the parallel Blender processes of decision 0034.
 - Under about 10 minutes a job starts on the click. From 10 to 30 minutes it starts with an **Undo** toast.
   Longer jobs, or jobs that would reach the storage budget, ask first with an estimate (counts, a time range,
   disk). The estimate comes from the render speed test and recent runs; without either it says
@@ -206,8 +206,8 @@ previews and search right away; remove it like any library folder.
 
 ## Descriptions
 
-Descriptions are optional (decision 0008). Assets are searchable by name and image as soon as their previews
-are made; descriptions add a third signal. Description runs write in batches (decision 0007), build their
+Descriptions are optional (decision 0033). Assets are searchable by name and image as soon as their previews
+are made; descriptions add a third signal. Description runs write in batches (decision 0033), build their
 search vectors and publish. Recorded description failures are kept and not retried; a cancelled run still
 publishes what it finished. Notifications (the bell) report descriptions ready to generate and each run's outcome.
 
@@ -242,37 +242,11 @@ The storage budget in **Settings → General** (10 GiB until you save one) caps 
 the project folder and the library store, counting hard-linked files once. Original assets and shared models
 don't count. Jobs measure before they start and between stages; at the budget they stop and keep finished work.
 
-## Moving results into the library store
+## Installs from before the library store
 
-An install from before the library store kept results in a generated folder inside each source. Until they
-are moved, the app shows a notice with the command and keeps showing your last published search, read only.
-Close the app and MCP servers, then run (base runtime; same arguments with `./scripts/uv.sh` on Linux):
-
-```powershell
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
-```
-
-This **dry run** finds every old folder at any depth (`--search PATH` adds places to look, for example a drive
-your library moved to) and writes a plan to `data/library/migration/plan-<time>.json`: assets and finished
-results per folder, sources relinked after a move (matched by their saved identity), folders whose identity
-two copies share (refused), images newly included and, for sources that imported only some formats, the
-folders proposed as exclusions so nothing new floods in. Review it, then add `--apply`:
-
-- It asks for a typed `yes` (no bypass), checks the app and MCP servers are closed, and saves storage receipts
-  before and after.
-- Results are copied, never moved: immutable files are hard-linked on the same drive. Each finished result is
-  re-keyed by its inputs, so **nothing renders or is described again**; a result that was already out of date
-  stays pending, as before.
-- Every asset keeps its ID. Old sources inside a `--library-folder` become part of it.
-- Models that borrowed textures from another old source keep them when both join one library folder (see
-  [Shared texture dependencies](dependency-path-overrides.md)).
-- It rescans without models and checks that every published asset is present and nothing newly pending, then
-  writes `data/library/migration/<time>.json`. A fault stops only its own folder. A folder is imported once.
-- It prints what it is doing with the elapsed time. Importing is quick; the final rescan of each library folder
-  takes longest, since it reads every file of the folder (later scans reuse those hashes).
-- **Run `--apply` again after a fault.** The new plan lists the folders that failed as `ready` (they join the
-  library folder that now contains them) and folders whose check found unexpected work as `recheck`: their kept
-  copy of the old ledger is re-keyed again and only rows untouched since the import are updated.
+Assetarium 0.1.0 kept results in a generated folder inside each library folder. 0.2.0 starts fresh: it does not
+read or import that folder, and never scans it as assets. Add your library folders again and process them;
+the old generated folders can be deleted by hand. Upgrades from 0.2.0 onwards keep your results.
 
 `--remove-old` then deletes the old generated folders whose import a receipt verified, asking for each one.
 

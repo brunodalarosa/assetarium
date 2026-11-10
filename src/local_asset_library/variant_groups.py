@@ -126,7 +126,7 @@ def membership(config, record):
 
 
 def collapse(config, results, record_of):
-    """Ranked results with each variant group once, at its best-ranked member, listing every variant (decision 0024).
+    """Ranked results with each variant group once, at its best-ranked member, listing every variant (decision 0035).
 
     Returns ``(results, folded)``; a member keeps ``variant`` (its value) and ``variants`` (``asset_id``, ``name``, ``variant``).
     """

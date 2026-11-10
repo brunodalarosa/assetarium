@@ -74,7 +74,7 @@ window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 ui = Harness(window, OUT, report)
-ROW = "document.querySelector('#folder-panel')"  # The library folder's panel on the Asset sources tab (decision 0023).
+ROW = "document.querySelector('#folder-panel')"  # The library folder's panel on the Asset sources tab (decision 0032).
 PANEL = ROW + ".querySelector('.texture-choice')"
 
 

@@ -65,7 +65,7 @@ def sibling_path(original, target):
 
 def portable(recipe, base):
     """A shared texture recipe as an input key sees it: provider paths relative to the model and no folder IDs, so
-    joining split projects under one library folder keeps the key (decision 0023: keyed by inputs, not places)."""
+    joining split projects under one library folder keeps the key (decision 0028: keyed by inputs, not places)."""
     from .result_store import relative_to
     if not recipe or recipe.get('kind') != 'shared_dependency_paths':
         return recipe
@@ -110,7 +110,7 @@ class SharedDependencies:
         folder, such as a pack's sub-packs sharing a core pack's textures); the nearest level with a match wins."""
         from .sources import bound, registry
         from .captions import file_hash
-        from .library_migration import LEGACY_METADATA_DIR
+        from .config import LEGACY_METADATA_DIR
         key, *parts = original.split('/')
         source = next((s for s in registry(self.config)['sources'] if s['key'] == key and s['enabled']), None)
         if source is None:

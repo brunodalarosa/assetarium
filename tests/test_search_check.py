@@ -1,4 +1,4 @@
-"""The search check runs on built-in sample images, never library assets (decision 0026)."""
+"""The search check runs on built-in sample images, never library assets (decision 0031)."""
 import json
 from pathlib import Path
 import shutil

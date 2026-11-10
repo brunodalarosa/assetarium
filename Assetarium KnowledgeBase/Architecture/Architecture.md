@@ -22,7 +22,8 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
   claims nobody could verify are marked *(unverified)*.
 - The "why" (constraints, decisions, history, what was tried) is the most valuable part, and mostly
   comes from people and history: capture it, and link the decision that made it binding.
-- Docs moved from `docs/` on 2026-10-28 keep their original text and are `draft` until reviewed.
+- The contracts were rewritten on 2026-11-10 as current truth (their step-by-step pilot history is in git at
+  commit `af02e91`). They were checked against the code by an agent and stay `draft` until the owner reads them.
 
 ## Docs
 
@@ -36,10 +37,9 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
 | [Desktop app design](Desktop%20App/Desktop%20app%20design.md) | Desktop App | system | draft |
 | [Design language](Desktop%20App/Design%20language.md) (design principles) | Desktop App | system | owner principles |
 | [Inference ports](Setup%20and%20Engines/Inference%20ports.md) | Setup and Engines | system | draft |
-| [Expansion plan](Roadmap/Expansion%20plan.md) and its [prompts](Roadmap/Prompts/01-asset-foundation.md) | Roadmap | macro | owner plan |
+| [Expansion plan](Roadmap/Expansion%20plan.md) | Roadmap | macro | owner plan |
 
-`docs/caption-contract.md` (the caption contract) stays in `docs/`, because
-`scripts/check-caption-classification.py` hashes that exact path.
+`docs/caption-contract.md` (the caption contract) stays in `docs/` with the other contracts code reads.
 
 ## Candidates
 
@@ -50,10 +50,10 @@ Roughly by how long the system takes to understand, longest first:
 2. [Publication and generations](Sources%20and%20Catalog/Publication%20and%20generations.md): per-source
    publications, the combined catalog and index, pinned generations, retention (system).
 3. [Parallel rendering](Processing/Parallel%20rendering.md): kept-open Blender hosts, devices,
-   the speed test (system; decision 0022 holds most of it today).
+   the speed test (system; decision 0034 holds most of it today).
 4. [Search ranking](Search/Search%20ranking.md): channels, weighted RRF, bounded shortlists and
    response caps (system).
 5. [Setup](Setup%20and%20Engines/Setup.md): `setup_core` shared by the wizard, the CLI and the
-   agent session (system; decisions 0014 and 0016).
+   agent tools (system; decision 0031).
 6. [Collections and tags](Desktop%20App/Collections%20and%20tags.md): owner data, leases, agent
-   writes, exports (system; decision 0012).
+   writes, exports (system; decision 0036).

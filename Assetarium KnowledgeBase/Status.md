@@ -13,7 +13,7 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 ## What works today
 
 - **Catalog and processing:** library folders with packs detected from structure and identity
-  by recognition; a central library store (nothing is written into asset folders; decision 0023);
+  by recognition; a central library store (nothing is written into asset folders; decision 0032);
   startup scans; Make previews and Generate descriptions through an implicit queue (Blender
   inspection and previews, optional Qwen3-VL descriptions, EmbeddingGemma vectors); results keyed
   by their inputs; incremental publication with faults kept visible. 3D formats (FBX, glTF/GLB,
@@ -39,9 +39,9 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 
 - **Safe upgrades, second part** (store coordinator, backups, recovery UI, skipped-release tests) gates the
   first release that changes a store format, likely 0.3.0 with audio. That release raises the
-  format number and ships the migration. `scripts/migrate-library.py` (0.1.0 → store) is not a
-  supported path.
-- **Asset library rework (decision 0023), provisional choices:** a pack without a preview image shows a
+  format number and ships the migration. 0.1.0 installs are not migrated: the 0.1.0 → store code was removed
+  in November 2026.
+- **Asset library rework (decision 0032), provisional choices:** a pack without a preview image shows a
   package glyph as its cover; "+N new" resets when you leave a library folder; the 10- and
   30-minute thresholds are constants (`processing_queue.QUICK`, `LONG`). Roadmap step 4 now covers
   material sets only.
@@ -54,8 +54,8 @@ Short, current summary. Detailed dated history, test counts and evidence are in
   model (the catalog re-derives the inspected file on every scan, so it needs its own design); tell agents
   about Format off in `get_asset`; `library_store._remap` maps ID fields directly instead of replacing text.
 
-- Owner visual/copy review of the setup wizard (decision 0014) and the agent setup panel
-  (decision 0016), and one run with a real agent on a throwaway project.
+- Owner visual/copy review of the setup wizard (decision 0031) and the agent setup panel
+  (decision 0031), and one run with a real agent on a throwaway project.
 - Linux GPU descriptions and semantic search are unverified; macOS is unsupported.
 - Linux path policy for case-insensitive references and `\` in MTL files is undecided.
 - No packaged installer; the app runs from a source checkout.
@@ -66,6 +66,6 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 
 Everyday entry points: `local-assets` (`scripts/local-assets.ps1` / `.sh`), `check-config`,
 `doctor`, `scripts/smoke-headless.py`, the `scripts/verify-*.py` synthetic checks and the
-pytest suite. Tools that reproduce the original pilot, benchmark or one-time migrations
-are in [`scripts/historical/`](../scripts/historical/README.md); they need the original
-owner's data and are not general tools.
+pytest suite. The tools that reproduced the original pilot, benchmark and one-time migrations
+were removed in November 2026 (they needed the original owner's data and code that no longer
+exists); they are in git history at commit `af02e91` under `scripts/historical/`.

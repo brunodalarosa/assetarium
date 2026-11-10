@@ -42,7 +42,7 @@ export function Rail() {
   const canBack = useApp((s) => s.historyIndex > 0);
   const canForward = useApp((s) => s.historyIndex < s.history.length - 1);
   const attention = useApp(processingAttention);
-  // The folder dot means the owner must act (offline, an answer to give, files missing, a migration); work has its own dot.
+  // The folder dot means the owner must act (offline, an answer to give, files missing); work has its own dot.
   const owner = useApp((s) => Boolean(s.sourcesView.tree?.attention));
   return (
     <nav aria-label="Main" className="flex w-24 shrink-0 flex-col items-center bg-rail pt-4 pb-5">
@@ -166,7 +166,7 @@ export function TopBar() {
   );
 }
 
-/** Work stopped when the app last closed: one quiet line on every page until Continue (decision 0023). */
+/** Work stopped when the app last closed: one quiet line on every page until Continue (decision 0032). */
 export function StoppedBanner() {
   const count = useApp((s) => (s.queue?.paused && s.queue?.stopped_on_close) || 0);
   const page = useApp((s) => s.history[s.historyIndex].page);

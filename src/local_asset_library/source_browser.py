@@ -1,13 +1,12 @@
-"""Read-only browsing of one library folder through the desktop presentation services.
+"""Read-only detail, card images and 3D previews of one library folder's assets, through the desktop services.
 
 It reads the folder's working catalog when there is one, so the Asset sources tab shows assets without previews
-yet and results not published yet (decision 0023); search keeps reading the published library.
+yet and results not published yet (decision 0032); search keeps reading the published library.
 """
 from .config import ConfigError
 from .desktop_service import DesktopService
 from .interactive_preview import InteractivePreviewService
-from .publication import generation
-from .sources import bound, get_source, source_status
+from .sources import bound, get_source
 
 
 class SourceBrowser:
@@ -18,8 +17,7 @@ class SourceBrowser:
 
     def session(self, key):
         # Resolve registration on every call: disabled is browsable, removed is not.
-        source = get_source(self.config, key)
-        scoped = bound(self.config, source)
+        scoped = bound(self.config, get_source(self.config, key))
         from .incremental import working
         if working(scoped).output_path('data', 'catalog.sqlite').is_file():
             scoped = working(scoped)
@@ -28,21 +26,11 @@ class SourceBrowser:
             service = DesktopService(scoped)
             session = (service, InteractivePreviewService(service, history=self.preview_history))
             self.sessions[key] = session
-        return source, session
+        return session
 
     def call(self, operation, key, *args):
-        if operation not in {'browse', 'asset', 'thumbnail', 'image_view', 'reveal', 'prepare', 'file', 'fault', 'release'}:
+        if operation not in {'asset', 'thumbnail', 'image_view', 'reveal', 'prepare', 'file', 'fault', 'release'}:
             raise ConfigError('Unknown source browsing operation')
-        source, (service, preview) = self.session(key)
-        if operation == 'browse':
-            if not service.config.output_path('data', 'catalog.sqlite').is_file():
-                saved = source_status(self.config, source)
-                return {'status': 'browse', 'items': [], 'total_count': 0, 'shown_count': 0,
-                        'generation': generation(service.config), 'source': source,
-                        'available': False, 'reason': saved.get('scan_fault') or
-                        ('Process this source from the library to prepare its assets for browsing.'
-                         if saved.get('scanned') else 'Scan and process this source from the library to browse its assets.')}
-            result = service.browse({}, *args)
-            return dict(result, source=source, available=True)
+        service, preview = self.session(key)
         target = service if operation in {'asset', 'thumbnail', 'image_view', 'reveal'} else preview
         return getattr(target, operation)(*args)

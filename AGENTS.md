@@ -166,8 +166,7 @@ processing of other items; never edit originals to resolve them.
   evidence that must be preserved. Keep fault records, reports, previews and usable
   partial results. Never recursively delete directories containing junctions or
   links without a reviewed containment check; never clear generic system caches.
-- Record cleanup targets, savings, verification and faults separately. The
-  one-time consolidation script refuses automatic reruns. See `Assetarium KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
+- Record cleanup targets, savings, verification and faults separately. See `Assetarium KnowledgeBase/Notebook/Platform and Storage/Storage discipline.md`.
 
 ## Versioning
 
@@ -180,7 +179,7 @@ the changes are listed in [CHANGELOG.md](CHANGELOG.md).
 - A release also freezes its library for later upgrade tests
   (`scripts/build-release-fixture.py --release X.Y.Z`, committed under `tests/fixtures/releases/`), and ships no
   edit to a fingerprinted worker (`blender_worker.py`, `render_math.py`, repair workers) unless
-  `scripts/check-render-stability.py` proves it equivalent (decision 0022), so upgrading never turns finished work into new work.
+  `scripts/check-render-stability.py` proves it equivalent (decision 0028), so upgrading never turns finished work into new work.
 - Choose a new version number, release, or tag (`vX.Y.Z`) only when the owner asks. A
   release updates the app's version fields together: `pyproject.toml` (and `uv lock` for the root
   `uv.lock`), `src/local_asset_library/__init__.py`, `frontend/package.json` (`npm version`) and the

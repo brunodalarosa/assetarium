@@ -6,12 +6,11 @@ from pathlib import Path
 import sqlite3
 
 import pytest
-from PIL import Image
 
 from test_incremental import library, view_image
 from local_asset_library.config import ConfigError
 from local_asset_library import sources
-from local_asset_library.catalog import digest, detail, save_json
+from local_asset_library.catalog import digest, detail
 from local_asset_library.incremental import working, update_record
 from local_asset_library.library_index import index_library
 from local_asset_library.membership import records
@@ -70,7 +69,7 @@ def failed_caption(work, record):
 
 
 def failed_previews(work, record):
-    # An import failure; description failures are not (decision 0008).
+    # An import failure; description failures are not (decision 0033).
     record['processing'].update(previews='failed')
     record['stage_faults'] = {'previews': {'status': 'failed', 'error': 'Synthetic retained fault'}}
     update_record(work, record)
@@ -230,11 +229,11 @@ def test_independent_roots_and_source_owned_results(managed):
     assert len(records(config))==6
     r=records(work)[0]
     preview=config.output_path('data',r['previews'][0]['path'][5:])
-    # Results live in the central library store, never in the asset folder (decision 0023).
+    # Results live in the central library store, never in the asset folder (decision 0032).
     assert preview.is_relative_to(config.library_store()) and not preview.is_relative_to(Path(one['path']))
     assert config.source_file(r['files'][0]['path']).parent==Path(one['path'])
     assert not sources.source_status(config,one)['needs_processing']
-    from local_asset_library.library_migration import LEGACY_METADATA_DIR
+    from local_asset_library.config import LEGACY_METADATA_DIR
     with pytest.raises(ConfigError):config.source_file(one['key']+'/'+LEGACY_METADATA_DIR+'/source.json')
 
 
@@ -277,7 +276,7 @@ def test_scan_add_change_remove_and_card_until_published(managed):
     new.unlink()
     sources.scan_source(config,one)
     assert len(records(config))==2
-    # Working data lives in the library store; the folder holds only its originals (decision 0023).
+    # Working data lives in the library store; the folder holds only its originals (decision 0032).
     assert sources.bound(config,one).metadata_root.is_dir() and not [p for p in Path(one['path']).iterdir() if p.is_dir()]
 
 
@@ -318,8 +317,8 @@ def test_empty_source_and_metadata_are_excluded_from_scans(managed,tmp_path):
     config,_,_,_=managed
     root=tmp_path/'empty-source';root.mkdir()
     source=sources.add(config,str(root))
-    from local_asset_library.library_migration import LEGACY_METADATA_DIR
-    (root/LEGACY_METADATA_DIR).mkdir()  # An old generated folder awaiting migration is never scanned.
+    from local_asset_library.config import LEGACY_METADATA_DIR
+    (root/LEGACY_METADATA_DIR).mkdir()  # A 0.1.0 generated folder is never scanned.
     (root/LEGACY_METADATA_DIR/'invented.obj').write_text('not an original')
     result=sources.scan_source(config,source)
     assert result['assets']==0 and not result['needs_processing']
@@ -363,7 +362,7 @@ def test_cancel_embeddings_saves_all_views_of_current_asset(managed):
 
 
 def test_atomic_metadata_writer_supports_long_source_paths(tmp_path):
-    from local_asset_library.publication import atomic_json,read_json,filesystem_path
+    from local_asset_library.publication import atomic_json, read_json
     target=tmp_path/('long-source-'+'a'*55)/('metadata-'+'b'*55)/('history-'+'c'*55)/('report-'+'d'*55+'.json')
     atomic_json(target,{'preserved':'evidence'})
     assert read_json(target)=={'preserved':'evidence'}
@@ -417,67 +416,6 @@ def test_use_wording_is_published_as_a_validation_note(managed,monkeypatch):
     assert [n['severity'] for n in published['caption_provenance']['validation_notes']]==['review_note']
     from local_asset_library.caption_quality import caption_quality
     assert caption_quality(work,published)['status']=='review_note'
-
-
-def load_revalidation():
-    import importlib.util
-    path=Path(__file__).parents[1]/'scripts/historical/revalidate-caption-wording.py'
-    spec=importlib.util.spec_from_file_location('revalidate_caption_wording',path)
-    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-    return module
-
-
-def test_wording_revalidation_accepts_saved_outputs_once(managed,monkeypatch):
-    from local_asset_library.incremental import checkpoint, ledger, run_caption
-    import local_asset_library.captions as captions
-    config,backend,one,_=managed;work=ready_source(config,backend,one)
-    module=load_revalidation()
-    good,bad,other=records(work)[:3]
-    backend.settings={}
-    def fail(record,text,error='Measured technical claim in visual observations'):
-        raw=json.dumps({**record['description'],'description':text,'suggested_uses':['scenery']})
-        attempts=[{'status':'invalid_output','error':error,'raw':raw}]
-        monkeypatch.setattr(captions,'infer_captions',lambda *args,**kwargs:[{'status':'failed','description':None,'suggested_uses':[],'attempts':attempts}])
-        run_caption(work,record,'f'*64,backend)
-        failed=detail(work,record['asset_id'])
-        failed['stage_faults']={'caption':{'status':'failed','error':error}}
-        update_record(work,failed)
-        with closing(ledger(sources.bound(config,one))) as db:
-            checkpoint(db,record['asset_id'],'caption','f'*64,'failed',{'status':'failed','attempts':attempts})
-    fail(good,'A low-poly sailboat with a curved hull and rigging lines from the mast, designed for use in games.')
-    fail(bad,'A low-poly figure with an armature and a curved wooden body and a plain round head.')
-    fail(other,'A low-poly crate with plain planks and a simple square frame on every side.','Invalid string list: colors')
-    monkeypatch.setattr(module,'EXPECTED',{one['key']:2})
-    monkeypatch.setattr(module,'caption_input',lambda config,record:'f'*64)
-    out=config.output_path('data','evidence/revalidation-fixture')
-    dry=module.run(config,out,dry_run=True)
-    assert [a['asset_id'] for a in dry['sources'][one['key']]['accepted']]==[good['asset_id']]
-    assert not out.exists() and detail(work,good['asset_id'])['processing']['caption']=='failed'
-    receipt=module.run(config,out)
-    result=receipt['sources'][one['key']]
-    assert [a['asset_id'] for a in result['accepted']]==[good['asset_id']] and result['accepted'][0]['review_notes']==1
-    assert [k['asset_id'] for k in result['kept_failed']]==[bad['asset_id']]
-    assert result['kept_failed'][0]['reason'].startswith('Still rejected: Measured technical claim')
-    accepted=detail(work,good['asset_id'])
-    assert accepted['processing']['caption']=='complete' and 'caption' not in accepted['stage_faults']
-    assert 'rigging lines' in accepted['description']['description'] and accepted['suggested_uses']==['scenery']
-    provenance=accepted['caption_provenance']
-    assert provenance['revalidation']['previous_error'].startswith('Measured technical claim')
-    assert provenance['validation_notes'][0]['severity']=='review_note'
-    assert provenance['attempts'][0]['status']=='invalid_output'
-    for identifier in (bad['asset_id'],other['asset_id']):
-        assert detail(work,identifier)['processing']['caption']=='failed' and detail(work,identifier)['stage_faults']['caption']
-    with closing(ledger(sources.bound(config,one))) as db:
-        assert db.execute("SELECT status FROM jobs WHERE asset_id=? AND stage='caption'",(good['asset_id'],)).fetchone()==('complete',)
-        assert [r[0] for r in db.execute("SELECT status FROM history WHERE asset_id=? AND stage='caption' ORDER BY sequence",(good['asset_id'],))][-2:]==['failed','complete']
-    saved=json.loads((out/'before'/one['key']/good['asset_id']/('f'*64+'.json')).read_text(encoding='utf-8'))
-    assert saved['status']=='failed' and json.loads((out/'receipt.json').read_text(encoding='utf-8'))['sources']
-    assert not (out/'before'/one['key']/bad['asset_id']).exists()
-    with pytest.raises(SystemExit,match='never reruns'):
-        module.run(config,out)
-    monkeypatch.setattr(module,'EXPECTED',{one['key']:2})
-    with pytest.raises(ConfigError,match='expected 2'):
-        module.run(config,config.output_path('data','evidence/revalidation-fixture-2'))
 
 
 def test_combined_publication_is_reused_after_removing_and_readding_source(managed):

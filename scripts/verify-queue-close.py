@@ -1,4 +1,4 @@
-"""Real WebView2 check of closing and reopening while assets are processing (decision 0023).
+"""Real WebView2 check of closing and reopening while assets are processing (decision 0032).
 
 Phase close: a running item (a synthetic operation record, no worker) makes the real window close ask first:
 Keep open keeps the app, Stop & close closes it and leaves every item waiting for Continue. Phase reopen (a

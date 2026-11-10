@@ -1,4 +1,4 @@
-"""Composition root for inference adapters, plus the engine table setup reads (decision 0015).
+"""Composition root for inference adapters, plus the engine table setup reads (decision 0033).
 
 The only place that chooses and constructs a description engine or an embedder.
 Readiness checks here are static: they read files and package metadata and never
@@ -6,7 +6,6 @@ import Torch, load a model, contact a server or start a process.
 """
 import json
 import os
-from pathlib import Path
 
 from .config import ConfigError, venv_python
 
@@ -266,7 +265,7 @@ def search_readiness(config, gpu=None, device=None):
                                                                            ' --device cpu' if device == 'cpu' else '')})
     capability = capability_ready(config, device)
     # A button, not a command (design principle P3): the app runs it on built-in samples, and processing runs it
-    # by itself when it is missing (decision 0026).
+    # by itself when it is missing (decision 0031).
     # Offered only when it can pass: the runtime and the model above are installed.
     runnable = not capability['ready'] and runtime['ready'] and not mismatch and weights['ready']
     items.append({'id': 'embedding_capability', 'label': 'Search check', 'ready': capability['ready'], 'command': None,

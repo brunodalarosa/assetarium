@@ -169,7 +169,7 @@ An agent can set Assetarium up for the computer it runs on
 | `propose_setup` | `blender_path` (≤1,024) | propose | Stores a pending proposal for a path `validate_blender` passed; the user applies or rejects it. `already_applied` when it is the configured Blender |
 | `finish_setup` | `{}` | apply and undo | Ends the agent's part: setup waits in `review` until the user confirms the report in the app (**Looks good** → `completed`); refused while a proposal is pending |
 
-- **Tiers, no session.** Since decision 0024 there is no setup session: what a tool may do depends
+- **Tiers, no session.** Since decision 0029 there is no setup session: what a tool may do depends
   on its tier. *Read* tools always answer; *apply and undo* values are recorded as set by the agent
   and raise one notice per day that the user can act on; *propose* waits for the user's Apply;
   *run* only ever starts a file named `blender.exe`/`blender`.
@@ -211,7 +211,7 @@ check can take up to two minutes. Verification: `scripts/verify-agent-setup-mcp.
 
 ## Pack structure
 
-Agents fix how a scan reads a pack (decision 0024): which folders are packs, which names are variants
+Agents fix how a scan reads a pack (decision 0035): which folders are packs, which names are variants
 of one asset, which folders are engine copies, how images are meant. Every response is capped at about
 8,000 characters (≈2,000 tokens) so small local models can work page by page.
 

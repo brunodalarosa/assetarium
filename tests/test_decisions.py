@@ -13,7 +13,7 @@ AREAS = {'Desktop App', 'MCP', 'Platform and Storage', 'Processing', 'Search', '
 MAX_LINES = 150
 FILE_TYPES = ('.py', '.ts', '.tsx', '.json', '.jsonl', '.toml', '.md', '.txt', '.sqlite', '.png')
 # Notes that patch a record instead of rewriting it: the habit that made 27 decisions unreadable.
-AMENDMENT = re.compile(r'^\s*(>\s*)?\*{0,2}\(?(Since |Update|Updated |Scope note|See also|Corrected |Amended|Added )'
+AMENDMENT = re.compile(r'^\s*(>\s*)?\*{0,2}\(?(Since |Update|Updated |Scope note|See also|Corrected |Amended|Amendment|Added )'
                        r'|[Pp]artly superseded|superseded_in_part_by|^status:\s*(retired|superseded)'
                        r'|\((?:[Uu]pdated|[Aa]dded|[Cc]orrected|[Aa]mended)\b[^)]*\d{4}', re.M)
 

@@ -1,10 +1,10 @@
-"""Descriptions turned off (decision 0014): enforced by the backend, and nothing existing is lost."""
+"""Descriptions turned off (decision 0033): enforced by the backend, and nothing existing is lost."""
 import json
 from types import SimpleNamespace
 
 import pytest
 
-from local_asset_library import notifications, overnight, sources
+from local_asset_library import notifications, sources
 from local_asset_library import source_operations as operations
 from local_asset_library.config import ConfigError
 from local_asset_library.incremental import process, update_record, working
@@ -103,9 +103,3 @@ def test_turning_off_mid_run_stops_after_the_finished_batch(managed):
         operations.worker_stage(config, one, 'caption', 'off1')
     fault = json.loads(operations.stage_fault_path(scoped, 'off1').read_text(encoding='utf-8'))
     assert fault['reason'] == operations.DESCRIPTIONS_STOPPED
-
-
-def test_overnight_runs_refuse_to_start(config):
-    turn_off(config)
-    with pytest.raises(ConfigError, match='turned off'):
-        overnight.caption_batch(config, 'unused', lambda work: pytest.fail('no engine'))

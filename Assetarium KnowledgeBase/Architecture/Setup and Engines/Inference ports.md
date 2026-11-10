@@ -10,7 +10,7 @@ branch:
 # Inference ports
 
 > Model inference is the only part of Assetarium built as ports and adapters: the caption stage,
-> overnight runs, indexing and search depend on two small contracts, and `engines.py` is the only
+> indexing and search depend on two small contracts, and `engines.py` is the only
 > place that picks the adapter. Refactors must keep fingerprints, proven with
 > `scripts/check-engine-stability.py --compare`.
 
@@ -53,17 +53,11 @@ On purpose, and listed so a later change knows about them:
 
 - `incremental.caption_input` knows the built-in engine's fingerprint inputs
   (`caption_backend.py`, `caption_batching.py`, the caption lock): they are frozen
-  evidence of every finished description (decision 0007).
-- `captions.infer_captions` still accepts a bare `QwenBackend` for the historical
-  evidence scripts.
+  evidence of every finished description (decision 0028).
+- `captions.infer_captions` still accepts a bare `QwenBackend` (`scripts/benchmark-caption-batching.py`
+  and tests use it).
 - `scripts/asset-worker.py` hosts the EmbeddingGemma runtime (`runtime_contract`, its
   library pre-load); it builds the embedder through `engines.embedder`.
-- One-off evidence and maintenance scripts build Qwen or EmbeddingGemma directly:
-  `benchmark-caption-batching.py`, `caption_pilot.py`, `image-pilot-describe.py`,
-  `image-pilot-search-eval.py`, `image-preprocessing-eval.py`, `kaykit-gltf-maintenance.py`,
-  `embedding_capability.py`, `embedding_demo.py`, `benchmark_evaluation.py`,
-  `measure_embedding_search.py`, `repair-textures.py`, `verify-model-relocation.py`,
-  `verify-storage.py`, `prepare_*_model.py`. Those tied to the original pilot or library
-  are in `scripts/historical/` (see its README).
-- `scripts/historical/embedding_capability.py` uses this project's own pilot asset IDs, so a fresh install
-  cannot record the search capability receipt yet (a follow-up for open source).
+- Evidence and maintenance scripts build Qwen or EmbeddingGemma directly:
+  `benchmark-caption-batching.py`, `measure_embedding_search.py`, `prepare_*_model.py`. The ones tied to
+  the original pilot or library were removed in November 2026; in git history at commit `af02e91`.

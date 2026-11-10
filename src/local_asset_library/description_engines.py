@@ -1,6 +1,6 @@
-"""Ports for model inference: description engines and embedders (decision 0015).
+"""Ports for model inference: description engines and embedders (decision 0033).
 
-The core (caption stage, overnight runs, indexing, search) depends only on these
+The core (caption stage, indexing, search) depends only on these
 contracts. Adapters live in their own modules and are chosen in one place,
 ``engines.py``; nothing in the core constructs one.
 

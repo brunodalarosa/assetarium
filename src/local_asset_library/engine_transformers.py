@@ -1,7 +1,7 @@
 """Built-in description engine adapter: the pinned Qwen3-VL Transformers backend on CUDA.
 
 ``caption_backend.py`` and ``caption_batching.py`` stay byte-identical: their hashes
-are fingerprint inputs of every finished description (decision 0007). This adapter
+are fingerprint inputs of every finished description (decision 0028). This adapter
 only maps them onto the DescriptionEngine port; batching, which needs the model's
 processor and tensors, is internal to it.
 """

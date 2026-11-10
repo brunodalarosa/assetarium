@@ -3,7 +3,7 @@ tags: [decision]
 decided: 2026-11-07
 area: Processing
 replaces: [0004, 0007, 0014, 0015, 0022, 0023]
-code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, result_store.adopt, result_store.location_free, library_migration.rekey, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
+code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, result_store.adopt, result_store.location_free, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py]
 ---
 # 0028 — Result identity: what makes finished work run again
 
@@ -68,7 +68,7 @@ The Blender **path** and its executable's mtime are in the inspection key. Movin
 the same Blender re-renders every 3D asset, although the path alone changes no pixel.
 
 **Owner direction (November 7, 2026):** key Blender by its **version** (what it reports), not by where it is
-installed. This needs a code change, re-keying through `library_migration.rekey` so nothing is re-queued, and
+installed. This needs a code change that re-keys existing results so nothing is re-queued, and
 the setup confirmation then asks only when the version changes. **Not implemented yet**; until it is, the path
 stays in the key and setup keeps asking before saving a different Blender.
 
@@ -98,9 +98,12 @@ stays in the key and setup keeps asking before saving a different Blender.
 
 - Keys hold inputs, never locations or IDs. New result kinds get a row in the table above.
 - An input left out of a key needs a new row in the exceptions table, with its risk, before it ships.
-- Changing how a key is computed re-keys existing results (`library_migration.rekey`, proven by
-  `scripts/check-rekey.py`), never re-queues them.
+- Changing how a key is computed re-keys existing results, never re-queues them. The change ships its own
+  re-keying code and a check, run on copies of real ledgers, that nothing becomes newly pending.
 - Switching an engine, device or performance setting never invalidates another engine's or device's
   finished results.
 - Engine refactors keep fingerprints (`scripts/check-engine-stability.py --compare`).
 
+## Changes
+
+- 2026-11-10: the Keep true line on re-keying no longer names code. The only re-keying code translated 0.1.0 keys and was removed with the 0.1.0 migration (owner: 0.2.0 is a fresh start; migrations are supported from 0.2.0 on).

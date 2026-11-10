@@ -1,4 +1,4 @@
-"""Real WebView2 check of Collections with small isolated synthetic sources (decision 0012).
+"""Real WebView2 check of Collections with small isolated synthetic sources (decision 0036).
 
 Covers the Collections tab, creation, the asset context menu and its collection flyout, labels,
 notes and tags, in-collection and Collections-tab search, batch removal with Undo, rename, agent

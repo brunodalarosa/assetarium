@@ -9,7 +9,7 @@ branch:
 
 Hub: [Platform and Storage](Platform%20and%20Storage.md). Moved from `docs/storage.md` on 2026-10-28; the binding rules are in `AGENTS.md` → Storage discipline.
 
-Generated asset results live in the library store (decision 0023), by default the ignored
+Generated asset results live in the library store (decision 0032), by default the ignored
 `data/library-store/`. Processing and migration receipts measure unique allocation across this
 project **and** the store when it lives elsewhere, deduplicating file identities.
 The standalone `storage-report.py` still reports just the selected project root;
@@ -50,7 +50,7 @@ pytest/verification folders in `scratch/` are removed only by the explicit
 two-step `scripts/cleanup-scratch.py --plan` / `--apply PLAN`.
 
 `cache/file-hashes.sqlite` records verified hashes by file identity for every LAL
-process (decision 0004); its size grows with the number of files ever hashed (tens of
+process (decision 0028); its size grows with the number of files ever hashed (tens of
 MB for a large library). It holds no evidence: deleting it only makes the next scan or
 search re-hash files once. Tests and synthetic verify scripts use their own records
 (`tests/conftest.py`, `gui_harness.isolate_hash_cache` → `scratch/hash-cache/`). With the
@@ -105,26 +105,6 @@ models, with fresh base-Python receipts before bulk work, after each bounded
 batch and after publication. Current measured coverage, retained storage and
 runtime evidence are summarized in `docs/history/progress-2026-10.md`; the original Step 8
 verification report has been retired. Historical 20 GiB estimates are not a current allowance.
-
-The approved one-time `scripts/historical/reduce-storage.py` operation consolidates only
-matching files of at least 1 MiB in the two installed `torch/lib` directories.
-It checks SHA-256 before and after creating each link, uses atomic replacement,
-and preserves the original duplicate until the replacement is ready. It records
-different files and faults separately and refuses to overwrite its receipt or retry.
-It does not install packages, delete caches, or touch source assets/model weights.
-
-Fresh cleanup and verification evidence is under `data/storage/`; historical
-processing evidence is retained. `setup-faults.json` records restricted-execution
-limitations. The initial `before.json` report used an older allocation measurement
-and classified deliberately excluded test links as faults; `before-allocated.json`
-is the corrected baseline. Those partial reports are preserved.
-
-The first consolidation found DLLs loaded by the active connector worker and
-retained its successful links and fault evidence. After explicit owner approval
-to retry, `scripts/historical/retry-storage-links.py` used the loaded embedding libraries as
-the canonical files and replaced the idle caption copies instead. It verified
-every SHA-256, removed only superseded temporary links after successful replacement,
-and retained the initial fault receipt. No running worker had to be stopped.
 
 Verification helper mistakes (an absolute reference-image argument, then hashing
 base64 text instead of decoded PNG bytes) are preserved in the partial embedding

@@ -13,7 +13,7 @@ from ui_text import assert_ui_text
 
 
 def isolate_hash_cache(script):
-    """Synthetic checks keep their hashes out of the shared cache/file-hashes.sqlite (decision 0004)."""
+    """Synthetic checks keep their hashes out of the shared cache/file-hashes.sqlite (decision 0028)."""
     os.environ['LAL_HASH_CACHE'] = str(Path(__file__).resolve().parents[1] / 'scratch/hash-cache' / (Path(script).stem + '.sqlite'))
 
 # Small page helpers: until() polls, frame() waits two paints, pick() chooses a beUI select

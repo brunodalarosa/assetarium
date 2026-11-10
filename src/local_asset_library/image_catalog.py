@@ -1,6 +1,6 @@
 """Scanner-side enrollment of static 2D images; no decoding and no inference.
 
-Every image is enrolled (decision 0023) and classified by ``image_kinds``: model textures stay dependencies,
+Every image is enrolled (decision 0032) and classified by ``image_kinds``: model textures stay dependencies,
 material textures and 2D images are assets. Kept apart from image_media.py so changing enrollment rules never
 changes the pixel-adapter fingerprint (and so never re-queues image inspections or descriptions).
 """

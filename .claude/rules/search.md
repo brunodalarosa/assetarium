@@ -6,7 +6,6 @@ paths:
   - "src/local_asset_library/library_cache.py"
   - "src/local_asset_library/hash_cache.py"
   - "src/local_asset_library/embedding_*.py"
-  - "src/local_asset_library/evaluation.py"
   - "tests/test_retrieval.py"
 ---
 This code belongs to the **Search** area. Before changing it, read `Assetarium KnowledgeBase/Notebook/Search/Search.md` and the notes it lists

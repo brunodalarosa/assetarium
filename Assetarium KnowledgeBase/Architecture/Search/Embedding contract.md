@@ -2,157 +2,110 @@
 tags: [architecture]
 parent: "[Architecture](../Architecture.md)"
 status: draft
-verified:
-branch:
+verified: 2026-11-10
+branch: feature/audit-simplify
 level: system
-code: [embedding_backend.py, embedding_cpu.py, library_index.py, retrieval.recorded_contract]
+code: [embedding_backend.py, embedding_cpu.py, library_index.py, retrieval.recorded_contract, retrieval.SearchEngine, search_policy.py]
 ---
-# Step 5 embedding and retrieval contract
+# Embedding and retrieval contract
 
-Up: [Architecture](../Architecture.md) · Where in code: [Search](../../Notebook/Search/Search.md). Moved from `docs/embedding-contract.md` on 2026-10-28 (history: written as step 5 of the original 40-asset pilot).
+> What a search vector is made from, what makes two vectors comparable, and what search verifies before it
+> answers. Rewritten on 2026-11-10 as the current contract; the pilot notes it used to carry are in git
+> (commit `af02e91`).
 
-Verified October 11, 2026 against Google's [model card](https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2),
-[text inference guide](https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers),
-[multimodal inference guide](https://ai.google.dev/gemma/docs/embeddinggemma/multimodal-embeddinggemma-with-sentence-transformers)
-and the [publisher repository](https://huggingface.co/google/embeddinggemma-2).
-The Google pages were updated October 6. The repository metadata reports
-Apache-2.0 and no access gate. No alternative model/runtime or fine-tuning used.
+Up: [Architecture](../Architecture.md) · Where in code: [Search](../../Notebook/Search/Search.md) ·
+Binding rules: [0018](../../Decisions/0018-cpu-search-embedder.md) (CPU or CUDA),
+[0028](../../Decisions/0028-result-identity.md) (what a contract change re-queues).
 
-## Inference
+## The model
 
-Weights resolve through `[storage].models` (the shared model directory in `config.local.toml`, or the project `models/` folder).
-Runtime caches remain under project `cache/`. Relocation changes storage only;
-the adapter, model revision, runtime lock and inference fingerprint are unchanged.
+`docs/embedding-model.json` pins `google/embeddinggemma-2` at one revision with the hash of every file
+(Apache-2.0, no access gate). Sources checked when it was chosen (October 2026): Google's
+[model card](https://ai.google.dev/gemma/docs/embeddinggemma/model_card_2), the
+[text](https://ai.google.dev/gemma/docs/embeddinggemma/inference-embeddinggemma-with-sentence-transformers) and
+[multimodal](https://ai.google.dev/gemma/docs/embeddinggemma/multimodal-embeddinggemma-with-sentence-transformers)
+inference guides, and the [publisher repository](https://huggingface.co/google/embeddinggemma-2).
 
-`docs/embedding-model.json` pins `google/embeddinggemma-2` revision
-`914f7f89142e33e77833254d9c9b90c3cef7303b`. Download the original checkpoint;
-disable audio at load via `config_kwargs={"audio_config": None}`. Actual loaded
-text/vision parameter count: 438,760,448. Vision is present; audio is absent.
+- Weights resolve through `[storage].models`; moving them changes storage only, not the contract.
+- Weights, configuration and tokenizer are hash-checked against the pinned receipt before every load.
+- Offline, local files only, no remote model code, no cloud inference. Audio is disabled at load
+  (`audio_config: None`); the contract covers text and images.
+- BF16 on CUDA (`embedding_backend.py`, `runtime/embedding/uv.lock`) or on the CPU (`embedding_cpu.py`,
+  `runtime/embedding-cpu/uv.lock`), chosen by the saved `search_device`. **Nothing falls back** from one device
+  or precision to another. The two have different contract identities, so their vectors never share an
+  index; switching device rebuilds search data.
 
-Use the isolated `runtime/embedding/uv.lock` and `.venv-embedding`. The runtime
-wrapper reuses only project-local dependency downloads from `cache/uv-caption`;
-it does not update `.venv-caption`, the base environment or other installations.
-Model weights/configuration/tokenizers are hash-checked against the exact-revision
-receipt before every load. Native library implementations only, offline/local
-files only, no remote model code, no cloud inference. Inference runs at CUDA BF16
-on the verified RTX 5070 with SDPA and TF32 disabled. FP16 and silent CPU/precision
-fallback are forbidden. A different hardware/precision contract requires explicit
-validation and reindexing; CPU inference is not verified in this step.
+## What goes in
 
-Text search queries use `task: search result | query: {query}`. Description documents
-have no title and use `title: none | text: {observations}`. Prefixes are applied
-explicitly and the runtime's default prompt is suppressed. Documents contain only
-the structured visual observations: identity with uncertainty, prose, shape,
-colors, parts, style, distinguishing features and uncertainties. Suggested uses,
-pack/filename text and measured geometry are excluded from description vectors.
-Descriptions remain provisional observations, not verified technical facts.
-Live owner correction files are validated; their observation changes invalidate
-description vectors. Suggestions remain separately available in detail records.
+| Input | Prepared as |
+| --- | --- |
+| Search text | `task: search result \| query: {query}` |
+| A description | `title: none \| text: {observations}` |
+| An image | The documented image API, **no text prefix** |
 
-Images use the documented `{"image": PIL_image}` API, with **no text prefix**.
-EXIF transpose, decode, RGBA composite over gray RGB (82,82,82), conversion to RGB,
-native image size and the publisher processor's 280 soft-token budget are fixed.
-No contact sheets/textures are indexed as individual asset views. Image queries
-use the same preprocessing as indexed images. Source/project relative reference
-paths only; URLs, traversal and external absolute paths are rejected.
+- Prefixes are applied explicitly; the runtime's default prompt is suppressed.
+- A description document holds only what the model observed: identity with its uncertainty, prose, shape,
+  colors, parts, style, distinguishing features. Suggested uses, pack and file names and measured geometry
+  are left out. The owner's corrections count: a changed effective description invalidates its vector.
+- Images: EXIF transpose, decode, RGBA over flat rgb(82,82,82), RGB, native size, the publisher processor's
+  280 soft-token budget. A query image is prepared exactly like an indexed one.
+- A 3D asset contributes one image vector per rendered view. A 2D image contributes one, from its recorded
+  `model_input` preview ([Catalog contract](../Sources%20and%20Catalog/Catalog%20contract.md#images)); originals,
+  display rasters and thumbnails are presentation, never extra vectors. Contact sheets and textures of a model
+  are not indexed as views.
+- A description vector exists only once a valid description does; a missing or failed description leaves just
+  that channel empty ([decision 0033](../../Decisions/0033-descriptions-and-engines.md)).
 
-**2D image assets (expansion step 2)** are embedded from exactly one recorded
-`model_input` preview: the derived `image-model-input-b-v1` PNG described in the
-[catalog contract](../Sources%20and%20Catalog/Catalog%20contract.md) (nearest-neighbour enlargement to at least
-256 px, flat rgb(82,82,82) behind transparent pixels, Lanczos reduction above
-1,024 px). This file then passes through the unchanged preprocessing above, so
-the embedding contract, adapter hash, capability receipt and every existing
-vector are unchanged; tiny sprites no longer reach the 16 px rejection. Originals,
-SVG display rasters and thumbnails are presentation, never extra vectors. A
-reference query on an image asset uses that same `model_input` file, so query and
-index preparation are identical. Images also get a description vector once a
-valid description exists; a missing or failed one leaves only that channel
-(decision 0008).
+## What comes out
 
-All vectors retain 768 dimensions and are checked for finite, nonzero output,
-converted to FP32 and L2 normalized. Stored vectors must already be unit length;
-search refuses corrupt/checksum-mismatched, nonfinite, zero or nonunit vectors.
-An 8,192-token input limit is checked before text truncation, and actual processed
-pixel tensors/context are checked. Inference faults propagate or become explicit
-item failures; there is no synthetic/random/zero-vector fallback and no ranking
-fallback after a query inference error.
+Every vector has 768 dimensions, is checked finite and nonzero, converted to FP32 and L2-normalized. Stored
+vectors must already be unit length. The 8,192-token limit is checked before any truncation. An inference
+fault is an error or an explicit item failure: there is no synthetic, random or zero vector, and no ranking
+fallback after a query fails.
 
-## Persistence and failure handling
+## The contract fingerprint
 
-`data/embeddings/index.sqlite` is separate from the existing catalog/FTS baseline.
-The current contract includes model ID/revision/file hashes, dependency versions,
-runtime lock hash, backend source hash, precision, device/attention, dimensions,
-both text prompts, image preprocessing and normalization. Each vector stores the
-contract fingerprint, modality/role, input/source fingerprint, dimension, FP32
-bytes/checksum and its individual view reference. Query and index contracts must
-match exactly before similarity is computed. Input fingerprints are checked
-against current descriptions/view bytes; unavailable or changed input rows are
-excluded with evidence. Changing a contract requires an explicit capability check
-and reindex, not automatic migration. A backend source or runtime lock that differs
-from `data/embeddings/capability.json`, or else from the published index's
-`data/library/embedding-contract.json`, only by LF/CRLF line endings (a git checkout)
-keeps its recorded hash (`retrieval.recorded_contract`); any other byte change is
-still a contract change. The published index counts because a library store
-can bring vectors built on another checkout to an install with no search check yet;
-the search check then records that reconciled form.
+`data/embeddings/index.sqlite` is separate from the catalog. Its contract covers the model ID, revision and
+file hashes, dependency versions, the runtime lock hash, the adapter's source hash, precision, device and
+attention, dimensions, both text prompts, image preprocessing and normalization. Each vector row stores the
+contract fingerprint, its modality and role, its input fingerprint, FP32 bytes with a checksum, and the view
+it came from.
 
-Only the members of the configured library (`data/library/membership.json`) are
-indexed; the index records their IDs and a search refuses an index whose members differ.
-Jobs publish atomically to SQLite and preserve usable successful items. Unchanged
-successful vectors are reused after verification; unchanged inference failures
-are retained without another inference attempt. Changed inputs/contracts are new
-jobs. Old vectors cannot survive failed replacement. Jobs/report evidence exposes
-absent captions, inference errors and individual image faults. Process/load faults
-leave the existing index intact and make the command fail.
+- **Query and index contracts must match exactly** before any similarity is computed.
+- A changed contract needs a search check and a reindex, never an automatic migration.
+- A source file or lock that differs from the recorded one only by LF/CRLF line endings (a git checkout on
+  another platform) keeps its recorded hash (`retrieval.recorded_contract`); any other byte change is a
+  contract change. The published index's own contract counts too, because a library store can bring vectors
+  built on another checkout to an install that has no search check yet.
+- The **search check** (`data/embeddings/capability.json`) proves real text and image inference on this
+  computer's search device before search data is built ([decision 0031](../../Decisions/0031-setup.md)).
 
-The road-crossroad caption remains failed; its actual views can still be indexed.
-BirchTree_1's missing image datablock is verified `required_for_render: false`;
-retain this source fault and its unresolved dependency in detail without discarding
-usable geometry/views. Missing/stale source files or required dependencies exclude
-the logical asset. Conservatively, any missing/stale recorded alternate source
-also excludes the asset. Unknown binary/alternate dependency completeness is
-reported, never inferred from a successful render.
+## Building the index
 
-## Retrieval and evidence
+Only members of the configured library are indexed; the index records their IDs, and search refuses an index
+whose members differ. Jobs publish atomically. An unchanged successful vector is reused after verification;
+an unchanged inference failure is kept without another attempt; changed inputs or contracts are new jobs. An
+old vector cannot survive a failed replacement. A process or load fault leaves the existing index intact.
 
-Omitting `--mode` keeps the plain full-catalog keyword CLI. Explicit
-`keyword`, `description`, `image`, `combined` and `reference` modes operate on the
-configured library. Filename/keyword ranking uses the existing FTS5 literal AND terms and
-BM25 ordering. Semantic ranking is normalized exact NumPy dot product; each image
-channel ranks an asset by its best individual view. All views/formats resolve to
-one logical ID. Combine unique-asset ranked lists by reciprocal rank fusion with
-`k=60`, retaining channel rankings and deterministic ID tie-breaking.
+## Retrieval
 
-Before every search/detail, boundary-resolve and SHA-256 verify recorded source
-files and required dependency bytes. Verified filters: pack, available format,
-maximum inspected evaluated-instance triangle count, and inspected armature
-presence (`rigged`, an enumeration rather than behavior/animation validation).
-Technical filters exclude unknown/uninspected facts; combined format and technical
-filters must refer to the actual inspected format. Caption colors/styles/uses
-are not verified metadata filters. Unknown filter keys are errors.
+- Modes: `keyword`, `description`, `image` (text to image), `reference` (an asset's own view, never a path or
+  upload), `keyword_description` and `combined` (the default).
+- Keyword ranking is FTS5 literal AND terms ordered by BM25. Semantic ranking is an exact NumPy dot product of
+  unit vectors; an asset ranks by its best view. Every view and format resolves to one logical asset.
+- Channels are fused by weighted reciprocal rank with `k = 60` (`search_policy`), ties broken by asset ID.
+  Scores are BM25, cosine similarity or a fused rank score; **none is a probability**, and semantic candidates
+  are labeled weak until a person has judged them.
+- **Before every search and detail**, recorded source files and required dependencies are resolved inside
+  their boundary and their SHA-256 verified. A stale or missing required file excludes the asset, counted
+  with its reason. Stale description or view inputs exclude only their rows.
+- Filters are verified facts only: asset type, pack, available format, maximum inspected triangle count,
+  `rigged` (an armature was found, not that it animates), and for images `transparent` and `size_class`.
+  Unknown filter keys are errors; a technical filter excludes assets whose fact is unknown.
+- A shortlist is bounded: at most 40 results (5 when omitted over MCP, 20 in the app), a short observation
+  excerpt, formats, a preview reference, matching channels, review flags and a score. Full paths appear only
+  in detail. `--min-similarity` on the CLI is an evaluation floor applied before fusion, not a confidence
+  threshold; `--rankings-output` saves every channel's ranking under `data/` for comparison.
 
-Default shortlist: at most five logical assets, short provisional observation
-excerpt, formats, preview reference, availability, matching channels, fault/review
-flags and ranking score. No full source/dependency paths until `detail`. Output is
-capped at 6,000 serialized characters with an explicitly heuristic characters/4
-token estimate. Requested images and transport/schema overhead are excluded.
-Scores mean BM25, cosine similarity or RRF rank score; none is a probability.
-
-Semantic results are explicitly `weak_unvalidated` without human judgments.
-Keyword/filtered empty sets return `no_match`. Optional `--min-similarity` is an
-evaluation cosine floor applied before fusion; it is not a calibrated confidence
-threshold. Unthresholded and eligible channel rankings are both retained, so
-negative-query behavior can be examined later without losing scores. Rank names
-are channel contributions, not proofs of relevance.
-
-Default full ranking evidence: `data/embeddings/last-search.json`; use distinct
-`--rankings-output embeddings/<name>.json` paths to preserve comparisons. It is
-intentionally separate from the compact response. Reference querying requires a
-matching capability receipt proving real image inference. The step 5 reference
-demonstration uses an already indexed apple view: capability/self-retrieval proof,
-not held-out relevance evidence.
-
-`detail ID --format FORMAT` resolves and hashes the selected source and all known
-logical-asset dependency references, retaining each referring source and missing
-optional faults. It does not export or copy anything. The legacy `get` command
-retains its raw catalog behavior.
+How ranking is implemented and tuned is in [Retrieval](../../Notebook/Search/Retrieval.md); the frozen
+evaluation that chose these weights is in [`docs/evaluation/`](../../../docs/evaluation/README.md).

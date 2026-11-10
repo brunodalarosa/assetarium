@@ -1,4 +1,4 @@
-"""Shared stat-identity hash record (decision 0004).
+"""Shared stat-identity hash record (decision 0028).
 
 A file is re-hashed only when its size, modification time, creation/change time
 or file ID changes; otherwise the hash recorded for that exact identity is

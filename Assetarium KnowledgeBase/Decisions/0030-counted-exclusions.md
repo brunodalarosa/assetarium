@@ -39,7 +39,7 @@ asset is not hidden: only the description channel is left out for it. That is no
 
 - The search results say it once: *"Descriptions not used for 23 of these results: 20 missing · 3 stale ·
   Generate descriptions"* (no line when there are none). MCP search returns the same counts and reasons.
-- It is still **not** an exclusion fault, an import failure or a warning (decision 0008 stands on that): a
+- It is still **not** an exclusion fault, an import failure or a warning ([decision 0033](0033-descriptions-and-engines.md): descriptions are optional): a
   missing description is optional work, not a problem.
 
 ## Today and target
@@ -59,3 +59,6 @@ asset is not hidden: only the description channel is left out for it. That is no
 - Re-inspection caused by a format change is pending work; it never starts by itself.
 - Folder views, search, agent results and the queue apply the same format rule (`settings.uses`).
 
+## Changes
+
+- 2026-11-10: a citation of replaced decision 0008 now names decision 0033, which holds that rule; no rule changed.

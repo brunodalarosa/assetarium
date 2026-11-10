@@ -1,4 +1,4 @@
-"""Owner tags: many short words per asset, shared by the whole app (decision 0012).
+"""Owner tags: many short words per asset, shared by the whole app (decision 0036).
 
 Tags describe the asset itself, independent of any collection; a collection's
 per-asset label is separate. One small atomic JSON file, written under the

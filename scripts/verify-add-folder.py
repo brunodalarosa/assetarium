@@ -1,4 +1,4 @@
-"""Verify the Add library folder wizard (decision 0024) in the real WebView2 shell with a synthetic library.
+"""Verify the Add library folder wizard (decision 0035) in the real WebView2 shell with a synthetic library.
 
 Checks the live quick look (the tree fills in by names), What we found (counts, reasons, How did we decide?), Let my
 agent finish (the folder is added and scanned, the copy-paste prompt, the connection line), an in-process agent

@@ -1,4 +1,4 @@
-"""The library store's own database: library folders, recognized assets and their history (decision 0023).
+"""The library store's own database: library folders, recognized assets and their history (decision 0032).
 
 A library folder is a watched root. An asset ID is assigned once, at first sight, and kept by recognizing the
 asset again: the same place, or the same content where a vanished asset was (a move). The same content beside a

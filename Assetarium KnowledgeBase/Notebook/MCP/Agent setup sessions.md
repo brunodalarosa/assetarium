@@ -1,7 +1,7 @@
 ---
 area: MCP
 tags: [system]
-code: [setup_agent.status, setup_agent.ask_user, setup_agent.actions, setup_agent.GUIDE, setup_agent.verify_weights, setup_agent.agent_change, setup_agent.notice_id, setup_agent.PROPOSAL_STATES, setup_agent.connections, setup_agent.registrations, setup_core.settings_from_answers, setup_core.confirm_review, setup_core.undo_value, frontend/src/ui/AgentSetup.tsx, frontend/src/ui/SetupReport.tsx, skills/assetarium-setup/SKILL.md, scripts/verify-agent-setup-mcp.py, scripts/verify-agent-setup.py]
+code: [setup_agent.status, setup_agent.ask_user, setup_agent.actions, setup_agent.GUIDE, setup_agent.verify_weights, setup_agent.agent_change, setup_agent.notice_id, setup_agent.connections, setup_agent.registrations, setup_core.settings_from_answers, setup_core.confirm_review, setup_core.undo_value, frontend/src/ui/AgentSetup.tsx, frontend/src/ui/SetupReport.tsx, skills/assetarium-setup/SKILL.md, scripts/verify-agent-setup-mcp.py, scripts/verify-agent-setup.py]
 verified: 2026-11-01
 branch: bugfix/mcp-registration-check
 ---
@@ -28,7 +28,7 @@ Decision: [0031](../../Decisions/0031-setup.md).
 - Tools are gated by tier, not by a session: read, apply and undo (recorded as the agent's, one
   `setup_changed` notice per day via `notice_id`), propose (the user applies), run (`validate_blender`).
 - Values the agent applies are recorded as set by the agent. The Blender path is only ever a
-  **proposal** (`PROPOSAL_STATES`: pending, applied, rejected, superseded, failed) that the user
+  **proposal** (pending, applied, rejected, superseded or failed) that the user
   applies after a fresh check in their own process.
 - While running, a server keeps `data/mcp/connections/<pid>.json`; the app shows "connected" only
   while that process is alive. There is no network listener, and the app never hosts the server.
@@ -44,7 +44,7 @@ Decision: [0031](../../Decisions/0031-setup.md).
 ## Rules
 
 - **Weight manifests stay out of the model contracts.** `docs/caption-model.json` and
-  `docs/embedding-model.json` bytes feed the overnight contract, the embedding vector identity and the search
+  `docs/embedding-model.json` bytes feed the embedding vector identity and the search
   speed test, so the file lists for `verify_weights` live in `docs/*-model-files.json`.
 - **Register agents only from the real checkout.** A verify run's panel shows snippets with the
   scratch fixture's paths (`setup_agent.snippets`); one registered at user scope made every agent

@@ -72,6 +72,6 @@ per text vector in BF16, 2–10 s model load; vectors within 0.998 cosine of FP3
 embedder's threads from Settings → General → Search, else the speed test's choice, else every
 logical thread (Torch defaults to one per physical core): 0.83–0.89 s per image at 24–32 threads on
 the same CPU, vectors bit-identical at any count, so no index changes (batches of 4–8 images and
-preparing each image once were measured and gave no gain; decision 0022). Every rendered view gets an image
+preparing each image once were measured and gave no gain; decision 0034). Every rendered view gets an image
 vector, so a 3D asset costs a few seconds to index. A local-server description run uses the app
 environment (`.venv-mcp`), so AMD and other GPUs need no description runtime at all.

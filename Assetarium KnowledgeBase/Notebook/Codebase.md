@@ -1,6 +1,6 @@
 ---
 tags: [hub]
-code: [src/local_asset_library, frontend/src, scripts, scripts/historical, runtime, skills, tests]
+code: [src/local_asset_library, frontend/src, scripts, runtime, skills, tests]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -18,7 +18,7 @@ read it first. Up: [Notebook](Notebook.md).
 | `frontend/` | React + TypeScript source of the desktop UI; builds into `src/local_asset_library/ui/build/` (committed) |
 | `src/local_asset_library/ui/` | `index.html`, the sandboxed viewer (`viewer.html`, `viewer.js`, `interactive-preview.js`), `build/`, `vendor/` |
 | `runtime/{mcp,caption,embedding,embedding-cpu}/` | Separately pinned uv projects behind the wrappers in `scripts/` ([Runtimes](Platform%20and%20Storage/Runtimes.md)) |
-| `scripts/` | Wrappers, `library-batch.py`, `verify-*.py` WebView2 checks, evidence and maintenance tools; `scripts/historical/` holds tools tied to the original pilot and library |
+| `scripts/` | Wrappers, `library-batch.py`, `verify-*.py` WebView2 checks, evidence and maintenance tools |
 | `tests/` | pytest suite, synthetic fixtures, real Blender fixtures (`conftest.py` prints a `Real-Blender tests:` line) |
 | `skills/` | Agent-facing skills shipped to users: `local-asset-library` (MCP usage), `assetarium-setup` |
 | `docs/` | User manual, plus JSON manifests and evidence that code reads ([Home](../Home.md#user-manual-outside-the-vault)) |
@@ -41,17 +41,16 @@ read it first. Up: [Notebook](Notebook.md).
   and `agent_practice_assets` (Try your agent), `transient` (practice log/cache isolation), `image_kinds` (model texture, material texture or 2D
   image), `library_view` (the Asset sources tab's tree, states and folder contents), `folder_view`
   (the small per-catalog views those tabs read instead of whole records),
-  `library_migration` (the one-time move into the store; the only code naming the old folder),
-  `source_operations`, `source_storage`, `source_browser`, `catalog`, `catalog_migration`,
+  `source_operations`, `source_storage`, `source_browser`, `catalog`,
   `asset_structure`, `image_catalog`, `membership`, `recheck`, `texture_folders`. The October 14
-  migration is `scripts/historical/source_migration.py`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
+  migration script was removed in November 2026; in git history at commit `af02e91`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
 - **Processing:** `incremental` (stage ledger and publication), `result_store` (results keyed by
   inputs, the result index, reuse for duplicates and moved files), `processing_queue` (Make
   previews / Generate descriptions queue), `inspection`, `blender_worker`,
   `blender_batch_worker`, `render_pool`, `render_devices`, `render_math`, `texture_repair`,
   `blender_repair_worker`, `blender_shared_dependency_worker`, `dependency_resolution`,
   `dependency_overrides`, `image_inspection`, `image_media`, `svg_worker`, `captions`,
-  `caption_backend`, `caption_batching`, `caption_quality`, `caption_review`, `overnight`,
+  `caption_backend`, `caption_batching`, `caption_quality`,
   `library_index`, `gpu_queue`. See [Processing](Processing/Processing.md).
 - **Search:** `retrieval`, `search_policy`, `library_cache`, `embedding_backend`, `embedding_cpu`,
   `search_speed`, `evaluation`. See [Search](Search/Search.md).
@@ -91,8 +90,7 @@ read it first. Up: [Notebook](Notebook.md).
 - **Before renaming anything, check whether the file is hashed into a fingerprint.** Editing
   `caption_backend.py`, `caption_batching.py`, `engine_server.py`, the Blender workers
   (`blender_worker.py`, `render_math.py`, repair workers) or a `runtime/*/uv.lock` sends finished
-  descriptions or inspections back to pending (`incremental.py`, decision 0022). Search-index
+  descriptions or inspections back to pending (`incremental.py`, decision 0028). Search-index
   metadata names are not fingerprint inputs: vector reuse keys on each vector's own fingerprint.
-- `scripts/historical/` scripts need the original owner's data and asset IDs from the original
-  pilot (history); some call code removed since, so run them from an older checkout. They are not
-  general tools.
+- The pilot-era and one-time scripts (`scripts/historical/`) were removed in November 2026: they needed
+  the original owner's data and called code removed since. Run them from commit `af02e91` or earlier.

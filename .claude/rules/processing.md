@@ -11,7 +11,6 @@ paths:
   - "src/local_asset_library/svg_worker.py"
   - "src/local_asset_library/caption*.py"
   - "src/local_asset_library/captions.py"
-  - "src/local_asset_library/overnight.py"
   - "src/local_asset_library/library_index.py"
   - "src/local_asset_library/gpu_queue.py"
   - "scripts/library-batch.py"

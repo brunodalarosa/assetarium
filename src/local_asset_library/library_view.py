@@ -1,4 +1,4 @@
-"""The Asset sources tab: library folders → bundles → packs → folders, with work states (decision 0023).
+"""The Asset sources tab: library folders → bundles → packs → folders, with work states (decision 0032).
 
 Read only. Built from each folder's working catalog and inventory (never a scan), cached by their identity.
 Each asset has one work state (no previews yet, queued, running, ready, blocked, failed, missing, excluded)
@@ -176,8 +176,7 @@ def folder_tree(config, source, blocked=None):
 
 
 def tree(config):
-    """Every library folder with its tree, what needs the owner, and the migration notice."""
-    from .library_migration import needed
+    """Every library folder with its tree and what needs the owner."""
     from .library_store import missing_count, revision
     from .sources import registry, source_status
     folders, blocked = [], blockers(config)
@@ -198,10 +197,9 @@ def tree(config):
                         'texture_suggestion': status.get('texture_suggestion'), 'texture_folder': status.get('texture_folder'),
                         'scan_fault': status.get('scan_fault'), 'operation': status.get('operation'),
                         'scanned_utc': status.get('scanned_utc')})
-    migration = needed(config)
-    return {'status': 'ready', 'folders': folders, 'migration': migration, 'blockers': list(blocked.values()),
+    return {'status': 'ready', 'folders': folders, 'blockers': list(blocked.values()),
             'types': [{'id': i, 'label': label} for i, label in TYPES],
-            'attention': bool(migration.get('needed') or any(f['attention'] for f in folders))}
+            'attention': any(f['attention'] for f in folders)}
 
 
 ITEM = 'asset_id, name, kind, state, reason, folder, formats, has_preview, path, description, warning'
@@ -247,7 +245,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     new = _new_ids(config, source)
     state, state_params, reason, reason_params = state_sql(blockers(config))
     where, params = asset_scope_sql(path)
-    where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0026).
+    where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0030).
     if filters.get('types'):
         where += f" AND kind IN ({','.join('?' * len(filters['types']))})"
         params += list(filters['types'])
@@ -367,7 +365,7 @@ def locate(config, asset_id):
 
 
 def record_visit(config, key):
-    """The owner looked at this folder: its "+N new" counts from now (decision 0023 open point: resets on visit)."""
+    """The owner looked at this folder: its "+N new" counts from now (decision 0032 open point: resets on visit)."""
     from .library_store import now, save_answer
     from .sources import get_source
     source = get_source(config, key)

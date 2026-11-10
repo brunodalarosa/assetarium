@@ -1,4 +1,4 @@
-"""Real WebView2 check of Setup (decision 0014) on isolated synthetic projects, in light and dark.
+"""Real WebView2 check of Setup (decision 0031) on isolated synthetic projects, in light and dark.
 
 Phase "fresh": an empty project with the shipped example config opens setup by itself; every step,
 Back/Next/Skip, arrow keys and focus, a failing and a passing Blender check, a fake local model
@@ -36,7 +36,7 @@ OUT = ROOT / 'data/gui' / args.run_name
 FIXTURE = ROOT / 'scratch' / args.run_name / args.phase
 OUT.mkdir(parents=True, exist_ok=args.phase == 'existing')
 FIXTURE.mkdir(parents=True, exist_ok=False)
-shutil.copytree(ROOT / 'samples', FIXTURE / 'samples')  # The built-in samples, as a fresh clone has them (decision 0026).
+shutil.copytree(ROOT / 'samples', FIXTURE / 'samples')  # The built-in samples, as a fresh clone has them (decision 0031).
 os.environ.update(PYTHONNET_RUNTIME='netfx', TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
 report = {'status': 'running', 'phase': args.phase, 'checks': {}, 'screenshots': [], 'synthetic_only': True,
           'owner_visual_review': 'pending', 'real_model_load': False}
@@ -294,7 +294,7 @@ def existing():
     ui.js("(async()=>{$('setup-close').click();await until(()=>!$('setup-wizard'));$('nav-processing').click();"
           "await until(()=>$('processing-view')&&lal.state.queue);await frame();return true})()")
     one = ui.js("lal.state.sources[0].key")
-    # Descriptions off (decision 0008): nothing offers Generate descriptions, and the queue refuses it with the reason.
+    # Descriptions off (decision 0033): nothing offers Generate descriptions, and the queue refuses it with the reason.
     queued = ui.js(f"lal.state.api.queue_add('descriptions',{{key:{json.dumps(one)}}},false)")
     assert queued['status'] == 'faulty' and 'turned off' in queued['reason'], queued
     ui.check('descriptions_off_removes_generate_descriptions', "!document.querySelector('[data-action=describe]')")

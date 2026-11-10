@@ -1,4 +1,4 @@
-"""Real parallel processing through the source coordinator (decision 0022), on a temporary source of
+"""Real parallel processing through the source coordinator (decision 0034), on a temporary source of
 twelve synthetic models: renders run several at a time on the planned device, a cancel (what closing
 the app does) settles every running render, a killed processing run takes its Blender processes with
 it, and the next Process assets finishes the rest with no asset fault. Originals stay byte-identical.

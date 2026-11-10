@@ -48,7 +48,7 @@ as the old name of `library …`.
 | `packs merge KEY FOLDER` | Merge into parent pack (rescans) |
 | `packs split KEY FOLDER` | Make this a pack (rescans) |
 | `packs reset KEY FOLDER` | Forget a merge or split; detection decides again (rescans) |
-| `packs signals KEY` | Which packs need a structure, and why (decision 0024) |
+| `packs signals KEY` | Which packs need a structure, and why (decision 0035) |
 | `packs profile KEY PACK` | A pack's profile rules and its versions (`""` is the library folder itself) |
 | `packs export KEY PACK --output FILE` | Write a pack profile file outside the library folder |
 | `packs apply KEY PACK [FILE] [--rules JSON] [--yes]` | Show a profile's effect, then make it the pack's profile (asks first; a file must match 80% of the pack's names) |
@@ -81,22 +81,6 @@ runtime missing) is never queued: the command names the fix instead.
 is kept; a second Ctrl+C only stops watching while the cancel completes. The work runs as its own process,
 so closing the terminal does not stop it; `--follow` reattaches. Recorded failures are never retried by
 these commands.
-
-## The one-time library migration
-
-Results from before the library store live in a `metadata` folder inside each old source. Move them into
-the store once, with the app and MCP servers closed (base runtime; nothing renders or is described again):
-
-```powershell
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets"
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --library-folder "D:\Game Assets" --apply
-.\scripts\uv.ps1 run --locked python scripts/migrate-library.py --remove-old
-```
-
-The first run is a dry run that writes a plan to `data/library/migration/`; `--apply` asks for a typed `yes`,
-imports, verifies and writes a receipt, printing progress; run `--apply` again after a fault to import the
-folders that failed and check unverified ones again; `--remove-old` deletes only verified old folders, asking for each.
-See [Library](asset-sources.md#moving-results-into-the-library-store).
 
 `process --stage inspection|caption|embeddings` is the existing stage-level
 maintenance command (used by `library-batch.py`) and is unchanged.
@@ -211,7 +195,7 @@ their fingerprint), so it needs `--confirm-rerender` when processed assets exist
 | Command | Notes |
 | --- | --- |
 | `collections list [TEXT]` | Same search as the Collections tab |
-| `collections export ID --format json\|png\|md [--output FILE]` | Default `data/exports/collections/<name>`; `--output` must stay under `data/exports` (decision 0012). PDF needs the desktop app |
+| `collections export ID --format json\|png\|md [--output FILE]` | Default `data/exports/collections/<name>`; `--output` must stay under `data/exports` (decision 0036). PDF needs the desktop app |
 | `collections delete ID` | Deletes the collection with its labels and notes; the assets are not affected |
 
 Creating and editing collections and tags is available to agents through the MCP
@@ -221,7 +205,7 @@ tools (`edit_collection`, `tag_assets`) and in the desktop app.
 
 `library remove` and `collections delete` ask you to type `yes`, like the app's red
 confirmations. They refuse to run without an interactive terminal and have no
-bypass flag: agents can run commands, and only the owner deletes (decision 0012).
+bypass flag: agents can run commands, and only the owner deletes (decision 0036).
 Replacing an existing export file asks the same way.
 
 ## Agents (MCP)

@@ -9,7 +9,7 @@ branch:
 ---
 # Assetarium v2 expansion
 
-Up: [Architecture](../Architecture.md) · Status: [Status](../../Status.md). The owner's roadmap, moved from `docs/next version plan/` on 2026-10-28; execution prompts per milestone are in [Prompts](Prompts/01-asset-foundation.md).
+Up: [Architecture](../Architecture.md) · Status: [Status](../../Status.md). The owner's roadmap, moved from `docs/next version plan/` on 2026-10-28.
 
 Prepared October 18, 2026. Status: steps 1 and 2 approved and technically complete
 (step 2 on October 20, including SVG); owner acceptance of both remains pending.
@@ -36,9 +36,8 @@ Read-only investigation may prepare this checkpoint. Confirm it again if the sco
 | --- | --- |
 | Existing repository | this checkout |
 | This reference | `KnowledgeBase/Architecture/Roadmap/Expansion plan.md` |
-| Expansion launch prompts | `KnowledgeBase/Architecture/Roadmap/Prompts/01-asset-foundation.md` through `08-shaders.md` |
 | Source originals | Existing configured source roots; read only |
-| Generated results | The library store (`[storage].library`, decision 0023) |
+| Generated results | The library store (`[storage].library`, decision 0032) |
 | Combined indexes, caches, settings, reports | Existing project-local configured storage |
 | Shared model revisions | Configured `[storage].models` |
 | Implementation agent | Scoped implementation, migrations, verification, receipts, and handoff |
@@ -51,7 +50,7 @@ Preserve the existing project and neighboring projects. Do not recreate the repo
 Read-only planning inspection on October 18, 2026 found:
 
 - The catalog and processing pipeline are centered on logical 3D models. Inventory recognizes texture and preview images, but generic images are not yet first-class searchable assets. Format-selection settings are also model-oriented.
-- The current pipeline has inspection, caption, and embedding stages, with immutable publication generations, source-side generated results, owner overlays, fault records, and shared desktop/MCP retrieval. Under decisions 0007-0008, **Process assets** performs inspection/previews and image search vectors, then publishes; optional **Generate descriptions** separately batches missing descriptions, builds description vectors, then publishes. Importing never generates descriptions.
+- The current pipeline has inspection, caption, and embedding stages, with immutable publication generations, source-side generated results, owner overlays, fault records, and shared desktop/MCP retrieval. Under decision 0033, **Process assets** performs inspection/previews and image search vectors, then publishes; optional **Generate descriptions** separately batches missing descriptions, builds description vectors, then publishes. Importing never generates descriptions.
 - `blender_worker.py` enumerates armatures/actions and explicitly does not play or behaviorally validate them. Enumeration is not animation support.
 - Captioning uses `Qwen/Qwen3-VL-2B-Instruct`, pinned in `docs/caption-model.json`. The active adapter consumes actual images. Video support advertised by the publisher has not been validated in Assetarium.
 - Embeddings use `google/embeddinggemma-2`, pinned in `docs/embedding-model.json`, with normalized 768-dimensional vectors. `embedding_backend.py` explicitly disables audio using `audio_config=None`; its current contract accepts text and image only.
@@ -107,27 +106,33 @@ Never silently reuse vectors across changed model/runtime/preprocessing contract
 
 ### Existing decisions remain binding
 
-- **[0001](../../Decisions/Decisions.md#replaced):** New entry points use `load_project_config` or `project_config_path`: ignored `config.local.toml` takes precedence over tracked `config.example.toml`.
-- **[0002](../../Decisions/0002-startup-scan-and-change-detection.md):** Scan enabled sources in the background at every launch without models or rendering. Unchanged content, including timestamp-only refreshes, must not rewrite scan/status files or bump views. Poll cheap stat tokens through `changes()` every 1.5 s; fetch data on changed tokens or while source operations run. Preserve visible cards through `refreshContext`. Do not add heavy periodic polls or manual Scan/Status controls; **Refresh published view** and **Importing failures report** remain.
-- **[0003](../../Decisions/0003-per-publication-read-caches.md):** Reuse publication-identity read caches and per-file-stat digests/classification reads. Add required list/filter fields to `library_cache.slim` without mutating shared records; detail reads full records. Processing/indexing must read fresh full records through `membership.records`, never cached slim records.
-- **[0028](../../Decisions/0028-result-identity.md):** Route runtime hashes through `verified_hash` and the shared `cache/file-hashes.sqlite`; scans seed it. Reuse requires unchanged file identity; missing/busy/corrupt cache data means hashing bytes again. Changed/replaced/missing required source or preview files still cause the appropriate exclusion/fault; unusable descriptions follow 0008 instead. Fresh byte audits and removal checks stay fresh. Preserve source/link boundaries, preview-identity thumbnail caching, and source verification in detail/`get_asset`; do not add another hash cache.
-- **[0005](../../Decisions/0005-embedding-worker-and-prestart.md):** Keep the worker protocol to `contract`/`text`/`image`, with embedding requests returning vectors; catalog verification, validated vector matrices, keyword search, and ranking stay in the caller. Desktop pre-starts libraries at launch without a model/GPU lease; MCP starts its worker on the first semantic query. Load the model only for semantic requests under the GPU lease, unload after 10 idle minutes or immediately for a processing/peer GPU request, and retain 5 s busy heartbeats/90 s silence fault handling. Busy-queue/stopped-worker `TransientFault` errors are not retained per-query faults; keyword search never contacts the worker. Keep stdout protocol-only and settings/source actions/`changes()` outside the presentation lock. Audio/video operations require an owner-approved amendment.
-- **[0006](../../Decisions/0006-retention.md):** After each combined publication, retain the active generation plus the two newest older `v_*` generations centrally and in each source; remove shortcuts to retired generations, leave work/scan folders alone, and do not fail publication on a retention fault. Keep the ten newest launch audits in `data/gui/runs`; do not touch other GUI evidence or MCP runs. Reuse `scratch/pytest`; old scratch needs the explicit cleanup plan/apply workflow. Removal uses `maintenance_files`, fresh hashes, link containment/refusal rules, changed-file faults, and receipts under `data/maintenance/`. This roadmap does not broaden those exact cleanup locations or authorize other evidence deletion.
-- **[0033](../../Decisions/0033-descriptions-and-engines.md):** Preserve image-description batching, per-asset outcomes, completed fingerprints and generation provenance. GPU-memory exhaustion stops with assets pending and no smaller-batch retry. Changing the batch-size preference never re-queues descriptions. Validate new modality contracts separately.
-- **[0033](../../Decisions/0033-descriptions-and-engines.md):** Importing never generates descriptions. Reuse separate per-source **Generate descriptions**, description vectors, and notifications. Missing/failed descriptions neither gate usable imports nor appear as import failures; unusable descriptions silently leave only their search channel. Retain failure evidence and never retry recorded failures without an explicit request.
+Every record in [Decisions](../../Decisions/Decisions.md) binds each milestone; read the ones for the area a
+milestone touches before planning it. The ones every milestone meets:
+
+- **[0027](../../Decisions/0027-saved-catalog-first-and-fast-scan.md):** scans run in the background, never run models, write nothing when nothing changed, and views learn of changes through `changes()` tokens.
+- **[0028](../../Decisions/0028-result-identity.md):** results are keyed by their inputs; a new modality needs its own key, and changing a key re-keys finished work instead of re-queuing it.
+- **[0032](../../Decisions/0032-library-store-and-queue.md):** nothing is written into asset folders; results live in the library store; processing goes through the queue.
+- **[0033](../../Decisions/0033-descriptions-and-engines.md):** descriptions are optional and separate from importing; batching, out-of-memory stops and notifications stay as they are. Validate a new modality's contract separately.
+- **[0006](../../Decisions/0006-retention.md):** the active generation plus two older ones are kept; `scratch/pytest` is reused.
+- **[0009](../../Decisions/0009-general-capabilities.md):** every capability is a general system feature, never a rule for one pack or publisher.
+
+Two designs that are not decisions but that new media types must respect: the read caches
+([Hash reuse and caches](../../Notebook/Search/Hash%20reuse%20and%20caches.md): a field that list or search views
+need must be kept by `library_cache.slim`) and the search worker
+([Search embedders](../../Notebook/Search/Search%20embedders.md): it only returns vectors).
 
 ## Milestone sequence
 
-| Step | Deliverable | Prerequisites | Prompt |
-| --- | --- | --- | --- |
-| 1 | Shared asset structure and type-aware stage dispatch | Current implementation review | [01](Prompts/01-asset-foundation.md) |
-| 2 | Static sprites, icons, and images | 1 | [02](Prompts/02-static-2d-images.md) |
-| 3 | Sprite sheets, atlases, animated 2D | 2 | [03](Prompts/03-sprite-sheets-and-animation.md) |
-| 4 | Textures and material sets | 2; builds on 3's relationships where useful | [04](Prompts/04-textures-and-materials.md) |
-| 5 | Audio playback, metadata, direct audio search | 1 and established search/preview conventions from 2 | [05](Prompts/05-audio-playback-and-search.md) |
-| 6 | Evaluated audio descriptions | 5 | [06](Prompts/06-audio-descriptions.md) |
-| 7 | Selectable 3D animation clips | 1 and temporal/sub-asset conventions from 3 | [07](Prompts/07-3d-animation-clips.md) |
-| 8 | Shader catalog, then one engine preview adapter | 1-2; reuse relevant dependencies/temporal work from 4 and 7 | [08](Prompts/08-shaders.md) |
+| Step | Deliverable | Prerequisites |
+| --- | --- | --- |
+| 1 | Shared asset structure and type-aware stage dispatch | Current implementation review |
+| 2 | Static sprites, icons, and images | 1 |
+| 3 | Sprite sheets, atlases, animated 2D | 2 |
+| 4 | Textures and material sets | 2; builds on 3's relationships where useful |
+| 5 | Audio playback, metadata, direct audio search | 1 and established search/preview conventions from 2 |
+| 6 | Evaluated audio descriptions | 5 |
+| 7 | Selectable 3D animation clips | 1 and temporal/sub-asset conventions from 3 |
+| 8 | Shader catalog, then one engine preview adapter | 1-2; reuse relevant dependencies/temporal work from 4 and 7 |
 
 The recommended execution order is 1-8. Dependencies describe actual prerequisites, not permission to run independent work in parallel. Each stage includes its own app/MCP integration and evaluation; these are not postponed to a final integration phase.
 
@@ -161,9 +166,9 @@ Done when: a user can select a sheet, inspect known frames, play a defined seque
 
 ### Step 4 - Textures and material sets
 
-> **Draft change for owner review (asset library rework, decision 0023, D15):** individual texture records exist
+> **Draft change for owner review (asset library rework, decision 0032, D15):** individual texture records exist
 > now: images are classified as model textures, **material textures** (browsable, found by name) or 2D
-> images. This step covers only linked **material sets** on top of them ([prompt](Prompts/04-textures-and-materials.md)).
+> images. This step covers only linked **material sets** on top of them.
 
 Support individual texture records and linked material sets. Record resolution, map role, color-space evidence, channel packing, tiling/scale evidence, normal convention, and dependency completeness. Keep unsupported/unknown details explicit. Use manifests or reviewed conventions for grouping; same-stem names alone are tentative evidence.
 

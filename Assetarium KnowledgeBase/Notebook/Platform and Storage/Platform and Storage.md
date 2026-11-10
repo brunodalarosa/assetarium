@@ -1,7 +1,7 @@
 ---
 area: Platform and Storage
 tags: [hub]
-code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, scripts/storage-report.py, retention.py, scripts/check-caption-classification.py]
+code: [config.venv_python, config.runtime_command, scripts/uv.ps1, scripts/mcp-runtime.ps1, scripts/caption-runtime.ps1, scripts/embedding-runtime.ps1, scripts/storage-report.py, retention.py]
 ---
 # Platform and Storage
 
@@ -12,7 +12,7 @@ Up: [Notebook](../Notebook.md).
 
 - [Runtimes](Runtimes.md): the four uv environments, their wrappers and how to run tests.
 - [Storage discipline](Storage%20discipline.md): receipts, budgets, hard links, `scratch/`.
-- [Core features](Core%20features.md) and [Optional features](Optional%20features.md): what setup must leave working (decision 0026).
+- [Core features](Core%20features.md) and [Optional features](Optional%20features.md): what setup must leave working (decision 0031).
 - [Formats](Formats.md): formats Assetarium uses; which can be turned off and which are always read.
 - [Session logs](Session%20logs.md): one log file per app, MCP or CLI session, joined by its workers (`logs.py`).
 - [Retention](Retention.md) *(gap)*: superseded generations and launch audits (`retention.py`,
@@ -29,5 +29,4 @@ Up: [Notebook](../Notebook.md).
 ## Gotchas
 
 - Links into the vault from outside it must spell the folder `Assetarium%20KnowledgeBase/…`: a
-  plain space breaks Markdown links on GitHub. `docs/caption-contract.md` keeps the old
-  `KnowledgeBase/` path because `scripts/check-caption-classification.py` hashes its contents.
+  plain space breaks Markdown links on GitHub.

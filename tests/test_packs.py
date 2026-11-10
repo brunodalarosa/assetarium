@@ -1,4 +1,4 @@
-"""Packs from folder structure and image kinds from layered evidence (decision 0023)."""
+"""Packs from folder structure and image kinds from layered evidence (decision 0032)."""
 from pathlib import Path
 
 import numpy as np

@@ -1,4 +1,4 @@
-"""Pack structure tools for agents and the app's Agent activity (decision 0024)."""
+"""Pack structure tools for agents and the app's Agent activity (decision 0029)."""
 import json
 
 import pytest

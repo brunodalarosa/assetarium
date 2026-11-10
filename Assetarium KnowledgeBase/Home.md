@@ -29,11 +29,10 @@ Install, use and operate the app: [README](../README.md) ·
 [Asset sources](../docs/asset-sources.md) · [Command line](../docs/cli.md) ·
 [Desktop app](../docs/gui/README.md) · [Interactive 3D preview](../docs/gui/3d-preview.md) ·
 [Agents (MCP)](../docs/mcp/README.md) · [Description engines](../docs/description-engines.md) ·
-[Overnight descriptions](../docs/overnight-descriptions.md) ·
 [Shared texture dependencies](../docs/dependency-path-overrides.md) ·
 [Shared model storage](../docs/model-storage.md) · [Linux](../docs/linux.md).
 Evidence and contracts that code reads stay in `docs/` as well: the `*.json` manifests,
-`docs/caption-contract.md`, `docs/evaluation/` and `docs/mcp/*.json` (hash-bound).
+`docs/caption-contract.md`, and the hash-bound `docs/evaluation/` and `docs/mcp/*.json`.
 History: [docs/history](../docs/history/README.md), including the frozen
 [progress journal](../docs/history/progress-2026-10.md).
 

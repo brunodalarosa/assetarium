@@ -1,7 +1,7 @@
 ---
 area: Desktop App
 tags: [system]
-code: [scripts/gui_harness.py, scripts/gui_harness.isolate_hash_cache, tests/ui_text.py, scripts/verify-asset-sources.py, scripts/verify-setup-wizard.py, scripts/verify-loading-states.py]
+code: [scripts/gui_harness.py, scripts/gui_harness.isolate_hash_cache, tests/ui_text.py, scripts/verify-asset-sources.py, scripts/verify-setup-wizard.py]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -26,6 +26,10 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
 
 ## Gotchas
 
+- **Every `store.ts` export is reachable as `window.lal.<name>`** (`frontend/src/main.tsx`), from verify
+  scripts and from `desktop.py` (`askClose`). "No importer in `frontend/src`" does not mean unused: search
+  `scripts/` and `src/` for the name too.
+
 - **Routes are not in `location.hash`.** Wait on `lal.state.history[lal.state.historyIndex].page` (for example `'sources'`) to see where `navigate` went.
 
 - **A restart can be simulated.** Set a flag (`window.__beforeRestart=true`), call
@@ -38,8 +42,9 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   `MutationObserver` (for example on `aria-pressed`), not a sampling timer. See the browsing check in
   `scripts/verify-interactive-preview.py`.
 
-- **A fixture with no registered sources opens setup**, which covers the window and swallows global keys.
-  Close it after `ui.wait_ready()` with `lal.closeSetup()`.
+- **A fixture with no registered sources opens setup**, which covers the window, swallows global keys and makes
+  the page behind it inert (nothing there takes focus). It opens shortly *after* `ui.wait_ready()` returns, so
+  wait for `lal.state.setup.open` before `lal.closeSetup()` (see `scripts/verify-library-gui.py`).
 
 - `verify-setup-wizard.py`'s opening-focus check (`opens_by_itself_on_a_fresh_install` → `focus`)
   failed on unchanged `develop` when launched from an agent session on 2026-10-28; treat a failure there

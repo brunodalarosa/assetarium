@@ -1,4 +1,4 @@
-"""Owner maintenance: drop hash records for paths that no longer exist (decision 0004).
+"""Owner maintenance: drop hash records for paths that no longer exist (decision 0028).
 
 The record is an accelerator, never evidence; pruning costs at most one re-hash per file.
 Stop the app, the MCP server and processing first. Writes a receipt under data/storage/.

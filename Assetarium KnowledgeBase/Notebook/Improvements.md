@@ -28,8 +28,6 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
   Seen: 2026-11-05
 - **The full test suite takes minutes and needs real Blender**: a skipped Blender fixture counts as
   unverified. Targeted runs (`tests/test_<area>.py`) are the everyday path. Seen: 2026-10-28
-- **`scripts/verify-loading-states.py` is stale**: it waits for `#source-warnings-loading`, which the
-  rebuilt Asset processing tab no longer has, so it fails before its later checks. Seen: 2026-10-31
 - **No process memory probe in the runtimes**: `.venv-mcp` has no `psutil`, so measuring peak memory
   needed a `kernel32.K32GetProcessMemoryInfo` ctypes snippet (`PeakWorkingSetSize`). A small helper
   in `scripts/gui_harness.py` would make memory checks repeatable. Seen: 2026-10-31
@@ -47,13 +45,15 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **Evidence lives in the owner's ignored `data/`**: verification reports, receipts and
   screenshots cited in docs and pull requests can't be opened by other contributors. Summarize
   the outcome in the PR; cite `data/` paths only as the owner's local record. Seen: 2026-10-28
-- **Search capability receipt on a fresh install**: `scripts/historical/embedding_capability.py`
-  uses the original pilot asset IDs, so a fresh install can't record it the historical way (see
-  [Inference ports](../Architecture/Setup%20and%20Engines/Inference%20ports.md#known-debt-and-direction)). Seen: 2026-10-26
 
-- **Three GUI verify scripts fail on `develop`**: `verify-gui` and `verify-library-retrieval` expect an
-  MCP tool list that predates the pack tools, and `verify-library-gui --synthetic` fails its arrow-key
-  card focus check. Tracked in the owner's task notes. Seen: 2026-11-07
+- **A git worktree has no `.venv*` or `node_modules`**: the wrappers point at environments inside the
+  checkout they are in. Tests ran with the main checkout's `.venv-mcp` interpreter and `PYTHONPATH` set to
+  the worktree's `src`; the frontend build needed a temporary `node_modules` link, removed afterwards.
+  Seen: 2026-11-09
+- **Verify scripts go stale without anyone noticing**: nothing runs them automatically, so four failed on
+  `develop` for days (an old MCP tool list, an old search limit, a pack ID from before packs followed folder
+  structure, a removed viewer control, the setup overlay opening after the script's check). A scheduled run
+  of the synthetic ones would catch this. Seen: 2026-11-09
 
 ## Codebase-wide
 

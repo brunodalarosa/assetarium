@@ -38,7 +38,7 @@ export function AgentButton() {
   );
 }
 
-/** App-wide Agent activity (decision 0024): who is connected, proposals waiting for you and everything agents did. */
+/** App-wide Agent activity (decision 0029): who is connected, proposals waiting for you and everything agents did. */
 export function AgentActivityPanel() {
   const agent = useApp((s) => s.agent);
   const panelRef = useRef<HTMLElement>(null);

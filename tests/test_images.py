@@ -128,7 +128,7 @@ def test_every_image_is_enrolled_by_kind_and_model_dependencies_or_sheets_never_
     assert 'Game Icons' in potion['type_metadata']['suggested_purpose']['evidence']
     assert potion['type_metadata']['identical_content']['asset_ids'] == [images['image:Pixel/copy']['asset_id']]
     assert potion['processing']['caption'] == 'pending' and potion['file_roles'] == {potion['files'][0]['path']: 'primary'}
-    # IDs are stable across rescans; every source enrolls its images (decision 0023).
+    # IDs are stable across rescans; every source enrolls its images (decision 0032).
     assert {k: r['asset_id'] for k, r in scoped_records(config, source).items()} == {k: r['asset_id'] for k, r in found.items()}
     other = tmp_path / 'other'
     (other / 'Icons').mkdir(parents=True)

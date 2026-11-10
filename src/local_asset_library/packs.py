@@ -1,4 +1,4 @@
-"""Packs and bundles detected from folder structure, never from publisher names (decisions 0019, 0023).
+"""Packs and bundles detected from folder structure, never from publisher names (decisions 0019, 0032).
 
 A pack is the folder closest to the assets that carries pack markers (a license, a readme, a preview image,
 internet shortcuts, a versioned name). A folder whose children hold packs is a bundle. Without markers, the
@@ -99,7 +99,6 @@ _lock = threading.Lock()
 
 def structure(config, source, view=None):
     """Packs of a scanned library folder from its working catalog's view (``folder_view``), cached by view and answers."""
-    from contextlib import closing
     from .folder_view import connect
     from .incremental import working
     from .library_store import answers

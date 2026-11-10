@@ -3,7 +3,7 @@
 Thin wrappers over the backend calls the desktop app makes, so no rule lives here
 (decision 0011: the backend is the authority). Works the same in PowerShell and a
 POSIX shell. Removing a source or deleting a collection needs an interactive
-terminal: agents can run commands, and only the owner deletes (decision 0012).
+terminal: agents can run commands, and only the owner deletes (decision 0036).
 """
 import argparse
 import json
@@ -484,7 +484,7 @@ def sources_command(args, config):
 
 
 def profile_command(args, config, source):
-    """Pack profiles from the terminal (decision 0024): signals, rules and versions, export, apply, revert."""
+    """Pack profiles from the terminal (decision 0035): signals, rules and versions, export, apply, revert."""
     from . import pack_profiles
     if args.action == 'signals':
         found = pack_profiles.signals(config, args.key)
@@ -778,7 +778,7 @@ REGISTRATION_STATES = {'ok': 'starts this copy of Assetarium.', 'missing': 'star
 
 
 def agent_command(args, config):
-    """How to connect an agent; deciding its proposals is a user gesture: interactive terminal only, no flag (decision 0016)."""
+    """How to connect an agent; deciding its proposals is a user gesture: interactive terminal only, no flag (decision 0029)."""
     from . import setup_agent
     if args.agent_action == 'check':
         found = setup_agent.registrations(config.project_root)
@@ -859,7 +859,7 @@ def setup_command(args, config):
 
 
 def search_check_command(args, config):
-    """The search check (decision 0026) on built-in sample images; Make previews also runs it by itself when missing."""
+    """The search check (decision 0031) on built-in sample images; Make previews also runs it by itself when missing."""
     from . import engines
     from .source_operations import start
     if engines.capability_ready(config, engines.search_device(config))['ready']:

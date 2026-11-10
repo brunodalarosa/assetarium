@@ -44,7 +44,6 @@ export interface Bridge {
   retry_failures(key: string, previewId: string): Promise<Json>;
   choose_source_directory(): Promise<Json>;
   browse(filters: Json, offset: number, pageSize: number): Promise<Json>;
-  source_browse(key: string, offset: number, pageSize: number): Promise<Json>;
   search(settings: Json): Promise<Json>;
   copy_text(text: string): Promise<Json>;
   preview_shell(): Promise<Json>;

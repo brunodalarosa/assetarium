@@ -45,7 +45,7 @@ export interface BlenderPickerProps {
   onChoose: () => void;
 }
 
-/** Choose and check a Blender executable (decision 0014); shared by the setup wizard and Settings → General. */
+/** Choose and check a Blender executable (decision 0031); shared by the setup wizard and Settings → General. */
 export function BlenderPicker({ idPrefix, report, path, check, checking, confirmRerender, saveNote, onPath, onConfirm, onCheck, onCancel, onChoose }: BlenderPickerProps) {
   if (!report) return <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Looking for Blender (nothing is run yet)…</p>;
   const paths: string[] = report.candidates.map((c: Json) => c.path);

@@ -2,68 +2,51 @@
 tags: [architecture]
 parent: "[Architecture](../Architecture.md)"
 status: draft
-verified:
-branch:
+verified: 2026-11-10
+branch: feature/audit-simplify
 level: system
-code: [caption_quality.py, caption_review.py, scripts/record_caption_review.py]
+code: [caption_quality.py, scripts/record_caption_review.py]
 ---
 # Caption severity in the desktop app and agent results
 
-Up: [Architecture](../Architecture.md) · Where in code: [Descriptions](../../Notebook/Processing/Descriptions.md). Moved from `docs/caption-quality.md` on 2026-10-28. `AGENTS.md` and the `local-asset-library` skill point here.
+> How a finding about a description is graded, and what each grade does. `AGENTS.md` and the
+> `local-asset-library` skill point here. Rewritten on 2026-11-10; the pilot's review counts it used to
+> carry are in git (commit `af02e91`).
 
-Assetarium uses a practical severity classification, separate from the original
-AI caption review. A successful search or usable source does not require
-every caption detail to be accurate. Caption findings never exclude an otherwise
-usable source or alter search ranking.
+Up: [Architecture](../Architecture.md) · Where in code: [Descriptions](../../Notebook/Processing/Descriptions.md) ·
+The description itself: [caption contract](../../../docs/caption-contract.md).
 
-| Status | Meaning | Desktop presentation |
+A successful search or a usable asset does not need every detail of its description to be right.
+**A finding never excludes an otherwise usable asset and never changes search ranking.**
+
+| Status | Meaning | In the app |
 | --- | --- | --- |
-| `clear` | No recorded caption findings; this does not mean owner approval | No caption badge |
-| `review_note` | Minor precision or uncertain detail; broad identity remains useful | Note in asset detail; no caption badge |
-| `warning` | Meaningful descriptive error or interpretation that could mislead selection | Caption warning badge and detail explanation |
-| `fault` | Caption processing failed/incomplete, or there is no usable description | Caption fault badge and recorded fault |
-| `pending` | Description generation has not started; no generation provenance or caption fault exists | No fault badge; coverage reports captions pending |
+| `clear` | No recorded finding. This is not owner approval | No badge |
+| `review_note` | A minor precision or an uncertain detail; the broad identity is still useful | A note in asset detail; no badge |
+| `warning` | A descriptive error or interpretation that could mislead a choice | A warning badge and an explanation in detail |
+| `fault` | Generation failed or was incomplete, or there is no usable description | A fault in detail with the recorded reason |
+| `pending` | Generation has not started; there is no provenance and no fault | No badge; counted as pending |
 
-The approved reclassification contains **16 assets with review notes, 14 with
-warnings, 1 failed caption, and 9 with no recorded findings**. All original 32
-visual findings remain available. Examples: the apple's exact polygon count is a
-note; a road bridge described as furniture is a warning; road-crossroad's failed
-caption remains a fault. These are classifications of existing evidence, not new
-visual inspections, caption corrections, or owner approval.
+Examples: an apple whose exact polygon count is uncertain is a note; a road bridge described as furniture is
+a warning; a description that never finished is a fault.
 
-`docs/caption-review-classification.json` holds individually recorded severities
-and reasons, bound to the asset ID and a digest of the stored description,
-generation fingerprint and original visual findings. Changed captions/evidence,
-missing classifications, malformed records or incomplete coverage leave the
-findings visible as warnings. This file cannot downgrade failed/unusable captions.
+## Rules
 
-The validator adds its own notes: use wording in a description ("designed for use in
-games") is recorded as a `review_note` in `caption_provenance.validation_notes` when the
-description is saved. These are already classified, sit beside review findings and are
-never replaced by a later review.
+- Do not mark a usable description or asset faulty only because a visual detail is uncertain, an exact
+  count is unsupported, a material is inferred, or owner review is pending.
+- Minor precision or appearance uncertainty is a `review_note`. A meaningful identity, color or structure
+  error is a `warning`. **When the severity is unclear, keep a warning** with its evidence and reason.
+- `fault` is only for failed or incomplete generation, or a missing or unusable description. A review
+  finding cannot use it, and cannot approve owner review.
+- A description that was never generated is `pending`, with null description and provenance. That state
+  never downgrades a failed or unusable one.
+- Changing these grades reruns no model, rewrites no description, retries nothing and touches no original.
+- Real source, dependency, decoding, generation, publication or runtime failures are processing faults and
+  follow the fault policy in `AGENTS.md`, not this table.
 
-The shared `caption_quality` implementation serves desktop browse/detail and
-retrieval/MCP responses. Search summaries and basic asset details expose
-`caption_status` and the compatible boolean `caption_faulty`. The boolean now
-means an actual unusable caption, not any review note. With `include_metadata=true`,
-agent details also include `metadata.caption_quality` with classified issues,
-their original evidence, and reasons. The legacy `caption_fault_evidence` field
-retains the original unmodified findings; interpret their historical `faulty`
-labels through the current classification. Owner caption/artistic review states
-remain separate and are not approved by this change.
+## Recording a review
 
-## Rules for future imports and reviews
-
-The current processing rules in `AGENTS.md` apply this distinction to new assets.
-Step 8 applies the same classification to configured library membership. The
-forty-asset classifications above remain historical evidence; newly generated
-captions await review and do not inherit an approval or a clear visual review.
-Historical expanded coverage and pending reviews are summarized in the frozen
-[progress journal](../../../docs/history/progress-2026-10.md); the original Step 8 verification report has been retired.
-Intentionally ungenerated descriptions have `processing.caption=pending` and
-null description/provenance. They remain eligible for a later generation run;
-this state does not downgrade failed, partially generated, or unusable captions.
-Record a caption review using `findings`, for example:
+A review input has a `scope` and an `assets` object keyed by asset ID. Each asset uses `findings`:
 
 ```json
 {
@@ -78,37 +61,34 @@ Record a caption review using `findings`, for example:
 }
 ```
 
-`scripts/record_caption_review.py` preserves that explicit severity and rationale
-in caption provenance. Future usable captions do not need entries in the historical
-reclassification file (from the original 40-asset pilot). Newly recorded severity takes precedence over
-that older file; it belongs to the reviewed caption's provenance. Legacy `faults`
-strings are accepted as unclassified warnings, rather than automatically becoming
-`faulty`. Ambiguous severity stays a warning. Review-only findings cannot use a
-`fault` severity or approve owner review. Generated review pages use the same
-classification when showing notes, warnings and real caption failures.
+```powershell
+.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python scripts/record_caption_review.py library --notes data/review-input.json
+```
 
-The review-page checker validates current severity banners and can still verify
-preserved historical pages under an explicit historical format. It saves a new
-receipt instead of overwriting the Step 4 receipt. Future measurement summaries
-use `caption_quality_counts` and `visual_review_findings_assets`; the presence of
-a review finding is no longer reported as a faulty asset.
+`scripts/record_caption_review.py` checks the saved results and image hashes, keeps the original provenance
+before it changes working data, stores each severity and reason in the description's provenance, keeps the
+owner's review states and never reruns a model. Publish afterwards. Older `faults` strings without a severity
+are accepted as warnings, never as `fault`.
 
-Source/import, dependency, image decoding, generation, schema/publication or
-runtime failures remain actual processing faults. Preserve partial results and
-recorded evidence; no inference retries, caption rewrites or full-library import
-are triggered by changing these rules. Existing caption generation schema and
-model settings remain unchanged. The original numbered implementation plan is
-historical; current caption handling follows `AGENTS.md` and this document.
+## Where grades come from
 
-The desktop detail displays caption warnings/notes separately from source,
-preview, runtime and actual caption faults. Original findings are expandable
-under “Original caption review evidence.” Earlier static review pages and receipts
-retain their historical wording. No catalog, caption result, correction overlay,
-embedding/index, original asset, dependency pin, or model file is rewritten.
+- **A recorded review** (above): the severity stored with the description wins.
+- **The validator.** Use wording in a description ("designed for use in games") is saved as a `review_note`
+  in `caption_provenance.validation_notes` when the description is written. These sit beside review findings
+  and a later review never replaces them.
+- **`docs/caption-review-classification.json`**: severities recorded for the first reviewed assets, each bound
+  to the asset ID and a digest of the description, its generation fingerprint and the original findings. A
+  changed description, a missing or malformed entry leaves the findings visible as warnings. This file cannot
+  downgrade a failed description.
 
-Historical verification (original 40-asset pilot): `data/caption-classification/{before,after}.json` retains protected
-input hashes and all 40 keyword-query rankings, plus classification parity across
-those 40 assets. Focused synthetic tests cover stale/invalid classifications,
-failed/missing descriptions, source-fault preservation and shared search behavior.
-The actual Windows rendering/STDIO checks are retained separately under
-`data/gui/caption-classification/`.
+## What the interfaces show
+
+One implementation, `caption_quality`, serves the desktop app, search and the MCP server.
+
+- Search results and basic detail carry `caption_status` and the boolean `caption_faulty`, which means an
+  unusable description, not the presence of a note.
+- With `include_metadata=true`, agent detail adds `metadata.caption_quality`: the graded issues with their
+  original evidence and reasons. `caption_fault_evidence` still returns the original, ungraded findings.
+- The app shows notes and warnings apart from source, preview and runtime faults; the original findings open
+  under "Original caption review evidence".
+- The owner's review of a description and of its artistic fit is a separate state that no grade sets.

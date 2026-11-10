@@ -4,16 +4,14 @@ from dataclasses import replace
 import json
 import logging
 import os
-from pathlib import Path
 import sqlite3
 import signal
 import subprocess
-import sys
 import threading
 import time
 import uuid
 
-from .config import ConfigError, load_config, runtime_command, venv_python, with_saved_blender
+from .config import ConfigError, runtime_command, venv_python, with_saved_blender
 from .publication import atomic_json, read_json, read_only
 from .sources import (registry, get_source, bound, now, source_status, scan_source,
                       aggregate, read_records, write_membership)
@@ -22,7 +20,7 @@ from .gpu_queue import lease, process_alive
 RUNNING = {"queued", "scanning", "processing", "publishing", "cancelling", "verifying"}
 STAGE_LABELS = {'inspection':'Inspecting assets and rendering previews',
                 'caption':'Writing descriptions', 'embeddings':'Preparing search data'}
-# Descriptions are optional extra data (decision 0008): importing never generates them.
+# Descriptions are optional extra data (decision 0033): importing never generates them.
 OPERATION_STAGES = {'process': ('inspection', 'embeddings'), 'describe': ('caption', 'embeddings')}
 RUNTIMES = {'inspection': 'mcp', 'caption': 'caption', 'embeddings': 'embedding'}
 DESCRIPTIONS_OFF = 'Descriptions are turned off. Turn them on in Settings → General to generate descriptions.'
@@ -427,7 +425,7 @@ def process_source(config, source, token):
 
 
 def search_check(config, token):
-    """Run Run check (decision 0026) in the search runtime: two built-in sample images, never library assets."""
+    """Run Run check (decision 0031) in the search runtime: two built-in sample images, never library assets."""
     from .search_check import IMAGES
     runtime, project = stage_runtime(config, "embeddings")
     state(config, status="processing", phase="Loading the search model for the one-time search check", progress=.1)
@@ -446,7 +444,7 @@ def search_check(config, token):
 
 
 def render_test(config, token):
-    """The owner-started render speed test (decision 0022); waits for processing like other operations."""
+    """The owner-started render speed test (decision 0034); waits for processing like other operations."""
     from .render_devices import label, run
     steps = [0]
 
@@ -518,7 +516,7 @@ EDITED_END = {'complete': ('complete', 'Search updated for the edited descriptio
 def describe_source(config, source, token):
     """Generate missing descriptions and their vectors, then publish what finished.
 
-    Descriptions are optional extra data (decision 0008). Recorded description
+    Descriptions are optional extra data (decision 0033). Recorded description
     failures are kept, not retried. A cancel or stop still publishes completed
     descriptions, and every run ends with one report notification.
     """
@@ -558,7 +556,7 @@ def describe_source(config, source, token):
 
 
 def ensure_search_check(config, scoped, token, backend=None):
-    """A missing search check never stops processing (decision 0026): the search stage runs it first, on the
+    """A missing search check never stops processing (decision 0031): the search stage runs it first, on the
     built-in sample images, and keeps the loaded model. A failed check stops the stage with its reason; assets stay
     pending and finished stages are kept.
     """
@@ -583,7 +581,6 @@ def ensure_search_check(config, scoped, token, backend=None):
 
 def worker_stage(config, source, stage, token):
     from .incremental import process
-    from .library_index import index_library
     from .incremental import working
     scoped = bound(config, source)
     from .settings import used_formats
@@ -591,7 +588,7 @@ def worker_stage(config, source, stage, token):
     operation = operation_status(scoped).get("operation", "process")
     # Description runs only describe assets whose renders are ready, so unfinished
     # imports never gain recorded description faults.
-    # A queue item's scope, resolved when it started (decision 0023); None is the whole folder.
+    # A queue item's scope, resolved when it started (decision 0032); None is the whole folder.
     scope = operation_status(scoped).get("asset_ids")
     only = set(scope) if scope is not None else None
     retry = set()

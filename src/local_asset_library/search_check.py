@@ -1,4 +1,4 @@
-"""The search check (decisions 0018 and 0026): the search model reads text and images on this computer's search device.
+"""The search check (decisions 0018 and 0031): the search model reads text and images on this computer's search device.
 
 It runs on two images shipped with Assetarium (a blue cube and a red sphere rendered by scripts/build-samples.py),
 never on library assets, so setup can run it before any library exists and processing can run it by itself when

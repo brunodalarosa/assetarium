@@ -1,4 +1,4 @@
-"""Formats Assetarium uses (decision 0026): an asset only in formats that are off is hidden everywhere, never deleted."""
+"""Formats Assetarium uses (decision 0030): an asset only in formats that are off is hidden everywhere, never deleted."""
 from pathlib import Path
 
 import pytest

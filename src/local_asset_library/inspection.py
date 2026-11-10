@@ -19,7 +19,6 @@ PINNED_SOURCES = {("kenney_car-kit", "sedan"): "glb",
                   ("kenney_car-kit", "sedan-sports"): "obj",
                   ("kenney_food-kit", "apple"): "fbx",
                   ("quaternius_ultimate-nature-pack", "BirchTree_1"): "blend"}
-SUPPORTED = {"glb", "gltf", "obj", "fbx", "blend", "stl"}
 BLENDER_FLAGS = ("--background", "--factory-startup", "--disable-autoexec", "--offline-mode")
 # The worker scripts call os.path.isreserved, which only Windows provides. Their hashes
 # are inspection fingerprints, so instead of editing them (re-queuing every finished
@@ -235,9 +234,3 @@ def publish(config, asset, source, reason, result, fingerprint, output_relative)
                 record['dependencies'][-1]['dependency_resolution'] = image['dependency_resolution']
     with closing(sqlite3.connect(config.output_path("data", "catalog.sqlite"))) as db, db:
         db.execute("UPDATE assets SET record=? WHERE asset_id=?", (encoded(record), asset["asset_id"]))
-
-
-def reuse_result(record, fingerprint, retry_faults=False):
-    run = record.get("inspection_run", {})
-    faulty = run.get("status") in {"failed", "unsupported"} or bool(run.get("source_faults"))
-    return run.get("fingerprint") == fingerprint and not (faulty and retry_faults)
