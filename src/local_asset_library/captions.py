@@ -249,6 +249,49 @@ def overlay_for(config, record):
     return validate_overlay(json.loads(path.read_text(encoding="utf-8"))), path
 
 
+def _clean(key, value):
+    """The owner's form value in the caption's own shape: trimmed text, one list item per non-empty line."""
+    if key == "identity":
+        if not isinstance(value, dict):
+            raise ValueError("Identity needs a label and a certainty")
+        return {"label": str(value.get("label", "")).strip(), "certainty": value.get("certainty")}
+    if key == "description":
+        return " ".join(str(value).split()) if isinstance(value, str) else value
+    if isinstance(value, str):
+        value = value.splitlines()
+    if not isinstance(value, list):
+        raise ValueError(f"Invalid string list: {key}")
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def save_edit(config, record, fields):
+    """Store the owner's corrected observation fields in the overlay (schema v1); the generated original is kept.
+
+    Only fields that differ from the generated text are stored; a field edited back to the original drops out.
+    The merged caption must still pass ``validate_caption``. Returns whether the stored overlay changed.
+    """
+    from .publication import atomic_json
+    original = record.get("description")
+    if record["processing"].get("caption") != "complete" or not original:
+        raise ConfigError("Only a generated description can be edited; generate one first")
+    if not isinstance(fields, dict) or not fields or not set(fields) <= OBSERVATIONS:
+        raise ValueError("An edit can change the visual description fields only")
+    overlay, path = overlay_for(config, record)
+    corrected = deepcopy(overlay["description"])
+    for key, value in fields.items():
+        value = _clean(key, value)
+        if value == (" ".join(original[key].split()) if key == "description" else original[key]):
+            corrected.pop(key, None)
+        else:
+            corrected[key] = value
+    if corrected == overlay["description"]:
+        return {"status": "unchanged", "edited": sorted(corrected)}
+    updated = {**overlay, "description": corrected}
+    effective_caption(record, updated)  # Raises with the rule the edit breaks; nothing is saved then.
+    atomic_json(path, updated)
+    return {"status": "saved", "edited": sorted(corrected)}
+
+
 def merge_record(record, outcome, provenance, overlay):
     result = deepcopy(record)
     result["description"] = deepcopy(outcome["description"])

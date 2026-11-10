@@ -84,7 +84,7 @@ def test_detail_separates_measured_observations_suggestions_review(indexed):
     assert info['technical']['inspected_format'] == 'obj'
     assert 'SECRET SPECULATIVE USE' in info['suggested_uses']
     assert 'SECRET SPECULATIVE USE' not in json.dumps(info['observations'])
-    assert info['owner_review'] == 'pending' and info['owner_artistic_approval'] == 'pending'
+    assert 'owner_review' not in info and 'owner_artistic_approval' not in info  # Editing replaced approval in the UI.
     assert info['scale'].startswith('Unknown physical scale')
 
 
@@ -162,7 +162,7 @@ def test_unattempted_disabled_format_is_excluded_without_a_preview_fault(indexed
     assert not service.preview_faults
 
 
-def test_live_owner_review_and_null_suggestions_preserve_generated_uses(indexed):
+def test_stored_owner_review_is_kept_unshown_and_null_suggestions_preserve_generated_uses(indexed):
     config, _, records = indexed
     _, record = png(config, records[0])
     path = config.output_path('data', 'captions/corrections/' + record['asset_id'] + '.json')
@@ -172,7 +172,7 @@ def test_live_owner_review_and_null_suggestions_preserve_generated_uses(indexed)
     path.write_text(json.dumps(overlay), encoding='utf-8')
     before = path.read_bytes()
     info = DesktopService(config).asset(record['asset_id'])['payload']['presentation']
-    assert info['owner_review'] == 'approved' and info['owner_artistic_approval'] == 'rejected'
+    assert info['description_edit']['state'] == 'generated'  # A stored review state is kept, not shown.
     assert info['suggested_uses'] == record['suggested_uses']
     assert path.read_bytes() == before
 

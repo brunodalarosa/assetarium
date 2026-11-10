@@ -22,6 +22,10 @@ from .store_versions import read_versioned
 
 ACTIONS = ('previews', 'descriptions')
 OPERATION = {'previews': 'process', 'descriptions': 'describe'}
+# A descriptions item generates missing ones; for named assets it can also try a recorded failure again (an explicit
+# owner request, never bulk) or bring search up to date after the owner edited a description (no model writes text).
+MODES = {'generate': 'missing', 'retry': 'failed', 'edited': 'complete'}
+MODE_TITLE = {'retry': 'Try description again', 'edited': 'Update search for an edited description'}
 QUICK, LONG = 10 * 60, 30 * 60  # Seconds: start on a click; above QUICK an Undo toast; above LONG ask first.
 UNMEASURED = 100  # Assets: with no time or storage measurement yet, more than this asks first (it may be the longest job).
 RECENT = 30
@@ -42,6 +46,7 @@ def load(config):
     value.setdefault('items', [])
     value.setdefault('recent', [])
     value.setdefault('paused', False)
+    value.setdefault('search_pending', {})  # Asset ID → {key, utc}: an owner edit search does not read yet.
     value.pop('overnight', None)  # The overnight hold was removed; a queue saved with it loads unchanged otherwise.
     return value
 
@@ -73,9 +78,13 @@ def validate_scope(config, scope):
     source = get_source(config, scope['key'])
     path = scope.get('path') or ''
     ids = scope.get('asset_ids') or []
+    mode = scope.get('mode') or 'generate'
     if not isinstance(path, str) or '..' in PurePosixPath(path).parts or not isinstance(ids, list) or len(ids) > 100000:
         raise ConfigError('Invalid scope')
-    return source, {'key': scope['key'], 'path': path.strip('/'), 'asset_ids': [str(i) for i in ids]}
+    if mode not in MODES or (mode != 'generate' and len(ids) != 1):
+        raise ConfigError('Try again and search updates name one asset')
+    return source, {'key': scope['key'], 'path': path.strip('/'), 'asset_ids': [str(i) for i in ids],
+                    **({'mode': mode} if mode != 'generate' else {})}
 
 
 def resolve(config, action, scope):
@@ -88,7 +97,8 @@ def resolve(config, action, scope):
     current = _current(config, source)
     blocked = blockers(config)
     fixes = {b['reason']: b['fix'] for b in blocked.values()}
-    if current is None or (action != 'previews' and not descriptions_enabled(config)):
+    mode = scope.get('mode') or 'generate'
+    if current is None or (action != 'previews' and mode != 'edited' and not descriptions_enabled(config)):
         return {'ids': [], 'blocked': {}, 'kinds': {}, 'fixes': fixes}
     picked = scope.get('asset_ids')
     where, params = ('asset_id IN (SELECT value FROM json_each(?))', [json.dumps(picked)]) if picked else asset_scope_sql(scope.get('path') or '')
@@ -104,7 +114,7 @@ def resolve(config, action, scope):
                     continue
                 if item_state != 'no_previews':
                     continue
-            elif description != 'missing':
+            elif description != MODES[mode]:
                 continue
             ids.append(asset_id)
             kinds[kind] = kinds.get(kind, 0) + 1
@@ -212,7 +222,9 @@ def add(config, action, scope, confirmed=False):
     """Queue an action. Under 10 minutes it starts on the click; 10–30 minutes start with Undo; longer asks first."""
     if action not in ACTIONS:
         raise ConfigError('Choose Make previews or Generate descriptions')
-    if action == 'descriptions':
+    if action == 'previews' and (scope or {}).get('mode'):
+        raise ConfigError('Try again and search updates are for descriptions')
+    if action == 'descriptions' and (scope or {}).get('mode') != 'edited':
         from .settings import descriptions_enabled
         from .source_operations import DESCRIPTIONS_OFF
         if not descriptions_enabled(config):
@@ -220,22 +232,31 @@ def add(config, action, scope, confirmed=False):
     source, scope = validate_scope(config, scope)
     if not source['enabled']:
         raise ConfigError('Enable this library folder in search before processing it')
+    mode = scope.get('mode')
+    with _locked(config):
+        twin = next((i for i in load(config)['items'] if i['status'] == 'waiting' and i['action'] == action and i['scope'] == scope), None)
+    if mode and twin:
+        # The same request already waits; it reads the description when it starts, so one is enough.
+        return {'status': 'queued', 'item': twin, 'undo': False, 'title': 'Waiting in line', 'body': MODE_TITLE[mode] + '.'}
     found = resolve(config, action, scope)
     label = scope_label(config, scope)
+    if mode and not found['ids']:
+        raise ConfigError('This description has no recorded failure to try again' if mode == 'retry'
+                          else 'This asset has no generated description to update search for')
     if not found['ids']:
         if found['blocked']:
             reason, count = next(iter(found['blocked'].items()))
             raise ConfigError(f"{count:,} {'asset waits' if count == 1 else 'assets wait'} for a fix: {reason}. {found['fixes'].get(reason, '')}".strip())
         raise ConfigError(f"Nothing in {label} needs {'previews' if action == 'previews' else 'descriptions'}")
     value = estimate(config, action, found)
-    verb = 'Make previews' if action == 'previews' else 'Generate descriptions'
+    verb = 'Make previews' if action == 'previews' else MODE_TITLE.get(mode, 'Generate descriptions')
     long = value['seconds'] is not None and value['seconds'][1] > LONG
     if (long or value['budget_reached'] or unmeasured(value)) and not confirmed:
         return {'status': 'confirm', 'estimate': value, 'title': f'{verb} for {label}?',
                 'body': describe_estimate(value) + ' It runs in the background; you can keep working or cancel it.',
                 'confirm_label': f"{verb} ({value['assets']:,} {'asset' if value['assets'] == 1 else 'assets'})"}
     item = {'id': uuid.uuid4().hex, 'action': action, 'scope': scope, 'label': label, 'added_utc': now(), 'status': 'waiting',
-            'estimate': value}
+            'estimate': value, **({'title': MODE_TITLE[mode]} if mode else {})}
     with _locked(config):
         queue = load(config)
         queue['items'].append(item)
@@ -271,6 +292,10 @@ def _finish_running(config, queue):
             continue
         outcome = status.get('status') if status.get('token') == item.get('token') else 'interrupted'
         queue['items'].remove(item)
+        if outcome == 'complete' and item['scope'].get('mode') == 'edited':
+            for asset_id in item['scope']['asset_ids']:  # Search reads the edit now, unless it was saved after the start.
+                if queue['search_pending'].get(asset_id, {}).get('utc', '') <= item.get('started_utc', ''):
+                    queue['search_pending'].pop(asset_id, None)
         queue['recent'] = ([{**item, 'status': outcome, 'finished_utc': now(), 'phase': status.get('phase'),
                              'reason': status.get('reason'), 'faults': status.get('faults')}] + queue['recent'])[:RECENT]
         changed = True
@@ -296,7 +321,7 @@ def advance(config):
                 continue
             try:
                 result = start(config, OPERATION[item['action']], item['scope']['key'], asset_ids=found['ids'], queue_item=item['id'],
-                               owner=_owner(queue))
+                               owner=_owner(queue), **({'mode': item['scope']['mode']} if item['scope'].get('mode') else {}))
             except ConfigError as exc:
                 queue['items'].remove(item)
                 queue['recent'] = ([{**item, 'status': 'faulty', 'finished_utc': now(), 'reason': str(exc)}] + queue['recent'])[:RECENT]
@@ -508,3 +533,61 @@ def state(config):
     return {'status': 'ready', 'paused': queue['paused'], 'running': running, 'up_next': _order(queue['items']),
             'stopped_on_close': sum(bool(i.get('stopped_on_close')) for i in queue['items']),
             'blocked': blocked_groups(config), 'failures': failures(config), 'recent': queue['recent']}
+
+
+def mark_search_pending(config, key, asset_id):
+    """An owner edit was saved: search keeps the earlier text until a search update for it finishes, so the
+    inspector can offer Update search even when the update was never queued (a declined confirmation, a fault)."""
+    with _locked(config):
+        queue = load(config)
+        queue['search_pending'][asset_id] = {'key': key, 'utc': now()}
+        save(config, queue)
+
+
+def place(config, key, asset_ids):
+    """Where description work for these assets stands: running, waiting (with its place) or, for an owner edit's
+    search update, the newest one that did not finish, else ``pending`` while no update is queued for a saved edit.
+    None when nothing concerns them. Read only."""
+    from .folder_view import Reading, connect
+    from .library_view import _current
+    from .source_operations import RUNNING, operation_status
+    from .sources import bound, get_source
+    queue = load(config)
+    try:
+        source = get_source(config, key)
+        current = _current(config, source)
+    except ConfigError:
+        return None
+    states, folders = {}, set()
+    if current is not None:
+        try:
+            with closing(connect(current)) as view:
+                marks = ','.join('?' * len(asset_ids))
+                states = dict(view.execute(f'SELECT asset_id, description FROM assets WHERE asset_id IN ({marks})', asset_ids))
+                folders = {r[0] for r in view.execute(f'SELECT folder FROM asset_folders WHERE visible AND asset_id IN ({marks})', asset_ids)}
+        except (Reading, ConfigError):
+            pass
+
+    def concerns(item):
+        scope, mode = item['scope'], item['scope'].get('mode') or 'generate'
+        if item['action'] != 'descriptions' or scope['key'] != key:
+            return False
+        if scope.get('asset_ids'):
+            return bool(set(scope['asset_ids']) & set(asset_ids))
+        return (scope.get('path') or '') in folders and MODES[mode] in states.values()
+    running = next((i for i in queue['items'] if i['status'] in {'running', 'cancelling'}), None)
+    if running and running['action'] == 'descriptions' and running['scope']['key'] == key:
+        operation = operation_status(bound(config, source))
+        if (operation.get('token') == running.get('token') and operation.get('status') in RUNNING
+                and set(operation.get('asset_ids') or []) & set(asset_ids)):
+            return {'status': 'running', 'mode': running['scope'].get('mode') or 'generate', 'phase': operation.get('phase')}
+    for index, item in enumerate(_order(queue['items'])):
+        if concerns(item):
+            return {'status': 'waiting', 'mode': item['scope'].get('mode') or 'generate', 'position': index + 1 + bool(running),
+                    'paused': queue['paused']}
+    last = next((i for i in queue['recent'] if i['scope'].get('mode') == 'edited' and concerns(i)), None)
+    if last and last['status'] != 'complete':
+        return {'status': 'faulty', 'mode': 'edited', 'reason': last.get('reason') or last.get('phase') or 'The search update did not finish'}
+    if any(queue['search_pending'].get(i, {}).get('key') == key for i in asset_ids):
+        return {'status': 'pending', 'mode': 'edited'}  # Saved, but no search update is queued for it.
+    return None

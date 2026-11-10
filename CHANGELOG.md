@@ -28,6 +28,15 @@ All notable changes to Assetarium are listed here. The project follows
   fullscreen and a ⋯ menu sit on the canvas; double-click fits, R resets. Formats the viewer can't open, models over
   16 MiB ("Large model · click to load") and load faults say why over the still. While the inspector shows an
   asset, arrow keys in the results select as they move, and browsing fast loads no viewer for the assets it passes.
+- **Edit and generate descriptions from the inspector**: the description section shows one line and one action
+  for its state: **Generate description** for one asset, its place in line or that it is being written, the
+  failure with **Try again**, **Set up descriptions** when no description model can run, and **Edit** on a
+  generated description. An edit corrects the text and, under **More details**, what the asset is and its
+  shape, colors, parts, style, distinguishing features and uncertainties; search follows the edit in the
+  background (no description model runs for it). An edited description says **Edited** and keeps the generated
+  original under **Show original**; editing a description shared by a variant group changes it for all its
+  variants. Editing replaces approval: the owner-review and artistic-suitability states are gone from the
+  inspector and the **Review** chip from the cards (stored values are kept).
 
 ### Removed
 

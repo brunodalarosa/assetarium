@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [processing_queue.py, processing_queue.add, processing_queue.advance, processing_queue.resolve, processing_queue.estimate, processing_queue.claim, processing_queue.release, processing_queue.owner_gone, source_operations.watch_owner, desktop.create_window, processing_queue.failures, folder_view.connect, source_operations.start, source_operations.worker_stage, scripts/source-operation.py, library_view.blockers]
+code: [processing_queue.py, processing_queue.add, processing_queue.place, processing_queue.MODES, processing_queue.advance, processing_queue.resolve, processing_queue.estimate, processing_queue.claim, processing_queue.release, processing_queue.owner_gone, source_operations.watch_owner, desktop.create_window, processing_queue.failures, folder_view.connect, source_operations.start, source_operations.worker_stage, scripts/source-operation.py, library_view.blockers]
 verified: 2026-11-04
 branch: feature/library-view
 ---
@@ -20,6 +20,15 @@ Start at `processing_queue.add` and `processing_queue.advance`.
   (`resolve`, from the folder's up-to-date view, `folder_view.connect(fresh=True)`): assets whose state is `no_previews` (or whose description is `missing`), skipping blocked
   ones. It then calls `source_operations.start` with `asset_ids`, which the operation saves in its state;
   `worker_stage` limits inspection and captions to them (search vectors still cover the whole folder).
+- **Description modes** (`MODES`, one named asset only): `retry` resolves a `failed` description and `edited` a
+  `complete` one; the default resolves `missing`. `source_operations.start(mode=…)` saves the mode in the operation
+  state; `edited` skips the caption stage, needs no description model (allowed with descriptions off) and raises no
+  report notice. A waiting item with the same scope is reused, not added twice. `place` tells the inspector whether
+  an asset's description work runs, waits (and where), or whose last search update did not finish.
+- **Saved edits search does not read yet** (`search_pending` in `queue.json`, `mark_search_pending`): the bridge marks
+  the asset before queueing its update, and `_finish_running` clears it only when an `edited` item completes (not for
+  an edit saved after that item started). `add` can return `confirm` without queueing (storage budget, no
+  measurement); `place` then reports `pending`, so the inspector keeps Update search instead of losing the update.
 - `scripts/source-operation.py` calls `advance` when **any** operation ends (scans and speed tests too), so an
   item whose start found its folder busy (`start` returned `busy`) never stalls.
 - **The open app owns the queue** (decision 0023, November 4, 2026). `DesktopBridge` calls `claim` at startup

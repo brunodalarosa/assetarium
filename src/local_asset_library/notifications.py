@@ -167,7 +167,8 @@ def reconcile(config, statuses):
     late = []
     for status in statuses:
         operation = status.get('operation') or {}
-        if (operation.get('operation') == 'describe' and operation.get('token')
+        # A search update after an owner edit writes no descriptions; the inspector shows how it ended.
+        if (operation.get('operation') == 'describe' and operation.get('token') and operation.get('mode') != 'edited'
                 and operation.get('status') in {'interrupted', 'faulty'}
                 and 'report-' + operation['token'] not in reported):
             late.append((status, operation))

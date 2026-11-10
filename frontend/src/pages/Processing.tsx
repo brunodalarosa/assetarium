@@ -51,13 +51,13 @@ function Running() {
       {item && (
         <div id="running-item" className="grid gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="mr-auto text-[13.5px] font-medium">{ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</p>
+            <p className="mr-auto text-[13.5px] font-medium">{item.title || ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</p>
             <span className="text-[12px] text-muted-foreground">{since(item.started_utc)}</span>
             <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} onClick={() => void queueControl("remove", item.id)}>
               <X className="size-3.5" aria-hidden />{item.status === "cancelling" ? "Stopping…" : "Cancel"}
             </Button>
           </div>
-          <OperationProgress operation={operation} label={ACTION[item.action] + " for " + item.label} />
+          <OperationProgress operation={operation} label={(item.title || ACTION[item.action]) + " for " + item.label} />
           <Reason text={operation.reason || phase} className="text-[12px] text-muted-foreground" />
           {(item.log || []).length > 0 && (
             <Disclosure title="Live log">
@@ -111,7 +111,7 @@ function UpNext() {
             {items.map((item, index) => (
               <motion.li key={item.id} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[13px]" data-action={item.action}>
-                <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}</span>
+                <span className="mr-auto min-w-0 truncate">{item.title || ACTION[item.action]} · {item.label}</span>
                 {item.estimate?.seconds && <span className="text-[11.5px] text-muted-foreground tabular-nums">~{Math.round(item.estimate.seconds[1] / 60)} min</span>}
                 <button type="button" aria-label="Move up" disabled={index === 0} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, Math.max(0, index - 1))}><ArrowUp className="size-3.5" /></button>
                 <button type="button" aria-label="Move down" disabled={index === items.length - 1} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, index + 1)}><ArrowDown className="size-3.5" /></button>
@@ -188,7 +188,7 @@ function Recent() {
         return (
           <li key={item.id + item.finished_utc} className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-[13px] hover:bg-surface-2">
             <Badge tone={tone}>{label}</Badge>
-            <span className="mr-auto min-w-0 truncate">{ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</span>
+            <span className="mr-auto min-w-0 truncate">{item.title || ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</span>
             {count > 1 && <span className="recent-repeat text-[11.5px] text-muted-foreground tabular-nums" title="The same work ended the same way several times in a row">× {count}</span>}
             {seconds !== null && <span className="text-[11.5px] text-muted-foreground tabular-nums">{seconds < 90 ? Math.round(seconds) + " s" : Math.round(seconds / 60) + " min"}</span>}
             {item.log && <Button variant="quiet" className="h-7 px-2" onClick={() => void showLog(item.log)}><FileText className="size-3.5" aria-hidden />Show log</Button>}

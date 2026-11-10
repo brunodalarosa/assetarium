@@ -136,18 +136,15 @@ class DesktopService(AssetService):
                 available = False
                 faults.append(self._record_fault(identifier, 'source', exc))
             try:
-                overlay = current_overlay(self.config, record) or {}
-                owner_review = overlay.get('caption_review', 'pending')
+                current_overlay(self.config, record)
             except (OSError, ValueError) as exc:
-                owner_review = 'faulty'
                 faults.append(self._record_fault(identifier, 'owner_correction', exc))
             items.append({'asset_id': identifier, 'name': record['display_name'], 'pack': record['pack_id'],
                 'asset_type': record.get('asset_type', 'model_3d'),
                 'formats': sorted({f['format'] for f in record['files']}),
                 'views': [v for v in VIEWS if any(p.get('view_label') == v for p in record['previews'])],
                 'availability': 'available' if available else 'faulty', 'faults': faults,
-                'source_faulty': bool(faults), **caption_summary(self.config, record),
-                'caption_owner_review': owner_review})
+                'source_faulty': bool(faults), **caption_summary(self.config, record)})
             items[-1]['processing']=record['processing']
         return {'status': 'browse', 'asset_count': len(records), 'shown_count': len(items), 'items': items,
                 'total_count': len(matching), 'offset': offset, 'page_size': page_size, 'generation': version,
@@ -262,7 +259,7 @@ class DesktopService(AssetService):
             effective = observations(self.config, record)
             owner = current_overlay(self.config, record) or {}
         except (OSError, ValueError) as exc:
-            effective, owner = None, {'caption_review': 'faulty'}
+            effective, owner = None, {}
             self._record_fault(identifier, 'owner_correction', exc)
         from .variant_groups import membership
         group = membership(self.config, record)
@@ -279,8 +276,7 @@ class DesktopService(AssetService):
             'views': [v for v in VIEWS if any(p.get('view_label') == v for p in record['previews'])],
             'observations': effective, 'description_shared_from': shared_from, 'variant_group': group,
             'suggested_uses': owner.get('suggested_uses') if owner.get('suggested_uses') is not None else record.get('suggested_uses'),
-            'owner_review': owner.get('caption_review', 'pending'),
-            'owner_artistic_approval': owner.get('artistic_suitability', 'pending'),
+            'description_edit': self.description_edit(record, group),
             **caption_summary(self.config, record),
             'caption_quality': caption_quality(self.config, record),
             'asset_type': record.get('asset_type', 'model_3d'),
@@ -300,6 +296,84 @@ class DesktopService(AssetService):
             'scale': ('Pixel measurements describe the inspected file; SVG sizes are canvas units.'
                       if record.get('asset_type') == 'image' else 'Unknown physical scale; measurements apply only to the inspected format.')}
         return {'payload': payload, 'image': image, 'evidence': evidence, 'generation': version, 'elapsed_seconds': time.perf_counter() - started}
+
+    def description_edit(self, record, group):
+        """The inspector's description state and its one action (P5): none, queued, running, failed, generated,
+        edited or not_set_up, with the generated original beside an edit and where queued work stands."""
+        from .processing_queue import place
+        from .sources import description_state
+        subject = record
+        if group and group['shared'] and group['representative']['asset_id'] != record['asset_id']:
+            subject = self.record(group['representative']['asset_id'])  # A shared description is edited at its source.
+        state = description_state(subject)
+        try:
+            overlay = current_overlay(self.config, subject) or {}
+        except (OSError, ValueError):
+            overlay = {}
+        edited = sorted((overlay.get('description') or {}) if state == 'complete' else ())
+        key = (subject.get('files') or [{}])[0].get('path', '').split('/', 1)[0]
+        work = place(self.config, key, [subject['asset_id']]) if self.config.sources_registry and key else None
+        provenance = subject.get('caption_provenance') or {}
+        model = provenance.get('model') or {}
+        setup = self.description_setup()
+        if state == 'complete':
+            value = 'edited' if edited else 'generated'
+        elif work and work['status'] in {'waiting', 'running'} and work['mode'] != 'edited':
+            value = 'queued' if work['status'] == 'waiting' else 'running'
+        elif state in {'missing', 'failed'} and not setup['ready']:
+            value = 'not_set_up'
+        else:
+            value = {'missing': 'none', 'failed': 'failed'}.get(state, 'unavailable')
+        fault = (subject.get('stage_faults') or {}).get('caption') or {}
+        attempts = provenance.get('attempts') or []
+        reason = fault.get('error') or fault.get('reason') or next((a.get('error') for a in reversed(attempts) if a.get('error')), None)
+        # A shared variant, or the representative whose description its variants share.
+        sharing = group and not group['separate'] and (subject is not record or group['representative']['asset_id'] == record['asset_id'])
+        return {'state': value, 'asset_id': subject['asset_id'], 'key': key or None,
+                'original': subject.get('description') if state == 'complete' else None, 'edited_fields': edited,
+                'model': model.get('model_id') or model.get('model') or (provenance.get('engine') or {}).get('model'),
+                'work': work, 'failure': (reason or 'Description generation failed')[:600] if state == 'failed' else None,
+                'setup': setup, 'shared_variants': len(group['variants']) if sharing else 0}
+
+    @pinned
+    def edit_description(self, identifier, fields):
+        """Save the owner's corrected fields into the overlay of the description the inspector shows.
+
+        A variant sharing its group's description edits the representative's, which every sharing variant uses.
+        Returns the asset whose description changed, its library folder and how many variants share it."""
+        from .captions import save_edit
+        from .variant_groups import membership
+        self.synchronize()
+        validate('get_asset', {'asset_id': identifier})
+        record = self.record(identifier)
+        group = membership(self.config, record)
+        info = self.description_edit(record, group)
+        subject = record if info['asset_id'] == identifier else self.record(info['asset_id'])
+        result = save_edit(self.config, subject, fields)
+        return {**result, 'asset_id': subject['asset_id'], 'key': info['key'], 'shared_variants': info['shared_variants']}
+
+    def description_setup(self):
+        """Whether Generate description can run here; cached briefly (it reads installed package metadata)."""
+        cached = getattr(self, '_description_setup', None)
+        if cached and time.monotonic() - cached[0] < 30:
+            return cached[1]
+        from . import engines
+        from .settings import descriptions_enabled
+        try:
+            if not descriptions_enabled(self.config):
+                value = {'ready': False, 'reason': 'Descriptions are turned off'}
+            elif engines.active(self.config)['engine'] == engines.SERVER:
+                server = engines.active(self.config)['server']
+                value = {'ready': bool(server['url'] and server['model']), 'reason': 'The local model server is not set up'}
+            else:
+                ready = engines.runtime_ready(self.config, 'caption')['ready'] and engines.weights_ready(self.config, 'caption')['ready']
+                value = {'ready': ready, 'reason': 'The description model is not installed'}
+        except (OSError, ValueError, KeyError, ConfigError) as exc:
+            value = {'ready': False, 'reason': str(exc)}
+        if value['ready']:
+            value['reason'] = None
+        self._description_setup = (time.monotonic(), value)
+        return value
 
     @pinned
     def reveal(self, identifier, source_format=None):

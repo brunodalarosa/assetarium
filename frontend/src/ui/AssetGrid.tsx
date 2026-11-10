@@ -5,7 +5,7 @@ import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { Tooltip } from "@/components/beui/tooltip";
-import { cardMeta, hasDescription, packName } from "../app/format";
+import { cardMeta, packName } from "../app/format";
 import { getState, type GridId, openAssetMenu, pathAction, pickAsset, requestThumb, selectAsset, type Thumb, toggleSelected, useApp } from "../app/store";
 
 /** A library pack is an object on the Asset sources tab ({name}); elsewhere a folder key. */
@@ -73,7 +73,6 @@ function badges(item: Json, thumb?: Thumb) {
   if (item.source_faulty) list.push({ label: "Source fault", tone: "fault" });
   if (item.hidden_by_formats) list.push({ label: "Format off", tone: "warning" });
   if (latest.caption_status === "warning") list.push({ label: "Caption warning", tone: "warning" });
-  if (hasDescription(latest) && latest.caption_owner_review !== "approved") list.push({ label: "Review " + (latest.caption_owner_review || "pending"), tone: "neutral" });
   if (thumb?.badge) list.push({ label: thumb.badge.label, tone: thumb.badge.tone === "fault" ? "fault" : "neutral" });
   return list;
 }
