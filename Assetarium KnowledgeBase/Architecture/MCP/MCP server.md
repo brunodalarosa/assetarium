@@ -51,7 +51,7 @@ Binding rules: [0029](../../Decisions/0029-agent-trust.md) (what agents may do),
 | --- | --- | --- |
 | Search and detail | `search_assets`, `get_asset` | Nothing |
 | Collections and tags | `list_collections`, `get_collection`, `edit_collection`, `tag_assets` | Owner data only; agents cannot delete a collection |
-| Pack structure | `list_packs`, `get_pack_outline`, `get_profile`, `propose_profile`, `finish_structure`, `say` | Pack profiles: rules that need no scan apply at once with Undo, others wait for the owner |
+| Pack structure | `list_packs`, `get_pack_outline`, `get_profile`, `propose_profile`, `finish_structure`, `say` | Pack profiles apply at once with Undo; rescanning rules also start one scan |
 | Setup | `get_setup_status`, `validate_blender`, `apply_setup`, `verify_weights`, `propose_setup`, `finish_setup` | Settings, recorded as the agent's and noticed; a Blender path is only proposed |
 
 What an agent may do without asking, what stays the owner's, and how the owner sees and undoes it (Agent

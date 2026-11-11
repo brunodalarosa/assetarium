@@ -3,11 +3,11 @@ tags: [decision]
 decided: 2026-11-07
 area: MCP
 replaces: [0012, 0016, 0023, 0024]
-code: [mcp_server.py, mcp_server.DESCRIPTIONS, pack_agent.propose, pack_agent.decide, setup_agent.py, agent_activity.py, agent_activity.sentence]
+code: [mcp_server.py, mcp_server.DESCRIPTIONS, mcp_server.PAUSABLE, pack_agent.propose, pack_agent.decide, setup_agent.py, agent_activity.py, agent_activity.sentence, agent_sessions.py, agent_sessions.undo, processing_queue.withdraw]
 ---
 # 0029 — Agent trust: agents act freely, in the open
 
-> **Approved by the owner on November 7, 2026** (decision review, round two). Parts marked *not built yet* are decided but need code: see [Today and target](#today-and-target).
+> **Approved by the owner on November 7, 2026** (decision review, round two); built in full on November 11, 2026.
 
 **Decision.** Assetarium is **agent-first**. A connected agent is a co-operator with the owner's powers, not a
 guest that asks permission. It may change structure, metadata and settings and start any work, at once.
@@ -41,11 +41,16 @@ downloads never happen inside Assetarium; an agent with its own shell runs them 
    the server's `calls.jsonl`), marked with the `Bot` icon (Design language P2). A job an agent started says so
    in Asset processing and in its notice.
 3. **Stop any job.** An agent's job stops like the owner's; finished results are kept.
-4. **Pause agents.** One switch refuses every agent write with "Paused by the owner"; reads and search keep
-   working. Only the owner turns it back on.
-5. **Undo a session.** Activity groups changes by agent session (one connected client run) with **Undo all**.
-   Undo of a pack profile is refused once the pack changed after it, and says so ([decision 0035](0035-packs-and-variant-groups.md)).
-   Processing time already spent cannot be undone; its results are simply kept.
+4. **Pause agents.** One switch refuses every agent write with "Paused by the owner"; reads, search and `say`
+   keep working, and jobs agents queued wait while the owner's run. An agent's request never resumes the owner's
+   paused queue. Only the owner turns it back on.
+5. **Undo a session.** Activity lists each agent session (one connected server run) that changed something,
+   with **Undo all** (`agent_sessions.undo`). It covers tags, collections, pack profiles and jobs still waiting,
+   newest first; each write is journaled inside its own lease. Anything changed after the session is kept and
+   listed with why (a pack profile is refused once the pack's rules changed after it, [decision 0035](0035-packs-and-variant-groups.md)).
+   Settings are not covered: each is one visible value the owner changes back in Settings, and the risk this
+   guards against is hidden or reorganized assets. Processing time already spent cannot be undone; its results
+   are simply kept.
 
 ## The risk the owner accepts
 
@@ -70,25 +75,15 @@ directly. Say so rather than claiming more.
   project path or asset records. A cloud model receives what tools return, and the tool descriptions say so.
 - Degraded mode: when the configuration does not load, only `get_setup_status` answers.
 
-## Today and target
-
-| Rule | Today (2026-11-07) |
-| --- | --- |
-| Tags, collections, setup values apply at once | Built |
-| Profiles that need no scan apply at once, with Undo | Built (`pack_agent.propose`) |
-| Profiles that rescan apply at once | *Not built yet:* they wait in Agent activity for the owner |
-| Agents start processing | *Not built yet:* no MCP tool starts a job |
-| Pause agents | *Not built yet* |
-| Undo all for an agent session | *Not built yet:* Undo is per proposal |
-| Told before connecting | *Partly:* the Welcome panel says a cloud model receives tool output; it does not list what agents may change |
-
 ## Keep true
 
 - New agent capabilities are added to the table above. An owner-only action needs a reason written here.
 - Every agent write is in the call log and Agent activity, with `Bot`. No silent agent action.
 - Pause, Stop and Undo stay owner-only and stay reachable from the app (and the CLI on Linux).
+- Every agent write is journaled for its session's Undo all, or this decision says why not (settings).
 - Destructive actions stay interactive and owner-only; no flag or tool argument bypasses that.
 
 ## Changes
 
 - 2026-11-07: named the export-folder groups and the texture folder as agent-applicable pack rules (0019, 0021 updated to match), and made recheck owner-only (PR review).
+- 2026-11-11: built the rest (agent processing, rescanning profiles at once, Pause agents, Undo all, the sentence before connecting); Undo all named as covering tags, collections, profiles and waiting jobs, not settings; removed the Today and target table.

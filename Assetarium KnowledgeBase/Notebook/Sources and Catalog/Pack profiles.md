@@ -50,7 +50,7 @@ variant groups those rules steer. Start at `pack_profiles.apply` and `variant_gr
   gets the scan's excluded folders.
 - "Folder variants" in `get_asset` (`source_variants`, decision 0019) are files of one asset; variant groups are
   separate assets.
-- **Image kinds are decided at scan time; pack boundaries when a view is read.** So `image_kind` (and other RESCAN kinds) wait for the owner, while INSTANT kinds apply with Undo (`pack_profiles.KINDS`).
+- **Image kinds are decided at scan time; pack boundaries when a view is read.** So `image_kind` (and other RESCAN kinds) need a scan after they are saved: an agent's profile starts it (`pack_agent.propose`), the owner's commit starts one per library folder; INSTANT kinds take effect without one (`pack_profiles.KINDS`).
 
 ## Related
 

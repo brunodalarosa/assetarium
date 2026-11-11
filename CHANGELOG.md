@@ -69,6 +69,13 @@ install; add your library folders again and process them. Supported upgrades sta
 
 ### Added
 
+- **Agents act freely, in the open** (decision 0029): a connected agent can start Make previews and Generate
+  descriptions (`start_processing`; a long job shows its estimate first), and its pack profiles apply at once,
+  including rules that rescan. Agent activity has a **Pause agents** switch (agent changes are refused, reads keep
+  working, jobs agents queued wait) and lists each agent session with **Undo all** for its tags, collections, pack
+  profiles and waiting jobs; anything changed since is kept and named. Jobs an agent started carry its name in
+  Asset processing. Connecting an agent now says what it may change on its own. CLI: `local-assets agents
+  status|pause|resume|undo` (interactive terminal only). Codex users add `start_processing` to `enabled_tools`.
 - **Library**: library folders replace asset sources (`local-assets library …`; `sources …` still works). Browse
   by folder, bundle, pack and folder, with a card state for every asset, pack headers, context menus and Show in
   pack from search. Packs are detected from structure (license, readme, preview image, versioned names) and can
