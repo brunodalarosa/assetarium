@@ -175,7 +175,8 @@ def fresh():
         ui.js(f"(async()=>{{type('setup-server-url',{json.dumps(url)});await frame();lal.setupNext();"
               "await until(()=>$('setup-wizard').dataset.step==='agent');await until(()=>$('setup-agent-connect'));await frame();return true})()")
         ui.check('connect_agent_step_offers_configurations_and_is_skippable', """(async()=>({snippet:!!$('agent-snippet'),
-          copy:!!$('agent-copy-snippet'), skip:!!$('setup-skip-step')}))()""")
+          copy:!!$('agent-copy-snippet'), skip:!!$('setup-skip-step'),
+          freedom:$('agent-freedom').textContent.includes('start processing on its own')}))()""")
         shoot('04b-connect-agent')
         ui.js("(async()=>{lal.setupNext(true);await until(()=>$('setup-wizard').dataset.step==='practice');await frame();return true})()")
         ui.check('agent_practice_step_is_offered_and_skippable', "!!$('setup-try-agent')&&!!$('setup-skip-step')")

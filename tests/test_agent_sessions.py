@@ -38,9 +38,13 @@ def test_a_session_journals_tag_and_collection_edits_and_undo_all_reverses_them(
     assert asset_tags.tags_for(config, ids[0]) == ['owner'] and asset_tags.tags_for(config, ids[1]) == []
     names = [c['name'] for c in collections.load(config)['collections']]
     assert names == ['Kept']
-    assert agent_sessions.summary(config, RUN)['undone']['undone'] == 3
-    with pytest.raises(ConfigError, match='already ran'):
+    assert agent_sessions.summary(config, RUN)['undone']['undone'] == 3 and agent_sessions.summary(config, RUN)['to_undo'] == 0
+    with pytest.raises(ConfigError, match='already took back everything'):
         agent_sessions.undo(config, RUN)
+    with agent_sessions.active(RUN):  # Still connected, the agent changes more; the next Undo all takes only that.
+        asset_tags.change(config, ids[2:3], add=['later'])
+    assert agent_sessions.summary(config, RUN)['to_undo'] == 1
+    assert agent_sessions.undo(config, RUN)['undone'] == ['Tags on 1 asset'] and asset_tags.tags_for(config, ids[2]) == []
 
 
 def test_tags_changed_after_the_session_are_kept(ready):
@@ -118,10 +122,33 @@ def test_start_processing_returns_the_estimate_first_for_long_jobs(fake):
                                                                            'budget_reached': False, 'kinds': {}, 'budget_bytes': None, 'used_bytes': None})
     monkeypatch.setattr(queue, 'describe_estimate', lambda value: 'About an hour.')
     args = {'action': 'previews', 'library_folder': one['key']}
-    payload, error, gateway = call(config, 'start_processing', args)
+    payload, error, gateway = call(config, 'start_processing', dict(args, confirm=True))
+    assert payload['status'] == 'confirm'  # confirm without having seen the estimate still returns it first.
+    payload, error, gateway = call(config, 'start_processing', args, gateway)
     assert not error and payload['status'] == 'confirm' and payload['estimate'].startswith('About an hour') and not started
     payload, error, _ = call(config, 'start_processing', dict(args, confirm=True), gateway)
     assert not error and payload['status'] == 'started' and started[0]['key'] == one['key']
     assert agent_sessions.summary(config, gateway.run_id)['counts'] == {'job': 1}
     payload, error, _ = call(config, 'start_processing', dict(args, mode='retry'), gateway)
     assert error  # No retry of recorded failures through an agent (decision 0020).
+
+
+def test_the_cli_pauses_resumes_and_undoes_only_in_an_interactive_terminal(ready, monkeypatch, capsys):
+    from test_owner_commands import Terminal
+    from local_asset_library import owner_commands
+    config, _, _, _, ids = ready
+    with agent_sessions.active(RUN):
+        asset_tags.change(config, ids[:1], add=['crate'])
+    run = lambda *argv: owner_commands.main(list(argv), config=config)  # noqa: E731
+    assert run('agents', 'pause') == 2 and not agent_sessions.paused(config)  # Captured output is not a terminal.
+    assert 'interactive terminal' in capsys.readouterr().err
+    monkeypatch.setattr(owner_commands.sys, 'stdout', Terminal())
+    for argv, answer in ((('agents', 'pause'), 'yes'), (('agents', 'resume'), 'no')):
+        monkeypatch.setattr(owner_commands.sys, 'stdin', Terminal(answer + '\n'))
+        assert run(*argv) == 0
+    assert agent_sessions.paused(config)
+    monkeypatch.setattr(owner_commands.sys, 'stdin', Terminal('yes\n'))
+    assert run('agents', 'resume') == 0 and not agent_sessions.paused(config)
+    assert run('agents', 'status') == 0
+    monkeypatch.setattr(owner_commands.sys, 'stdin', Terminal('yes\n'))
+    assert run('agents', 'undo', RUN) == 0 and asset_tags.tags_for(config, ids[0]) == []

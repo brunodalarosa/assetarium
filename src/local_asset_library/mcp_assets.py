@@ -378,8 +378,12 @@ class AssetService:
         if args.get("path") and args.get("asset_ids"):
             raise ConfigError("Give path or asset_ids, not both")
         scope = {"key": args["library_folder"], "path": args.get("path", ""), "asset_ids": args.get("asset_ids", [])}
-        result = add(self.config, args["action"], scope, confirmed=args.get("confirm", False), by="agent")
+        # confirm counts only after this connection saw the same request's estimate: the estimate always comes first.
+        request = encoded([args["action"], scope])
+        estimated = self.__dict__.setdefault("_estimated", set())
+        result = add(self.config, args["action"], scope, confirmed=args.get("confirm", False) and request in estimated, by="agent")
         if result["status"] == "confirm":
+            estimated.add(request)
             payload = {"status": "confirm", "title": result["title"], "estimate": result["body"],
                        "next": "A long job: tell the user this estimate, then call again with confirm: true to start it."}
         else:

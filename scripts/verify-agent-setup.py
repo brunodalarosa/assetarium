@@ -139,6 +139,7 @@ def verify():
         ui.check('panel_opens_without_a_session_and_waits', """(async()=>({waiting:$('agent-connection').dataset.state==='waiting',
           access:$('agent-access').textContent.includes('whenever it is connected'),
           honest:!/server is running/i.test(document.body.innerText), privacy:$('agent-privacy').textContent.includes('cloud'),
+          freedom:$('agent-freedom').textContent.includes('pause agents or undo a session'),
           tabs:$('agent-snippet-tabs').querySelectorAll('[role=tab]').length===4,
           allowlist:$('agent-snippet').textContent.includes('enabled_tools')&&$('agent-snippet').textContent.includes('finish_setup'),
           prompt:$('agent-prompt').textContent.includes('get_setup_status')}))()""")

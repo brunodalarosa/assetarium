@@ -2377,7 +2377,7 @@ export async function setAgentsPaused(paused: boolean) {
 /** Undo all of one agent session, after the owner confirms; what changed since is kept and listed with why. */
 export function undoAgentSession(session: Json) {
   askConfirm({ tone: "neutral", title: `Undo everything ${session.agent || "this agent"} changed?`,
-    body: `${plural(session.changes, "change", "changes")} from this session go back, newest first: tags, collections, pack profiles, and jobs still waiting. `
+    body: `${plural(session.to_undo, "change", "changes")} from this session go back, newest first: tags, collections, pack profiles, and jobs still waiting. `
       + "Anything changed after it is kept, and finished processing keeps its results. Settings stay as they are.",
     confirmLabel: "Undo all", run: async () => {
       setState((s) => ({ agent: { ...s.agent, undoing: session.run_id } }));

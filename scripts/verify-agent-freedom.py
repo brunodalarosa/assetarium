@@ -122,7 +122,7 @@ def verify():
         ui.js("lal.setAgentOpen(true)")
         wait("$('agent-sessions')&&$('agent-sessions').textContent.includes('verify-agent')&&$('agent-sessions').textContent.includes('1 job')")
         ui.js("$('agent-pause').querySelector('button,[role=switch]').click()")
-        wait("lal.state.agent.paused&&$('agent-pause').textContent.includes('Agents are paused')", 20)
+        wait("[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Agents paused'))&&$('agent-pause').textContent.includes('Agents are paused')", 20)
         assert agent_sessions.paused(config)
         refused = tool('edit_collection', error=True, action='rename', collection_id=made['collection_id'], name='Renamed')
         assert refused['status'] == 'refused' and 'Paused by the owner' in refused['reason'], refused
@@ -150,7 +150,8 @@ def verify():
         ui.js("lal.setAgentOpen(false)")
         ui.js("lal.navigate({page:'settings'});true")
         ui.js("lal.setAgentsPaused(false)")
-        wait("!lal.state.agent.paused")
+        wait("[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Agents are on again'))")
+        assert not agent_sessions.paused(config)
         report['checks'].append('The owner turns agents back on from the app')
         window.resize(680, 900)
         wait('innerWidth<761')

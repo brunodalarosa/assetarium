@@ -77,12 +77,15 @@ def test_rescan_proposals_apply_at_once_and_start_one_scan(kit, scans):
     assert undone['rescan'] and sources.excluded_folders(sources.bound(config, one)) == []
 
 
-def test_a_rescan_profile_whose_scan_cannot_start_says_when_it_takes_effect(kit, monkeypatch):
+def test_a_rescan_profile_on_a_busy_folder_scans_when_the_running_operation_ends(kit, monkeypatch):
     config, one = kit
     from local_asset_library import source_operations
     monkeypatch.setattr(source_operations, 'start', lambda *a, **k: {'status': 'busy', 'reason': 'This operation is already running'})
     result = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
-    assert result['status'] == 'applied' and result['scan'] == 'busy' and 'next scan' in result['note']
+    assert result['status'] == 'applied' and result['scan'] == 'busy' and 'running operation ends' in result['note']
+    started = []
+    monkeypatch.setattr(source_operations, 'start', lambda config, operation, key=None, **_: started.append(key) or {'status': 'started'})
+    assert source_operations.start_wanted(config) == [one['key']] and source_operations.start_wanted(config) == []
 
 
 def test_held_rescan_proposals_wait_for_the_owner_and_a_newer_one_replaces_them(kit):

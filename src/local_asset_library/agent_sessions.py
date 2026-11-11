@@ -93,10 +93,12 @@ def _journal(folder):
 
 
 def _undone(folder):
+    """What Undo all already did for this session: ``through`` journal entries, and its latest outcome."""
     try:
-        return read_json(folder / 'undo.json')
+        value = read_json(folder / 'undo.json')
     except (OSError, ValueError):
-        return None
+        return {'through': 0, 'last': None}
+    return {'through': int(value.get('through', 0)), 'last': value.get('last')}
 
 
 def _what(entry):
@@ -120,8 +122,10 @@ def summary(config, run_id):
     counts = {}
     for entry in entries:
         counts[entry['kind']] = counts.get(entry['kind'], 0) + 1
+    done = _undone(folder)
     return {'run_id': run_id, 'agent': next((e['agent'] for e in entries if e.get('agent')), ''), 'started_utc': entries[0]['utc'],
-            'last_utc': entries[-1]['utc'], 'changes': len(entries), 'counts': counts, 'undone': _undone(folder)}
+            'last_utc': entries[-1]['utc'], 'changes': len(entries), 'counts': counts, 'undone': done['last'],
+            'to_undo': len(entries) - done['through']}
 
 
 def sessions(config, limit=10):
@@ -147,7 +151,10 @@ def sessions(config, limit=10):
 
 def undo(config, run_id):
     """Undo all of one session, newest first. Returns what was undone, what was skipped and why, and the library folders
-    that need one rescan each (the caller starts it once, after every change). Processing already done is kept."""
+    that need one rescan each (the caller starts it once, after every change). Processing already done is kept.
+
+    A session still connected may change more after an Undo all; the next Undo all takes only those changes.
+    """
     from . import asset_collections, asset_tags, processing_queue
     from .library_store import now
     from .pack_agent import decide
@@ -155,10 +162,11 @@ def undo(config, run_id):
     entries = _journal(folder)
     if not entries:
         raise ConfigError('This agent session changed nothing')
-    if _undone(folder):
-        raise ConfigError('Undo all already ran for this session')
+    through = _undone(folder)['through']
+    if through >= len(entries):
+        raise ConfigError('Undo all already took back everything this session changed')
     undone, skipped, rescan = [], [], []
-    for entry in reversed(entries):
+    for entry in reversed(entries[through:]):
         what = _what(entry)
         try:
             if entry['kind'] == 'tags':
@@ -175,7 +183,7 @@ def undo(config, run_id):
             reason = str(exc)
         (skipped.append({'what': what, 'reason': reason}) if reason else undone.append(what))
     record = {'utc': now(), 'undone': len(undone), 'skipped': skipped}
-    atomic_json(folder / 'undo.json', record)
+    atomic_json(folder / 'undo.json', {'schema_version': 1, 'through': len(entries), 'last': record})
     from .logs import kv
     import logging
     logging.getLogger(__name__).info('Agent session undone · %s', kv(run=run_id[:8], undone=len(undone), skipped=len(skipped)))

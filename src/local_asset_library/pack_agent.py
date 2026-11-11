@@ -202,15 +202,18 @@ def propose(config, args, client=None, hold=False):
     payload = {'status': 'applied', 'proposal_id': identifier, 'version': result['version'], 'effect': seen['lines'],
                'note': 'Applied at once; the owner can undo it in the app.'}
     if result.get('rescan'):
-        from .source_operations import start
+        from .source_operations import start, want_scan
         try:
             scan = start(config, 'scan', source['key'])
         except ConfigError as exc:
             scan = {'status': 'faulty', 'reason': str(exc)}
+        if scan.get('status') == 'busy':
+            want_scan(config, source['key'])  # Starts when the folder's running operation ends.
         payload['scan'] = scan.get('status')
-        payload['note'] = ('Applied at once; a scan of the library folder started (it processes nothing). The owner can undo it.'
-                           if scan.get('status') == 'started' else 'Applied at once, but its scan could not start now ('
-                           + (scan.get('reason') or 'busy') + '); the rules take effect at the next scan of this library folder.')
+        payload['note'] = {'started': 'Applied at once; a scan of the library folder started (it processes nothing). The owner can undo it.',
+                           'busy': 'Applied at once; the library folder is busy, so its scan starts when the running operation ends.'}.get(
+            scan.get('status'), 'Applied at once, but its scan could not start (' + str(scan.get('reason')) + '); the rules take effect '
+                                'at the next scan of this library folder.')
     return payload
 
 

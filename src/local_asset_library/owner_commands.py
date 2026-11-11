@@ -334,15 +334,14 @@ def agents_command(args, config):
         result = {'status': 'ready', 'paused': agent_sessions.paused(config), 'sessions': agent_sessions.sessions(config)}
         say(args, 'Agents are paused.' if result['paused'] else 'Agents are on.')
         for item in result['sessions']:
-            state = ' · undone' if item['undone'] else ''
+            state = (' · undone' if item['undone'] else '') + (f" · {item['to_undo']} to undo" if item['undone'] and item['to_undo'] else '')
             say(args, f"  {item['run_id']}  {item['agent'] or 'agent'} · {item['changes']} change(s) · {item['last_utc'][:16]}{state}")
         return result
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise ConfigError('Only the owner pauses agents, turns them back on or undoes a session: run it yourself in an '
                           'interactive terminal')
     question = {'pause': 'Pause agents? Their changes are refused until you run "agents resume"; reads keep working.',
-                'resume': 'Turn agents back on? They can change things again.'}.get(args.action,
-                f'Undo every change of agent session {args.session}?')
+                'resume': 'Turn agents back on? They can change things again.'}.get(args.action) or         f'Undo every change of agent session {args.session}?'
     if input(question + ' Type "yes" to confirm: ').strip().lower() != 'yes':
         say(args, 'Nothing changed.')
         return {'status': 'skipped'}

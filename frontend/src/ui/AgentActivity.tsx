@@ -34,9 +34,10 @@ function Session({ session, busy }: { session: Json; busy: boolean }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{session.agent || "Agent"} · {day(session.started_utc)}</span>
         <span className="block truncate text-[11.5px] text-muted-foreground">{counts(session.counts)}
-          {undone ? ` · undone${undone.skipped.length ? `, ${undone.skipped.length} kept` : ""}` : ""}</span>
+          {undone ? ` · undone${undone.skipped.length ? `, ${undone.skipped.length} kept` : ""}` : ""}
+          {undone && session.to_undo > 0 ? ` · ${plural(session.to_undo, "new change", "new changes")}` : ""}</span>
       </span>
-      {!undone && (
+      {session.to_undo > 0 && (
         <button type="button" disabled={busy} className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-primary hover:underline disabled:opacity-50"
           onClick={() => undoAgentSession(session)}><Undo2 className="size-3.5" aria-hidden />{busy ? "Undoing…" : "Undo all"}</button>
       )}
