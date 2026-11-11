@@ -5,7 +5,7 @@ import { Switch } from "@/components/beui/switch";
 import type { Json } from "../app/api";
 import { nearMissText, operationActive, plural } from "../app/format";
 import { confirmForgetMissing, loadMissingEntries, confirmRemoveSource, folderAction, loadPackProfile, packProfileAction, pathAction, sourceAction, sourceFolders, useApp } from "../app/store";
-import { Badge, Banner, Button, RadioCards, TextField } from "./primitives";
+import { Badge, Banner, Button, Hint, Pressable, RadioCards, TextField } from "./primitives";
 
 const where = (anchor: string) => (anchor ? `In ${anchor}` : "At the top of this library folder");
 
@@ -33,7 +33,7 @@ function TextureChoice({ source, busy }: { source: Json; busy: boolean }) {
       {chosen && (
         <p className="texture-chosen flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
           <span>Textures from {chosen.folder || "no folder"}{chosen.single_copies ? " and single copies" : ""}. Repaired models wait for Make previews; originals are not changed.</span>
-          <button type="button" className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="textures-undo" onClick={() => void run(true)}>Undo</button>
+          <Pressable className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="textures-undo" tooltip="Forgets this texture choice and scans the source again" onClick={() => void run(true)}>Undo</Pressable>
         </p>
       )}
       {found && (
@@ -53,7 +53,7 @@ function TextureChoice({ source, busy }: { source: Json; busy: boolean }) {
             {(fixes || 0).toLocaleString()} fixed{left > 0 ? ` · ${left.toLocaleString()} ${left === 1 ? "stays" : "stay"} failed with ${left === 1 ? "its" : "their"} recorded ${left === 1 ? "reason" : "reasons"}` : " · none left unresolved"}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button className="h-9 px-4" disabled={disabled || !fixes} data-action="textures-apply" onClick={() => void run(false)}>Apply</Button>
+            <Button className="h-9 px-4" disabled={disabled || !fixes} data-action="textures-apply" tooltip="Records this texture choice with each repaired model and scans again; nothing is rendered yet" onClick={() => void run(false)}>Apply</Button>
           </div>
           <p className="hint text-[11.5px] leading-relaxed text-subtle">Applying records your choice with each repaired model and scans again. Nothing is rendered until you choose Make previews, and original files are never changed. Undo removes the choice.</p>
         </>
@@ -101,9 +101,9 @@ export function SourceFolders({ source, busy }: { source: Json; busy: boolean })
             Grouping makes one asset per model with every folder’s file attached; only the preferred file is rendered. Previews and descriptions are kept and search data is rebuilt. Excluding stops scanning the extra folders ({s.folders.filter((f: string) => f !== s.reference && !s.grouped_folders.includes(f)).join(", ")}){excludedOnly(s)}. Nothing on disk changes either way.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button className="h-9 px-4" disabled={disabled} data-action="group" onClick={() => void run("export", s.id, "group")}>Group as alternate files</Button>
-            <Button variant="secondary" className="h-9 px-4" disabled={disabled} data-action="exclude" onClick={() => void run("export", s.id, "exclude")}>Exclude extra folders</Button>
-            <Button variant="quiet" className="h-9 px-4" disabled={disabled} data-action="separate" onClick={() => void run("export", s.id, "separate")}>Keep separate</Button>
+            <Button className="h-9 px-4" disabled={disabled} data-action="group" tooltip="Makes one asset per model with each folder’s file attached; only the preferred file is rendered" onClick={() => void run("export", s.id, "group")}>Group as alternate files</Button>
+            <Button variant="secondary" className="h-9 px-4" disabled={disabled} data-action="exclude" tooltip="Stops scanning the extra folders; nothing on disk changes" onClick={() => void run("export", s.id, "exclude")}>Exclude extra folders</Button>
+            <Button variant="quiet" className="h-9 px-4" disabled={disabled} data-action="separate" tooltip="Keeps every folder’s models as separate assets and stops suggesting this" onClick={() => void run("export", s.id, "separate")}>Keep separate</Button>
           </div>
         </div>
       ))}
@@ -112,7 +112,7 @@ export function SourceFolders({ source, busy }: { source: Json; busy: boolean })
           {answers.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center gap-2">
               <span>{d.decision === "group" ? "Grouped" : "Kept separate"}: {d.anchor ? d.anchor + " / " : ""}{d.folders.join(", ")}</span>
-              <button type="button" className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="undo" onClick={() => void run("undo", d.id)}>Undo</button>
+              <Pressable className="font-medium text-primary hover:underline disabled:opacity-50" disabled={disabled} data-action="undo" tooltip="Forgets this answer, so the suggestion comes back" onClick={() => void run("undo", d.id)}>Undo</Pressable>
             </li>
           ))}
         </ul>
@@ -124,15 +124,15 @@ export function SourceFolders({ source, busy }: { source: Json; busy: boolean })
             {exclusions.map((item) => (
               <li key={item} className="flex items-center gap-1.5 rounded-full bg-surface-2 py-1 pl-3 pr-1.5 text-[12px]">
                 <span className="font-mono">{item}</span>
-                <button type="button" aria-label={"Stop excluding " + item} disabled={disabled} className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-50"
-                  onClick={() => void run("exclusions", exclusions.filter((p) => p !== item))}>×</button>
+                <Pressable aria-label={"Stop excluding " + item} tooltip="Stops excluding this pattern and scans the source again" disabled={disabled} className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-50"
+                  onClick={() => void run("exclusions", exclusions.filter((p) => p !== item))}>×</Pressable>
               </li>
             ))}
           </ul>
         )}
         <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); if (pattern.trim()) void run("exclusions", [...exclusions, pattern.trim()]); }}>
           <TextField id={`exclude-${source.id}`} label="Folder name or path" value={pattern} disabled={disabled} spellCheck={false} placeholder="Unity*  or  Models/Unity FBX" onChange={(e) => setPattern(e.target.value)} className="min-w-[220px] flex-1" />
-          <Button type="submit" variant="secondary" className="h-10 px-4" disabled={disabled || !pattern.trim()}>Exclude</Button>
+          <Button type="submit" variant="secondary" className="h-10 px-4" disabled={disabled || !pattern.trim()} tooltip="Stops scanning folders that match and scans the source again; nothing on disk is deleted">Exclude</Button>
         </form>
         <p className="hint text-[11.5px] leading-relaxed text-subtle">
           {exclusions.length ? `${files.toLocaleString()} files in ${excluded.length} excluded ${excluded.length === 1 ? "folder" : "folders"} are not scanned. ` : ""}
@@ -187,7 +187,7 @@ function PackProfile({ folderKey, path, busy }: { folderKey: string; path: strin
     <section id="pack-profile" className="grid gap-2.5" data-status={signals?.status || "fine"}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="mr-auto text-[13px] font-medium">Structure</h3>
-        <Badge tone={status.tone}>{status.label}</Badge>
+        <Hint content="How the pack’s detected structure looks; the lines below say why"><span className="inline-flex"><Badge tone={status.tone}>{status.label}</Badge></span></Hint>
       </div>
       {signals && [...signals.needs, ...signals.suggestions].length > 0 && (
         <ul className="grid gap-1 text-[12.5px] leading-relaxed text-muted-foreground">
@@ -195,13 +195,13 @@ function PackProfile({ folderKey, path, busy }: { folderKey: string; path: strin
         </ul>
       )}
       {signals && !signals.reviewed && signals.status !== "fine" && (
-        <Button variant="quiet" className="h-8 w-fit px-3" data-action="review-structure" disabled={busy} onClick={() => void act("review", signals.evidence)}>It’s right as it is</Button>
+        <Button variant="quiet" className="h-8 w-fit px-3" data-action="review-structure" disabled={busy} tooltip="Marks this structure as reviewed, so the pack stops asking for one" onClick={() => void act("review", signals.evidence)}>It’s right as it is</Button>
       )}
       <p className="text-[12.5px] text-muted-foreground">{rules.length ? plural(rules.length, "rule steers", "rules steer") + " this pack:" : "No rules: detection and the defaults decide this pack."}</p>
-      {rules.length > 0 && <ul className="profile-rules grid gap-1 text-[12.5px]">{rules.map((rule, i) => <li key={i} title={rule.note}>{ruleText(rule)}</li>)}</ul>}
+      {rules.length > 0 && <ul className="profile-rules grid gap-1 text-[12.5px]">{rules.map((rule, i) => <Hint key={i} content={rule.note}><li>{ruleText(rule)}</li></Hint>)}</ul>}
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" className="h-8 px-3" data-action="export-profile" onClick={() => void act("export")}><Download className="size-4" aria-hidden />Export profile</Button>
-        {history.length > 0 && <Button variant="quiet" className="h-8 px-3" aria-expanded={open} onClick={() => setOpen(!open)}><History className="size-4" aria-hidden />{plural(history.length, "version", "versions")}</Button>}
+        <Button variant="secondary" className="h-8 px-3" data-action="export-profile" tooltip="Saves this pack’s rules to a profile file and shows where" onClick={() => void act("export")}><Download className="size-4" aria-hidden />Export profile</Button>
+        {history.length > 0 && <Button variant="quiet" className="h-8 px-3" aria-expanded={open} tooltip={open ? "Hides the earlier versions" : "Shows every version of these rules; any can be restored"} onClick={() => setOpen(!open)}><History className="size-4" aria-hidden />{plural(history.length, "version", "versions")}</Button>}
       </div>
       {open && (
         <ol className="profile-history grid gap-1.5 border-l border-border pl-3">
@@ -209,7 +209,7 @@ function PackProfile({ folderKey, path, busy }: { folderKey: string; path: strin
             <li key={item.version} className="flex flex-wrap items-center gap-x-2 text-[12px]">
               <span className="font-medium tabular-nums">v{item.version}</span>
               <span className="text-muted-foreground">{ORIGIN[item.origin.by] || item.origin.by}{item.origin.agent ? ` (${item.origin.agent})` : ""} · {new Date(item.utc).toLocaleString()} · {plural(item.rules, "rule", "rules")}</span>
-              {index > 0 && <button type="button" className="text-primary hover:underline disabled:opacity-50" disabled={busy} onClick={() => void act("revert", item.version)}>Restore</button>}
+              {index > 0 && <Pressable className="text-primary hover:underline disabled:opacity-50" disabled={busy} tooltip="Makes these rules current again as a new version; the history is kept" onClick={() => void act("revert", item.version)}>Restore</Pressable>}
             </li>
           ))}
         </ol>
@@ -224,12 +224,12 @@ const KIND_ICON = { library: HardDrive, bundle: Boxes, pack: Package, folder: Fo
 function PackName({ folderKey, path, name }: { folderKey: string; path: string; name: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   if (draft === null)
-    return <button type="button" className="w-fit text-[12px] font-medium text-primary hover:underline" data-action="rename-pack" onClick={() => setDraft(name)}>Rename</button>;
+    return <Pressable className="w-fit text-[12px] font-medium text-primary hover:underline" data-action="rename-pack" tooltip="Gives this pack a name of your own; its folder keeps its name on disk" onClick={() => setDraft(name)}>Rename</Pressable>;
   return (
     <form className="flex items-end gap-2" onSubmit={(event) => { event.preventDefault(); void folderAction("rename_pack", folderKey, path, draft).then(() => setDraft(null)); }}>
       <TextField id="pack-name" label="Pack name" value={draft} maxLength={120} onChange={(e) => setDraft(e.target.value)} className="min-w-0 flex-1" />
-      <Button type="submit" variant="secondary" className="h-10 px-4">Save</Button>
-      <Button type="button" variant="quiet" className="h-10 px-3" onClick={() => setDraft(null)}>Cancel</Button>
+      <Button type="submit" variant="secondary" className="h-10 px-4" tooltip={false}>Save</Button>
+      <Button type="button" variant="quiet" className="h-10 px-3" tooltip={false} onClick={() => setDraft(null)}>Cancel</Button>
     </form>
   );
 }
@@ -262,13 +262,13 @@ function MissingEntries({ folderKey, path, name, count, revision }: { folderKey:
           <ul className="mt-2 grid gap-1 break-all text-muted-foreground">{item.paths.map((p: string) => <li key={p}>{p}</li>)}</ul>
         </details>)}
         {page && <div className="flex items-center gap-2">
-          <Button variant="quiet" disabled={!offset} onClick={() => setOffset(Math.max(0, offset - 30))}>Previous</Button>
+          <Button variant="quiet" disabled={!offset} tooltip={false} onClick={() => setOffset(Math.max(0, offset - 30))}>Previous</Button>
           <span className="mr-auto tabular-nums">{page.total ? offset + 1 : 0}–{Math.min(offset + 30, page.total)} / {page.total}</span>
-          <Button variant="quiet" disabled={offset + 30 >= page.total} onClick={() => setOffset(offset + 30)}>Next</Button>
+          <Button variant="quiet" disabled={offset + 30 >= page.total} tooltip={false} onClick={() => setOffset(offset + 30)}>Next</Button>
         </div>}
       </div>}
     </details>
-    <Button variant="danger" className="w-fit" data-action="forget-missing" onClick={() => void confirmForgetMissing(folderKey, path, name)}>Forget all missing files</Button>
+    <Button variant="danger" className="w-fit" data-action="forget-missing" tooltip="Asks first, then forgets the entries whose files are gone" onClick={() => void confirmForgetMissing(folderKey, path, name)}>Forget all missing files</Button>
   </section>;
 }
 
@@ -291,7 +291,7 @@ export function FolderPanel() {
       <header className="grid gap-1.5">
         <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground"><Icon className="size-3.5" aria-hidden />{KIND_LABEL[kind] || "Folder"}</p>
         <h2 id="folder-panel-title" tabIndex={-1} className="text-[20px] font-semibold break-words outline-none">{name}</h2>
-        <p className="truncate text-[12px] text-muted-foreground" title={full}>{full}</p>
+        <Hint content={full}><p className="truncate text-[12px] text-muted-foreground">{full}</p></Hint>
         {kind === "pack" && <PackName folderKey={folder.key} path={view.path} name={name} />}
       </header>
       {folder.scan_fault && <Banner><span id="folder-fault">{folder.scan_fault}</span></Banner>}
@@ -310,32 +310,32 @@ export function FolderPanel() {
             {license ? `Found ${license.evidence} in this pack. ` : "No license file found in this pack. "}
             {node.pack?.basis === "owner" ? "You made this folder a pack." : node.pack?.basis === "markers" ? "Detected from " + (node.pack.markers || []).map((m: Json) => m.evidence).slice(0, 3).join(", ") + "." : "The first folder with assets."}
           </p>
-          {license && <Badge tone="neutral" className="w-fit">License file</Badge>}
+          {license && <Hint content={"Found " + license.evidence}><span className="inline-flex w-fit"><Badge tone="neutral" className="w-fit">License file</Badge></span></Hint>}
         </section>
       )}
       {kind === "pack" && <PackProfile folderKey={folder.key} path={view.path} busy={busy} />}
       <section className="grid gap-2">
         <h3 className="text-[13px] font-medium">Organize</h3>
         <div className="flex flex-wrap gap-2">
-          {kind !== "pack" && kind !== "library" && <Button variant="secondary" className="h-9 px-3" data-action="make-pack" disabled={busy} onClick={() => void folderAction("make_pack", folder.key, view.path)}>Make this a pack</Button>}
-          {kind === "pack" && view.path !== "" && <Button variant="secondary" className="h-9 px-3" data-action="merge-pack" disabled={busy} onClick={() => void folderAction("merge", folder.key, view.path)}>Merge into parent pack</Button>}
-          {node.pack?.basis === "owner" && <Button variant="quiet" className="h-9 px-3" disabled={busy} onClick={() => void folderAction("clear_pack", folder.key, view.path)}>Undo pack choice</Button>}
-          <Button variant="secondary" className="h-9 px-3" data-action="images-textures" disabled={busy} onClick={() => void folderAction("image_kind", folder.key, view.path, "texture")}>Treat images here as textures</Button>
-          <Button variant="secondary" className="h-9 px-3" data-action="images-2d" disabled={busy} onClick={() => void folderAction("image_kind", folder.key, view.path, "image")}>Treat images here as 2D assets</Button>
-          {view.path !== "" && <Button variant="quiet" className="h-9 px-3" data-action="exclude-folder" disabled={busy} onClick={() => void folderAction("exclude", folder.key, view.path)}>Exclude folder</Button>}
+          {kind !== "pack" && kind !== "library" && <Button variant="secondary" className="h-9 px-3" data-action="make-pack" disabled={busy} tooltip="Treats this folder as a pack of its own and scans again" onClick={() => void folderAction("make_pack", folder.key, view.path)}>Make this a pack</Button>}
+          {kind === "pack" && view.path !== "" && <Button variant="secondary" className="h-9 px-3" data-action="merge-pack" disabled={busy} tooltip="Makes this folder part of the pack around it and scans again" onClick={() => void folderAction("merge", folder.key, view.path)}>Merge into parent pack</Button>}
+          {node.pack?.basis === "owner" && <Button variant="quiet" className="h-9 px-3" disabled={busy} tooltip="Forgets your pack choice here, so detection decides again" onClick={() => void folderAction("clear_pack", folder.key, view.path)}>Undo pack choice</Button>}
+          <Button variant="secondary" className="h-9 px-3" data-action="images-textures" disabled={busy} tooltip="Images here become textures of the models, not assets of their own" onClick={() => void folderAction("image_kind", folder.key, view.path, "texture")}>Treat images here as textures</Button>
+          <Button variant="secondary" className="h-9 px-3" data-action="images-2d" disabled={busy} tooltip="Images here become 2D assets you can search and preview" onClick={() => void folderAction("image_kind", folder.key, view.path, "image")}>Treat images here as 2D assets</Button>
+          {view.path !== "" && <Button variant="quiet" className="h-9 px-3" data-action="exclude-folder" disabled={busy} tooltip="Stops scanning this folder; nothing on disk changes" onClick={() => void folderAction("exclude", folder.key, view.path)}>Exclude folder</Button>}
         </div>
         <p className="hint text-[11.5px] leading-relaxed text-subtle">Each answer is saved with this folder and the library folder is scanned again. Nothing on disk changes, and nothing is processed until you ask.</p>
       </section>
       <section className="flex flex-wrap gap-2">
-        <Button variant="secondary" className="h-9 px-3" onClick={() => void pathAction("reveal", folder.key, view.path)}><FolderSearch className="size-4" aria-hidden />Show in Explorer</Button>
-        <Button variant="quiet" className="h-9 px-3" onClick={() => void pathAction("copy", folder.key, view.path)}><Copy className="size-4" aria-hidden />Copy path</Button>
+        <Button variant="secondary" className="h-9 px-3" tooltip="Opens this folder in Windows Explorer" onClick={() => void pathAction("reveal", folder.key, view.path)}><FolderSearch className="size-4" aria-hidden />Show in Explorer</Button>
+        <Button variant="quiet" className="h-9 px-3" tooltip="Copies the folder’s full path" onClick={() => void pathAction("copy", folder.key, view.path)}><Copy className="size-4" aria-hidden />Copy path</Button>
       </section>
       {kind === "library" && (
         <>
           <section className="flex flex-wrap items-center gap-3">
             <Switch checked={source.enabled} onCheckedChange={(checked) => void sourceAction("enabled", folder.key, null, checked)} label="Included in search" ariaLabel={"Include " + folder.name + " in search"} />
-            <Button variant="secondary" className="h-9 px-3" data-action="rescan" disabled={busy || folder.offline} onClick={() => void sourceAction("scan", folder.key)}><RefreshCw className="size-4" aria-hidden />Rescan</Button>
-            <Button variant="danger" className="h-9 px-3" data-action="remove" disabled={busy} onClick={() => confirmRemoveSource(source)}><Trash2 className="size-4" aria-hidden />Remove…</Button>
+            <Button variant="secondary" className="h-9 px-3" data-action="rescan" disabled={busy || folder.offline} tooltip="Looks for added, changed and removed files; scans never render or run models" onClick={() => void sourceAction("scan", folder.key)}><RefreshCw className="size-4" aria-hidden />Rescan</Button>
+            <Button variant="danger" className="h-9 px-3" data-action="remove" disabled={busy} tooltip="Asks first, then stops listing this source; its files and results stay on disk" onClick={() => confirmRemoveSource(source)}><Trash2 className="size-4" aria-hidden />Remove…</Button>
           </section>
           <SourceFolders source={source} busy={busy} />
         </>

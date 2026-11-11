@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import { decideAgentProposal, setAgentOpen, useApp } from "../app/store";
-import { IconButton } from "./primitives";
+import { IconButton, Pressable } from "./primitives";
 import { ProposalReview } from "./ProposalReview";
 
 const KIND = {
@@ -24,7 +24,7 @@ export function AgentButton() {
   const last = agent.entries[agent.entries.length - 1];
   const label = `Agent activity${agent.working ? ", an agent is working" : ""}${waiting ? `, ${plural(waiting, "proposal", "proposals")} waiting` : ""}`;
   return (
-    <button id="open-agent-activity" type="button" aria-label={label} aria-haspopup="dialog" aria-expanded={agent.open} aria-controls="agent-activity-panel"
+    <Pressable id="open-agent-activity" aria-label={label} side="bottom" tooltip={agent.open ? "Hides agent activity" : "Shows what your agent did here and the proposals waiting for you"} aria-haspopup="dialog" aria-expanded={agent.open} aria-controls="agent-activity-panel"
       data-agent-anchor="" data-working={agent.working ? "true" : "false"} onClick={() => setAgentOpen(!agent.open)}
       className={cn("relative flex h-10 max-w-[280px] items-center gap-2 rounded-full border px-3 text-[12.5px] transition-colors",
         agent.open ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-muted-foreground hover:text-foreground")}>
@@ -34,7 +34,7 @@ export function AgentButton() {
       </span>
       {agent.working && last ? <span className="hidden truncate md:inline">{last.text}</span> : <span className="hidden md:inline">Agent</span>}
       {waiting > 0 && <span id="agent-waiting-count" className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">{waiting}</span>}
-    </button>
+    </Pressable>
   );
 }
 
@@ -104,7 +104,7 @@ export function AgentActivityPanel() {
                       <span className="min-w-0 flex-1 break-words">{entry.text}</span>
                       <time className="shrink-0 text-[11px] text-subtle tabular-nums" dateTime={entry.utc}>{time(entry.utc)}</time>
                       {entry.kind === "change" && entry.proposal_id && (
-                        <button type="button" className="shrink-0 text-[11.5px] font-medium text-primary hover:underline" onClick={() => void decideAgentProposal(entry.proposal_id, "undo")}>Undo</button>
+                        <Pressable className="shrink-0 text-[11.5px] font-medium text-primary hover:underline" tooltip="Undoes this change your agent made" onClick={() => void decideAgentProposal(entry.proposal_id, "undo")}>Undo</Pressable>
                       )}
                     </motion.li>
                   );

@@ -1,10 +1,9 @@
 import { Ban, Box, Check, Circle, CircleAlert, CircleSlash, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, ToggleLeft, TriangleAlert, Unlink } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import { type ComponentType, type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
-import { Tooltip } from "@/components/beui/tooltip";
 import { cardMeta, packName } from "../app/format";
 import { getState, type GridId, openAssetMenu, pathAction, pickAsset, requestThumb, selectAsset, type Thumb, toggleSelected, useApp } from "../app/store";
 
@@ -41,11 +40,11 @@ function StateStrip({ item }: { item: Json }) {
   return (
     <span className="state-strip absolute top-3 right-3 z-10 flex gap-1" data-state={item.state}>
       {icons.map(({ icon: Icon, label, tone, spin }) => (
-        <Tooltip key={label} content={label} delay={250}>
+        <Hint key={label} content={label}>
           <span role="img" aria-label={label} className={cn("grid size-6 place-items-center rounded-full bg-surface/90 shadow-sm backdrop-blur", tone)}>
             <Icon className={cn("size-3.5", spin && "animate-spin")} strokeWidth={2} />
           </span>
-        </Tooltip>
+        </Hint>
       ))}
     </span>
   );
@@ -64,7 +63,7 @@ function NoPreview({ item }: { item: Json }) {
   );
 }
 import { AssetCardGhost, Skeleton, useShownWhile } from "./Loading";
-import { Badge } from "./primitives";
+import { Badge, Hint, MotionPressable, Pressable } from "./primitives";
 
 function badges(item: Json, thumb?: Thumb) {
   const latest = { ...item, ...(thumb?.presentation || {}) };
@@ -123,16 +122,16 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
   };
   return (
     <div className="card-wrap relative min-w-0">
-    <motion.button
+    <MotionPressable
       ref={ref}
-      type="button"
       data-id={item.asset_id}
       aria-pressed={choosing ? ticked : selected}
       aria-label={(choosing ? (ticked ? "Selected: " : "Not selected: ") : "") + label + (item.label ? `, labeled ${item.label}` : "")
         + (variants.length ? `, ${variants.length} variants, showing ${item.variant}` : "")}
       aria-describedby={describedBy}
       aria-haspopup="menu"
-      title={thumb?.presentation?.faults?.length ? "Recorded faults available in detail" : undefined}
+      // The card shows the asset; selecting it to inspect needs no label, a recorded fault does.
+      tooltip={thumb?.presentation?.faults?.length ? "Recorded faults: select the card to see them in detail" : false}
       onClick={(event) => {
         if (choosing) return toggleSelected(item.asset_id, event.shiftKey);
         // Ctrl- or Shift-click picks several assets on the Asset sources tab, for queue actions and collections.
@@ -166,13 +165,14 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
       )}
       {grid === "source" && <StateStrip item={item} />}
       {variants.length > 0 && (
-        <Tooltip content={`${variants.length} variants`} delay={250}>
+        <Hint content={`${variants.length} variants`}>
           <span className="variant-badge absolute top-3 left-3 z-10 inline-flex h-6 items-center gap-1 rounded-full bg-surface/90 px-2 text-[11px] font-medium text-foreground shadow-sm backdrop-blur">
             <SwatchBook className="size-3.5" strokeWidth={2} aria-hidden />{variants.length}
           </span>
-        </Tooltip>
+        </Hint>
       )}
-      <div title={item.source_format && thumb?.card?.format && item.source_format !== thumb.card.format ? `Shared preview from ${thumb.card.format.toUpperCase()}; this file is ${item.source_format.toUpperCase()}.` : undefined} className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb",
+      <Hint content={item.source_format && thumb?.card?.format && item.source_format !== thumb.card.format ? `Shared preview from ${thumb.card.format.toUpperCase()}; this file is ${item.source_format.toUpperCase()}.` : null}>
+      <div className={cn("thumb flex aspect-[258/166] items-center justify-center overflow-hidden rounded-xl", item.asset_type === "image" && thumb?.image ? "bg-checker" : "bg-thumb",
         grid === "source" && item.state === "missing" && "opacity-60")}>
         {thumb?.image ? (
           <img
@@ -184,15 +184,18 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
         ) : thumb && grid === "source" && item.state ? (
           <NoPreview item={item} />
         ) : thumb ? (
-          <span className="placeholder px-3 text-center text-[12px] leading-snug text-muted-foreground" title={thumb.reason} aria-label={thumb.placeholder ? `${thumb.placeholder}: ${thumb.reason}` : undefined}>
-            {thumb.placeholder}
-          </span>
+          <Hint content={thumb.reason}>
+            <span className="placeholder px-3 text-center text-[12px] leading-snug text-muted-foreground" aria-label={thumb.placeholder ? `${thumb.placeholder}: ${thumb.reason}` : undefined}>
+              {thumb.placeholder}
+            </span>
+          </Hint>
         ) : (
           <span className="thumb-loading size-full" role="img" aria-label="Loading preview…">
             <Skeleton className="size-full rounded-none" wave={(index % 4) * 90} />
           </span>
         )}
       </div>
+      </Hint>
       <div className="card-text grid gap-1 px-3 pt-3.5 pb-2.5">
         {item.label && <span className="card-label w-fit max-w-full truncate rounded-md bg-accent-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-accent-soft-foreground">{item.label}</span>}
         <span className="card-name truncate text-[14px] font-medium text-foreground">{item.name}</span>
@@ -211,17 +214,17 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
         {variants.length > 0 && <span aria-hidden className="h-8" />}
       </div>
       {thumb?.reason && <span id={describedBy} className="sr">{thumb.reason}</span>}
-    </motion.button>
+    </MotionPressable>
     {variants.length > 0 && (
       <span className="variant-chips absolute bottom-3 left-5 right-5 flex gap-1 overflow-hidden" role="radiogroup" aria-label={`Variants of ${card.name}`}
         onMouseLeave={() => setPeek(null)}>
         {variants.map((v) => (
-          <button key={v.asset_id} type="button" role="radio" aria-checked={v.asset_id === shown} title={v.name} tabIndex={v.asset_id === shown ? 0 : -1}
+          <Pressable key={v.asset_id} role="radio" aria-checked={v.asset_id === shown} tooltip={v.name} delay={250} tabIndex={v.asset_id === shown ? 0 : -1}
             onMouseEnter={() => setPeek(v.asset_id)} onFocus={() => setPeek(v.asset_id)} onBlur={() => setPeek(null)} onClick={() => pick(v.asset_id)}
             className={cn("h-6 min-w-7 shrink-0 rounded-full border px-2 text-[11px] transition-colors",
               v.asset_id === shown ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground")}>
             {v.variant}
-          </button>
+          </Pressable>
         ))}
       </span>
     )}

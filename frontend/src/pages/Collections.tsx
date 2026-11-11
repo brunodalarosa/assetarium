@@ -1,5 +1,5 @@
 import { LayoutGrid, Plus, Search, X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,7 @@ import type { Json } from "../app/api";
 import { ago, plural } from "../app/format";
 import { coverThumb, openCollection, openCollectionMenu, openCreateCollection, setCollectionsQuery, type Thumb, useApp } from "../app/store";
 import { CollectionCardGhost, Skeleton, useShownWhile } from "../ui/Loading";
-import { Banner, Button, IconButton, Spinner } from "../ui/primitives";
+import { Banner, Button, Hint, IconButton, MotionPressable, Spinner } from "../ui/primitives";
 
 export function updatedText(utc: string) {
   const days = (Date.now() - Date.parse(utc)) / 86400000;
@@ -26,13 +26,13 @@ function CoverTile({ entry, index }: { entry?: Json; index: number }) {
   if (!entry) return <span className="rounded-lg bg-thumb/60" />;
   if (!thumb) return <Skeleton className="rounded-lg" wave={(index % 2) * 50 + Math.floor(index / 2) * 30} />;
   return (
-    <span className={cn("grid place-items-center overflow-hidden rounded-lg", entry.asset_type === "image" && thumb.image ? "bg-checker" : "bg-thumb")} title={thumb.reason || entry.name}>
+    <Hint content={thumb.reason || entry.name}><span className={cn("grid place-items-center overflow-hidden rounded-lg", entry.asset_type === "image" && thumb.image ? "bg-checker" : "bg-thumb")}>
       {thumb.image ? (
         <img src={"data:image/png;base64," + thumb.image} alt="" draggable={false} className={cn("reveal-img size-full object-contain", entry.asset_type === "image" && "p-1", thumb.pixelArt && "pixelated")} />
       ) : (
         <span className="px-1 text-center text-[10.5px] leading-tight text-subtle">{thumb.placeholder}</span>
       )}
-    </span>
+    </span></Hint>
   );
 }
 
@@ -42,9 +42,9 @@ function CollectionCard({ summary, index }: { summary: Json; index: number }) {
   const cover: Json[] = summary.cover || [];
   const match = summary.match;
   return (
-    <motion.button
+    <MotionPressable
       ref={ref}
-      type="button"
+      tooltip="Opens this collection. Right-click to delete it"
       data-collection={summary.collection_id}
       aria-haspopup="menu"
       aria-label={`${summary.name}, ${plural(summary.asset_count, "asset", "assets")}, ${updatedText(summary.updated_at)}`}
@@ -75,7 +75,7 @@ function CollectionCard({ summary, index }: { summary: Json; index: number }) {
         )}
         <span className="collection-updated mt-1 text-[11px] text-subtle">{updatedText(summary.updated_at)}</span>
       </span>
-    </motion.button>
+    </MotionPressable>
   );
 }
 
@@ -95,7 +95,7 @@ export function Collections() {
           <h1 ref={heading} tabIndex={-1} className="text-[26px] font-semibold text-foreground outline-none">Collections</h1>
           <p className="mt-1 text-[12.5px] text-muted-foreground">Group assets from any source for a project. Files stay where they are.</p>
         </div>
-        <Button id="new-collection" onClick={() => openCreateCollection()}><Plus className="size-4" aria-hidden />New collection</Button>
+        <Button id="new-collection" tooltip="Creates an empty collection; you name it first" onClick={() => openCreateCollection()}><Plus className="size-4" aria-hidden />New collection</Button>
       </div>
       {collections.total > 0 && (
         <form role="search" aria-label="Search collections" onSubmit={(event) => event.preventDefault()} className={cn("search-surface mt-6 flex h-14 w-full max-w-[720px] items-center gap-2 rounded-full pr-2 pl-5", waiting && searching && "sheen")}>
@@ -140,7 +140,7 @@ export function Collections() {
           <p className="max-w-[380px] text-[13px] leading-relaxed text-muted-foreground">
             Create a collection for a project, then right-click any asset card and choose <span className="font-medium text-foreground">Add to a collection</span>.
           </p>
-          <Button onClick={() => openCreateCollection()}><Plus className="size-4" aria-hidden />Create your first collection</Button>
+          <Button tooltip="Creates an empty collection; you name it first" onClick={() => openCreateCollection()}><Plus className="size-4" aria-hidden />Create your first collection</Button>
         </div>
       )}
       {collections.loaded && searching && collections.total > 0 && collections.items.length === 0 && !collections.loading && (

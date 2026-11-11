@@ -17,7 +17,7 @@ import { TRY_AGENT_HELP, TryAgent } from "./TryAgent";
 import { Reason } from "./CommandBlock";
 import { FORMATS_HELP, FormatToggles, IMAGE_FORMATS, ImageFormatsNote, MODEL_FORMATS } from "./FormatToggles";
 import { ReadinessList } from "./Readiness";
-import { Badge, Banner, Button, Card, RadioCards, Spinner, TextField } from "./primitives";
+import { Badge, Banner, Button, Card, Hint, Pressable, RadioCards, Spinner, TextField } from "./primitives";
 
 const STEP_LABELS: Record<SetupStep, string> = {
   welcome: "Welcome", blender: "Blender", formats: "Formats", storage: "Storage budget",
@@ -112,11 +112,12 @@ function FormatsStep() {
           {hints.map((item) => {
             const active = draft.engineHint.includes(item.id);
             return (
-              <button key={item.id} type="button" aria-pressed={active} data-value={item.id}
+              <Pressable key={item.id} aria-pressed={active} data-value={item.id}
+                tooltip={active ? `Stops suggesting ${item.label}’s formats` : `Preselects the formats ${item.label} imports`}
                 onClick={() => toggle(item.id)}
                 className={cn("h-9 rounded-full border px-4 text-[12.5px] font-medium transition-colors", active ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-foreground hover:bg-surface-2")}>
                 {item.label}
-              </button>
+              </Pressable>
             );
           })}
         </div>
@@ -158,17 +159,17 @@ function StorageStep() {
               : storage?.status === "faulty" ? storage.reason : "Not measured yet"}
           </Fact>
         </div>
-        <div><Button variant="secondary" id="setup-measure-storage" disabled={measuring} onClick={() => void measureSetupStorage()}>{measuring ? "Measuring…" : "Measure now"}</Button></div>
+        <div><Button variant="secondary" id="setup-measure-storage" disabled={measuring} tooltip="Reads how much space Assetarium’s results use now; nothing is changed (can take a minute)" onClick={() => void measureSetupStorage()}>{measuring ? "Measuring…" : "Measure now"}</Button></div>
         <div role="radiogroup" aria-label="Budget presets" id="setup-budget-presets" className="flex flex-wrap gap-2">
           {presets.map((gib) => {
             const active = draft.budget === String(gib);
             const tooBig = free != null && storage?.allocated_gib != null && gib > storage.allocated_gib + free;
             return (
-              <button key={gib} type="button" role="radio" aria-checked={active} data-value={gib} disabled={tooBig}
+              <Pressable key={gib} role="radio" aria-checked={active} data-value={gib} disabled={tooBig} tooltip={false}
                 onClick={() => updateSetupDraft({ budget: String(gib) })}
                 className={cn("h-9 rounded-full border px-4 text-[12.5px] font-medium tabular-nums transition-colors disabled:opacity-40", active ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-foreground hover:bg-surface-2")}>
                 {gib === recommended ? `Recommended · ${gib} GiB` : `${gib} GiB`}
-              </button>
+              </Pressable>
             );
           })}
         </div>
@@ -232,7 +233,7 @@ function BatchStep() {
             value: String(row.size),
             title: `${row.size}${row.size === 8 ? " (default)" : ""}`,
             detail: `About ${row.seconds_per_asset} s per asset · ${row.peak_gib} GiB peak GPU memory`,
-            badge: recommended?.size === row.size ? <Badge tone="info">Recommended</Badge> : undefined,
+            badge: recommended?.size === row.size ? <Hint content="Recommended for this computer’s graphics memory"><span className="inline-flex"><Badge tone="info">Recommended</Badge></span></Hint> : undefined,
           }))} />
         <p className="text-[12.5px] text-muted-foreground">
           {recommended ? `Recommended for your ${recommended.vram_gib} GiB GPU: ${recommended.size}.${recommended.may_not_fit ? " The model alone peaked at 4.7 GiB, so descriptions may not fit on this GPU." : ""}` : "No NVIDIA GPU was detected, so there is no recommendation."}
@@ -290,8 +291,8 @@ function Review() {
         </ul>
         <Paragraph>{result.samples && result.samples.status !== "faulty" ? "Next: open Library and choose Make previews on Sample assets, or add your own library folder." : "Next: add a library folder in Library, then choose Make previews on a pack."}</Paragraph>
         <div className="flex flex-wrap gap-3">
-          <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Library</Button>
-          <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>
+          <Button id="setup-go-sources" tooltip="Closes setup and opens the Library, where you add your asset folders" onClick={() => finishSetup("sources")}>Go to Library</Button>
+          <Button variant="secondary" id="setup-close" tooltip={false} onClick={() => finishSetup("close")}>Close</Button>
         </div>
       </div>
     );
@@ -299,7 +300,7 @@ function Review() {
   const steps = SETUP_STEPS.filter((step) => step !== "welcome" && step !== "review");
   const setBy = info?.set_by || {};
   const badge = (step: SetupStep) => {
-    if (setup.baseline && stepChanged(step, draft, setup.baseline)) return <Badge tone="neutral">Changed by you</Badge>;
+    if (setup.baseline && stepChanged(step, draft, setup.baseline)) return <Hint content="Differs from the saved value; Save records it as set by you"><span className="inline-flex"><Badge tone="neutral">Changed by you</Badge></span></Hint>;
     const key = STEP_KEYS[step]?.find((name) => setBy[name]);
     return key ? <SetByBadge entry={setBy[key]} /> : null;
   };
@@ -312,7 +313,7 @@ function Review() {
             <div key={step} className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)_auto] items-start gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
               <dt className="text-[12.5px] text-muted-foreground">{STEP_LABELS[step]}</dt>
               <dd className="grid justify-items-start gap-1.5 break-words text-[13px]" data-step={step}>{summary(step, draft, info)}{badge(step)}</dd>
-              <Button variant="quiet" className="h-8 px-3 text-[12px]" onClick={() => goToSetupStep(SETUP_STEPS.indexOf(step))} aria-label={`Change ${STEP_LABELS[step]}`}>Change</Button>
+              <Button variant="quiet" className="h-8 px-3 text-[12px]" tooltip="Goes back to this step; nothing is saved until you Save" onClick={() => goToSetupStep(SETUP_STEPS.indexOf(step))} aria-label={`Change ${STEP_LABELS[step]}`}>Change</Button>
             </div>
           ))}
         </dl>
@@ -427,7 +428,7 @@ export function SetupWizard() {
               const current = index === setup.step;
               return (
                 <li key={item}>
-                  <button type="button" disabled={saved} aria-current={current ? "step" : undefined} data-step={item} onClick={() => goToSetupStep(index)}
+                  <Pressable disabled={saved} aria-current={current ? "step" : undefined} data-step={item} tooltip={false} onClick={() => goToSetupStep(index)}
                     className={cn("flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left text-[13px] transition-colors disabled:pointer-events-none", current ? "bg-accent-soft font-medium text-accent-soft-foreground" : "text-foreground hover:bg-surface-2", !needed && "text-subtle")}>
                     <span className={cn("grid size-6 shrink-0 place-items-center rounded-full border text-[11px] tabular-nums", current ? "border-primary bg-primary text-primary-foreground" : index < setup.step ? "border-border bg-surface-2" : "border-border")}>
                       {(done && item !== "practice" && needed) || (index < setup.step && !skipped && needed) ? <Check className="size-3" aria-hidden /> : index + 1}
@@ -435,7 +436,7 @@ export function SetupWizard() {
                     <span className="min-w-0 flex-1 truncate">{item === "welcome" && done ? (review ? "Agent's report" : "Summary") : STEP_LABELS[item]}</span>
                     {skipped && <span className="text-[11px] text-muted-foreground">Skipped</span>}
                     {!needed && <span className="text-[11px]">Not needed</span>}
-                  </button>
+                  </Pressable>
                 </li>
               );
             })}
@@ -445,8 +446,8 @@ export function SetupWizard() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 px-8 pt-6">
           <span className="text-[12px] text-muted-foreground tabular-nums md:invisible">Step {setup.step + 1} of {SETUP_STEPS.length}</span>
-          {!saved && !done && <Button variant="quiet" id="setup-skip-all" onClick={() => void skipSetup()}>Skip setup</Button>}
-          {!saved && report && <Button variant="quiet" id="setup-close-report" onClick={() => finishSetup("close")}>{review ? "Later" : "Close"}</Button>}
+          {!saved && !done && <Button variant="quiet" id="setup-skip-all" tooltip="Closes setup without saving anything; run it any time from Settings" onClick={() => void skipSetup()}>Skip setup</Button>}
+          {!saved && report && <Button variant="quiet" id="setup-close-report" tooltip={review ? "Closes this; the report waits for you in Settings → Setup" : false} onClick={() => finishSetup("close")}>{review ? "Later" : "Close"}</Button>}
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 pt-2 pb-10 scroll-thin">
           <div className="mx-auto grid max-w-[760px] gap-5">
@@ -457,13 +458,13 @@ export function SetupWizard() {
         </main>
         {!saved && step !== "welcome" && (
           <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-8 py-4">
-            <Button variant="secondary" id="setup-back" disabled={setup.step === 0} onClick={setupBack}>Back</Button>
+            <Button variant="secondary" id="setup-back" disabled={setup.step === 0} tooltip={false} onClick={setupBack}>Back</Button>
             <div className="flex flex-wrap items-center gap-3">
-              {step !== "review" && <Button variant="quiet" id="setup-skip-step" onClick={() => setupNext(true)}>Skip step</Button>}
+              {step !== "review" && <Button variant="quiet" id="setup-skip-step" tooltip="Moves on and keeps this step’s current value; it is marked as skipped" onClick={() => setupNext(true)}>Skip step</Button>}
               {step === "review" ? (
-                <Button id="setup-save" disabled={setup.saving || setup.loading} onClick={() => void saveSetup()}>{setup.saving ? "Saving…" : "Save"}</Button>
+                <Button id="setup-save" disabled={setup.saving || setup.loading} tooltip="Saves every choice above; you can change them later in Settings → General" onClick={() => void saveSetup()}>{setup.saving ? "Saving…" : "Save"}</Button>
               ) : (
-                <Button id="setup-next" disabled={setup.loading} onClick={() => setupNext(false)}>Next</Button>
+                <Button id="setup-next" disabled={setup.loading} tooltip={false} onClick={() => setupNext(false)}>Next</Button>
               )}
             </div>
           </footer>

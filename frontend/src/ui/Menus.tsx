@@ -19,7 +19,7 @@ import {
   inspectFolder, navigate, copyText, recheckFailures, confirmForgetMissing,
 } from "../app/store";
 import { Skeleton } from "./Loading";
-import { Button, IconButton, Spinner } from "./primitives";
+import { Button, IconButton, Pressable, Spinner } from "./primitives";
 
 const ICON = "size-4 shrink-0 text-muted-foreground";
 const GAP = 8; // Between the menu and the flyout, covered by the bridge.
@@ -136,9 +136,9 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
           className="h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
         />
       </label>
-      <button
-        type="button"
+      <Pressable
         role="menuitem"
+        tooltip={false}
         data-flyout-item=""
         id="collection-flyout-create"
         onClick={create}
@@ -146,7 +146,7 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
       >
         <Plus className="size-4 shrink-0" aria-hidden />
         <span className="min-w-0 truncate">{words && !exact ? `Create “${query.trim()}”` : "Create new collection"}</span>
-      </button>
+      </Pressable>
       <hr className="-mx-1.5 my-1 h-px border-0 bg-border" />
       <div className="max-h-64 overflow-y-auto overscroll-contain scroll-thin" role="group" aria-label="Collections">
         {items === null && !error && (
@@ -164,21 +164,21 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
         {items !== null && !items.length && <p className="px-2.5 py-2 text-[12.5px] text-muted-foreground">No collections yet. Create one to start grouping assets.</p>}
         {items !== null && items.length > 0 && !shown.length && <p className="px-2.5 py-2 text-[12.5px] text-muted-foreground">No collection matches “{query.trim()}”.</p>}
         {shown.map((collection) => (
-          <button
+          <Pressable
             key={collection.collection_id}
-            type="button"
             role="menuitemcheckbox"
+            side="right"
             aria-checked={Boolean(collection.contains)}
             data-flyout-item=""
             data-collection={collection.collection_id}
-            title={collection.contains ? "Already in this collection; choose to remove it" : undefined}
+            tooltip={collection.contains ? "Already in this collection; choose it to take the asset out" : `Adds the asset to ${collection.name}`}
             onClick={() => choose(collection)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] outline-none hover:bg-foreground/[0.065] focus-visible:bg-foreground/[0.065]"
           >
             <span className="grid size-4 shrink-0 place-items-center">{collection.contains && <Check className="size-3.5 text-primary" strokeWidth={2.4} aria-hidden />}</span>
             <span className="min-w-0 flex-1 truncate">{collection.name}</span>
             <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{collection.asset_count}</span>
-          </button>
+          </Pressable>
         ))}
       </div>
     </motion.div>
@@ -553,9 +553,9 @@ export function ConfirmDialog() {
           </div>
           {error && <p role="alert" className="rounded-xl bg-fault-bg px-4 py-3 text-[12.5px] text-fault">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button variant="secondary" id="confirm-cancel" data-autofocus="" disabled={busy} onClick={closeConfirm}>{request.cancelLabel || (request.run ? "Cancel" : "Close")}</Button>
+            <Button variant="secondary" id="confirm-cancel" data-autofocus="" disabled={busy} tooltip={false} onClick={closeConfirm}>{request.cancelLabel || (request.run ? "Cancel" : "Close")}</Button>
             {request.run && (
-              <Button variant={neutral ? "primary" : "destructive"} className={request.deleteOnLeft ? "order-first mr-auto" : undefined} id="confirm-accept" disabled={busy} onClick={() => void confirm()}>
+              <Button variant={neutral ? "primary" : "destructive"} className={request.deleteOnLeft ? "order-first mr-auto" : undefined} id="confirm-accept" disabled={busy} tooltip={false} onClick={() => void confirm()}>
                 {busy && <Spinner className="size-3.5" />}{request.confirmLabel}
               </Button>
             )}
@@ -642,8 +642,8 @@ export function CreateCollectionDialog() {
           </div>
           {error && <p role="alert" id="create-collection-error" className="rounded-xl bg-fault-bg px-4 py-3 text-[12.5px] text-fault">{error}</p>}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" disabled={busy} onClick={closeCreateCollection}>Cancel</Button>
-            <Button type="submit" id="create-collection-submit" disabled={busy || !name.trim()}>{busy && <Spinner className="size-3.5" />}{adding ? "Create and add" : "Create collection"}</Button>
+            <Button type="button" variant="secondary" disabled={busy} tooltip={false} onClick={closeCreateCollection}>Cancel</Button>
+            <Button type="submit" id="create-collection-submit" disabled={busy || !name.trim()} tooltip={false}>{busy && <Spinner className="size-3.5" />}{adding ? "Create and add" : "Create collection"}</Button>
           </div>
         </form>
       )}
@@ -669,11 +669,11 @@ export function SelectionBar({ onSelectAll, onRemove, onCancel, count, total }: 
         <span id="selection-count" role="status" aria-live="polite" className="mr-2 text-[13px] font-medium tabular-nums">
           {count ? `${plural(count, "asset", "assets")} selected` : "Select assets to remove"}
         </span>
-        <Button variant="quiet" className="h-9 px-3 text-[12.5px]" id="selection-all" disabled={count === total} onClick={onSelectAll}>Select all</Button>
-        <Button variant="danger" className={cn("h-9 px-4 text-[12.5px]")} id="selection-remove" disabled={!count} onClick={onRemove}>
+        <Button variant="quiet" className="h-9 px-3 text-[12.5px]" id="selection-all" disabled={count === total} tooltip="Selects every asset shown (Ctrl+A)" onClick={onSelectAll}>Select all</Button>
+        <Button variant="danger" className={cn("h-9 px-4 text-[12.5px]")} id="selection-remove" disabled={!count} tooltip="Takes the selected assets out of this collection; their files are not touched" onClick={onRemove}>
           <ListX className="size-4" aria-hidden />Remove from collection
         </Button>
-        <Button variant="secondary" className="h-9 px-4 text-[12.5px]" id="selection-cancel" onClick={onCancel}>Cancel</Button>
+        <Button variant="secondary" className="h-9 px-4 text-[12.5px]" id="selection-cancel" tooltip="Leaves selection without removing anything (Esc)" onClick={onCancel}>Cancel</Button>
       </motion.div>
     </AnimatePresence>
   );

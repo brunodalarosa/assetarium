@@ -7,7 +7,7 @@ import { operationActive, plural } from "../app/format";
 import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, showLog, sourceAction, useApp } from "../app/store";
 import { Skeleton } from "../ui/Loading";
 import { Reason } from "../ui/CommandBlock";
-import { Badge, Banner, Button, Disclosure } from "../ui/primitives";
+import { Badge, Banner, Button, Disclosure, Hint, Pressable } from "../ui/primitives";
 import { OperationProgress } from "../ui/OperationProgress";
 
 const ACTION = { previews: "Make previews", descriptions: "Generate descriptions" } as Record<string, string>;
@@ -53,7 +53,7 @@ function Running() {
           <div className="flex flex-wrap items-center gap-2">
             <p className="mr-auto text-[13.5px] font-medium">{item.title || ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</p>
             <span className="text-[12px] text-muted-foreground">{since(item.started_utc)}</span>
-            <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} onClick={() => void queueControl("remove", item.id)}>
+            <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} tooltip="Stops this work. Assets already finished keep their results" onClick={() => void queueControl("remove", item.id)}>
               <X className="size-3.5" aria-hidden />{item.status === "cancelling" ? "Stopping…" : "Cancel"}
             </Button>
           </div>
@@ -66,7 +66,7 @@ function Running() {
                   <li key={index} className={cn("flex items-start gap-2 rounded px-1.5 py-1", line.level === "error" ? "text-fault" : line.level === "warning" ? "text-warning" : "text-muted-foreground")}>
                     <span className="min-w-0 flex-1 break-all select-text">{line.text}</span>
                     {line.level !== "info" && (
-                      <button type="button" aria-label="Copy this line" className="shrink-0 rounded p-0.5 hover:bg-surface" onClick={() => void copyText(line.text, "The log line is on the clipboard.")}><Copy className="size-3.5" /></button>
+                      <Pressable aria-label="Copy this line" tooltip="Copies this log line" className="shrink-0 rounded p-0.5 hover:bg-surface" onClick={() => void copyText(line.text, "The log line is on the clipboard.")}><Copy className="size-3.5" /></Pressable>
                     )}
                   </li>
                 ))}
@@ -81,7 +81,7 @@ function Running() {
           <OperationProgress operation={s.operation} label={"Scanning " + s.name} />
           <div className="flex items-center gap-2">
             <p className="mr-auto text-[12px] text-muted-foreground">{s.operation.phase}</p>
-            <Button variant="quiet" className="h-7 px-2" onClick={() => void sourceAction("cancel", s.key)}>Cancel</Button>
+            <Button variant="quiet" className="h-7 px-2" tooltip="Stops this scan; what it found so far is kept" onClick={() => void sourceAction("cancel", s.key)}>Cancel</Button>
           </div>
         </div>
       ))}
@@ -97,9 +97,9 @@ function UpNext() {
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-4">
         {queue?.paused ? (
-          <Button id="resume-queue" className="h-8 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />{queue.stopped_on_close ? "Continue" : "Resume"}</Button>
+          <Button id="resume-queue" className="h-8 px-3" tooltip="Starts the waiting work again, in this order" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />{queue.stopped_on_close ? "Continue" : "Resume"}</Button>
         ) : items.length > 0 && (
-          <Button variant="quiet" className="h-8 px-3" onClick={() => void queueControl("pause")}><Pause className="size-3.5" aria-hidden />Pause</Button>
+          <Button variant="quiet" className="h-8 px-3" tooltip="Nothing waiting starts until you resume; what is running now carries on" onClick={() => void queueControl("pause")}><Pause className="size-3.5" aria-hidden />Pause</Button>
         )}
       </div>
       {queue?.paused && <Banner tone="info"><span id="queue-paused">{queue.stopped_on_close
@@ -113,9 +113,9 @@ function UpNext() {
                 className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[13px]" data-action={item.action}>
                 <span className="mr-auto min-w-0 truncate">{item.title || ACTION[item.action]} · {item.label}</span>
                 {item.estimate?.seconds && <span className="text-[11.5px] text-muted-foreground tabular-nums">~{Math.round(item.estimate.seconds[1] / 60)} min</span>}
-                <button type="button" aria-label="Move up" disabled={index === 0} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, Math.max(0, index - 1))}><ArrowUp className="size-3.5" /></button>
-                <button type="button" aria-label="Move down" disabled={index === items.length - 1} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, index + 1)}><ArrowDown className="size-3.5" /></button>
-                <button type="button" aria-label={"Remove " + item.label} className="rounded p-1 hover:bg-surface" onClick={() => void queueControl("remove", item.id)}><X className="size-3.5" /></button>
+                <Pressable aria-label="Move up" tooltip="Runs this one step earlier" disabled={index === 0} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, Math.max(0, index - 1))}><ArrowUp className="size-3.5" /></Pressable>
+                <Pressable aria-label="Move down" tooltip="Runs this one step later" disabled={index === items.length - 1} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, index + 1)}><ArrowDown className="size-3.5" /></Pressable>
+                <Pressable aria-label={"Remove " + item.label} tooltip="Takes this out of the queue before it starts" className="rounded p-1 hover:bg-surface" onClick={() => void queueControl("remove", item.id)}><X className="size-3.5" /></Pressable>
               </motion.li>
             ))}
           </AnimatePresence>
@@ -135,7 +135,7 @@ function Blocked() {
           <span className="font-medium">{b.reason}{b.assets ? ` · fixing it unblocks ${plural(b.assets, "asset", "assets")}` : ""}</span>
           <span className="flex flex-wrap items-center gap-2 text-[12.5px]">
             <Reason text={b.fix} className="flex-1" />
-            {b.reason.startsWith("Blender") && <Button variant="quiet" className="h-7 px-2" onClick={() => navigate({ page: "settings" })}>Open Settings</Button>}
+            {b.reason.startsWith("Blender") && <Button variant="quiet" className="h-7 px-2" tooltip="Opens Settings, where you choose the Blender to use" onClick={() => navigate({ page: "settings" })}>Open Settings</Button>}
           </span>
         </li>
       ))}
@@ -151,14 +151,14 @@ function Failures() {
       {groups.map((g) => (
         <li key={g.key + g.stage + g.reason} className="grid gap-2 rounded-xl bg-surface-2 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
-            <Badge tone="fault">{g.stage}</Badge>
+            <Hint content="The step that failed"><span className="inline-flex"><Badge tone="fault">{g.stage}</Badge></span></Hint>
             <Reason text={g.reason} className="mr-auto" />
             <span className="text-[12px] text-muted-foreground">{plural(g.assets.length, "asset", "assets")} · {g.folder}</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="quiet" className="h-7 px-2" onClick={() => void copyText(`${g.stage}: ${g.reason}\n` + g.assets.map((a: Json) => a.path || a.name).join("\n"), "The failure and its files are on the clipboard.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
-            <Button variant="quiet" className="h-7 px-2" onClick={() => void recheckFailures({ key: g.key })}><RotateCcw className="size-3.5" aria-hidden />Recheck…</Button>
-            <Button variant="quiet" className="h-7 px-2" onClick={() => openSources(g.key, "", g.assets[0]?.asset_id)}><FolderOpen className="size-3.5" aria-hidden />Show in Library</Button>
+            <Button variant="quiet" className="h-7 px-2" tooltip="Copies the failure and the paths of its files" onClick={() => void copyText(`${g.stage}: ${g.reason}\n` + g.assets.map((a: Json) => a.path || a.name).join("\n"), "The failure and its files are on the clipboard.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
+            <Button variant="quiet" className="h-7 px-2" tooltip="Checks which of these failures came from a file problem that is fixed now, and asks before retrying them" onClick={() => void recheckFailures({ key: g.key })}><RotateCcw className="size-3.5" aria-hidden />Recheck…</Button>
+            <Button variant="quiet" className="h-7 px-2" tooltip="Opens the Library at the first failed asset" onClick={() => openSources(g.key, "", g.assets[0]?.asset_id)}><FolderOpen className="size-3.5" aria-hidden />Show in Library</Button>
           </div>
         </li>
       ))}
@@ -189,9 +189,9 @@ function Recent() {
           <li key={item.id + item.finished_utc} className="flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-[13px] hover:bg-surface-2">
             <Badge tone={tone}>{label}</Badge>
             <span className="mr-auto min-w-0 truncate">{item.title || ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</span>
-            {count > 1 && <span className="recent-repeat text-[11.5px] text-muted-foreground tabular-nums" title="The same work ended the same way several times in a row">× {count}</span>}
+            {count > 1 && <Hint content="The same work ended the same way several times in a row" focusable><span className="recent-repeat text-[11.5px] text-muted-foreground tabular-nums">× {count}</span></Hint>}
             {seconds !== null && <span className="text-[11.5px] text-muted-foreground tabular-nums">{seconds < 90 ? Math.round(seconds) + " s" : Math.round(seconds / 60) + " min"}</span>}
-            {item.log && <Button variant="quiet" className="h-7 px-2" onClick={() => void showLog(item.log)}><FileText className="size-3.5" aria-hidden />Show log</Button>}
+            {item.log && <Button variant="quiet" className="h-7 px-2" tooltip="Opens the full log this work wrote" onClick={() => void showLog(item.log)}><FileText className="size-3.5" aria-hidden />Show log</Button>}
             {item.reason && <Reason text={item.reason} className="w-full text-[12px] text-muted-foreground" />}
           </li>
         );
@@ -221,7 +221,7 @@ export function Processing({ focus: _focus }: { focus?: string }) {
           <div className="grid gap-1 text-right">
             <p id="coverage" className="text-[12.5px] text-muted-foreground">{coverage || <Skeleton className="h-3.5 w-48" />}</p>
             {context?.versions && <p id="version" className="font-mono text-[11px] text-subtle">Catalog {String(context.versions.catalog).slice(0, 10)} · index {String(context.versions.index).slice(0, 10)}</p>}
-            <Button variant="quiet" className="h-7 justify-self-end px-2 text-[12px]" onClick={() => void refreshContext(true)}><RotateCcw className="size-3.5" aria-hidden />Refresh published view</Button>
+            <Button variant="quiet" className="h-7 justify-self-end px-2 text-[12px]" tooltip="Reloads the catalog and search index versions agents see now" onClick={() => void refreshContext(true)}><RotateCcw className="size-3.5" aria-hidden />Refresh published view</Button>
           </div>
         </div>
         {!queue ? <Skeleton className="h-40 w-full rounded-[22px]" /> : (

@@ -2,11 +2,11 @@ import { Check, ChevronRight } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 import { useDismiss } from "@/lib/hooks/use-dismiss";
-import { Tooltip } from "@/components/beui/tooltip";
 import { SPRING_LAYOUT, SPRING_PANEL, SPRING_SWAP } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import { type Activity, activities, navigate, useApp } from "../app/store";
 import { useShownWhile } from "./Loading";
+import { MotionPressable, Pressable } from "./primitives";
 
 /** An orbiting comet around a breathing core; static under reduced motion. */
 function ActivityMark({ className }: { className?: string }) {
@@ -52,9 +52,9 @@ function ActivityRow({ item, previews, done, onOpen }: { item: Activity; preview
   );
   return item.source ? (
     <li>
-      <Tooltip content={item.progressDetail || item.detail}><button type="button" data-activity={item.id} onClick={() => onOpen(item.source!)} className="group block w-full rounded-xl px-3 py-2.5 text-left outline-none hover:bg-surface-2 focus-visible:bg-surface-2">
+      <Pressable tooltip={item.progressDetail || item.detail} delay={120} data-activity={item.id} onClick={() => onOpen(item.source!)} className="group block w-full rounded-xl px-3 py-2.5 text-left outline-none hover:bg-surface-2 focus-visible:bg-surface-2">
         {body}
-      </button></Tooltip>
+      </Pressable>
     </li>
   ) : (
     <li data-activity={item.id} className="px-3 py-2.5">{body}</li>
@@ -88,10 +88,11 @@ export function ActivityIndicator() {
     <div ref={root} className="relative">
       <AnimatePresence>
         {shown && primary && (
-          <motion.button
+          <MotionPressable
             key="activity"
-            type="button"
             id="activity"
+            tooltip={open ? "Hides the list" : "Shows what is running in the background"}
+            side="bottom"
             layout
             aria-haspopup="dialog"
             aria-expanded={open}
@@ -136,7 +137,7 @@ export function ActivityIndicator() {
             {items.length > 1 && (
               <motion.span layout="position" className="rounded-full bg-primary/12 px-1.5 text-[11px] leading-[18px] font-semibold text-primary tabular-nums">+{items.length - 1}</motion.span>
             )}
-          </motion.button>
+          </MotionPressable>
         )}
       </AnimatePresence>
       <AnimatePresence>

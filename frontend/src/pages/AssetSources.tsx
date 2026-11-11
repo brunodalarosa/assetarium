@@ -10,19 +10,24 @@ import {
 import { AssetGrid } from "../ui/AssetGrid";
 import { FolderTree } from "../ui/FolderTree";
 import { Reason } from "../ui/CommandBlock";
-import { Banner, Button, SelectField, Spinner } from "../ui/primitives";
+import { Banner, Button, Hint, Pressable, SelectField, Spinner } from "../ui/primitives";
 
 const SORTS: [string, string][] = [["name", "Name"], ["added", "Recently added"], ["pending", "Most without previews"], ["assets", "Most assets"]];
-const STATUS: [string, string][] = [["new", "Has new"], ["no_previews", "Needs previews"], ["blocked", "Blocked"], ["failed", "Failures"]];
+const STATUS: [string, string, string][] = [
+  ["new", "Has new", "what was added since your last visit"],
+  ["no_previews", "Needs previews", "assets that don’t have a preview yet"],
+  ["blocked", "Blocked", "assets whose next step can’t run on this computer yet"],
+  ["failed", "Failures", "assets with a recorded failure"],
+];
 const TYPE_ICON: Record<string, typeof Box> = { model_3d: Box, image: ImageIcon, material_texture: Layers };
 
-function Chip({ active, onClick, children, id }: { active: boolean; onClick: () => void; children: React.ReactNode; id?: string }) {
+function Chip({ active, onClick, children, id, shows }: { active: boolean; onClick: () => void; children: React.ReactNode; id?: string; shows: string }) {
   return (
-    <button type="button" id={id} aria-pressed={active} onClick={onClick}
+    <Pressable id={id} aria-pressed={active} onClick={onClick} tooltip={active ? "Removes this filter" : `Shows only ${shows}`}
       className={cn("inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] transition-colors",
         active ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground")}>
       {children}
-    </button>
+    </Pressable>
   );
 }
 
@@ -42,15 +47,15 @@ function Header() {
         <h1 id="sources-title" tabIndex={-1} className="mr-auto text-[26px] font-semibold outline-none">Library</h1>
         <SelectField id="sources-sort" label="Sort" value={view.sort} onChange={(value) => setSourcesFilter({ sort: value as SourcesView["sort"] })}
           options={SORTS} className="w-52" />
-        <Button id="add-library-folder" disabled={busy} onClick={() => void add()}>{busy ? <Spinner className="size-4" /> : <FolderPlus className="size-4" aria-hidden />}Add library folder</Button>
+        <Button id="add-library-folder" disabled={busy} tooltip="Choose a folder of assets to add. Assetarium reads it and never changes its files" onClick={() => void add()}>{busy ? <Spinner className="size-4" /> : <FolderPlus className="size-4" aria-hidden />}Add library folder</Button>
       </div>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filters">
         {types.map((t) => {
           const Icon = TYPE_ICON[t.id] || Box;
-          return <Chip key={t.id} id={"type-" + t.id} active={view.types.includes(t.id)} onClick={() => setSourcesFilter({ types: toggle(view.types, t.id) })}><Icon className="size-3.5" aria-hidden />{t.label}</Chip>;
+          return <Chip key={t.id} id={"type-" + t.id} active={view.types.includes(t.id)} shows={t.label.toLowerCase()} onClick={() => setSourcesFilter({ types: toggle(view.types, t.id) })}><Icon className="size-3.5" aria-hidden />{t.label}</Chip>;
         })}
         <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-        {STATUS.map(([id, label]) => <Chip key={id} id={"status-" + id} active={view.states.includes(id)} onClick={() => setSourcesFilter({ states: toggle(view.states, id) })}>{label}</Chip>)}
+        {STATUS.map(([id, label, shows]) => <Chip key={id} id={"status-" + id} active={view.states.includes(id)} shows={shows} onClick={() => setSourcesFilter({ states: toggle(view.states, id) })}>{label}</Chip>)}
       </div>
     </div>
   );
@@ -106,22 +111,22 @@ function FolderHeader() {
     <div id="folder-header" className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[22px] border border-border bg-surface p-4">
       {kind === "pack" && <Cover folderKey={folder.key} path={node.pack?.cover ?? null} />}
       <div className="grid min-w-[180px] flex-1 gap-1">
-        <h2 className="truncate text-[17px] font-semibold" title={name}>{name}</h2>
+        <Hint content={name}><h2 className="truncate text-[17px] font-semibold">{name}</h2></Hint>
         <p className="text-[12.5px] text-muted-foreground tabular-nums">
           {plural(node.assets || 0, "asset", "assets")}
           {node.assets ? ` · ${Math.round((node.coverage || 0) * 100)}% with previews` : ""}
           {node.blocked ? ` · ${node.blocked.toLocaleString()} blocked` : ""}
           {node.failed ? ` · ${node.failed.toLocaleString()} recorded ${node.failed === 1 ? "failure" : "failures"}` : ""}
-          {node.skipped ? <span title="Assetarium does not process these file types; they are listed so you can find them"> · {node.skipped.toLocaleString()} not processed</span> : ""}
+          {node.skipped ? <> · <Hint content="Assetarium does not process these file types; they are listed so you can find them" focusable><span>{node.skipped.toLocaleString()} not processed</span></Hint></> : ""}
           {node.hidden ? (
-            <> · <button type="button" id="hidden-formats" className="underline underline-offset-2 hover:text-foreground" title="Their formats are off in Settings → General → Formats Assetarium uses"
-              onClick={() => { navigate({ page: "settings", tab: "general" }); setTimeout(() => document.getElementById("formats-card")?.scrollIntoView({ block: "start" }), 120); }}>{plural(node.hidden, "file", "files")} in formats you don’t use</button></>
+            <> · <Pressable id="hidden-formats" className="underline underline-offset-2 hover:text-foreground" tooltip="Their formats are off. Opens Settings → General → Formats Assetarium uses"
+              onClick={() => { navigate({ page: "settings", tab: "general" }); setTimeout(() => document.getElementById("formats-card")?.scrollIntoView({ block: "start" }), 120); }}>{plural(node.hidden, "file", "files")} in formats you don’t use</Pressable></>
           ) : ""}
           {(node.pack?.markers || []).some((m: Json) => m.kind === "license") ? " · License file" : ""}
         </p>
       </div>
       {pending > 0 && !folder.offline && (
-        <Button id="make-previews" onClick={() => void makePreviews({ key: folder.key, path: view.path }, pending)}>
+        <Button id="make-previews" tooltip="Queues preview renders for the assets here that have none; follow them in Processing" onClick={() => void makePreviews({ key: folder.key, path: view.path }, pending)}>
           {plural(pending, "without previews", "without previews").replace(/^(\d[\d,]*) /, "$1 ")} · Make previews
         </Button>
       )}
@@ -138,12 +143,12 @@ function OtherFiles() {
       <ul id="other-files" className="grid gap-0.5 opacity-60">
         {view.files.map((file: Json) => (
           <li key={file.path}>
-            <button type="button" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] hover:bg-surface-2"
+            <Pressable tooltip="Double-click to show it in Explorer; right-click for more" className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] hover:bg-surface-2"
               onDoubleClick={() => void pathAction("reveal", view.key!, file.path.split("/").slice(1).join("/"))}
               onContextMenu={(event) => { event.preventDefault(); openFolderMenu({ ...file, key: view.key, relative: file.path.split("/").slice(1).join("/") }, event.clientX, event.clientY, event.currentTarget); }}>
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               <span className="shrink-0 truncate text-[11px] text-muted-foreground">{file.folder}</span>
-            </button>
+            </Pressable>
           </li>
         ))}
       </ul>
@@ -165,7 +170,7 @@ function Empty() {
       </svg>
       <p className="text-[15px] font-medium">Point Assetarium at a folder of game assets</p>
       <p className="text-[12.5px] text-muted-foreground">Models and images are found and grouped into packs. Nothing is written into your folders, and nothing is processed until you ask.</p>
-      <Button disabled={busy} onClick={async () => { setBusy(true); await startAddFolder(); setBusy(false); }}>
+      <Button disabled={busy} tooltip="Choose a folder of assets to add. Assetarium reads it and never changes its files" onClick={async () => { setBusy(true); await startAddFolder(); setBusy(false); }}>
         <FolderOpen className="size-4" aria-hidden />Add library folder
       </Button>
     </motion.div>
@@ -211,8 +216,8 @@ export function AssetSources() {
                   <input type="checkbox" id="show-other-files" checked={view.showFiles} onChange={(e) => setSourcesFilter({ showFiles: e.target.checked })} className="accent-[var(--color-primary)]" />Show other files
                 </label>
                 <div className="flex rounded-lg border border-border p-0.5" role="group" aria-label="View">
-                  <button type="button" aria-pressed={!view.list} aria-label="Grid view" className={cn("grid size-7 place-items-center rounded-md", !view.list && "bg-surface-2")} onClick={() => setSourcesFilter({ list: false })}><Grid2x2 className="size-4" /></button>
-                  <button type="button" aria-pressed={view.list} aria-label="List view" className={cn("grid size-7 place-items-center rounded-md", view.list && "bg-surface-2")} onClick={() => setSourcesFilter({ list: true })}><LayoutList className="size-4" /></button>
+                  <Pressable aria-pressed={!view.list} aria-label="Grid view" tooltip="Shows assets as cards with previews" className={cn("grid size-7 place-items-center rounded-md", !view.list && "bg-surface-2")} onClick={() => setSourcesFilter({ list: false })}><Grid2x2 className="size-4" /></Pressable>
+                  <Pressable aria-pressed={view.list} aria-label="List view" tooltip="Shows assets as a compact list" className={cn("grid size-7 place-items-center rounded-md", view.list && "bg-surface-2")} onClick={() => setSourcesFilter({ list: true })}><LayoutList className="size-4" /></Pressable>
                 </div>
               </div>
               {grid.error && <Banner><span id="sources-grid-error">{grid.error}</span></Banner>}
@@ -221,7 +226,7 @@ export function AssetSources() {
                 {!grid.loading && grid.items.length === 0 && grid.emptyText && <p id="sources-grid-empty" className="py-12 text-center text-[13px] text-muted-foreground">{grid.emptyText}</p>}
               </section>
               {!grid.finished && grid.items.length > 0 && (
-                <div className="flex justify-center"><Button variant="secondary" id="sources-load-more" disabled={grid.loading} onClick={() => void loadFolderItems()}>Load more</Button></div>
+                <div className="flex justify-center"><Button variant="secondary" id="sources-load-more" disabled={grid.loading} tooltip={false} onClick={() => void loadFolderItems()}>Load more</Button></div>
               )}
               <OtherFiles />
             </div>

@@ -65,16 +65,16 @@ export function BlenderPicker({ idPrefix, report, path, check, checking, confirm
           No Blender was found. Install Blender {report.tested_version} from the address below, then choose its {navigator.platform.startsWith("Win") ? "blender.exe" : "blender"} here.
           <span className="mt-2 flex min-w-0 items-center gap-2 rounded-xl bg-surface-2 py-1.5 pr-1.5 pl-3">
             <code className="min-w-0 flex-1 break-all font-mono text-[11.5px] text-foreground select-text">{report.download_url}</code>
-            <Button variant="quiet" className="h-8 shrink-0 px-3 text-[12px]" onClick={() => void copyText(report.download_url, "Address copied.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
+            <Button variant="quiet" className="h-8 shrink-0 px-3 text-[12px]" tooltip="Copies the download address to open in your browser" onClick={() => void copyText(report.download_url, "Address copied.")}><Copy className="size-3.5" aria-hidden />Copy</Button>
           </span>
         </Banner>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="secondary" id={`${idPrefix}-choose-blender`} disabled={checking} onClick={onChoose}><FolderOpen className="size-4" aria-hidden />Choose executable…</Button>
+        <Button variant="secondary" id={`${idPrefix}-choose-blender`} disabled={checking} tooltip="Pick a Blender executable on this computer; it is checked before it can be saved" onClick={onChoose}><FolderOpen className="size-4" aria-hidden />Choose executable…</Button>
         {checking ? (
-          <Button variant="secondary" id={`${idPrefix}-cancel-blender`} onClick={onCancel}>Cancel check</Button>
+          <Button variant="secondary" id={`${idPrefix}-cancel-blender`} tooltip="Stops checking this Blender" onClick={onCancel}>Cancel check</Button>
         ) : (
-          <Button id={`${idPrefix}-check-blender`} disabled={!path} onClick={onCheck}>Check Blender</Button>
+          <Button id={`${idPrefix}-check-blender`} disabled={!path} tooltip="Runs this Blender once in the background to confirm it can inspect and render (up to about 2 minutes)" onClick={onCheck}>Check Blender</Button>
         )}
         <p role="status" aria-live="polite" className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
           {checking ? <><Spinner />Checking… (up to about 2 minutes)</> : current ? CHECK_STATUS[current.status as string] : path ? "Not checked yet." : ""}

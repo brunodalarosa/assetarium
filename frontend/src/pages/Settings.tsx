@@ -18,7 +18,7 @@ import { EngineFields, SearchDeviceField } from "../ui/EngineFields";
 import { SkeletonLines } from "../ui/Loading";
 import { ReadinessList } from "../ui/Readiness";
 import { BlenderChecks, BlenderPicker } from "../ui/BlenderPicker";
-import { Badge, Banner, Button, Card, SelectField, Spinner, TextField } from "../ui/primitives";
+import { Badge, Banner, Button, Card, Hint, Pressable, SelectField, Spinner, TextField } from "../ui/primitives";
 import { TryAgentCard } from "../ui/TryAgent";
 
 const APPEARANCES = [
@@ -34,10 +34,10 @@ function AppearancePicker() {
       {APPEARANCES.map(({ value, label, icon: Icon }) => {
         const active = appearance === value;
         return (
-          <button
+          <Pressable
             key={value}
-            type="button"
             role="radio"
+            tooltip={false}
             aria-checked={active}
             id={`appearance-${value}`}
             onClick={() => void setAppearance(value)}
@@ -56,7 +56,7 @@ function AppearancePicker() {
             {active && <motion.span layoutId="appearance-pill" transition={SPRING_LAYOUT} className="absolute inset-0 rounded-full bg-surface shadow-[0_1px_3px_rgb(0_0_0/0.1)]" />}
             <Icon className="relative size-4" aria-hidden />
             <span className="relative">{label}</span>
-          </button>
+          </Pressable>
         );
       })}
     </div>
@@ -71,8 +71,8 @@ function SetupCard() {
         <p id="setup-record">{setupRecordText(info?.record)}</p>
       </div>
       <div className="flex flex-wrap gap-3">
-        <Button variant="secondary" id="run-setup" onClick={() => void openSetup()}>Run setup</Button>
-        <Button variant="secondary" id="run-agent-setup" onClick={() => void openAgentSetupFromSettings()}>Run setup with my agent</Button>
+        <Button variant="secondary" id="run-setup" tooltip="Walks through setup again with your current values filled in; nothing is saved until you save it" onClick={() => void openSetup()}>Run setup</Button>
+        <Button variant="secondary" id="run-agent-setup" tooltip="Opens setup and lets your AI agent propose the values; you approve each one" onClick={() => void openAgentSetupFromSettings()}>Run setup with my agent</Button>
       </div>
     </Card>
   );
@@ -138,7 +138,7 @@ function BlenderInstallation() {
       {!report || !status ? <SkeletonLines lines={2} /> : (
         <>
           <p id="blender-status" className="flex min-w-0 flex-wrap items-center gap-2 text-[13px]" data-status={status.label}>
-            <Badge tone={status.tone}>{status.label}</Badge>
+            <Hint content={{ Saved: "Assetarium uses this Blender", Missing: "The saved Blender is no longer at this path", "Not saved": "Found, but not saved yet", "Not found": "No Blender found on this computer" }[status.label]}><span className="inline-flex"><Badge tone={status.tone}>{status.label}</Badge></span></Hint>
             <span className="min-w-0 break-all">{status.text}</span>
           </p>
           {b.editing ? (
@@ -149,8 +149,8 @@ function BlenderInstallation() {
                 onCheck={() => void checkBlenderInstallation()} onCancel={() => void cancelBlenderCheck()} onChoose={() => void chooseBlenderInstallation()} />
               {(writes || saved) && (
                 <div className="flex flex-wrap items-center gap-3">
-                  {writes && <Button id="save-blender" disabled={!canSave} onClick={() => void saveBlenderInstallation()}>{b.saving ? "Saving…" : "Save Blender"}</Button>}
-                  {saved && <Button variant="secondary" id="keep-blender" disabled={b.saving} onClick={() => updateBlenderInstallation({ editing: false })}>Keep the saved Blender</Button>}
+                  {writes && <Button id="save-blender" disabled={!canSave} tooltip="Writes this Blender to config.local.toml; previews and the speed test use it right away" onClick={() => void saveBlenderInstallation()}>{b.saving ? "Saving…" : "Save Blender"}</Button>}
+                  {saved && <Button variant="secondary" id="keep-blender" disabled={b.saving} tooltip="Closes this without changing the saved Blender" onClick={() => updateBlenderInstallation({ editing: false })}>Keep the saved Blender</Button>}
                 </div>
               )}
             </>
@@ -158,11 +158,11 @@ function BlenderInstallation() {
             <>
               <div className="flex flex-wrap items-center gap-3">
                 {b.checking ? (
-                  <Button variant="secondary" id="settings-cancel-blender" onClick={() => void cancelBlenderCheck()}>Cancel check</Button>
+                  <Button variant="secondary" id="settings-cancel-blender" tooltip="Stops checking; the saved Blender stays as it is" onClick={() => void cancelBlenderCheck()}>Cancel check</Button>
                 ) : (
-                  <Button variant="secondary" id="settings-check-blender" onClick={() => void checkBlenderInstallation(report.configured)}>Check Blender</Button>
+                  <Button variant="secondary" id="settings-check-blender" tooltip="Runs the saved Blender once in the background to confirm it can inspect and render (up to about 2 minutes)" onClick={() => void checkBlenderInstallation(report.configured)}>Check Blender</Button>
                 )}
-                <Button variant="secondary" id="change-blender" disabled={b.checking} onClick={() => updateBlenderInstallation({ editing: true })}>Change Blender…</Button>
+                <Button variant="secondary" id="change-blender" disabled={b.checking} tooltip="Pick another Blender executable and check it before saving" onClick={() => updateBlenderInstallation({ editing: true })}>Change Blender…</Button>
                 <p role="status" aria-live="polite" className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
                   {b.checking ? <><Spinner />Checking… (up to about 2 minutes)</> : current ? CHECK_STATUS[current.status] : ""}
                 </p>
@@ -180,10 +180,10 @@ function BlenderInstallation() {
 /** "See the speed test" for the Rendering and Search cards, whose Automatic choices come from it. */
 function SpeedTestLink({ running }: { running?: boolean }) {
   return (
-    <button type="button" className="speed-test-link w-fit text-[12.5px] font-medium text-primary hover:underline"
+    <Pressable className="speed-test-link w-fit text-[12.5px] font-medium text-primary hover:underline" tooltip="Scrolls to the speed test, which picks the Automatic values"
       onClick={() => document.getElementById("speed-test-card")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
       {running ? "Speed test running…" : "See the speed test"}
-    </button>
+    </Pressable>
   );
 }
 
@@ -216,9 +216,9 @@ function SpeedTest() {
       </div>
       <div className="flex flex-wrap items-center gap-4">
         {running ? (
-          <Button type="button" variant="secondary" id="render-test-cancel" disabled={render.busy} onClick={() => void renderTest("cancel")}>Cancel test</Button>
+          <Button type="button" variant="secondary" id="render-test-cancel" disabled={render.busy} tooltip="Stops the speed test; the last finished result stays" onClick={() => void renderTest("cancel")}>Cancel test</Button>
         ) : (
-          <Button type="button" variant="secondary" id="render-test-start" disabled={render.busy || !values.blender} onClick={() => void renderTest("start")}>
+          <Button type="button" variant="secondary" id="render-test-start" disabled={render.busy || !values.blender} tooltip="A 2–3 minute test with synthetic shapes, never your assets, that picks the Automatic render and search settings" onClick={() => void renderTest("start")}>
             {test ? "Test again" : "Test speed"}
           </Button>
         )}
@@ -239,7 +239,7 @@ function SearchReadiness({ device }: { device: string }) {
       <p className="font-medium text-[12.5px]">What is installed</p>
       {check.error ? <Banner tone="fault">{check.error}</Banner> : <ReadinessList id="search-readiness" items={check.checking ? undefined : check.devices?.[device]} onChanged={() => void checkSearchReadiness()} />}
       <div className="flex flex-wrap items-center gap-4">
-        <Button type="button" variant="secondary" id="search-readiness-check" disabled={check.checking} onClick={() => void checkSearchReadiness()}>Check again</Button>
+        <Button type="button" variant="secondary" id="search-readiness-check" disabled={check.checking} tooltip="Looks again for what search needs on this device" onClick={() => void checkSearchReadiness()}>Check again</Button>
         <p className="hint text-[12.5px] leading-relaxed text-muted-foreground">Copy a missing command into a terminal in the Assetarium folder, then check again.</p>
       </div>
     </div>
@@ -338,7 +338,7 @@ function General() {
         <Rendering draft={rendering} onDraft={setRendering} disabled={disabled} />
         <SpeedTest />
         <div className="flex flex-wrap items-center gap-4">
-          <Button type="submit" id="save-general-settings" disabled={disabled}>Save</Button>
+          <Button type="submit" id="save-general-settings" disabled={disabled} tooltip="Saves storage, formats, descriptions, search and rendering above. Turning a format off never deletes results">Save</Button>
           <p id="general-settings-message" role="status" aria-live="polite" className="text-[12.5px] leading-relaxed text-muted-foreground">{general.message}</p>
         </div>
       </form>

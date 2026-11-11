@@ -1,7 +1,6 @@
 import { ArrowLeft, ArrowRight, Bell, Folder, House, LayoutGrid, PanelRight, Pause, Pencil, Play, Settings, Workflow } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Tooltip } from "@/components/beui/tooltip";
 import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import { plural } from "../app/format";
@@ -9,7 +8,7 @@ import { goBack, goForward, navigate, type Page, processingAttention, queueContr
 import { ActivityIndicator } from "./Activity";
 import { AgentButton } from "./AgentActivity";
 import { Skeleton } from "./Loading";
-import { Button, IconButton } from "./primitives";
+import { Button, Hint, IconButton, Pressable } from "./primitives";
 
 const NAV: { page: Page; label: string; icon: ReactNode }[] = [
   { page: "home", label: "Home", icon: <House className="size-5" strokeWidth={1.75} /> },
@@ -21,20 +20,20 @@ function RailItem({ page, label, icon, dot }: { page: Page; label: string; icon:
   const current = useApp((s) => s.history[s.historyIndex].page);
   const active = current === page || (page === "collections" && current === "collection");
   return (
-    <Tooltip content={label} side="right" delay={250}>
-      <button
-        type="button"
-        id={`nav-${page}`}
-        aria-label={label + (dot ? ", needs attention" : "")}
-        aria-current={active ? "page" : undefined}
-        onClick={() => navigate(page === "settings" ? { page, tab: "general" } : { page })}
-        className={cn("relative grid size-11 place-items-center rounded-xl transition-colors", active ? "text-accent-soft-foreground" : "text-foreground/80 hover:bg-surface-2/70 hover:text-foreground")}
-      >
-        {active && <motion.span layoutId="rail-active" transition={SPRING_LAYOUT} className="absolute inset-0 rounded-xl bg-accent-soft" />}
-        <span className="relative">{icon}</span>
-        {dot && <span className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-rail" aria-hidden />}
-      </button>
-    </Tooltip>
+    <Pressable
+      tooltip={label}
+      side="right"
+      delay={250}
+      id={`nav-${page}`}
+      aria-label={label + (dot ? ", needs attention" : "")}
+      aria-current={active ? "page" : undefined}
+      onClick={() => navigate(page === "settings" ? { page, tab: "general" } : { page })}
+      className={cn("relative grid size-11 place-items-center rounded-xl transition-colors", active ? "text-accent-soft-foreground" : "text-foreground/80 hover:bg-surface-2/70 hover:text-foreground")}
+    >
+      {active && <motion.span layoutId="rail-active" transition={SPRING_LAYOUT} className="absolute inset-0 rounded-xl bg-accent-soft" />}
+      <span className="relative">{icon}</span>
+      {dot && <span className="absolute top-2 right-2 size-2 rounded-full bg-primary ring-2 ring-rail" aria-hidden />}
+    </Pressable>
   );
 }
 
@@ -126,7 +125,7 @@ function TopTitle() {
     );
   return (
     <div className="flex min-w-0 items-center gap-1">
-      <h1 id="collection-title" className="truncate text-[24px] font-semibold text-foreground" title={view.name}>{view.name || "Collection"}</h1>
+      <Hint content={view.name} side="bottom"><h1 id="collection-title" className="truncate text-[24px] font-semibold text-foreground">{view.name || "Collection"}</h1></Hint>
       <IconButton id="rename-collection" label="Rename collection" disabled={!view.name} onClick={() => { setDraft(view.name); setError(null); setEditing(true); }} className="size-8 shrink-0 rounded-lg text-muted-foreground">
         <Pencil className="size-4" />
       </IconButton>
@@ -178,8 +177,8 @@ export function StoppedBanner() {
           className="mx-8 mb-2 flex flex-wrap items-center gap-3 rounded-xl bg-accent-soft px-4 py-2 text-[13px] text-accent-soft-foreground">
           <Pause className="size-3.5 shrink-0" aria-hidden />
           <span className="mr-auto">{plural(count, "item", "items")} stopped when you closed Assetarium</span>
-          <Button variant="quiet" className="h-7 px-2" onClick={() => navigate({ page: "processing" })}>Show</Button>
-          <Button id="continue-stopped" className="h-7 px-3" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />Continue</Button>
+          <Button variant="quiet" className="h-7 px-2" tooltip="Opens Asset processing, where the stopped work waits" onClick={() => navigate({ page: "processing" })}>Show</Button>
+          <Button id="continue-stopped" className="h-7 px-3" tooltip="Starts the stopped work again; finished assets are kept" onClick={() => void queueControl("resume")}><Play className="size-3.5" aria-hidden />Continue</Button>
         </motion.div>
       )}
     </AnimatePresence>
