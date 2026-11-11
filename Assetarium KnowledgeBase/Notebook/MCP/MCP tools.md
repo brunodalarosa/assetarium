@@ -52,6 +52,7 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
 
 ## Gotchas
 
+- The session is a context variable, so it follows `asyncio.to_thread` but not a plain `threading.Thread`: an agent write made on a thread you start yourself is not journaled and Undo all misses it. Run such work through `asyncio.to_thread`, or enter `agent_sessions.active(run_id)` in the thread.
 - A preview reference, a successful render or an image transport test is not proof that the agent's
   model looked at the image.
 - MCP servers and desktop windows each run their own embedding worker and can contend for GPU memory;

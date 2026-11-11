@@ -26,6 +26,7 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
   computer". Building from a neutral path (for example a copy of the samples under the throwaway project in
   `scratch/`) would remove it; frozen fixtures are never replaced, so it can only change from 0.3.0.
   Seen: 2026-11-05
+- **No automated check starts a real scan or job from the MCP process**: the GUI verify scripts and tests replace `source_operations.start`, so the real spawn path used by agent `propose_profile` and `start_processing` (STDIO server → `scripts/source-operation.py`) is only exercised by hand. A verify script that runs the STDIO server against a synthetic folder and waits for a real scan would close it. Seen: 2026-11-11
 - **The full test suite takes minutes and needs real Blender**: a skipped Blender fixture counts as
   unverified. Targeted runs (`tests/test_<area>.py`) are the everyday path. Seen: 2026-10-28
 - **No process memory probe in the runtimes**: `.venv-mcp` has no `psutil`, so measuring peak memory
