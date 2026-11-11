@@ -126,12 +126,29 @@ def lookup(config, identifiers, source_key=None):
     return found
 
 
-def _edit(config, update, notice=None):
+def _state(value, identifier):
+    import copy
+    found = next((c for c in value['collections'] if c['id'] == identifier), None)
+    return copy.deepcopy(found) if found else None
+
+
+def _same(current, recorded):
+    """A collection is unchanged since a journal entry when everything but its touch time matches."""
+    strip = lambda c: c and {k: v for k, v in c.items() if k != 'updated_at'}  # noqa: E731
+    return strip(current) == strip(recorded)
+
+
+def _edit(config, update, notice=None, subject=None):
+    """``subject``: the collection an edit changes, journaled before and after for an agent session's Undo all."""
     with lease(config, 'collections', resource='collections'):
         value = load(config)
+        before = _state(value, subject) if subject else None
         result = update(value)
         value['revision'] = value.get('revision', 0) + 1
         atomic_json(path(config), value)
+        if subject:
+            from .agent_sessions import note
+            note(config, 'collection', collection_id=subject, before=before, after=_state(value, subject))
     if notice:
         # Agent edits raise one notice per collection; it opens the collection in the app.
         from .notifications import notify_collection
@@ -181,7 +198,7 @@ def create(config, name, description='', members=(), source_key=None, label='', 
         return {'status': 'created', 'collection_id': identifier, 'name': name, 'added': len(members)}
     notice = _agent_notice(actor, lambda value: (find(value, identifier), 'created',
                                                  f'An agent created this collection with {len(members)} asset(s).'))
-    return _edit(config, update, notice)
+    return _edit(config, update, notice, subject=identifier)
 
 
 def update(config, identifier, name=None, description=None, actor='app'):
@@ -199,7 +216,7 @@ def update(config, identifier, name=None, description=None, actor='app'):
         _touch(collection)
         return {'status': 'saved', 'collection_id': identifier, 'name': collection['name']}
     notice = _agent_notice(actor, lambda value: (find(value, identifier), 'updated', 'An agent renamed or described this collection.'))
-    return _edit(config, change, notice)
+    return _edit(config, change, notice, subject=identifier)
 
 
 def delete(config, identifier):
@@ -231,7 +248,7 @@ def add(config, identifier, members, source_key=None, label='', notes='', actor=
         return {'status': 'saved', 'collection_id': identifier, 'name': collection['name'],
                 'added': len(added), 'already_present': len(members) - len(added)}
     notice = _agent_notice(actor, lambda value: (find(value, identifier), 'updated', f'An agent added {len(members)} asset(s).'))
-    return _edit(config, change, notice)
+    return _edit(config, change, notice, subject=identifier)
 
 
 def remove(config, identifier, members, actor='app'):
@@ -245,7 +262,7 @@ def remove(config, identifier, members, actor='app'):
             _touch(collection)
         return {'status': 'saved', 'collection_id': identifier, 'name': collection['name'], 'removed': removed}
     notice = _agent_notice(actor, lambda value: (find(value, identifier), 'updated', f'An agent removed {len(members)} asset(s).'))
-    return _edit(config, change, notice)
+    return _edit(config, change, notice, subject=identifier)
 
 
 def restore(config, identifier, removed):
@@ -278,6 +295,33 @@ def restore(config, identifier, removed):
     return _edit(config, change)
 
 
+def undo(config, identifier, before, after):
+    """Undo all (decision 0029): put a collection back as it was before an agent edit, or remove the one it created.
+
+    Refused (returns the reason) when the collection changed since that edit, so a later edit is never lost.
+    """
+    with lease(config, 'collections', resource='collections'):
+        value = load(config)
+        current = _state(value, identifier)
+        if not _same(current, after):
+            return 'It changed after this edit (or was deleted), so it was kept as it is'
+        if before is None:
+            value['collections'] = [c for c in value['collections'] if c['id'] != identifier]
+        else:
+            if named(value, before['name']) not in (None, find(value, identifier)):
+                return f'Another collection is named “{before["name"]}” now, so it was kept as it is'
+            value['collections'][value['collections'].index(find(value, identifier))] = dict(before, updated_at=now())
+        value['revision'] = value.get('revision', 0) + 1
+        atomic_json(path(config), value)
+    if before is None:
+        from .notifications import forget_collection
+        try:
+            forget_collection(config, identifier)
+        except (OSError, ValueError):
+            pass
+    return None
+
+
 def set_item(config, identifier, member, label=None, notes=None, actor='app'):
     if not isinstance(member, str) or not re.fullmatch(ID_PATTERN, member):
         raise ConfigError('Malformed asset ID')
@@ -295,7 +339,7 @@ def set_item(config, identifier, member, label=None, notes=None, actor='app'):
         _touch(collection)
         return {'status': 'saved', 'collection_id': identifier, 'asset_id': member, 'label': item['label'], 'notes': item['notes']}
     notice = _agent_notice(actor, lambda value: (find(value, identifier), 'updated', 'An agent changed asset labels or notes.'))
-    return _edit(config, change, notice)
+    return _edit(config, change, notice, subject=identifier)
 
 
 def member_ids(config, identifier):

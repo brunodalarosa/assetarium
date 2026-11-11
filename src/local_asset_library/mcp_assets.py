@@ -116,10 +116,17 @@ SCHEMAS = {
                   "that are present but not verified yet)."}}},
     "propose_setup": {"type": "object", "required": ["blender_path"], "additionalProperties": False, "properties": {
         "blender_path": {"type": "string", "maxLength": 1024, "description": "A path validate_blender passed; the user applies it in the app."}}},
-    "finish_setup": {"type": "object", "additionalProperties": False, "properties": {}}}
+    "finish_setup": {"type": "object", "additionalProperties": False, "properties": {}},
+    # Processing (decision 0029): agents queue jobs like the owner; no retry of recorded failures (decision 0020).
+    "start_processing": {"type": "object", "required": ["action", "library_folder"], "additionalProperties": False, "properties": {
+        "action": {"type": "string", "enum": ["previews", "descriptions"], "description": "previews: Make previews; descriptions: Generate descriptions."},
+        "library_folder": {"type": "string", "maxLength": 128, "description": "A library folder key from list_packs."},
+        "path": {"type": "string", "maxLength": 400, "description": "A pack or folder inside the library folder (\"\" or omitted: all of it)."},
+        "asset_ids": {**ASSET_IDS, "maxItems": 200, "description": "Only these assets of the library folder, instead of path."},
+        "confirm": {"type": "boolean", "description": "Start a long job after a first call returned its estimate (status confirm)."}}}}
 from .pack_agent import SCHEMAS as PACK_SCHEMAS, TOOLS as PACK_TOOLS, WRITE as PACK_WRITE  # noqa: E402
 SCHEMAS.update(PACK_SCHEMAS)  # Pack structure tools (decision 0035): paged outlines, profiles, proposals.
-WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup", *PACK_WRITE}
+WRITE_TOOLS = {"edit_collection", "tag_assets", "apply_setup", "propose_setup", "finish_setup", "start_processing", *PACK_WRITE}
 SETUP_TOOLS = {"get_setup_status", "validate_blender", "verify_weights", "apply_setup", "propose_setup", "finish_setup"}
 COLLECTION_MEANING = ("A collection is a named, owner-organized bundle of asset IDs, not an asset. Members keep their files "
                       "where they are; labels and notes belong to the collection. Use get_asset on a member for its files.")
@@ -298,7 +305,7 @@ class AssetService:
         validate(name, args)
         handler = {"search_assets": self.search, "get_asset": self.get, "list_collections": self.list_collections,
                    "get_collection": self.get_collection, "edit_collection": self.edit_collection,
-                   "tag_assets": self.tag_assets}[name]
+                   "tag_assets": self.tag_assets, "start_processing": self.start_processing}[name]
         return handler(args)
 
     def list_collections(self, args):
@@ -365,6 +372,20 @@ class AssetService:
         if missing:
             raise ConfigError("Asset ID unavailable in configured approved membership: " + ", ".join(missing[:3]))
         return bounded(change(self.config, args["asset_ids"], args.get("add", []), args.get("remove", [])), SEARCH_CAP), None, {}
+
+    def start_processing(self, args):
+        from .processing_queue import add
+        if args.get("path") and args.get("asset_ids"):
+            raise ConfigError("Give path or asset_ids, not both")
+        scope = {"key": args["library_folder"], "path": args.get("path", ""), "asset_ids": args.get("asset_ids", [])}
+        result = add(self.config, args["action"], scope, confirmed=args.get("confirm", False), by="agent")
+        if result["status"] == "confirm":
+            payload = {"status": "confirm", "title": result["title"], "estimate": result["body"],
+                       "next": "A long job: tell the user this estimate, then call again with confirm: true to start it."}
+        else:
+            payload = {"status": result["status"], "job": result["item"]["label"], "summary": result["body"],
+                       "note": "Shown to the owner in Asset processing as started by an agent; they can stop it or undo the session."}
+        return bounded(payload, SEARCH_CAP), None, {}
 
     def search(self, args):
         mode = args.get("mode", DEFAULT_MODE)

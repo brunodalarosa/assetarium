@@ -336,7 +336,7 @@ def tool(config, key, name, args, client=None):
         try:
             validate(name, args)
             scoped_args = dict(args, library_folder=key)
-            result = execute(_config(root, key), name, scoped_args, client)
+            result = execute(_config(root, key), name, scoped_args, client, hold=True)  # Practice walks the owner's review.
             error = False
         except Exception as exc:
             result, error = {'status': 'refused', 'reason': str(exc)}, True

@@ -218,8 +218,15 @@ def unmeasured(value):
     return value['assets'] > UNMEASURED and (value['seconds'] is None or bool(value['budget_bytes'] and value['used_bytes'] is None))
 
 
-def add(config, action, scope, confirmed=False):
-    """Queue an action. Under 10 minutes it starts on the click; 10–30 minutes start with Undo; longer asks first."""
+def add(config, action, scope, confirmed=False, by='owner'):
+    """Queue an action. Under 10 minutes it starts on the click; 10–30 minutes start with Undo; longer asks first.
+
+    ``by='agent'`` (decision 0029): the job is the current agent session's, journaled for its Undo all; it never
+    resumes the owner's paused queue and is refused while agents are paused.
+    """
+    from .agent_sessions import PAUSED_REASON, current, note, paused
+    if by == 'agent' and paused(config):
+        raise ConfigError(PAUSED_REASON)
     if action not in ACTIONS:
         raise ConfigError('Choose Make previews or Generate descriptions')
     if action == 'previews' and (scope or {}).get('mode'):
@@ -255,14 +262,18 @@ def add(config, action, scope, confirmed=False):
         return {'status': 'confirm', 'estimate': value, 'title': f'{verb} for {label}?',
                 'body': describe_estimate(value) + ' It runs in the background; you can keep working or cancel it.',
                 'confirm_label': f"{verb} ({value['assets']:,} {'asset' if value['assets'] == 1 else 'assets'})"}
+    session = current() if by == 'agent' else None
     item = {'id': uuid.uuid4().hex, 'action': action, 'scope': scope, 'label': label, 'added_utc': now(), 'status': 'waiting',
-            'estimate': value, **({'title': MODE_TITLE[mode]} if mode else {})}
+            'estimate': value, **({'title': MODE_TITLE[mode]} if mode else {}),
+            **({'by': 'agent', 'agent': session['agent'] if session else ''} if by == 'agent' else {})}
     with _locked(config):
         queue = load(config)
         queue['items'].append(item)
-        if queue['paused'] and not any(i['status'] == 'running' for i in queue['items']):
-            queue['paused'] = False  # Asking for work is the owner's go-ahead.
+        if by != 'agent' and queue['paused'] and not any(i['status'] == 'running' for i in queue['items']):
+            queue['paused'] = False  # Asking for work is the owner's go-ahead; an agent's request never is.
         save(config, queue)
+    if by == 'agent':
+        note(config, 'job', item=item['id'], label=f'{verb} for {label}')
     started = advance(config)
     running = started and started.get('id') == item['id']
     undo = value['seconds'] is not None and QUICK < value['seconds'][1] <= LONG
@@ -272,9 +283,10 @@ def add(config, action, scope, confirmed=False):
             'body': f'{verb} for {label}. {text}'}
 
 
-def _order(items):
-    """Previews always go ahead of descriptions; otherwise the owner's order."""
-    waiting = [i for i in items if i['status'] == 'waiting']
+def _order(items, held=False):
+    """Previews always go ahead of descriptions; otherwise the owner's order. ``held``: agents are paused, so their
+    jobs wait and the owner's go first."""
+    waiting = [i for i in items if i['status'] == 'waiting' and not (held and i.get('by') == 'agent')]
     return [i for i in waiting if i['action'] == 'previews'] + [i for i in waiting if i['action'] == 'descriptions']
 
 
@@ -312,7 +324,8 @@ def advance(config):
         if running or queue['paused']:
             save(config, queue)
             return running
-        for item in _order(queue['items']):
+        from .agent_sessions import paused
+        for item in _order(queue['items'], held=paused(config)):
             found = resolve(config, item['action'], item['scope'])  # The scope is resolved when the item starts.
             if not found['ids']:
                 queue['items'].remove(item)
@@ -367,6 +380,20 @@ def control(config, action, identifier=None, value=None):
     if action in {'resume', 'remove', 'move'}:
         advance(config)
     return state(config)
+
+
+def withdraw(config, identifier):
+    """Undo all of an agent session: a job of it that still waits leaves the queue. Returns why not otherwise;
+    processing time already spent cannot be undone and its results are kept."""
+    with _locked(config):
+        queue = load(config)
+        item = next((i for i in queue['items'] if i['id'] == identifier), None)
+        if item is not None and item['status'] == 'waiting':
+            queue['items'].remove(item)
+            save(config, queue)
+            return None
+    return ('It is running now; stop it in Asset processing (finished results are kept)' if item is not None
+            else 'It already ran or was removed; its results are kept')
 
 
 def _owner(queue):
@@ -530,7 +557,8 @@ def state(config):
                        'log': _log_lines(config, running)}
         except ConfigError:
             pass
-    return {'status': 'ready', 'paused': queue['paused'], 'running': running, 'up_next': _order(queue['items']),
+    from .agent_sessions import paused
+    return {'status': 'ready', 'paused': queue['paused'], 'agents_paused': paused(config), 'running': running, 'up_next': _order(queue['items']),
             'stopped_on_close': sum(bool(i.get('stopped_on_close')) for i in queue['items']),
             'blocked': blocked_groups(config), 'failures': failures(config), 'recent': queue['recent']}
 

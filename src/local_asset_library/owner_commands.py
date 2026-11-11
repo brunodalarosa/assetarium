@@ -15,7 +15,7 @@ import time
 from .config import ConfigError, load_config, project_config_path
 
 COMMANDS = {'library', 'sources', 'packs', 'previews', 'queue', 'forget-missing', 'settings', 'rendering', 'process', 'describe',
-            'cancel', 'failures', 'recheck', 'collections', 'setup', 'logs'}
+            'cancel', 'failures', 'recheck', 'collections', 'setup', 'logs', 'agents'}
 ENDED_OK = {'complete'}
 
 
@@ -114,6 +114,13 @@ def parser():
     test = rendering.add_parser('test', help='Run the render speed test now (about 2 minutes; synthetic shapes only)')
     test.add_argument('--follow', action='store_true', help='Watch a running test instead of starting one')
     rendering.add_parser('cancel', help='Cancel a running speed test (the previous result is kept)')
+    agents = commands.add_parser('agents', help='What connected agents changed: pause them, turn them back on, undo a session'
+                                 ).add_subparsers(dest='action', required=True)
+    agents.add_parser('status', help='Whether agents are paused, and the recent sessions that changed something')
+    agents.add_parser('pause', help='Refuse every agent change until you turn agents back on (interactive terminal only)')
+    agents.add_parser('resume', help='Turn agents back on (interactive terminal only)')
+    agents.add_parser('undo', help='Undo all of one agent session (interactive terminal only)').add_argument(
+        'session', help='The session ID that "agents status" lists')
     setup =commands.add_parser('setup', help='Guided setup in this terminal, or its parts').add_subparsers(dest='action')
     setup.add_parser('status', help='This computer, Blender, engines and what is missing (runs nothing)')
     setup.add_parser('skip', help='Record that setup was skipped')
@@ -317,6 +324,39 @@ def confirm(question):
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise ConfigError('This deletes or detaches data and needs an interactive terminal; run it yourself')
     return input(question + ' Type "yes" to confirm: ').strip().lower() == 'yes'
+
+
+def agents_command(args, config):
+    """Pause, resume and Undo all (decision 0029): owner gestures, so an interactive terminal must answer and an agent with
+    a shell cannot run them."""
+    from . import agent_sessions
+    if args.action == 'status':
+        result = {'status': 'ready', 'paused': agent_sessions.paused(config), 'sessions': agent_sessions.sessions(config)}
+        say(args, 'Agents are paused.' if result['paused'] else 'Agents are on.')
+        for item in result['sessions']:
+            state = ' · undone' if item['undone'] else ''
+            say(args, f"  {item['run_id']}  {item['agent'] or 'agent'} · {item['changes']} change(s) · {item['last_utc'][:16]}{state}")
+        return result
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        raise ConfigError('Only the owner pauses agents, turns them back on or undoes a session: run it yourself in an '
+                          'interactive terminal')
+    question = {'pause': 'Pause agents? Their changes are refused until you run "agents resume"; reads keep working.',
+                'resume': 'Turn agents back on? They can change things again.'}.get(args.action,
+                f'Undo every change of agent session {args.session}?')
+    if input(question + ' Type "yes" to confirm: ').strip().lower() != 'yes':
+        say(args, 'Nothing changed.')
+        return {'status': 'skipped'}
+    if args.action in {'pause', 'resume'}:
+        result = agent_sessions.set_paused(config, args.action == 'pause')
+        say(args, 'Agents are paused.' if args.action == 'pause' else 'Agents are on.')
+        return result
+    result = agent_sessions.undo(config, args.session)
+    from .source_operations import start
+    result['operations'] = [start(config, 'scan', key) for key in result['rescan']]
+    say(args, f"Undid {len(result['undone'])} change(s).")
+    for item in result['skipped']:
+        say(args, f"  Kept: {item['what']}: {item['reason']}")
+    return dict(result, status='saved')
 
 
 def progress_line(operation):
@@ -997,6 +1037,8 @@ def main(argv, config=None):
             say(args, result.get('reason') or 'Nothing is running for this source.')
         elif args.command == 'recheck':
             result = recheck_command(args, config)
+        elif args.command == 'agents':
+            result = agents_command(args, config)
         elif args.command == 'failures':
             from .sources import importing_failures
             result = importing_failures(config)
