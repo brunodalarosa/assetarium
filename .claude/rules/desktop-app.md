@@ -14,7 +14,6 @@ paths:
   - "tests/test_ui_encoding.py"
 ---
 This code belongs to the **Desktop App** area. Before changing it, read `Assetarium KnowledgeBase/Notebook/Desktop App/Desktop App.md` and the notes it lists
-for the systems you touch, plus `Architecture/Desktop App/Design language.md` (the design principles; only the owner changes it, agents propose and wait
-for approval) and `Notebook/Desktop App/Design system.md` (components and UI rules) for any UI change,
+for the systems you touch, plus `Architecture/Desktop App/Design language.md` (the design principles; shared, so change it when needed and report the change) and `Notebook/Desktop App/Design system.md` (components and UI rules) for any UI change,
 plus `Assetarium KnowledgeBase/Notebook/Codebase.md` when a module is unfamiliar.
 Notes can be stale: the code wins; report a wrong note and fix it in the same change.

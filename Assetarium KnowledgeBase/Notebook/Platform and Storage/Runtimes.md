@@ -20,6 +20,10 @@ environments that share one hard-linked cache. Always go through the wrappers in
 | `caption-runtime` | `.venv-caption` | `runtime/caption` | Qwen3-VL descriptions (Torch, Transformers 4.x) |
 | `embedding-runtime` | `.venv-embedding` | `runtime/embedding`, `runtime/embedding-cpu` | EmbeddingGemma indexing and semantic search (Transformers 5.x) |
 
+- The React UI is built with `npm` in `frontend/` (Node 24, dev only; cache in `cache/npm`): `npm run build`
+  regenerates the committed `ui/build/` bundle.
+- Config and health, read only: `.\scripts\uv.ps1 run --locked python -m local_asset_library.cli check-config`
+  and `… cli doctor`.
 - Wrappers keep the uv cache, temp files and Hugging Face/Torch caches inside the project and set
   `UV_LINK_MODE=hardlink`.
 - Tests: `.\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest`

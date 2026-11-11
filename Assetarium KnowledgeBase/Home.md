@@ -10,7 +10,7 @@ contributors read it before a task and add to it after one. Open this folder as 
 
 **Start here:** [Status](Status.md) (what works, open work) · [Notebook](Notebook/Notebook.md)
 (working notes per area) · [Architecture](Architecture/Architecture.md) (how and why) ·
-[Decisions](Decisions/Decisions.md) (binding owner decisions) · [Codebase](Notebook/Codebase.md)
+[Decisions](Decisions/Decisions.md) (what was agreed and why) · [Codebase](Notebook/Codebase.md)
 (module map) · [Improvements](Notebook/Improvements.md) (known friction).
 
 ## Sections
@@ -19,8 +19,8 @@ contributors read it before a task and add to it after one. Open this folder as 
   things are, rules, gotchas, legacy vs current. One hub per area, one note per system.
 - **Architecture**: explanatory docs, humans first. How systems are meant to work and why:
   contracts, mental models, flows, the roadmap.
-- **Decisions**: owner-approved decisions that bind later changes. Change one only after asking
-  the owner, and update the record together with the code.
+- **Decisions**: what was agreed and why. Anyone, agents included, may challenge, change or delete
+  one as long as the owner is told; update the record together with the code.
 - **Reference**: external docs with how far each can be trusted.
 
 ## User manual (outside the vault)

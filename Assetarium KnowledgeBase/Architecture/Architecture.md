@@ -18,12 +18,13 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
 
 ## Writing a doc
 
-- Agent-written docs stay `status: draft` until someone who knows the system reviews them, and
-  claims nobody could verify are marked *(unverified)*.
+- Docs are shared: people and agents write and change them alike, reporting what changed and why. A doc
+  is `status: draft` until its claims are checked against the code, by a person or an agent, and `reviewed`
+  after; claims nobody could verify are marked *(unverified)*.
 - The "why" (constraints, decisions, history, what was tried) is the most valuable part, and mostly
   comes from people and history: capture it, and link the decision that made it binding.
 - The contracts were rewritten on 2026-11-10 as current truth (their step-by-step pilot history is in git at
-  commit `af02e91`). They were checked against the code by an agent and stay `draft` until the owner reads them.
+  commit `af02e91`). They were checked against the code by an agent.
 
 ## Docs
 
@@ -35,7 +36,7 @@ their first doc. Start a doc from [Architecture Doc](../_Templates/Architecture%
 | [Embedding contract](Search/Embedding%20contract.md) | Search | system | draft |
 | [MCP server](MCP/MCP%20server.md) | MCP | system | draft |
 | [Desktop app design](Desktop%20App/Desktop%20app%20design.md) | Desktop App | system | draft |
-| [Design language](Desktop%20App/Design%20language.md) (design principles) | Desktop App | system | owner principles |
+| [Design language](Desktop%20App/Design%20language.md) (design principles) | Desktop App | system | reviewed |
 | [Inference ports](Setup%20and%20Engines/Inference%20ports.md) | Setup and Engines | system | draft |
 | [Expansion plan](Roadmap/Expansion%20plan.md) | Roadmap | macro | owner plan |
 
