@@ -10,8 +10,8 @@ branch:
 ---
 # Design language
 
-> **Only the owner changes this document.** Agents may propose an edit, then wait for the owner's approval
-> before writing it (`AGENTS.md` → Knowledge base). This is the one home of Assetarium's design principles
+> **Shared between humans and agents.** Anyone may change this document, as long as the change and its
+> reason are reported (`AGENTS.md` → Knowledge base). This is the one home of Assetarium's design principles
 > (also called "Design principles"); other notes link here and never restate them.
 
 Assetarium's UI and UX follow these named principles. They are **principles, not rules**: a change may depart

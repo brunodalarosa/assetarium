@@ -22,7 +22,7 @@ Up: [Notebook](../Notebook.md).
 
 ## Read first
 
-- `AGENTS.md` → Storage discipline (binding for every agent).
+- `AGENTS.md` → Storage discipline and [Storage discipline](Storage%20discipline.md) → Rules (binding for every agent).
 - Decisions: [0006](../../Decisions/0006-retention.md), [0010](../../Decisions/0010-shared-project-dependencies.md),
   [0013](../../Decisions/0013-platform-support.md).
 

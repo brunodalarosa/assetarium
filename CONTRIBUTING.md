@@ -55,7 +55,7 @@ relicensing rights described above.
   they are binding for behavior changes. Contributor knowledge (where things are, rules,
   gotchas, how systems work) is in [`Assetarium KnowledgeBase/`](Assetarium%20KnowledgeBase/Home.md); update the notes
   you touch in the same pull request.
-- Run the tests through the runtime wrappers (see [CLAUDE.md](CLAUDE.md)):
+- Run the tests through the runtime wrappers (see [AGENTS.md](AGENTS.md) → Running things):
 
   ```
   .\scripts\mcp-runtime.ps1 run --locked --no-sync --offline --project runtime/mcp python -m pytest --basetemp scratch/pytest

@@ -3,13 +3,25 @@ tags: [hub]
 ---
 # Decisions
 
-Up: [Home](../Home.md). Decisions are owner-owned: agents never edit one on their own initiative (see `AGENTS.md` → Recorded decisions).
+Up: [Home](../Home.md). Decisions are shared: agents may challenge, change or delete one, as long as the owner is told (see `AGENTS.md` → Recorded decisions).
 
-Owner-approved decisions that later changes must respect. Each file states the decision, why it was made, and
-what future work must keep true. **Every file here is current.** How to change one (place it, check it, replace
-without keeping halves) is in `AGENTS.md` → Recorded decisions; `tests/test_decisions.py` enforces the
+Decisions that later changes weigh before going another way. Each file states the decision, why it was made, and
+what future work must keep true. **Every file here is current.** `tests/test_decisions.py` enforces the
 mechanical rules. Each decision has an `area` (a Notebook area, or `Project` for project-wide ones) and a
 `## Changes` list of dated edits.
+
+## Changing a decision
+
+Anyone may, agents included, as long as the owner is told what changed and why. In this order:
+
+1. **Place it.** A change in an area that already has a decision covering it **edits that decision in place**:
+   rewrite the text so it reads as today's truth and add a dated line under `## Changes`. Never stack a note
+   ("Since…", "Update…", "partly superseded") on top. Write a new file only for a subject no decision covers, or
+   to split a decision that would pass 150 lines.
+2. **Check it.** At the scope checkpoint, read every decision with the same `area` or overlapping `code` names
+   and show the Decision check block from `AGENTS.md` → Recorded decisions, quoting every Keep true line you
+   compared. A conflict is explained to the owner (what it means, the ways forward), who chooses how to proceed.
+3. **Replace, don't keep halves.** See the next paragraph.
 
 **Replacing a decision.** The new decision lists the numbers it takes over in `replaces`, carries over the why and
 any alternatives the owner rejected, and the old file is deleted. Its number stays in [Replaced](#replaced) below,

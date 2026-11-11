@@ -7,7 +7,27 @@ branch:
 ---
 # Project storage
 
-Hub: [Platform and Storage](Platform%20and%20Storage.md). Moved from `docs/storage.md` on 2026-10-28; the binding rules are in `AGENTS.md` → Storage discipline.
+Hub: [Platform and Storage](Platform%20and%20Storage.md). Moved from `docs/storage.md` on 2026-10-28.
+
+## Rules
+
+Binding for every agent, together with the always-on rules in `AGENTS.md` → Storage discipline (`scratch/`
+safe to delete, immutable installed files, read-only originals, disk cost at the checkpoint).
+
+- Use the existing runtime wrappers. All four environments share `cache/uv` with `UV_LINK_MODE=hardlink`.
+  Do not automatically fall back to copying large packages or create another environment without explaining
+  its disk cost at the scope/plan checkpoint.
+- Before and after dependency/model installation or bulk processing, run `scripts/storage-report.py` using
+  the existing base Python environment and save a new receipt under `data/storage/`. **Compare unique
+  allocated bytes, not the sum of folder sizes**, because Windows can count hard links more than once.
+- After a successful installation and runtime verification, clear redundant uv cache entries with uv's cache
+  commands against the exact project-local cache. Hard-linked installed files remain usable after their cache
+  names are removed. Keeping a download cache for offline reinstalls is an explicit disk-space tradeoff.
+- Reuse a bounded temporary directory for repeatable checks when it contains no evidence that must be
+  preserved.
+- Record cleanup targets, savings, verification and faults separately.
+
+## Background
 
 Generated asset results live in the library store (decision 0032), by default the ignored
 `data/library-store/`. Processing and migration receipts measure unique allocation across this
