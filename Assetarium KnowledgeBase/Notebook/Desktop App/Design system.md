@@ -1,7 +1,7 @@
 ---
 area: Desktop App
 tags: [system]
-code: [frontend/src/ui/primitives.tsx, frontend/src/ui/CommandBlock.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
+code: [frontend/src/ui/primitives.tsx, tests/test_ui_tooltips.py, scripts/verify-tooltips.py, frontend/src/ui/CommandBlock.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
 verified: 2026-11-01
 branch: feature/library-view
 ---
@@ -22,6 +22,12 @@ behind it are in the [Design language](../../Architecture/Desktop%20App/Design%2
   `CommandBlock` / `Reason`; P1 in `ProposalReview`.
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
+- **Every control says what it does.** `Button`, `Pressable` and `MotionPressable` require `tooltip`: what the
+  action will do (its effect or consequence), never the label again; `tooltip={false}` marks a self-explaining
+  text button (Cancel, Close, Back, Next) and renders `data-no-tooltip`. Informative icons, badges, counts and
+  truncated text get a `Hint`. No raw `<button>` outside `ui/primitives.tsx` and no native `title=` tooltips:
+  `tests/test_ui_tooltips.py` fails on both, and `scripts/verify-tooltips.py` fails on any visible control
+  without `data-tooltip` / `data-no-tooltip` (form fields with a visible label and select triggers excepted).
 
 ## How it works
 
@@ -39,7 +45,9 @@ are in `lib/ease.ts` (`SPRING_LAYOUT`, `SPRING_PANEL`); honor `useReducedMotion`
 | `Button` primary | the one main action of a view or card |
 | `Button` secondary / quiet | other actions; quiet for low-emphasis inline ones (Accept all, Copy again) |
 | `Button` danger / destructive | danger: an action that removes something; destructive: only the button that confirms a deletion |
-| `IconButton` | icon-only actions; its label is required and doubles as the tooltip |
+| `IconButton` | icon-only actions; its label is required and doubles as the tooltip (`tooltip` overrides it) |
+| `Pressable` / `MotionPressable` | a custom-styled clickable (card, chip, row, link in text): an unstyled button with the required `tooltip` |
+| `Hint` | a tooltip on something that isn't clickable (icon, badge, count, truncated text); `focusable` puts it in the tab order |
 | `Badge` | a short state or count beside a name |
 | `Banner` | a fault or warning that belongs to a whole section |
 | `Card` | a titled settings or report block with optional help |

@@ -23,7 +23,9 @@ example in a shortcut's target) to log every call the window makes. Session logs
 **Layout.** The left rail has **Back**/**Forward** (view history; a mouse's dedicated back and forward
 buttons do the same), **Home**,
 **Library**, **Collections** and **Asset processing**, with **Settings** at the
-bottom; every icon has a label and a focus/hover tooltip. The Library lets you add
+bottom; every icon has a label and a focus/hover tooltip. Across the app, hovering or focusing a control,
+badge or count shows a tooltip that says what it is or what it will do; plain buttons such as Cancel or
+Back, whose text already says it, have none. The Library lets you add
 folders, organize packs and review agent proposals. The top bar holds the background
 activity indicator (only while something runs), the notifications bell and the
 inspection toggle. At launch the library opens from its last scan at once and shows
