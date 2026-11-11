@@ -8,6 +8,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- **Tooltips everywhere**: every icon button, non-obvious action and informative icon, badge or count shows a
+  tooltip on hover and keyboard focus that says what it is or what will happen (the variant count on asset cards,
+  queue controls, folder actions, setup steps…). Native browser tooltips are gone outside the 3D viewer; truncated names and
+  paths show in full in the same tooltip.
 - **Faster startup scans**: a scan reads only files whose content changed since the last scan; an unchanged
   library scans about ten times faster. Each scan writes one summary line to the log (files, changes, seconds
   per phase).

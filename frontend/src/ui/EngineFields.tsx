@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { ENGINE_NOTE, plural } from "../app/format";
 import { checkServer } from "../app/store";
-import { Badge, Button, RadioCards, TextField } from "./primitives";
+import { Badge, Button, Hint, RadioCards, TextField } from "./primitives";
 
 /** How descriptions are generated: the engines setup_core lists, plus a local server's address and model (Settings and setup). */
 export function EngineFields({ engine, onEngine, url, onUrl, model, onModel, disabled, engines, idPrefix }: {
@@ -30,7 +30,7 @@ export function EngineFields({ engine, onEngine, url, onUrl, model, onModel, dis
           value: item.id,
           title: item.id === "builtin" ? `${item.label} — ${item.name}` : `${item.label} (experimental)`,
           detail: item.summary,
-          badge: <Badge tone={item.status === "tested" ? "success" : "warning"}>{item.status === "tested" ? "Tested" : "Experimental"}</Badge>,
+          badge: <Hint content={item.status === "tested" ? "Assetarium is tested with this engine" : "Not tested with Assetarium; results may vary"}><span className="inline-flex"><Badge tone={item.status === "tested" ? "success" : "warning"}>{item.status === "tested" ? "Tested" : "Experimental"}</Badge></span></Hint>,
         }))}
       />
       {engine === "local-server" && (
@@ -38,7 +38,7 @@ export function EngineFields({ engine, onEngine, url, onUrl, model, onModel, dis
           <div className="flex flex-wrap items-end gap-3">
             <TextField id={`${idPrefix}-server-url`} label="Server address" value={url} disabled={disabled} spellCheck={false} onChange={(e) => { onUrl(e.target.value); setProbe(null); }} className="min-w-[240px] flex-1" />
             <TextField id={`${idPrefix}-server-model`} label="Model name" value={model} disabled={disabled} spellCheck={false} onChange={(e) => { onModel(e.target.value); setProbe(null); }} className="min-w-[200px] flex-1" />
-            <Button type="button" variant="secondary" id={`${idPrefix}-test-server`} disabled={disabled || testing || !url.trim()} onClick={() => void test()}>{testing ? "Testing…" : "Test connection"}</Button>
+            <Button type="button" variant="secondary" id={`${idPrefix}-test-server`} disabled={disabled || testing || !url.trim()} tooltip="Asks the server which models it has; it never generates text" onClick={() => void test()}>{testing ? "Testing…" : "Test connection"}</Button>
           </div>
           <p id={`${idPrefix}-server-result`} role="status" aria-live="polite" className={cn("text-[12.5px] leading-relaxed", probe && !connected ? "text-fault" : "text-muted-foreground")}>
             {!probe ? "Only addresses on this computer are accepted. Test connection only lists the server’s models; it never generates text."
@@ -48,7 +48,7 @@ export function EngineFields({ engine, onEngine, url, onUrl, model, onModel, dis
           {connected && probe.models.length > 0 && !probe.models.includes(model) && (
             <div className="flex flex-wrap gap-2">
               {probe.models.slice(0, 6).map((name: string) => (
-                <Button key={name} type="button" variant="quiet" className="h-8 px-3 text-[12px]" onClick={() => onModel(name)}>Use “{name}”</Button>
+                <Button key={name} type="button" variant="quiet" className="h-8 px-3 text-[12px]" tooltip="Puts this model name in Model name" onClick={() => onModel(name)}>Use “{name}”</Button>
               ))}
             </div>
           )}

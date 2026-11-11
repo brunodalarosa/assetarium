@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import { inspectFolder, openFolderMenu, pathAction, type SourcesView, toggleFolder, useApp } from "../app/store";
+import { Pressable } from "./primitives";
 
 const ROW = 34; // px; the tree renders only the rows in view (Kenney-sized libraries have thousands of folders).
 const ICONS = { library: HardDrive, bundle: Boxes, pack: Package, folder: Folder, excluded: FolderX } as const;
@@ -102,10 +103,11 @@ function TreeRow({ row, selected, focused, onFocus }: { row: Row; selected: bool
         (offline || excluded) && "opacity-55",
       )}
     >
-      <button
-        type="button"
+      <Pressable
         tabIndex={-1}
         aria-hidden
+        tooltip={row.open ? "Hides the folders inside" : "Shows the folders inside"}
+        delay={500}
         className={cn("grid size-5 shrink-0 place-items-center rounded text-muted-foreground", !row.hasChildren && "invisible")}
         onClick={(event) => {
           event.stopPropagation();
@@ -115,7 +117,7 @@ function TreeRow({ row, selected, focused, onFocus }: { row: Row; selected: bool
         <motion.span animate={{ rotate: row.open ? 90 : 0 }} transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 30 }}>
           <ChevronRight className="size-3.5" />
         </motion.span>
-      </button>
+      </Pressable>
       <Icon className={cn("size-4 shrink-0", row.node.kind === "pack" ? "text-primary" : "text-muted-foreground")} strokeWidth={1.75} aria-hidden />
       <span className="min-w-0 flex-1 truncate">{row.node.name || row.folder.name}</span>
       {offline && <span className="text-[11px] text-muted-foreground">Offline</span>}

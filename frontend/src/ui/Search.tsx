@@ -5,7 +5,7 @@ import { SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import { formatLabel, LIMITS, MODES, packName, VIEWS } from "../app/format";
 import { applyFilters, clearSearch, DEFAULT_FILTERS, type Filters, setFiltersOpen, setQuery, submitSearch, useApp } from "../app/store";
-import { Button, IconButton, SelectField, Spinner, TextField } from "./primitives";
+import { Button, IconButton, Pressable, SelectField, Spinner, TextField } from "./primitives";
 
 export function SearchBar({ compact }: { compact: boolean }) {
   const query = useApp((s) => s.query);
@@ -46,15 +46,16 @@ export function SearchBar({ compact }: { compact: boolean }) {
         <Spinner className="text-primary" />
         <span className="sr">Searching…</span>
       </span>
-      <button
+      <Pressable
         id="submit"
         type="submit"
         disabled={busy}
         aria-label={query.trim() || reference ? "Search" : "Browse the filtered library"}
+        tooltip={query.trim() || reference ? "Searches the whole library with the chosen mode and filters" : "Shows the library narrowed by the filters"}
         className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-[background-color,transform] hover:bg-primary-hover active:scale-95 disabled:opacity-60"
       >
         <ArrowRight className="size-5" />
-      </button>
+      </Pressable>
       <IconButton
         id="open-filters"
         label="Filters & search options"
@@ -149,8 +150,8 @@ export function FiltersPanel() {
               Image and 3D filters apply to their asset types; technical filters need measured evidence. An empty search browses the filtered library.
             </p>
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="quiet" onClick={() => setDraft({ ...DEFAULT_FILTERS })}>Reset</Button>
-              <Button id="apply-filters" disabled={draft.mode === "reference" && !draft.reference_asset} onClick={() => void applyFilters(draft)}>Apply filters</Button>
+              <Button variant="quiet" tooltip="Puts every filter back to its default; nothing changes until you apply" onClick={() => setDraft({ ...DEFAULT_FILTERS })}>Reset</Button>
+              <Button id="apply-filters" disabled={draft.mode === "reference" && !draft.reference_asset} tooltip="Applies these filters; a search or browse on screen runs again with them" onClick={() => void applyFilters(draft)}>Apply filters</Button>
             </div>
           </div>
         </motion.div>

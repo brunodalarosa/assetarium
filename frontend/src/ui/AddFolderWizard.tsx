@@ -105,9 +105,9 @@ function Found({ look }: { look: Json }) {
       {error && <Banner><span>{error}</span></Banner>}
       <div className="grid gap-2">
         <div className="flex flex-wrap gap-2">
-          <Button id="add-folder-agent" disabled={busy} onClick={() => void finishAddFolder("agent")}><Bot className="size-4" aria-hidden />Let my agent finish</Button>
-          {!practice && <Button id="add-folder-myself" variant="secondary" disabled={busy} onClick={() => void finishAddFolder("myself")}>Review myself</Button>}
-          {!practice && <Button id="add-folder-later" variant="quiet" disabled={busy} onClick={() => void finishAddFolder("later")}>Later</Button>}
+          <Button id="add-folder-agent" disabled={busy} tooltip="Adds the folder and gives you a prompt so your AI agent proposes each pack’s structure; you approve what it proposes" onClick={() => void finishAddFolder("agent")}><Bot className="size-4" aria-hidden />Let my agent finish</Button>
+          {!practice && <Button id="add-folder-myself" variant="secondary" disabled={busy} tooltip="Adds the folder and opens it in the Library, where you set each pack’s structure" onClick={() => void finishAddFolder("myself")}>Review myself</Button>}
+          {!practice && <Button id="add-folder-later" variant="quiet" disabled={busy} tooltip="Adds the folder and leaves the structure for later; packs that need one say so in the Library" onClick={() => void finishAddFolder("later")}>Later</Button>}
         </div>
         <p className="text-[11.5px] text-subtle">{practice ? "Adds and scans these practice packs in a temporary library. Review your agent’s proposals here; everything is removed when you finish or cancel." : "Each choice adds the folder and scans it (reading every file once); nothing is rendered or described until you ask."}</p>
       </div>
@@ -142,7 +142,7 @@ function TakeOver() {
       <section className="grid gap-2 rounded-2xl border border-border bg-surface-2/50 p-4">
         <h3 className="text-[13px] font-semibold">Paste this into your agent</h3>
         <p id="agent-take-over-prompt" className="max-h-28 overflow-y-auto text-[12.5px] leading-relaxed select-text scroll-thin">{add.prompt}</p>
-        <div><Button id="copy-agent-prompt" variant="secondary" className="h-8 px-3" onClick={() => copyAgentPrompt()}><Copy className="size-3.5" aria-hidden />Copy prompt</Button></div>
+        <div><Button id="copy-agent-prompt" variant="secondary" className="h-8 px-3" tooltip="Copies the prompt; paste it into your AI agent" onClick={() => copyAgentPrompt()}><Copy className="size-3.5" aria-hidden />Copy prompt</Button></div>
       </section>
       <p id="take-over-connection" role="status" className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
         <span aria-hidden className={cn("size-2 rounded-full", agent.connected.length ? (agent.working ? "agent-pulse bg-primary" : "bg-success") : "bg-border-strong")} />
@@ -151,8 +151,8 @@ function TakeOver() {
       {idle && (
         <Banner tone="warning">
           <span id="agent-idle" className="flex flex-wrap items-center gap-2">Your agent seems idle.
-            <Button variant="quiet" className="h-7 px-2" onClick={() => copyAgentPrompt()}>Copy the prompt again</Button>
-            {!add.practice && <Button variant="quiet" className="h-7 px-2" onClick={() => { closeAddFolder(); openSources(add.key || undefined, ""); }}>Take over myself</Button>}
+            <Button variant="quiet" className="h-7 px-2" tooltip={false} onClick={() => copyAgentPrompt()}>Copy the prompt again</Button>
+            {!add.practice && <Button variant="quiet" className="h-7 px-2" tooltip="Closes this and opens the folder in the Library to finish its structure yourself" onClick={() => { closeAddFolder(); openSources(add.key || undefined, ""); }}>Take over myself</Button>}
           </span>
         </Banner>
       )}
@@ -168,8 +168,8 @@ function TakeOver() {
         <ul className="grid gap-1 text-[12.5px]" aria-label="Practice outcomes">{(add.practiceState?.checks || []).map((check: Json) =>
           <li key={check.label} className={check.passed ? "text-success" : "text-muted-foreground"}>{check.passed ? "✓" : "○"} {check.label}</li>)}</ul>
         {(add.practiceState?.applied || []).map((p: Json) => <div key={p.id} className="flex items-center gap-2 text-[12px]">
-          <span>Applied to {p.pack || "practice packs"}</span><Button variant="quiet" onClick={() => void undoPractice(p.id)}>Undo</Button></div>)}
-        <div><Button variant="secondary" disabled={add.busy} onClick={() => void finishPractice()}>{add.busy ? "Finishing and cleaning up…" : "Finish and see results"}</Button></div>
+          <span>Applied to {p.pack || "practice packs"}</span><Button variant="quiet" tooltip="Undoes this applied change in the practice packs" onClick={() => void undoPractice(p.id)}>Undo</Button></div>)}
+        <div><Button variant="secondary" disabled={add.busy} tooltip="Checks the outcome and removes the practice files, including unresolved proposals" onClick={() => void finishPractice()}>{add.busy ? "Finishing and cleaning up…" : "Finish and see results"}</Button></div>
         <p className="text-[11.5px] text-subtle">Finishing checks the current outcome and removes the practice files, including unresolved proposals.</p>
       </div>}
       <div className="grid gap-1.5">
@@ -194,7 +194,7 @@ function Done() {
     {!!add.result?.faults?.length && <details className="text-[12px] text-warning"><summary>Tool calls that were refused ({add.result.faults.length})</summary>
       <ul className="mt-2 grid gap-1">{add.result.faults.map((fault: string, i: number) => <li key={i}>{fault}</li>)}</ul></details>}
     <p className="text-[12px] text-muted-foreground">These observations cover this practice import only. Closing this screen forgets the results.</p>
-    <div className="flex gap-2"><Button onClick={() => closeAddFolder()}>Close</Button><Button variant="secondary" onClick={() => { closeAddFolder(); void startAgentPractice(); }}>Try again</Button></div>
+    <div className="flex gap-2"><Button tooltip={false} onClick={() => closeAddFolder()}>Close</Button><Button variant="secondary" tooltip="Starts a new practice with fresh practice packs" onClick={() => { closeAddFolder(); void startAgentPractice(); }}>Try again</Button></div>
   </div>;
   return (
     <div id="add-folder-done" className="grid justify-items-start gap-4">
@@ -202,8 +202,8 @@ function Done() {
       <p className="text-[15px] font-semibold">Every pack in {add.name} has a structure.</p>
       <p className="text-[13px] text-muted-foreground">Make previews next to render, describe and index them; it starts only when you ask.</p>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => { if (add.key) void makePreviews({ key: add.key }); closeAddFolder(); }}>Make previews</Button>
-        <Button variant="secondary" onClick={() => { const key = add.key; closeAddFolder(); openSources(key || undefined, ""); }}><FolderOpen className="size-4" aria-hidden />Open the folder</Button>
+        <Button tooltip="Queues preview renders for this folder and closes this; follow them in Processing" onClick={() => { if (add.key) void makePreviews({ key: add.key }); closeAddFolder(); }}>Make previews</Button>
+        <Button variant="secondary" tooltip="Closes this and shows the folder in the Library" onClick={() => { const key = add.key; closeAddFolder(); openSources(key || undefined, ""); }}><FolderOpen className="size-4" aria-hidden />Open the folder</Button>
       </div>
     </div>
   );

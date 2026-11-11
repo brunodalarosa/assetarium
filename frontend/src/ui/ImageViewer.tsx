@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { AssetApi } from "../app/api";
 import { setState, useApp } from "../app/store";
 import { Checkbox } from "@/components/beui/checkbox";
-import { IconButton, SelectField } from "./primitives";
+import { IconButton, Pressable, SelectField } from "./primitives";
 
 const BACKGROUNDS: [string, string][] = [["checker", "Checkerboard"], ["light", "Light"], ["dark", "Dark"], ["gray", "Mid gray"]];
 const ZOOMS = [0.125, 0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
@@ -87,8 +87,8 @@ export function ImageViewer({ assetId, name, image, api, version, native, pixelA
       </div>
       <div className="image-toolbar flex flex-wrap items-end gap-2">
         <div className="flex items-center gap-1 rounded-full border border-border p-1">
-          <button type="button" onClick={() => setZoom("fit")} aria-label="Fit image to panel" title="Fit image to panel" className="h-8 rounded-full px-3 text-[12px] hover:bg-surface-2"><Maximize className="inline size-3.5" aria-hidden /> Fit</button>
-          <button type="button" onClick={() => setZoom(1)} aria-label="Native size (100%)" title="Native size (100%)" className="h-8 rounded-full px-3 text-[12px] hover:bg-surface-2">1:1</button>
+          <Pressable onClick={() => setZoom("fit")} aria-label="Fit image to panel" tooltip="Fits the whole image in the panel (0)" className="h-8 rounded-full px-3 text-[12px] hover:bg-surface-2"><Maximize className="inline size-3.5" aria-hidden /> Fit</Pressable>
+          <Pressable onClick={() => setZoom(1)} aria-label="Native size (100%)" tooltip="Shows the image at its native size, one image pixel per screen pixel (1)" className="h-8 rounded-full px-3 text-[12px] hover:bg-surface-2">1:1</Pressable>
           <IconButton label="Zoom out" onClick={() => step(-1)} className="size-8 rounded-full"><Minus className="size-3.5" /></IconButton>
           <span className="image-zoom min-w-12 text-center text-[12px] tabular-nums" aria-live="polite">{zoom === "fit" ? "Fit" : Math.round(zoom * 100) + "%"}</span>
           <IconButton label="Zoom in" onClick={() => step(1)} className="size-8 rounded-full"><Plus className="size-3.5" /></IconButton>

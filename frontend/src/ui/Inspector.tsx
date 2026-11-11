@@ -2,7 +2,6 @@ import { Box, ChevronRight, CircleAlert, Clock, Copy, GripVertical, SwatchBook, 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Switch } from "@/components/beui/switch";
-import { Tooltip } from "@/components/beui/tooltip";
 import { EASE_OUT, SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
@@ -16,7 +15,7 @@ import {
 import { FolderPanel } from "./FolderPanel";
 import { ImageViewer } from "./ImageViewer";
 import { InspectorGhost, Skeleton, useShownWhile } from "./Loading";
-import { Badge, Banner, Button, Disclosure, EvidenceBlock, IconButton, SelectField, Spinner, TextField } from "./primitives";
+import { Badge, Banner, Button, Disclosure, EvidenceBlock, Hint, IconButton, Pressable, SelectField, Spinner, TextField } from "./primitives";
 
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 960;
@@ -56,7 +55,7 @@ function Facts({ entries }: { entries: [string, unknown][] }) {
     </dl>
   );
 }
-const Hint = ({ children }: { children: ReactNode }) => <p className="text-[11.5px] leading-relaxed text-muted-foreground">{children}</p>;
+const HelpText = ({ children }: { children: ReactNode }) => <p className="text-[11.5px] leading-relaxed text-muted-foreground">{children}</p>;
 const Text = ({ children, className }: { children: ReactNode; className?: string }) => <p className={cn("text-[13px] leading-relaxed text-foreground break-words", className)}>{children}</p>;
 
 function faultText(fault: Json) {
@@ -96,9 +95,10 @@ function Collapsible({ name, children }: { name: InspectorSection; children: Rea
   return (
     <section id={id} data-section={name} aria-labelledby={id + "-toggle"} className="inspector-section scroll-mt-3 border-t border-border">
       <h3>
-        <button
+        <Pressable
           id={id + "-toggle"}
-          type="button"
+          // The section title says what opens; the chevron shows the state.
+          tooltip={false}
           aria-expanded={open}
           aria-controls={id + "-content"}
           onClick={() => setInspectorSection(name, !open)}
@@ -108,7 +108,7 @@ function Collapsible({ name, children }: { name: InspectorSection; children: Rea
             <ChevronRight className="size-4" aria-hidden />
           </motion.span>
           {SECTION_TITLE[name]}
-        </button>
+        </Pressable>
       </h3>
       <AnimatePresence initial={false}>
         {open && (
@@ -139,12 +139,10 @@ function FactChip({ to, hint, children }: { to: InspectorSection; hint: string; 
   const reduce = useReducedMotion();
   return (
     <li>
-      <Tooltip content={`${hint} · Opens ${SECTION_TITLE[to]}`} delay={350}>
-        <button type="button" data-section={to} onClick={() => reveal(to, reduce)}
-          className="fact-chip inline-flex h-7 items-center rounded-full bg-surface-2 px-2.5 text-[12px] text-foreground outline-none transition-colors hover:bg-accent-soft hover:text-accent-soft-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
-          {children}
-        </button>
-      </Tooltip>
+      <Pressable tooltip={`${hint} · Opens ${SECTION_TITLE[to]}`} data-section={to} onClick={() => reveal(to, reduce)}
+        className="fact-chip inline-flex h-7 items-center rounded-full bg-surface-2 px-2.5 text-[12px] text-foreground outline-none transition-colors hover:bg-accent-soft hover:text-accent-soft-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
+        {children}
+      </Pressable>
     </li>
   );
 }
@@ -210,7 +208,7 @@ function FaultLine({ faults }: { faults: Json[] }) {
       <span className="line-clamp-3 min-w-0 flex-1 break-words">
         {faultText(faults[0])}{faults.length > 1 && <span className="font-medium"> · {plural(faults.length - 1, "more fault", "more faults")}</span>}
       </span>
-      <button type="button" onClick={() => reveal("record", reduce)} className="shrink-0 rounded font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-fault/40">Details</button>
+      <Pressable tooltip="Opens the Processing record with every recorded fault and its evidence" onClick={() => reveal("record", reduce)} className="shrink-0 rounded font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-fault/40">Details</Pressable>
     </div>
   );
 }
@@ -319,11 +317,11 @@ function DescriptionForm({ grid, assetId, observations, shared, onDone }: { grid
   return (
     <motion.form initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: EASE_OUT }}
       className="description-form grid gap-3" onKeyDown={keys} onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      {shared > 1 && <Hint>Changes the description for all {shared} variants.</Hint>}
+      {shared > 1 && <HelpText>Changes the description for all {shared} variants.</HelpText>}
       <div className="grid gap-1.5">
         <label htmlFor="description-edit" className="sr">Description</label>
         <textarea id="description-edit" ref={field} rows={6} maxLength={1800} value={text} onChange={(event) => setText(event.target.value)} className={AREA} />
-        <Hint>{plural(wordCount(text), "word", "words")} · 10–170 words about how it looks</Hint>
+        <HelpText>{plural(wordCount(text), "word", "words")} · 10–170 words about how it looks</HelpText>
       </div>
       <Disclosure title="More details">
         <div className="grid gap-3">
@@ -338,13 +336,13 @@ function DescriptionForm({ grid, assetId, observations, shared, onDone }: { grid
                 onChange={(event) => setLists({ ...lists, [key]: event.target.value })} className={AREA} />
             </div>
           ))}
-          <Hint>One item per line. Search reads every field, so a corrected color or part helps it too.</Hint>
+          <HelpText>One item per line. Search reads every field, so a corrected color or part helps it too.</HelpText>
         </div>
       </Disclosure>
       {error && <Banner className="description-error">{error}</Banner>}
       <div className="flex gap-2">
-        <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-        <Button type="button" variant="quiet" onClick={onDone}>Cancel</Button>
+        <Button type="submit" disabled={saving} tooltip="Saves your text; search keeps the earlier text until it is updated (Ctrl+Enter)">{saving ? "Saving…" : "Save"}</Button>
+        <Button type="button" variant="quiet" tooltip={false} onClick={onDone}>Cancel</Button>
       </div>
     </motion.form>
   );
@@ -369,7 +367,7 @@ function DescriptionState({ grid, edit, image, processed }: { grid: GridId; edit
   switch (edit.state) {
     case "none":
       return line(null, `No description yet. ${searchable}.`,
-        <Button variant="secondary" disabled={busy} onClick={() => void run("generate")}>Generate description</Button>);
+        <Button variant="secondary" disabled={busy} tooltip="Queues this asset for a description written by the local model from its previews" onClick={() => void run("generate")}>Generate description</Button>);
     case "queued":
       return line(<Clock className="mt-0.5 size-4 shrink-0" aria-hidden />,
         `Waiting to be described · ${ordinal(work.position)} in line${work.paused ? ". The queue is paused; continue it in Asset processing" : ""}`);
@@ -377,10 +375,10 @@ function DescriptionState({ grid, edit, image, processed }: { grid: GridId; edit
       return line(<Spinner className="mt-0.5 size-4 shrink-0" />, "Writing the description now…");
     case "failed":
       return line(<CircleAlert className="mt-0.5 size-4 shrink-0 text-fault" aria-hidden />, `Description generation failed: ${edit.failure}`,
-        <Button variant="secondary" disabled={busy} onClick={() => void run("retry")}>Try again</Button>);
+        <Button variant="secondary" disabled={busy} tooltip="Queues the description again; the recorded failure stays until it succeeds" onClick={() => void run("retry")}>Try again</Button>);
     case "not_set_up":
       return line(null, `No description yet. ${edit.setup?.reason || "Descriptions are not set up"}, so none can be generated here. ${searchable}.`,
-        <Button variant="secondary" onClick={() => void openDescriptionSetup()}>Set up descriptions</Button>);
+        <Button variant="secondary" tooltip="Opens setup at the descriptions step; nothing is installed or run without you" onClick={() => void openDescriptionSetup()}>Set up descriptions</Button>);
     default:
       return line(null, processed ? `Descriptions can be generated once previews are made. ${searchable}.`
         : "Descriptions can be generated after the image is processed. It is still found by name.");
@@ -396,14 +394,14 @@ function SearchUpdate({ grid, edit }: { grid: GridId; edit: Json }) {
     return (
       <div className="search-update grid justify-items-start gap-2" data-status="pending">
         <p className="flex items-center gap-2 text-[12px] text-muted-foreground"><Clock className="size-3.5" aria-hidden />Search still uses the earlier text until you update it.</p>
-        <Button variant="secondary" className="h-8 px-3 text-[12px]" onClick={() => void describeAsset(grid, edit, "edited")}>Update search</Button>
+        <Button variant="secondary" className="h-8 px-3 text-[12px]" tooltip="Queues a search data update so search reads your edited text" onClick={() => void describeAsset(grid, edit, "edited")}>Update search</Button>
       </div>
     );
   if (work.status === "faulty")
     return (
       <div className="search-update grid justify-items-start gap-2" data-status="faulty">
         <p className="flex items-start gap-2 text-[12px] leading-relaxed text-warning"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />Search still uses the earlier text: {work.reason}</p>
-        <Button variant="secondary" className="h-8 px-3 text-[12px]" onClick={() => void describeAsset(grid, edit, "edited")}>Update search</Button>
+        <Button variant="secondary" className="h-8 px-3 text-[12px]" tooltip="Queues the search data update again so search reads your edited text" onClick={() => void describeAsset(grid, edit, "edited")}>Update search</Button>
       </div>
     );
   return (
@@ -439,18 +437,18 @@ function Description({ grid, assetId, info, image }: { grid: GridId; assetId: st
       <div className="flex min-h-7 flex-wrap items-center gap-2">
         <h3 id="description-title" className="text-[14px] font-semibold text-foreground">Description</h3>
         {notes.length > 0 && (
-          <button type="button" aria-expanded={notesOpen} aria-controls="caption-notes" onClick={() => setNotesOpen(!notesOpen)}
+          <Pressable aria-expanded={notesOpen} aria-controls="caption-notes" tooltip={notesOpen ? "Hides the review notes" : "Shows what may be imprecise in this description"} onClick={() => setNotesOpen(!notesOpen)}
             className={cn("caption-notes-chip inline-flex h-6 items-center gap-1 rounded-md px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/40", warnings ? "bg-warning-bg text-warning" : "bg-surface-2 text-muted-foreground hover:text-foreground")}>
             {warnings > 0 && <TriangleAlert className="size-3" aria-hidden />}
             {[warnings && plural(warnings, "warning", "warnings"), notes.length - warnings && plural(notes.length - warnings, "review note", "review notes")].filter(Boolean).join(" · ")}
-          </button>
+          </Pressable>
         )}
         {text && (
-          <Tooltip content={tooltip} delay={250}>
-            <span tabIndex={0} className={cn("generated-label ml-auto rounded px-1 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40", edited ? "text-foreground" : "text-muted-foreground")}>
+          <Hint content={tooltip} focusable>
+            <span className={cn("generated-label ml-auto rounded px-1 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40", edited ? "text-foreground" : "text-muted-foreground")}>
               {edited ? "Edited" : info.description_shared_from ? "Generated · shared" : "Generated"}
             </span>
-          </Tooltip>
+          </Hint>
         )}
       </div>
       {notesOpen && (
@@ -477,16 +475,16 @@ function Description({ grid, assetId, info, image }: { grid: GridId; assetId: st
                 <div className="description-original grid gap-1.5 rounded-xl bg-surface-2/60 px-3.5 py-3">
                   <h4 className="text-[11.5px] font-medium text-muted-foreground">Generated original{edit.model ? ` · ${edit.model}` : ""}</h4>
                   <Text className="text-muted-foreground">{edit.original.description}</Text>
-                  {also.length > 0 && <Hint>You also corrected: {also.join(", ")}.</Hint>}
+                  {also.length > 0 && <HelpText>You also corrected: {also.join(", ")}.</HelpText>}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
           <SearchUpdate grid={grid} edit={edit} />
           <div className="description-actions flex flex-wrap gap-2">
-            <Button variant="secondary" className="h-8 px-3 text-[12px]" onClick={() => setEditing(true)}>Edit</Button>
+            <Button variant="secondary" className="h-8 px-3 text-[12px]" tooltip="Correct the description yourself; the generated original is kept" onClick={() => setEditing(true)}>Edit</Button>
             {edited && (
-              <Button variant="quiet" className="h-8 px-3 text-[12px]" aria-expanded={original} onClick={() => setOriginal(!original)}>{original ? "Hide original" : "Show original"}</Button>
+              <Button variant="quiet" className="h-8 px-3 text-[12px]" aria-expanded={original} tooltip={original ? "Hides the generated original" : "Shows the text the model wrote, before your edit"} onClick={() => setOriginal(!original)}>{original ? "Hide original" : "Show original"}</Button>
             )}
           </div>
         </>
@@ -517,9 +515,9 @@ function FileSection({ result, image }: { result: Json; image: boolean }) {
           <>
             <Text>{formatLabel(source.format)}{source.variant ? ` · ${source.variant} folder` : ""}</Text>
             <code className="path block rounded-xl bg-surface-2 px-3 py-2.5 font-mono text-[11.5px] leading-relaxed break-all text-muted-foreground select-text">{source.resolved_path}</code>
-            <div><Button variant="secondary" className="h-9 px-4" onClick={() => void copyText(source.resolved_path, "Source path copied. Asset files were not copied.")}><Copy className="size-3.5" aria-hidden />Copy source path</Button></div>
+            <div><Button variant="secondary" className="h-9 px-4" tooltip="Copies the full path of this file; the file itself is not copied" onClick={() => void copyText(source.resolved_path, "Source path copied. Asset files were not copied.")}><Copy className="size-3.5" aria-hidden />Copy source path</Button></div>
             {others.length > 0 && (
-              <Hint>Also in this asset: {others.map((v) => `${v.variant} (${formatLabel(v.format)}${v.usable === false ? `, unusable: ${v.reason}` : ""})`).join(" · ")}. Agents can ask for a usable one by its folder name.</Hint>
+              <HelpText>Also in this asset: {others.map((v) => `${v.variant} (${formatLabel(v.format)}${v.usable === false ? `, unusable: ${v.reason}` : ""})`).join(" · ")}. Agents can ask for a usable one by its folder name.</HelpText>
             )}
           </>
         ) : (
@@ -546,7 +544,7 @@ function FileSection({ result, image }: { result: Json; image: boolean }) {
       {image && (suggested || meta.identical_content) && (
         <Group title="Purpose">
           {suggested && <Text>Suggested: {suggested.value} — {suggested.evidence}</Text>}
-          {suggested && <Hint>Suggestions come from folder names and are not verified. Search and filters treat every image the same way.</Hint>}
+          {suggested && <HelpText>Suggestions come from folder names and are not verified. Search and filters treat every image the same way.</HelpText>}
           {meta.identical_content && <Text>Byte-identical to {plural(meta.identical_content.total, "other image", "other images")} in this source; kept separate.</Text>}
         </Group>
       )}
@@ -594,7 +592,7 @@ function ImageSection({ result }: { result: Json }) {
   return (
     <Collapsible name="image">
       <Facts entries={imageFacts(t)} />
-      <Hint>{info.scale}</Hint>
+      <HelpText>{info.scale}</HelpText>
       <Text className="search-input text-muted-foreground">
         {derivation
           ? `Image search and descriptions read a derived copy${derivation.scale > 1 ? `, enlarged ${derivation.scale}× with hard pixel edges` : ""}${derivation.resample?.includes("lanczos-downscale") ? ", reduced to fit 1024 px" : ""}${derivation.background ? ` on a flat rgb(${derivation.background.join(", ")}) backdrop. The backdrop fills transparent pixels only; it is not a colour of this image.` : ". No backdrop was needed."}`
@@ -669,7 +667,7 @@ function TagsSection({ assetId }: { assetId: string }) {
   };
   return (
     <Section title="Tags" className="asset-tags">
-      <Hint>Tags describe the asset everywhere in Assetarium and can be used as a search filter. Collection labels are separate.</Hint>
+      <HelpText>Tags describe the asset everywhere in Assetarium and can be used as a search filter. Collection labels are separate.</HelpText>
       {tags === null && !error && (
         <span className="flex gap-1.5" role="status">
           <span className="sr">Loading tags…</span>
@@ -681,9 +679,9 @@ function TagsSection({ assetId }: { assetId: string }) {
           {tags.map((tag) => (
             <li key={tag} className="inline-flex h-7 items-center gap-1 rounded-full bg-surface-2 pr-1 pl-2.5 text-[12px] text-foreground">
               {tag}
-              <button type="button" aria-label={`Remove tag ${tag}`} onClick={() => void save(tags.filter((t) => t !== tag))} className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground">
+              <Pressable aria-label={`Remove tag ${tag}`} tooltip="Removes this tag from this asset; other assets keep it" onClick={() => void save(tags.filter((t) => t !== tag))} className="grid size-5 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground">
                 <X className="size-3" />
-              </button>
+              </Pressable>
             </li>
           ))}
         </ul>
@@ -701,7 +699,7 @@ function TagsSection({ assetId }: { assetId: string }) {
             className="h-9 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 text-[12.5px] outline-none hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25"
           />
           <datalist id={listId}>{known.filter((t) => !tags.includes(t.tag)).map((t) => <option key={t.tag} value={t.tag} />)}</datalist>
-          <Button type="submit" variant="secondary" className="h-9 px-3.5 text-[12.5px]" disabled={!draft.trim()}>Add</Button>
+          <Button type="submit" variant="secondary" className="h-9 px-3.5 text-[12.5px]" disabled={!draft.trim()} tooltip="Adds the tag to this asset; tags are shared app-wide and searchable">Add</Button>
         </form>
       )}
       {error && <p role="alert" className="text-[12px] text-fault">{error}</p>}
@@ -815,7 +813,7 @@ function CollectionEntry({ assetId }: { assetId: string }) {
           className="resize-y rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px] leading-relaxed outline-none hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25"
         />
       </div>
-      <Hint>Saved automatically as you type. Exports and agents receive the label and notes with this collection.</Hint>
+      <HelpText>Saved automatically as you type. Exports and agents receive the label and notes with this collection.</HelpText>
     </section>
   );
 }
@@ -830,8 +828,8 @@ function UnavailableDetail({ entry }: { entry: Json }) {
       </div>
       <Banner tone="warning" role="note"><span id="unavailable-reason">Unavailable: {entry.reason}</span></Banner>
       <CollectionEntry assetId={entry.asset_id} />
-      <Button variant="danger" onClick={() => startSelection(entry.asset_id)}>Remove from collection…</Button>
-      <Hint>Asset ID {entry.asset_id}. Restoring or re-adding its source brings it back with this label and notes.</Hint>
+      <Button variant="danger" tooltip="Selects this entry so you can take it out of the collection" onClick={() => startSelection(entry.asset_id)}>Remove from collection…</Button>
+      <HelpText>Asset ID {entry.asset_id}. Restoring or re-adding its source brings it back with this label and notes.</HelpText>
     </div>
   );
 }
@@ -852,18 +850,18 @@ function Variants({ grid, group, assetId }: { grid: GridId; group: Json; assetId
       </div>
       <div className="variant-chips flex flex-wrap gap-1.5" role="radiogroup" aria-label="Variants">
         {group.variants.map((v: Json) => (
-          <button key={v.asset_id} type="button" role="radio" aria-checked={v.asset_id === assetId} title={v.name}
+          <Pressable key={v.asset_id} role="radio" aria-checked={v.asset_id === assetId} tooltip={v.name}
             onClick={() => v.asset_id !== assetId && void selectAsset(grid, v.asset_id, null, "three_quarter", false)}
             className={cn("h-7 min-w-8 rounded-full border px-2.5 text-[12px] transition-colors",
               v.asset_id === assetId ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground")}>
             {v.value}
-          </button>
+          </Pressable>
         ))}
       </div>
       {grid === "source" && (
         <div id="separate-descriptions" className="grid gap-1">
           <Switch checked={!!group.separate} disabled={busy} onCheckedChange={() => void toggle()} label="Generate separate descriptions for each variant" ariaLabel="Generate separate descriptions for each variant" />
-          <Hint>{group.separate ? "Each variant is described on its own by Generate descriptions." : `Off: one description, from ${group.representative.name}, serves them all.`}</Hint>
+          <HelpText>{group.separate ? "Each variant is described on its own by Generate descriptions." : `Off: one description, from ${group.representative.name}, serves them all.`}</HelpText>
         </div>
       )}
     </div>
@@ -878,7 +876,7 @@ function FormatOff({ hold }: { hold: Json }) {
     <Banner tone="warning" className="format-off grid gap-2">
       <span>{hold.reason}</span>
       <span>
-        <Button variant="secondary" className="h-8 px-3" disabled={busy} onClick={() => { setBusy(true); void turnFormatOn(hold.format).finally(() => setBusy(false)); }}>
+        <Button variant="secondary" className="h-8 px-3" disabled={busy} tooltip="Turns this format on in Settings, so its files are used again" onClick={() => { setBusy(true); void turnFormatOn(hold.format).finally(() => setBusy(false)); }}>
           {busy && <Spinner className="size-3.5" />}Turn {label} on
         </Button>
       </span>
@@ -911,7 +909,7 @@ function DetailBody({ grid }: { grid: GridId }) {
   if (!detail.result)
     return detail.error ? (
       <div className="grid gap-3 p-6"><Banner tone={detail.stale ? "info" : "fault"}>{detail.stale ? "Inspection changed" : "Detail fault"}: {detail.error}</Banner>
-        {detail.stale && <Button variant="secondary" onClick={() => void selectAsset(grid, detail.assetId, detail.format, detail.view, false, true)}>Refresh inspection</Button>}
+        {detail.stale && <Button variant="secondary" tooltip="Reloads this asset’s inspection, which changed since it was opened" onClick={() => void selectAsset(grid, detail.assetId, detail.format, detail.view, false, true)}>Refresh inspection</Button>}
       </div>
     ) : (
       waiting ? <InspectorGhost /> : <span className="sr" role="status">Loading asset evidence…</span>
@@ -925,7 +923,7 @@ function DetailBody({ grid }: { grid: GridId }) {
       <div className="detail-header grid gap-2">
         <h2 ref={headingRef} tabIndex={-1} className="text-[22px] leading-tight font-semibold break-words text-foreground outline-none">{info.name || p.name || detail.assetId}</h2>
         <div className="flex flex-wrap gap-1.5">
-          <Badge>{image ? ((info.formats || []).length === 1 && info.formats[0] === "svg" ? "SVG image" : "2D image") : "3D model"}</Badge>
+          <Hint content="The kind of asset"><span className="inline-flex"><Badge>{image ? ((info.formats || []).length === 1 && info.formats[0] === "svg" ? "SVG image" : "2D image") : "3D model"}</Badge></span></Hint>
           <span className="pack inline-flex h-6 items-center text-[12px] text-muted-foreground">{packName(info.pack || p.pack || "")}</span>
           {detail.loading && <Spinner className="ml-1 size-3.5 self-center text-muted-foreground" />}
         </div>
@@ -996,29 +994,31 @@ export function Inspector() {
           style={{ width: shown + 24 }}
           className={cn("flex h-full shrink-0 pt-0 pr-4 pb-4 pl-6", overlay ? "absolute top-0 right-0 z-20 [&>div:last-child]:shadow-panel" : "relative", dragging && "select-none")}
         >
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize asset inspection"
-            aria-valuemin={MIN_WIDTH}
-            aria-valuemax={max}
-            aria-valuenow={shown}
-            tabIndex={0}
-            onPointerDown={startDrag}
-            onKeyDown={(event) => {
-              const delta = event.key === "ArrowLeft" ? 24 : event.key === "ArrowRight" ? -24 : 0;
-              if (event.key === "Home" || event.key === "End") {
-                event.preventDefault();
-                setInspectorWidth(event.key === "Home" ? MIN_WIDTH : max, true);
-              } else if (delta) {
-                event.preventDefault();
-                setInspectorWidth(Math.min(max, Math.max(MIN_WIDTH, shown + delta)), true);
-              }
-            }}
-            className="group absolute top-0 bottom-4 left-0 flex w-6 cursor-col-resize items-center justify-center outline-none"
-          >
-            <GripVertical className={cn("size-4 text-subtle transition-colors group-hover:text-muted-foreground group-focus-visible:text-primary", dragging && "text-primary")} aria-hidden />
-          </div>
+          <Hint content="Drag to resize; arrow keys, Home and End work too" side="left">
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize asset inspection"
+              aria-valuemin={MIN_WIDTH}
+              aria-valuemax={max}
+              aria-valuenow={shown}
+              tabIndex={0}
+              onPointerDown={startDrag}
+              onKeyDown={(event) => {
+                const delta = event.key === "ArrowLeft" ? 24 : event.key === "ArrowRight" ? -24 : 0;
+                if (event.key === "Home" || event.key === "End") {
+                  event.preventDefault();
+                  setInspectorWidth(event.key === "Home" ? MIN_WIDTH : max, true);
+                } else if (delta) {
+                  event.preventDefault();
+                  setInspectorWidth(Math.min(max, Math.max(MIN_WIDTH, shown + delta)), true);
+                }
+              }}
+              className="group absolute top-0 bottom-4 left-0 flex w-6 cursor-col-resize items-center justify-center outline-none"
+            >
+              <GripVertical className={cn("size-4 text-subtle transition-colors group-hover:text-muted-foreground group-focus-visible:text-primary", dragging && "text-primary")} aria-hidden />
+            </div>
+          </Hint>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-[22px] border border-border bg-surface">
             <div className="flex h-[76px] shrink-0 items-center justify-between pr-4 pl-6">
               <span className="text-[14px] font-semibold text-foreground">{folder ? "Folder" : "Asset inspection"}</span>

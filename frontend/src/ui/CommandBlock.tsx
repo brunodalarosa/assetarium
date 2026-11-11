@@ -14,7 +14,7 @@ export function CommandBlock({ command, className }: { command: string; classNam
   return (
     <div className={cn("command-block flex min-w-0 items-center gap-2 rounded-xl bg-surface-2 py-1.5 pr-1.5 pl-3 text-foreground", className)}>
       <code className="min-w-0 flex-1 break-all font-mono text-[11.5px] select-text">{command}</code>
-      <Button variant="quiet" className="h-8 shrink-0 px-3 text-[12px]" onClick={() => void copyText(command, "Command copied. Run it in a terminal in the Assetarium folder.")}>
+      <Button variant="quiet" className="h-8 shrink-0 px-3 text-[12px]" tooltip="Copies the command; run it in a terminal in the Assetarium folder" onClick={() => void copyText(command, "Command copied. Run it in a terminal in the Assetarium folder.")}>
         <Copy className="size-3.5" aria-hidden />Copy
       </Button>
     </div>

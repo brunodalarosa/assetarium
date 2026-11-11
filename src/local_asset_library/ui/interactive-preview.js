@@ -63,7 +63,7 @@ window.LALPreview = (() => {
       this.views = make('div', undefined, 'model-views');
       this.views.setAttribute('role','group'); this.views.setAttribute('aria-label','View');
       this.viewButtons = VIEWS.map(([name, label]) => {
-        const button = make('button', label); button.type = 'button'; button.dataset.view = name;
+        const button = make('button', label); button.type = 'button'; button.dataset.view = name; button.dataset.noTooltip = '';
         button.onclick = () => this.chooseView(name); this.views.append(button); return button;
       });
       this.stage.append(this.still, this.viewport, this.status, this.hint, corner, this.menu, this.views);
@@ -95,6 +95,7 @@ window.LALPreview = (() => {
     iconButton(name, label, action) {
       const button = make('button', undefined, 'model-icon'); button.type = 'button';
       button.innerHTML = icon(name); button.setAttribute('aria-label', label); button.title = label;
+      button.dataset.tooltip = '';  // Its title is its tooltip (verify-tooltips.py audits the marker).
       button.onclick = action; return button;
     }
     buildMenu() {
@@ -103,7 +104,7 @@ window.LALPreview = (() => {
       this.menuControls = [];
       const actions = make('div', undefined, 'model-menu-actions');
       for (const [label, action] of [['Fit', 'fit'], ['Reset view', 'reset']]) {
-        const button = make('button', label); button.type = 'button'; button.dataset.action = action;
+        const button = make('button', label); button.type = 'button'; button.dataset.action = action; button.dataset.noTooltip = '';
         button.onclick = () => this.command(action); this.menuControls.push(button); actions.append(button);
       }
       menu.append(actions,
@@ -157,7 +158,7 @@ window.LALPreview = (() => {
       if (tone === 'loading') this.status.append(make('span', undefined, 'search-spinner'));
       this.status.append(make('span', text));
       if (action) {
-        const button = make('button', action.label); button.type = 'button'; button.onclick = action.run;
+        const button = make('button', action.label); button.type = 'button'; button.onclick = action.run; button.dataset.noTooltip = '';
         this.status.append(button);
       }
     }

@@ -9,7 +9,7 @@ import {
   dismissToast, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
 } from "../app/store";
 import { Reason } from "./CommandBlock";
-import { Button, IconButton, Spinner } from "./primitives";
+import { Button, IconButton, Pressable, Spinner, type TooltipText } from "./primitives";
 import { OperationProgress } from "./OperationProgress";
 
 export function ToneIcon({ tone, className }: { tone: Tone; className?: string }) {
@@ -27,9 +27,9 @@ function Card({ tone, title, meta, children, unread, className, onDismiss, dismi
         <ToneIcon tone={tone} className="mt-px" />
         <h3 className="flex-1 text-[13.5px] leading-snug font-medium text-foreground">{unread && <span className="sr">Unread: </span>}{title}</h3>
         {onDismiss && (
-          <button type="button" onClick={onDismiss} aria-label={dismissLabel || "Dismiss"} className="notification-dismiss -mt-1 -mr-1 grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground">
+          <Pressable onClick={onDismiss} aria-label={dismissLabel || "Dismiss"} tooltip="Removes this notice from the list" className="notification-dismiss -mt-1 -mr-1 grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground">
             <X className="size-3.5" />
-          </button>
+          </Pressable>
         )}
       </div>
       {meta && <p className="notification-meta text-[11.5px] text-muted-foreground">{meta}</p>}
@@ -45,20 +45,20 @@ function NotificationActions({ item, onAct }: { item: Json; onAct?: () => void }
   // Continue can only run while descriptions are on; the backend reports it per source.
   const describable = useApp((s) => s.sources.find((source) => source.key === item.source_key)?.descriptions_enabled !== false);
   if (!exists) return null;
-  const action = (label: string, name: string, variant: "primary" | "secondary" | "quiet") => (
-    <Button key={name} variant={variant} className="h-9 px-4 text-[12.5px]" data-notification={item.id} data-action={name} onClick={() => { onAct?.(); void notificationAction(name, item); }}>
+  const action = (label: string, name: string, variant: "primary" | "secondary" | "quiet", tooltip: TooltipText) => (
+    <Button key={name} variant={variant} className="h-9 px-4 text-[12.5px]" data-notification={item.id} data-action={name} tooltip={tooltip} onClick={() => { onAct?.(); void notificationAction(name, item); }}>
       {label}
     </Button>
   );
   const buttons: ReactNode[] = [];
-  if (item.kind === "collection_changed") buttons.push(action("Open collection", "open_collection", "secondary"));
+  if (item.kind === "collection_changed") buttons.push(action("Open collection", "open_collection", "secondary", false));
   // Proposal notices disappear once decided, so Review always reaches Apply / Reject.
-  else if (item.kind === "setup_proposal") buttons.push(action("Review proposal", "review_setup", "primary"));
-  else if (item.kind === "setup_changed") buttons.push(action("Review", "review_setup", "secondary"));
-  else if (item.kind === "descriptions_ready") buttons.push(action("Generate descriptions", "generate", "primary"), action("Not now", "dismiss", "quiet"));
+  else if (item.kind === "setup_proposal") buttons.push(action("Review proposal", "review_setup", "primary", "Opens the proposal, where you apply or reject it"));
+  else if (item.kind === "setup_changed") buttons.push(action("Review", "review_setup", "secondary", "Opens what your agent set; you can change any of it"));
+  else if (item.kind === "descriptions_ready") buttons.push(action("Generate descriptions", "generate", "primary", "Queues descriptions for this source’s assets that have none"), action("Not now", "dismiss", "quiet", "Hides this notice; generate them later from the Library"));
   else {
-    if (describable && item.remaining && ["cancelled", "stopped", "interrupted"].includes(item.outcome)) buttons.push(action("Continue", "generate", "primary"));
-    buttons.push(["stopped", "interrupted", "complete_with_failures"].includes(item.outcome) ? action("View report", "report", "secondary") : action("View in Asset processing", "view", "secondary"));
+    if (describable && item.remaining && ["cancelled", "stopped", "interrupted"].includes(item.outcome)) buttons.push(action("Continue", "generate", "primary", "Queues the descriptions that are still missing; finished ones are kept"));
+    buttons.push(["stopped", "interrupted", "complete_with_failures"].includes(item.outcome) ? action("View report", "report", "secondary", "Opens what was written, what failed and what is left") : action("View in Asset processing", "view", "secondary", false));
   }
   return <div className="notification-actions mt-1 flex flex-wrap gap-2">{buttons}</div>;
 }
@@ -95,10 +95,10 @@ function RunningItem({ source }: { source: Json }) {
       <OperationProgress operation={operation} label={"Description progress for " + source.name} />
       <p className="notification-body text-[12px] text-muted-foreground">{phase}</p>
       <div className="notification-actions flex gap-2">
-        <Button variant="secondary" className="h-9 px-4 text-[12.5px]" data-notification={"running-" + source.key} data-action="cancel" disabled={operation.status === "cancelling"} onClick={() => void sourceAction("cancel", source.key)}>
+        <Button variant="secondary" className="h-9 px-4 text-[12.5px]" data-notification={"running-" + source.key} data-action="cancel" disabled={operation.status === "cancelling"} tooltip="Stops generating; descriptions already written are kept" onClick={() => void sourceAction("cancel", source.key)}>
           {operation.status === "cancelling" ? "Cancelling…" : "Cancel"}
         </Button>
-        <Button variant="quiet" className="h-9 px-4 text-[12.5px]" onClick={() => void openProcessing(source.key)}>Open Asset processing</Button>
+        <Button variant="quiet" className="h-9 px-4 text-[12.5px]" tooltip={false} onClick={() => void openProcessing(source.key)}>Open Asset processing</Button>
       </div>
     </div>
   );
@@ -151,9 +151,9 @@ export function NotificationsPanel() {
           <div className="flex items-center justify-between px-6 pt-5 pb-3">
             <h2 id="notifications-title" tabIndex={-1} className="text-[15px] font-semibold outline-none">Notifications</h2>
             <div className="flex items-center gap-1">
-              <button id="notifications-read-all" type="button" disabled={!unread} onClick={() => void saveNotification("read_all")} className="h-8 rounded-lg px-2.5 text-[12px] font-medium text-primary hover:bg-surface-2 disabled:text-subtle">
+              <Pressable id="notifications-read-all" disabled={!unread} tooltip="Marks every notice as read; none is removed" onClick={() => void saveNotification("read_all")} className="h-8 rounded-lg px-2.5 text-[12px] font-medium text-primary hover:bg-surface-2 disabled:text-subtle">
                 Mark all read
-              </button>
+              </Pressable>
               <IconButton label="Close notifications" onClick={() => setNotificationsOpen(false)} className="size-9"><X className="size-4" /></IconButton>
             </div>
           </div>
@@ -201,16 +201,16 @@ function ToastView({ toast }: { toast: Toast }) {
         {!item && toast.actions?.length ? (
           <div className="toast-actions mt-1 flex flex-wrap gap-2">
             {toast.actions.map((action) => (
-              <Button key={action.label} variant="secondary" className="h-9 px-4 text-[12.5px]" data-toast-action={action.label} onClick={() => { dismissToast(toast.id); action.run(); }}>
+              <Button key={action.label} variant="secondary" className="h-9 px-4 text-[12.5px]" data-toast-action={action.label} tooltip={false} onClick={() => { dismissToast(toast.id); action.run(); }}>
                 {action.label}
               </Button>
             ))}
           </div>
         ) : null}
       </Card>
-      <button type="button" aria-label="Close" onClick={() => dismissToast(toast.id)} className="notification-dismiss mt-3 mr-3 grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-2">
+      <Pressable aria-label="Close" tooltip="Closes this message" onClick={() => dismissToast(toast.id)} className="notification-dismiss mt-3 mr-3 grid size-7 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-surface-2">
         <X className="size-3.5" />
-      </button>
+      </Pressable>
     </motion.div>
   );
 }
@@ -265,7 +265,7 @@ export function RunReport() {
           </p>
           {memory && <p className="text-[13px] text-muted-foreground">Before starting another run, lower Description batch size in Settings → General.</p>}
           <div className="flex justify-end">
-            <Button variant="secondary" onClick={close}>Close report</Button>
+            <Button variant="secondary" tooltip={false} onClick={close}>Close report</Button>
           </div>
         </div>
       )}

@@ -5,7 +5,7 @@ import type { Json } from "../app/api";
 import { formatLabel } from "../app/format";
 import { changeSetupStep, confirmSetupReview, finishSetup, leaveAgentSetup, startAgentSetup, type SetupStep, undoSetupValue, useApp } from "../app/store";
 import { CommandBlock } from "./CommandBlock";
-import { Badge, Button, Card, Spinner } from "./primitives";
+import { Badge, Button, Card, Hint, Pressable, Spinner } from "./primitives";
 
 /** Readiness items that only processed assets can satisfy are not setup work. */
 const LATER = new Set(["gpu", "search_gpu", "embedding_capability"]);
@@ -52,12 +52,12 @@ function Source({ row, info }: { row: Row; info: Json }) {
   if (entry?.set_by === "agent")
     return (
       <span className="flex items-center gap-2">
-        <Badge tone="info">{entry.approved_by === "user" ? "Proposed by agent · approved by you" : "Set by agent"}</Badge>
+        <Hint content={entry.approved_by === "user" ? "Your agent proposed this value and you applied it" : "Your agent chose this value; Undo puts back the earlier one"}><span className="inline-flex"><Badge tone="info">{entry.approved_by === "user" ? "Proposed by agent · approved by you" : "Set by agent"}</Badge></span></Hint>
         {undoable && (
-          <button type="button" className="report-undo flex items-center gap-1 text-[12px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
-            disabled={busy} aria-label={`Undo ${row.label}`} onClick={() => { setBusy(true); void undoSetupValue(undoable).finally(() => setBusy(false)); }}>
+          <Pressable className="report-undo flex items-center gap-1 text-[12px] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline disabled:opacity-50"
+            disabled={busy} aria-label={`Undo ${row.label}`} tooltip="Puts back the value from before your agent changed it" onClick={() => { setBusy(true); void undoSetupValue(undoable).finally(() => setBusy(false)); }}>
             <Undo2 className="size-3" aria-hidden />Undo
-          </button>
+          </Pressable>
         )}
       </span>
     );
@@ -93,7 +93,7 @@ export function SetupReport() {
                 </span>
                 <span className="text-[12.5px] text-muted-foreground">{row.label}</span>
                 <span className="grid justify-items-start gap-1.5 break-words text-[13px]">{row.value}<Source row={row} info={info} /></span>
-                <Button variant="quiet" className="h-8 px-3 text-[12px]" onClick={() => void changeSetupStep(row.step)} aria-label={`Change ${row.label}`}>Change</Button>
+                <Button variant="quiet" className="h-8 px-3 text-[12px]" tooltip="Opens this setup step with the current value filled in" onClick={() => void changeSetupStep(row.step)} aria-label={`Change ${row.label}`}>Change</Button>
               </div>
               {row.missing.length > 0 && (
                 <ul className="grid gap-2 pl-9" aria-label={`${row.label}: needs you`}>
@@ -116,16 +116,16 @@ export function SetupReport() {
         <p className="text-[13px] leading-relaxed text-muted-foreground">Add the folders with your asset library in the Library tab. Assetarium lists them right away, and makes previews and search data when you start it. Your files are never changed.</p>
         <div className="flex flex-wrap gap-3">
           {review
-            ? <Button id="setup-looks-good" disabled={busy} onClick={() => void confirmSetupReview()}>{busy ? "Saving…" : "Looks good"}</Button>
-            : <Button id="setup-go-sources" onClick={() => finishSetup("sources")}>Go to Library</Button>}
-          {!review && <Button variant="secondary" id="setup-close" onClick={() => finishSetup("close")}>Close</Button>}
+            ? <Button id="setup-looks-good" disabled={busy} tooltip="Confirms your agent’s choices and finishes setup" onClick={() => void confirmSetupReview()}>{busy ? "Saving…" : "Looks good"}</Button>
+            : <Button id="setup-go-sources" tooltip="Closes setup and opens the Library, where you add your asset folders" onClick={() => finishSetup("sources")}>Go to Library</Button>}
+          {!review && <Button variant="secondary" id="setup-close" tooltip={false} onClick={() => finishSetup("close")}>Close</Button>}
         </div>
       </section>
       <p className="text-[12.5px] text-muted-foreground">
         Start over?{" "}
-        <button type="button" id="setup-report-agent" className="font-medium text-foreground underline underline-offset-2" onClick={() => void startAgentSetup()}>Set up with my agent</button>
+        <Pressable id="setup-report-agent" className="font-medium text-foreground underline underline-offset-2" tooltip="Starts setup again, letting your AI agent choose the values" onClick={() => void startAgentSetup()}>Set up with my agent</Pressable>
         {" · "}
-        <button type="button" id="setup-report-manual" className="font-medium text-foreground underline underline-offset-2" onClick={() => leaveAgentSetup()}>Set it up yourself</button>
+        <Pressable id="setup-report-manual" className="font-medium text-foreground underline underline-offset-2" tooltip="Starts setup again with the questions, one at a time" onClick={() => leaveAgentSetup()}>Set it up yourself</Pressable>
       </p>
     </div>
   );

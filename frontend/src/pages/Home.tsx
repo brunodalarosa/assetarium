@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { modeLabel, plural } from "../app/format";
 import { copyText, pageBrowse, useApp } from "../app/store";
 import { AssetGrid } from "../ui/AssetGrid";
-import { Badge, Banner, Button, IconButton } from "../ui/primitives";
+import { Badge, Banner, Button, Hint, IconButton } from "../ui/primitives";
 import { FiltersPanel, SearchBar } from "../ui/Search";
 
 function ResultsHeader() {
@@ -19,12 +19,12 @@ function ResultsHeader() {
       <div className="min-w-0">
         <h2 id="results-title" className="text-[21px] font-semibold text-foreground" aria-label={search.title}>{heading}</h2>
         <p className="mt-1.5 truncate text-[13px] text-muted-foreground">{browsing ? "Browsing the filtered library" : search.queryUsed || (search.modeUsed === "reference" ? "Similar to the reference asset" : "")}</p>
-        <p id="status" role="status" aria-live="polite" title={search.statusTitle || undefined} className="mt-1 text-[11.5px] text-subtle">{search.status}</p>
+        <Hint content={search.statusTitle} focusable><p id="status" role="status" aria-live="polite" className="mt-1 text-[11.5px] text-subtle">{search.status}</p></Hint>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge className="h-7 px-2.5">{browsing ? "Browse" : modeLabel(search.modeUsed)}</Badge>
+        <Hint content={browsing ? "No search: the library, narrowed by the filters" : "How these results were found"}><span className="inline-flex"><Badge className="h-7 px-2.5">{browsing ? "Browse" : modeLabel(search.modeUsed)}</Badge></span></Hint>
         {!browsing && (
-          <Button id="copy-settings" variant="quiet" className="h-8 px-3 text-[12px]" disabled={!search.lastSettings} title="Copies the completed search for agents (MCP search_assets)" onClick={() => search.lastSettings && void copyText(JSON.stringify(search.lastSettings, null, 2), "Exact MCP search_assets settings copied. Use the same catalog and index versions.")}>
+          <Button id="copy-settings" variant="quiet" className="h-8 px-3 text-[12px]" disabled={!search.lastSettings} tooltip="Copies this search’s exact settings so an agent can repeat it with MCP search_assets" onClick={() => search.lastSettings && void copyText(JSON.stringify(search.lastSettings, null, 2), "Exact MCP search_assets settings copied. Use the same catalog and index versions.")}>
             <Copy className="size-3.5" aria-hidden />Copy search settings
           </Button>
         )}

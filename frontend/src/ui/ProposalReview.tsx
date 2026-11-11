@@ -7,7 +7,7 @@ import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import { commitStaged, previewStaged, type RuleChoice, stagedDecisions, stageRules, useApp } from "../app/store";
 import { ruleText } from "./FolderPanel";
-import { Button } from "./primitives";
+import { Button, Hint, Pressable } from "./primitives";
 
 type Member = { id: string; index: number; pack: string; note?: string };
 type Group = { key: string; rule: Json; members: Member[] };
@@ -36,13 +36,14 @@ function choiceOf(members: Member[], staged: Record<string, Record<number, RuleC
 /** Accept / Reject as a pair of toggles; pressing the chosen one again clears it. */
 function Choice({ value, onChange, label, small }: { value: RuleChoice | "mixed" | null; onChange: (c: RuleChoice | null) => void; label: string; small?: boolean }) {
   const item = (choice: RuleChoice, Icon: typeof Check, text: string) => (
-    <button type="button" aria-pressed={value === choice} aria-label={`${text}: ${label}`} data-choice={choice}
+    <Pressable aria-pressed={value === choice} aria-label={`${text}: ${label}`} data-choice={choice}
+      tooltip={value === choice ? "Clears this choice" : choice === "accept" ? "Stages this rule to apply; nothing changes until you apply" : "Stages this rule to be turned down; nothing changes until you apply"}
       onClick={() => onChange(value === choice ? null : choice)}
       className={cn("flex items-center gap-1 rounded-full font-medium transition-colors", small ? "h-7 px-2.5 text-[11.5px]" : "h-8 px-3 text-[12px]",
         value === choice ? (choice === "accept" ? "bg-primary text-primary-foreground" : "bg-surface-2 text-foreground ring-1 ring-border-strong")
           : "text-muted-foreground hover:bg-surface-2 hover:text-foreground")}>
       <Icon className="size-3.5" aria-hidden />{text}
-    </button>
+    </Pressable>
   );
   return <div role="group" aria-label={label} className="flex shrink-0 gap-1">{item("accept", Check, "Accept")}{item("reject", X, "Reject")}</div>;
 }
@@ -69,8 +70,8 @@ function RuleGroup({ group }: { group: Group }) {
           <summary className="cursor-pointer text-muted-foreground">{value === "mixed" ? "Decided per pack" : "Choose per pack"}</summary>
           <ul className="mt-1.5 grid gap-1">
             {group.members.map((m) => (
-              <li key={m.id} className="flex items-center gap-2" title={m.note}>
-                <span className="min-w-0 flex-1 truncate">{m.pack}</span>
+              <li key={m.id} className="flex items-center gap-2">
+                <Hint content={m.note ? `${m.pack} · ${m.note}` : m.pack}><span className="min-w-0 flex-1 truncate">{m.pack}</span></Hint>
                 <Choice small value={staged[m.id]?.[m.index] ?? null} label={`${text} in ${m.pack}`} onChange={(c) => stageRules([m], c)} />
               </li>
             ))}
@@ -106,7 +107,7 @@ function FolderReview({ folder, proposals }: { folder: string; proposals: Json[]
           <p className="text-[13px] font-semibold">{folder.startsWith("agent-practice-") ? "Practice packs" : folder}</p>
           <p className="text-[11.5px] text-muted-foreground">{plural(proposals.length, "pack", "packs")} · {plural(list.length, "different rule", "different rules")}</p>
         </div>
-        <Button variant="quiet" className="h-8 px-3 text-[12px]" data-action="accept-all" onClick={() => stageRules(all, "accept")}>Accept all</Button>
+        <Button variant="quiet" className="h-8 px-3 text-[12px]" data-action="accept-all" tooltip="Stages every rule here to apply; nothing changes until you apply" onClick={() => stageRules(all, "accept")}>Accept all</Button>
       </div>
       <ul className="grid gap-1.5">{list.map((g) => <RuleGroup key={g.key} group={g} />)}</ul>
       <details className="text-[12px] text-muted-foreground">
@@ -129,7 +130,7 @@ function FolderReview({ folder, proposals }: { folder: string; proposals: Json[]
         </p>
         {faulty.map((p: Json) => <p key={p.id} className="text-[12px] text-fault">{p.reason}</p>)}
         <div className="flex flex-wrap items-center gap-3">
-          <Button className="h-9 px-4" data-action="apply-staged" disabled={!decisions.length || committing !== null} onClick={() => void commitStaged(folder, decisions)}>
+          <Button className="h-9 px-4" data-action="apply-staged" disabled={!decisions.length || committing !== null} tooltip="Saves your accepted and rejected rules together; the arrows above show what changes" onClick={() => void commitStaged(folder, decisions)}>
             {committing === folder ? "Applying…" : decisions.length ? `Apply decisions for ${plural(decisions.length, "pack", "packs")}` : "Apply"}
           </Button>
           <p className="text-[11.5px] text-muted-foreground">

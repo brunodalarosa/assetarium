@@ -1,14 +1,23 @@
 import { ChevronRight } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { type ComponentProps, type ReactNode, useId, useState } from "react";
+import { AnimatePresence, type HTMLMotionProps, motion, useReducedMotion } from "motion/react";
+import { cloneElement, type ComponentProps, type ReactElement, type ReactNode, useId, useState } from "react";
 import { Button as BeButton, type ButtonProps } from "@/components/beui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/beui/select";
-import { Tooltip } from "@/components/beui/tooltip";
+import { Tooltip, type TooltipSide } from "@/components/beui/tooltip";
 import { EASE_OUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
-/** beUI's spring-pressed button with Assetarium sizes: primary, secondary (outlined) and quiet. */
-export function Button({ variant = "primary", className, ...props }: Omit<ButtonProps, "variant"> & { variant?: "primary" | "secondary" | "quiet" | "danger" | "destructive" }) {
+/**
+ * What a control's tooltip says: what it is, or what will happen when it is used. `false` marks a control whose
+ * visible text already says everything (Cancel, Close, Back); `null`/`undefined` are not allowed, so no control
+ * is silently without one. The marker (`data-tooltip` / `data-no-tooltip`) is what `verify-tooltips.py` audits.
+ */
+export type TooltipText = string | ReactElement | false;
+const TOOLTIP_DELAY = 350;
+const marker = (tooltip: TooltipText) => (tooltip === false ? { "data-no-tooltip": "" } : tooltip ? { "data-tooltip": "" } : {});
+
+/** beUI's spring-pressed button with Assetarium sizes: primary, secondary (outlined) and quiet. Its tooltip is required. */
+export function Button({ variant = "primary", tooltip, side = "top", className, ...props }: Omit<ButtonProps, "variant"> & { variant?: "primary" | "secondary" | "quiet" | "danger" | "destructive"; tooltip: TooltipText; side?: TooltipSide }) {
   const tone = {
     primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
     secondary: "border border-border bg-surface text-foreground hover:bg-surface-2",
@@ -17,16 +26,21 @@ export function Button({ variant = "primary", className, ...props }: Omit<Button
     // Solid red: only the button that confirms a deletion.
     destructive: "bg-danger text-danger-foreground hover:bg-danger-hover",
   }[variant];
-  return <BeButton variant="ghost" size="md" pressScale={0.96} className={cn("h-10 gap-2 px-5 text-[13px] font-medium", tone, className)} {...props} />;
+  return (
+    <Tooltip content={tooltip || null} side={side} delay={TOOLTIP_DELAY}>
+      <BeButton variant="ghost" size="md" pressScale={0.96} className={cn("h-10 gap-2 px-5 text-[13px] font-medium", tone, className)} {...marker(tooltip)} {...props} />
+    </Tooltip>
+  );
 }
 
 /** Icon-only action with a required accessible label that also shows as its focus/hover tooltip. */
-export function IconButton({ label, active, className, children, side = "bottom", ...props }: ComponentProps<"button"> & { label: string; active?: boolean; side?: "top" | "bottom" | "left" | "right" }) {
+export function IconButton({ label, tooltip, active, className, children, side = "bottom", ...props }: ComponentProps<"button"> & { label: string; tooltip?: string | ReactElement; active?: boolean; side?: TooltipSide }) {
   return (
-    <Tooltip content={label} side={side} delay={350}>
+    <Tooltip content={tooltip ?? label} side={side} delay={TOOLTIP_DELAY}>
       <button
         type="button"
         aria-label={label}
+        data-tooltip=""
         className={cn(
           "relative grid size-10 place-items-center rounded-xl text-foreground transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:text-subtle",
           active && "bg-accent-soft text-accent-soft-foreground hover:bg-accent-soft",
@@ -38,6 +52,34 @@ export function IconButton({ label, active, className, children, side = "bottom"
       </button>
     </Tooltip>
   );
+}
+
+/** An unstyled clickable (cards, rows, chips, links in text) that keeps its own look; its tooltip is required like `Button`'s. */
+export function Pressable({ tooltip, side = "top", delay = TOOLTIP_DELAY, ...props }: ComponentProps<"button"> & { tooltip: TooltipText; side?: TooltipSide; delay?: number }) {
+  return (
+    <Tooltip content={tooltip || null} side={side} delay={delay}>
+      <button type="button" {...marker(tooltip)} {...props} />
+    </Tooltip>
+  );
+}
+
+/** `Pressable` for a clickable that animates (`motion.button`). */
+export function MotionPressable({ tooltip, side = "top", delay = TOOLTIP_DELAY, ...props }: HTMLMotionProps<"button"> & { tooltip: TooltipText; side?: TooltipSide; delay?: number }) {
+  return (
+    <Tooltip content={tooltip || null} side={side} delay={delay}>
+      <motion.button type="button" {...marker(tooltip)} {...props} />
+    </Tooltip>
+  );
+}
+
+/**
+ * Explains an informative element that isn't clickable (an icon, badge, count or truncated text). `focusable`
+ * puts it in the tab order so keyboard users reach it too; use it for things that inform on their own.
+ */
+export function Hint({ content, children, focusable = false, side = "top", delay = 250 }: { content: ReactNode; children: ReactElement<Record<string, unknown>>; focusable?: boolean; side?: TooltipSide; delay?: number }) {
+  const shown = content === "" || content == null || content === false ? null : content;
+  const child = cloneElement(children, { ...(shown ? { "data-tooltip": "" } : {}), ...(focusable && shown ? { tabIndex: 0 } : {}) });
+  return <Tooltip content={shown} side={side} delay={delay}>{child}</Tooltip>;
 }
 
 export type BadgeTone = "neutral" | "warning" | "fault" | "success" | "info";
@@ -109,6 +151,8 @@ export function Disclosure({ title, children, defaultOpen = false, className }: 
         type="button"
         aria-expanded={open}
         aria-controls={contentId}
+        // Its title names what opens; the chevron shows the state.
+        data-no-tooltip=""
         onClick={() => setOpen(!open)}
         className="-mx-1 flex min-h-8 items-center gap-2 rounded-md px-1 text-left text-[12px] font-medium text-foreground hover:bg-surface-2"
       >
@@ -205,6 +249,8 @@ export function RadioCards({ label, value, onChange, options, disabled, id, clas
             role="radio"
             aria-checked={checked}
             data-value={option.value}
+            // Each card states its choice and what it means.
+            data-no-tooltip=""
             disabled={disabled}
             tabIndex={index === current ? 0 : -1}
             onClick={() => onChange(option.value)}

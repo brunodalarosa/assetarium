@@ -6,7 +6,7 @@ import type { Json } from "../app/api";
 import { formatLabel, plural } from "../app/format";
 import { copyText, decideProposal, leaveAgentSetup, loadAgentSetup, reviewAgentSetup, setupDone, showSetupReport, startAgentSetup, useApp } from "../app/store";
 import { CommandBlock } from "./CommandBlock";
-import { Badge, Banner, Button, Card, Spinner } from "./primitives";
+import { Badge, Banner, Button, Card, Pressable, Spinner } from "./primitives";
 
 export function SetByBadge({ entry }: { entry: Json | undefined }) {
   if (!entry) return null;
@@ -36,10 +36,10 @@ export function SetupPaths() {
     <div id="setup-paths" className="grid gap-4 sm:grid-cols-2">
       <PathCard icon={<Bot className="size-4.5" />} title="Set up with your AI agent"
         body="Your agent checks this computer and chooses settings for you. You approve the risky parts, like which Blender to run, here."
-        action={<Button id="setup-agent-start" disabled={busy === "open"} onClick={() => void startAgentSetup()}>{busy === "open" ? "Opening…" : "Set up with my agent"}</Button>} />
+        action={<Button id="setup-agent-start" disabled={busy === "open"} tooltip="Shows how to connect your AI agent and the prompt to give it; it sets what it can and you approve Blender" onClick={() => void startAgentSetup()}>{busy === "open" ? "Opening…" : "Set up with my agent"}</Button>} />
       <PathCard icon={<Wrench className="size-4.5" />} title="Set it up yourself"
         body="Answer a few questions about Blender, formats, storage and descriptions. It takes about two minutes."
-        action={<Button variant="secondary" id="setup-manual" onClick={() => leaveAgentSetup()}>Start setup</Button>} />
+        action={<Button variant="secondary" id="setup-manual" tooltip="Walks you through Blender, formats, storage and descriptions, one question at a time" onClick={() => leaveAgentSetup()}>Start setup</Button>} />
     </div>
   );
 }
@@ -50,16 +50,16 @@ export function Snippets({ snippets, client, setClient }: { snippets: Json[]; cl
     <div className="grid gap-3">
       <div role="tablist" aria-label="Agent" id="agent-snippet-tabs" className="flex flex-wrap gap-2">
         {snippets.map((item) => (
-          <button key={item.id} type="button" role="tab" aria-selected={item.id === current.id} data-client={item.id} onClick={() => setClient(item.id)}
+          <Pressable key={item.id} role="tab" aria-selected={item.id === current.id} data-client={item.id} tooltip={`Shows how to add Assetarium to ${item.label}`} onClick={() => setClient(item.id)}
             className={cn("h-9 rounded-full border px-4 text-[12.5px] font-medium transition-colors", item.id === current.id ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-foreground hover:bg-surface-2")}>
             {item.label}
-          </button>
+          </Pressable>
         ))}
       </div>
       <p className="text-[12.5px] text-muted-foreground">{current.where}</p>
       <div className="grid gap-2 rounded-xl bg-surface-2 p-3">
         <pre id="agent-snippet" data-client={current.id} className="max-h-56 overflow-auto font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-all text-foreground select-text scroll-thin">{current.text}</pre>
-        <div><Button variant="quiet" id="agent-copy-snippet" className="h-8 px-3 text-[12px]" onClick={() => void copyText(current.text, `${current.label} configuration copied. Restart your agent after adding it.`)}><Copy className="size-3.5" aria-hidden />Copy</Button></div>
+        <div><Button variant="quiet" id="agent-copy-snippet" className="h-8 px-3 text-[12px]" tooltip={"Copies this configuration; add it to " + current.label + " and restart it"} onClick={() => void copyText(current.text, `${current.label} configuration copied. Restart your agent after adding it.`)}><Copy className="size-3.5" aria-hidden />Copy</Button></div>
       </div>
     </div>
   );
@@ -87,7 +87,7 @@ function Problem({ item, onShow }: { item: Json; onShow: (client: string) => voi
           ? <CommandBlock command={item.fix} />
           : <span className="flex flex-wrap items-center gap-3">
               <span>Replace it with the {item.label} configuration below, then restart {item.label}.</span>
-              <Button variant="secondary" className="agent-registration-show h-8 px-3 text-[12px]" onClick={() => onShow(item.client)}>Show the {item.label} fix</Button>
+              <Button variant="secondary" className="agent-registration-show h-8 px-3 text-[12px]" tooltip="Scrolls to the configuration that replaces the broken one" onClick={() => onShow(item.client)}>Show the {item.label} fix</Button>
             </span>}
       </Banner>
     </div>
@@ -123,9 +123,9 @@ function Registrations({ agent, onShow }: { agent: Json; onShow: (client: string
       <p id="agent-registration-note" className="flex flex-wrap items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
         <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">{agent.registration_note}</span>
-        <button type="button" id="agent-registrations-check" disabled={checking} className="font-medium text-foreground underline underline-offset-2 disabled:opacity-60" onClick={() => void again()}>
+        <Pressable id="agent-registrations-check" disabled={checking} className="font-medium text-foreground underline underline-offset-2 disabled:opacity-60" tooltip="Reads your agents’ configurations again to see which Assetarium they start" onClick={() => void again()}>
           {checking ? "Checking…" : "Check again"}
-        </button>
+        </Pressable>
       </p>
     </div>
   );
@@ -169,10 +169,10 @@ function ProposalCard({ proposal }: { proposal: Json }) {
         </Banner>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <Button className="agent-apply" disabled={Boolean(busy) || (proposal.rerender > 0 && !confirmed)} onClick={() => void decideProposal(proposal, "apply", confirmed)}>
+        <Button className="agent-apply" disabled={Boolean(busy) || (proposal.rerender > 0 && !confirmed)} tooltip="Checks this Blender again on this computer, then saves it to config.local.toml" onClick={() => void decideProposal(proposal, "apply", confirmed)}>
           {busy === proposal.id + ":apply" ? "Checking again…" : "Apply"}
         </Button>
-        <Button variant="secondary" className="agent-reject" disabled={Boolean(busy)} onClick={() => void decideProposal(proposal, "reject")}>Reject</Button>
+        <Button variant="secondary" className="agent-reject" disabled={Boolean(busy)} tooltip="Turns down this proposal; the saved Blender stays as it is" onClick={() => void decideProposal(proposal, "reject")}>Reject</Button>
         {deciding && <span role="status" className="flex items-center gap-2 text-[12.5px] text-muted-foreground"><Spinner />Up to about 2 minutes</span>}
       </div>
     </div>
@@ -235,7 +235,7 @@ export function AgentPanel() {
       {finished && (
         <Banner tone="info" role="status" className="flex flex-wrap items-center justify-between gap-3">
           <span className="flex items-center gap-2"><Check className="size-4 text-success" aria-hidden />Your agent finished setup. Look over its report and confirm it.</span>
-          <Button id="agent-review" onClick={() => void showSetupReport()}>See the report</Button>
+          <Button id="agent-review" tooltip="Opens what your agent set and why, to look over and confirm" onClick={() => void showSetupReport()}>See the report</Button>
         </Banner>
       )}
       <Card title="1 · Add Assetarium to your agent" help="Generated for this computer’s folders. Assetarium’s server runs only while your agent is connected.">
@@ -246,7 +246,7 @@ export function AgentPanel() {
         <p id="agent-prompt" className="rounded-xl bg-surface-2 p-3 text-[12.5px] leading-relaxed select-text">{agent.prompt}</p>
         {!done && (
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="secondary" id="agent-copy-prompt" onClick={() => void copyText(agent.prompt, "Setup prompt copied. Paste it into your agent.")}><Copy className="size-3.5" aria-hidden />Copy setup prompt</Button>
+            <Button variant="secondary" id="agent-copy-prompt" tooltip="Copies the setup prompt; paste it into your agent" onClick={() => void copyText(agent.prompt, "Setup prompt copied. Paste it into your agent.")}><Copy className="size-3.5" aria-hidden />Copy setup prompt</Button>
           </div>
         )}
         <ConnectionLine connections={agent.connections || []} blocked={(agent.registrations || []).some((item: Json) => PROBLEM[item.state])} />
@@ -256,10 +256,10 @@ export function AgentPanel() {
       </Card>
       <Card title="What your agent has set" help="Every change also raises a notice. You can change anything in the review.">
         <Values agent={agent} />
-        {anySet && !finished && <div><Button variant="secondary" id="agent-review-early" onClick={() => void reviewAgentSetup()}>Review choices</Button></div>}
+        {anySet && !finished && <div><Button variant="secondary" id="agent-review-early" tooltip="Opens what your agent has set so far; you can change any of it" onClick={() => void reviewAgentSetup()}>Review choices</Button></div>}
       </Card>
       <p className="text-[12.5px] text-muted-foreground">
-        Prefer to answer the questions yourself? <button type="button" id="agent-leave" className="font-medium text-foreground underline underline-offset-2" onClick={() => leaveAgentSetup()}>Set it up yourself</button>
+        Prefer to answer the questions yourself? <Pressable id="agent-leave" className="font-medium text-foreground underline underline-offset-2" tooltip="Switches to answering the setup questions yourself" onClick={() => leaveAgentSetup()}>Set it up yourself</Pressable>
       </p>
     </div>
   );

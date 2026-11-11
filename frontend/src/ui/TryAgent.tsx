@@ -21,11 +21,11 @@ export function TryAgent({ id = "try-agent" }: { id?: string }) {
     <p className="text-[13px] text-muted-foreground">{connected.length
       ? `${connected.map((c: { name?: string }) => c.name).filter(Boolean).join(", ") || "Your agent"} is connected. You’ll paste a prompt into it and review its proposals here.`
       : "Connect your agent, then return here to try a practice import."}</p>
-    <div className="flex flex-wrap gap-2"><Button id={id + "-start"} disabled={!connected.length || open || starting} onClick={async () => {
+    <div className="flex flex-wrap gap-2"><Button id={id + "-start"} disabled={!connected.length || open || starting} tooltip="Adds small practice packs to a temporary library for your agent to organize; everything is removed when you finish" onClick={async () => {
       setStarting(true);
       try { await startAgentPractice(); } finally { setStarting(false); }
     }}><Bot className="size-4" aria-hidden />{starting ? "Preparing practice packs…" : "Try your agent"}</Button>
-      {!connected.length && <Button variant="secondary" onClick={async () => {
+      {!connected.length && <Button variant="secondary" tooltip="Opens setup at the step that connects your AI agent" onClick={async () => {
         if (!getState().setup.open) await openSetup();
         goToSetupStep(SETUP_STEPS.indexOf("agent"));
       }}>Connect your agent</Button>}</div>

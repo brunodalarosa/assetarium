@@ -10,7 +10,7 @@ import {
 import { AssetGrid } from "../ui/AssetGrid";
 import { SelectionBar } from "../ui/Menus";
 import { Skeleton, SkeletonLines, useShownWhile } from "../ui/Loading";
-import { Banner, Button, IconButton, Spinner } from "../ui/primitives";
+import { Banner, Button, IconButton, Pressable, Spinner } from "../ui/primitives";
 import { updatedText } from "./Collections";
 
 // Reference search compares to one library preview; it has no meaning inside a collection.
@@ -56,9 +56,9 @@ function SearchBar() {
           {COLLECTION_MODES.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
         </SelectContent>
       </Select>
-      <button id="collection-submit" type="submit" disabled={view.busy} aria-label={view.query.trim() ? "Search" : "Show all assets"} className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-[background-color,transform] hover:bg-primary-hover active:scale-95 disabled:opacity-60">
+      <Pressable id="collection-submit" type="submit" disabled={view.busy} aria-label={view.query.trim() ? "Search" : "Show all assets"} tooltip={view.query.trim() ? "Searches inside this collection only" : "Shows every asset in this collection"} className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-[background-color,transform] hover:bg-primary-hover active:scale-95 disabled:opacity-60">
         <ArrowRight className="size-5" />
-      </button>
+      </Pressable>
     </form>
   );
 }
@@ -107,8 +107,8 @@ function Description() {
         />
         {error && <p role="alert" className="text-[12px] text-fault">{error}</p>}
         <div className="flex gap-2">
-          <Button className="h-9 px-4 text-[12.5px]" id="collection-description-save" onClick={() => void save()}>Save</Button>
-          <Button variant="quiet" className="h-9 px-4 text-[12.5px]" onClick={() => setEditing(false)}>Cancel</Button>
+          <Button className="h-9 px-4 text-[12.5px]" id="collection-description-save" tooltip="Saves the description (Ctrl+Enter)" onClick={() => void save()}>Save</Button>
+          <Button variant="quiet" className="h-9 px-4 text-[12.5px]" tooltip={false} onClick={() => setEditing(false)}>Cancel</Button>
         </div>
       </div>
     );
@@ -166,7 +166,7 @@ export function Collection({ collectionId }: { collectionId: string }) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" id="collection-select" className="h-9 px-4 text-[12.5px]" disabled={!view.count || selection.active} onClick={() => startSelection()}>
+            <Button variant="secondary" id="collection-select" className="h-9 px-4 text-[12.5px]" disabled={!view.count || selection.active} tooltip="Pick assets to remove from this collection" onClick={() => startSelection()}>
               <ListChecks className="size-4" aria-hidden />Select
             </Button>
             <Button
@@ -175,6 +175,7 @@ export function Collection({ collectionId }: { collectionId: string }) {
               aria-haspopup="menu"
               className="h-9 px-4 text-[12.5px]"
               disabled={!view.id}
+              tooltip="Saves this collection as JSON for agents, a sample image, Markdown or PDF"
               onClick={(event) => {
                 const button = event.currentTarget, rect = button.getBoundingClientRect();
                 openExportMenu(collectionId, rect.left, rect.bottom + 6, button, event.detail === 0);
@@ -204,7 +205,7 @@ export function Collection({ collectionId }: { collectionId: string }) {
             <p className="max-w-[380px] text-[13px] leading-relaxed text-muted-foreground">
               Search from Home, then right-click an asset and choose <span className="font-medium text-foreground">Add to a collection</span>.
             </p>
-            <Button variant="secondary" onClick={() => navigate({ page: "home" })}>Go to Home</Button>
+            <Button variant="secondary" tooltip={false} onClick={() => navigate({ page: "home" })}>Go to Home</Button>
           </div>
         )}
         {searching && !view.busy && !grid.items.length && !view.error && (
