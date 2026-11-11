@@ -21,10 +21,11 @@ const OUTCOME: Record<string, [string, "success" | "warning" | "fault" | "neutra
 function ByAgent({ item, held }: { item: Json; held?: boolean }) {
   if (item.by !== "agent") return null;
   return (
-    <span className="agent-job inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent-soft-foreground"
-      title={held ? "Agents are paused: this waits until you turn them back on" : "Started by an agent"}>
-      <Bot className="size-3" aria-hidden />{item.agent || "Agent"}{held ? " · held" : ""}
-    </span>
+    <Hint content={held ? "Agents are paused: this waits until you turn them back on" : "Started by an agent"} focusable>
+      <span className="agent-job inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent-soft-foreground">
+        <Bot className="size-3" aria-hidden />{item.agent || "Agent"}{held ? " · held" : ""}
+      </span>
+    </Hint>
   );
 }
 
@@ -120,8 +121,8 @@ function UpNext() {
       {queue?.agents_paused && items.some((i) => i.by === "agent") && (
         <Banner tone="info"><span id="agent-jobs-held" className="flex flex-wrap items-center gap-2">
           <span className="mr-auto">Agents are paused, so jobs they queued wait; yours run first.</span>
-          <Button variant="quiet" className="h-7 px-2" onClick={() => setAgentOpen(true)}>Agent activity</Button>
-          <Button variant="secondary" className="h-7 px-2" onClick={() => void setAgentsPaused(false)}>Turn agents back on</Button>
+          <Button variant="quiet" className="h-7 px-2" tooltip="Opens what the agent did, with Pause agents and Undo all" onClick={() => setAgentOpen(true)}>Agent activity</Button>
+          <Button variant="secondary" className="h-7 px-2" tooltip="Lets agents change things again and starts the jobs they queued" onClick={() => void setAgentsPaused(false)}>Turn agents back on</Button>
         </span></Banner>
       )}
       {!items.length ? <p className="text-[13px] text-muted-foreground">Nothing waiting. Previews always run before descriptions.</p> : (

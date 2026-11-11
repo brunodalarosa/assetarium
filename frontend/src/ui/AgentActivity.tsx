@@ -38,8 +38,8 @@ function Session({ session, busy }: { session: Json; busy: boolean }) {
           {undone && session.to_undo > 0 ? ` · ${plural(session.to_undo, "new change", "new changes")}` : ""}</span>
       </span>
       {session.to_undo > 0 && (
-        <button type="button" disabled={busy} className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-primary hover:underline disabled:opacity-50"
-          onClick={() => undoAgentSession(session)}><Undo2 className="size-3.5" aria-hidden />{busy ? "Undoing…" : "Undo all"}</button>
+        <Pressable disabled={busy} className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-primary hover:underline disabled:opacity-50"
+          tooltip="Takes back this agent's tags, collections, profiles and waiting jobs; settings stay as they are" onClick={() => undoAgentSession(session)}><Undo2 className="size-3.5" aria-hidden />{busy ? "Undoing…" : "Undo all"}</Pressable>
       )}
     </li>
   );
