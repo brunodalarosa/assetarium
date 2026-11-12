@@ -88,6 +88,21 @@ def test_a_rescan_profile_on_a_busy_folder_scans_when_the_running_operation_ends
     assert source_operations.start_wanted(config) == [one['key']] and source_operations.start_wanted(config) == []
 
 
+def test_a_rescan_profile_refused_by_a_running_operation_changes_nothing(kit, scans):
+    import os
+    from local_asset_library import agent_sessions
+    from local_asset_library.source_operations import state
+    config, one = kit
+    named = [{'kind': 'pack_name', 'value': 'Owner name'}]
+    pack_profiles.apply(config, one['key'], 'Kit_1.0', named, {'by': 'owner'})
+    state(sources.bound(config, one), token='fixture', pid=os.getpid(), status='scanning')
+    with agent_sessions.active('b' * 32), pytest.raises(sources.Busy, match='Wait for this library folder'):
+        call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    assert pack_profiles.current(config, one, 'Kit_1.0') == named  # The rules before the refusal are kept.
+    assert sources.excluded_folders(sources.bound(config, one)) == [] and not scans
+    assert pack_agent.proposals(config, state=None) == [] and agent_sessions.summary(config, 'b' * 32) is None
+
+
 def test_held_rescan_proposals_wait_for_the_owner_and_a_newer_one_replaces_them(kit):
     config, one = kit
     copy = [{'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}]

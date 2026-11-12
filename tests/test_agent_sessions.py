@@ -70,6 +70,23 @@ def test_undo_all_reverts_the_sessions_profiles_and_scans_each_folder_once(kit, 
     assert pack_profiles.current(config, one, 'Kit_1.0') == [] and sources.excluded_folders(sources.bound(config, one)) == []
 
 
+def test_an_undo_refused_by_a_running_operation_stays_to_undo(kit, monkeypatch):
+    import os
+    from local_asset_library import source_operations
+    config, one = kit
+    monkeypatch.setattr(source_operations, 'start', lambda *a, **k: {'status': 'started'})
+    with agent_sessions.active(RUN):
+        pack_agent.propose(config, {'library_folder': one['key'], 'pack': 'Kit_1.0', 'rules': [{'kind': 'exclude', 'folder': 'Unity FBX'}]})
+    scoped = sources.bound(config, one)
+    source_operations.state(scoped, token='fixture', pid=os.getpid(), status='scanning')  # The scan the profile started.
+    busy = agent_sessions.undo(config, RUN)
+    assert not busy['undone'] and busy['skipped'][0]['reason'].endswith('Undo all again when it ends')
+    assert agent_sessions.summary(config, RUN)['to_undo'] == 1 and sources.excluded_folders(scoped) == ['Kit_1.0/Unity FBX']
+    source_operations.state(scoped, status='completed')
+    assert len(agent_sessions.undo(config, RUN)['undone']) == 1 and sources.excluded_folders(scoped) == []
+    assert agent_sessions.summary(config, RUN)['to_undo'] == 0
+
+
 def test_agent_jobs_never_resume_the_owners_paused_queue_and_wait_while_agents_are_paused(fake):
     config, one, two, started, finish, _ = fake
     queue.control(config, 'pause')

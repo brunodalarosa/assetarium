@@ -189,15 +189,28 @@ def propose(config, args, client=None, hold=False):
     identifier = 'prop_' + uuid.uuid4().hex[:16]
     scans = bool(set(seen['changed']) & set(RESCAN))
     previous = _latest(config, source, pack)
+    held = scans and hold
+
+    def supersede(db):
+        db.execute("UPDATE proposals SET state='superseded', decided_utc=? WHERE folder_id=? AND pack=? AND state='pending' AND id<>?",
+                   (now(), source['id'], pack, identifier))
     with closing(_db(config)) as db, db:
-        db.execute("UPDATE proposals SET state='superseded', decided_utc=? WHERE folder_id=? AND pack=? AND state='pending'",
-                   (now(), source['id'], pack))
+        if held:
+            supersede(db)
         db.execute('INSERT INTO proposals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', (identifier, source['id'], source['key'], pack,
                    json.dumps(rules), json.dumps(agent), json.dumps(seen), 'pending', now(), None, None, previous))
-    if scans and hold:
+    if held:
         return {'status': 'pending', 'proposal_id': identifier, 'effect': seen['lines'],
                 'note': 'Waits for the owner to Apply in the app (it rescans the library folder; nothing is processed).'}
-    result = decide(config, identifier, 'apply', approved='auto')
+    try:
+        result = decide(config, identifier, 'apply', approved='auto')
+    except ConfigError:
+        # Refused (a running operation, a stale suggestion): apply saved nothing, so the proposal leaves no trace either.
+        with closing(_db(config)) as db, db:
+            db.execute('DELETE FROM proposals WHERE id=?', (identifier,))
+        raise
+    with closing(_db(config)) as db, db:
+        supersede(db)
     note(config, 'profile', proposal=identifier, library_folder=source['key'], pack=pack)
     payload = {'status': 'applied', 'proposal_id': identifier, 'version': result['version'], 'effect': seen['lines'],
                'note': 'Applied at once; the owner can undo it in the app.'}

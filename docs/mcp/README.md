@@ -220,7 +220,7 @@ of one asset, which folders are engine copies, how images are meant. Every respo
 | `list_packs` | `library_folder`?, `status`?, `cursor`?, `limit`? (≤50) | read | Packs, those that need a structure first, with their reasons |
 | `get_pack_outline` | `library_folder`, `path`?, `cursor`?, `limit`? (≤60) | read | One folder level: subfolders with file and asset counts and pack evidence, and its files as patterns (`Car_11_{B,G,R}.obj (3)`, `Rock_{01..20}.fbx (20)`) |
 | `get_profile` | `library_folder`, `pack` | read | The pack's rules, signals, version, any waiting proposal and the rule vocabulary |
-| `propose_profile` | `library_folder`, `pack`, `rules` (≤500), `note`? | apply and undo | The pack's whole rule list, applied at once (the user can undo). Exclusions, engine copies, image kinds, export groups and the texture folder also start one scan of the library folder (`scan`: `started`, or why not; a scan processes nothing). Returns the effect |
+| `propose_profile` | `library_folder`, `pack`, `rules` (≤500), `note`? | apply and undo | The pack's whole rule list, applied at once (the user can undo). Exclusions, engine copies, image kinds, export groups and the texture folder also start one scan of the library folder (`scan`: `started`, or why not; a scan processes nothing); while the library folder has an operation running they are refused and nothing changes, so propose again when it ends. Returns the effect |
 | `finish_structure` | `library_folder`, `pack` | apply and undo | Marks the pack's current signals reviewed; new signals show again |
 | `say` | `message` (≤300) | apply and undo | One line in the user's Agent activity |
 
