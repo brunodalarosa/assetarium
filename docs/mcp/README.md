@@ -220,7 +220,7 @@ of one asset, which folders are engine copies, how images are meant. Every respo
 | `list_packs` | `library_folder`?, `status`?, `cursor`?, `limit`? (≤50) | read | Packs, those that need a structure first, with their reasons |
 | `get_pack_outline` | `library_folder`, `path`?, `cursor`?, `limit`? (≤60) | read | One folder level: subfolders with file and asset counts and pack evidence, and its files as patterns (`Car_11_{B,G,R}.obj (3)`, `Rock_{01..20}.fbx (20)`) |
 | `get_profile` | `library_folder`, `pack` | read | The pack's rules, signals, version, any waiting proposal and the rule vocabulary |
-| `propose_profile` | `library_folder`, `pack`, `rules` (≤500), `note`? | propose (instant rules: apply and undo) | The pack's whole rule list. Variant and pack rules apply at once (the user can undo); exclusions, engine copies, image kinds, export groups and the texture folder wait for the user's Apply and rescan. Returns the effect |
+| `propose_profile` | `library_folder`, `pack`, `rules` (≤500), `note`? | apply and undo | The pack's whole rule list, applied at once (the user can undo). Exclusions, engine copies, image kinds, export groups and the texture folder also start one scan of the library folder (`scan`: `started`, or why not; a scan processes nothing); while the library folder has an operation running they are refused and nothing changes, so propose again when it ends. Returns the effect |
 | `finish_structure` | `library_folder`, `pack` | apply and undo | Marks the pack's current signals reviewed; new signals show again |
 | `say` | `message` (≤300) | apply and undo | One line in the user's Agent activity |
 
@@ -232,7 +232,7 @@ activity, built from the server's call log.
 
 **Try your agent** (Settings → General or optional setup) generates small practice packs and opens the same
 discovery, handoff and proposal review used by the Library. Connect your agent, copy the practice prompt into it,
-then accept or reject its proposed rules in Assetarium. The check observes engine copies, pack boundaries, image
+then accept or reject its proposed rules in Assetarium (practice keeps this review; the real library applies them at once). The check observes engine copies, pack boundaries, image
 classification and a correctly organized pack; marking signals reviewed alone does not pass it. Finish at any
 time to see what worked and what remains unresolved. Practice does not render or generate descriptions.
 
@@ -242,6 +242,24 @@ on the next launch. A cleanup failure stays visible. The agent's own chat histor
 The practice prompt scopes every call to its temporary `library_folder`; `say` also accepts that optional field.
 No new MCP registration or tool names are needed. Existing Codex registrations must include the six pack tool
 names in `enabled_tools`.
+
+## Processing, and what the owner controls
+
+Agents act freely and in the open ([decision 0029](../../Assetarium%20KnowledgeBase/Decisions/0029-agent-trust.md)):
+*Your agent can reorganize packs, edit tags and collections, change settings and start processing on its own.
+Everything it does appears in Agent activity, where you can stop it, pause agents or undo a session.*
+
+| Tool | Input | Tier | Does |
+| --- | --- | --- | --- |
+| `start_processing` | `action` (`previews` \| `descriptions`), `library_folder`, `path`? or `asset_ids`? (≤200), `confirm`? | apply (stop, undo while waiting) | Queues Make previews or Generate descriptions like the owner's buttons. A short job starts or waits in line; a long one (over 30 minutes, past the storage budget, or unmeasured and large) first returns `status: confirm` with the estimate; call again with `confirm: true`. Never retries recorded failures (decision 0020) and never resumes the owner's paused queue |
+
+- **Pause agents** (Agent activity switch, or `local-assets agents pause` in an interactive terminal): every
+  write tool returns `status: refused` with "Paused by the owner"; reads, search and `say` keep working, and
+  jobs agents queued wait while the owner's run.
+- **Undo all**: each server run is one session. Its tag and collection edits, pack profiles and waiting jobs go
+  back newest first; anything changed after it is kept and listed with the reason. Settings are not part of it
+  (each is one value in Settings), and processing already done keeps its results.
+- Existing Codex registrations must add `start_processing` to `enabled_tools`.
 
 ## Privacy
 

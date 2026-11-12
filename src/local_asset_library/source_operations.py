@@ -193,6 +193,38 @@ def start(config, operation, key=None, asset_ids=None, queue_item=None, owner=No
     return {"status": "started", "token": token}
 
 
+def _wanted_path(config):
+    return config.output_path("data", "library/scans-wanted.json")
+
+
+def want_scan(config, key):
+    """Remember a scan that could not start because its folder was busy; it starts when that operation ends."""
+    with lease(config, "scans-wanted", resource="sources"):
+        target = _wanted_path(config)
+        keys = read_json(target).get("keys", []) if target.exists() else []
+        atomic_json(target, {"keys": sorted(set(keys) | {key})})
+
+
+def start_wanted(config):
+    """Start the remembered scans (every operation calls this as it ends); one still busy stays remembered."""
+    target = _wanted_path(config)
+    if not target.exists():
+        return []
+    with lease(config, "scans-wanted", resource="sources"):
+        keys = read_json(target).get("keys", [])
+        atomic_json(target, {"keys": []})
+    left, started = [], []
+    for key in keys:
+        try:
+            (started if start(config, "scan", key).get("status") == "started" else left).append(key)
+        except ConfigError:
+            continue  # The folder was removed or cannot be read; its own status says why.
+    if left:
+        for key in left:
+            want_scan(config, key)
+    return started
+
+
 def watch_owner(config, scoped, owner, poll=1.0, end=None):
     """Work the app started never outlives it: once that app is gone, closed or crashed, this operation and its
     child processes stop at once. A crash is logged with its reason and its queue items go to Recent."""

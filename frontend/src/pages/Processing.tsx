@@ -1,10 +1,10 @@
-import { ArrowDown, ArrowUp, Copy, FileText, FolderOpen, Pause, Play, RotateCcw, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Bot, Copy, FileText, FolderOpen, Pause, Play, RotateCcw, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { operationActive, plural } from "../app/format";
-import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, showLog, sourceAction, useApp } from "../app/store";
+import { copyText, loadQueue, navigate, openSources, queueControl, recheckFailures, refreshContext, setAgentOpen, setAgentsPaused, showLog, sourceAction, useApp } from "../app/store";
 import { Skeleton } from "../ui/Loading";
 import { Reason } from "../ui/CommandBlock";
 import { Badge, Banner, Button, Disclosure, Hint, Pressable } from "../ui/primitives";
@@ -16,6 +16,18 @@ const OUTCOME: Record<string, [string, "success" | "warning" | "fault" | "neutra
   faulty: ["Stopped", "fault"], interrupted: ["Interrupted", "warning"], nothing_to_do: ["Nothing to do", "neutral"],
   stopped: ["Stopped · app closed", "fault"],
 };
+
+/** Who started a job, when an agent did (design principle P6), with the Bot sign (P2). */
+function ByAgent({ item, held }: { item: Json; held?: boolean }) {
+  if (item.by !== "agent") return null;
+  return (
+    <Hint content={held ? "Agents are paused: this waits until you turn them back on" : "Started by an agent"} focusable>
+      <span className="agent-job inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent-soft-foreground">
+        <Bot className="size-3" aria-hidden />{item.agent || "Agent"}{held ? " · held" : ""}
+      </span>
+    </Hint>
+  );
+}
 
 function Section({ id, title, count, children, hint }: { id: string; title: string; count?: number; children: ReactNode; hint?: ReactNode }) {
   return (
@@ -52,6 +64,7 @@ function Running() {
         <div id="running-item" className="grid gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="mr-auto text-[13.5px] font-medium">{item.title || ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</p>
+            <ByAgent item={item} />
             <span className="text-[12px] text-muted-foreground">{since(item.started_utc)}</span>
             <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} tooltip="Stops this work. Assets already finished keep their results" onClick={() => void queueControl("remove", item.id)}>
               <X className="size-3.5" aria-hidden />{item.status === "cancelling" ? "Stopping…" : "Cancel"}
@@ -105,6 +118,13 @@ function UpNext() {
       {queue?.paused && <Banner tone="info"><span id="queue-paused">{queue.stopped_on_close
         ? "Stopped when you closed Assetarium. Finished assets are kept; Continue picks up the rest."
         : "Paused. Nothing here starts until you resume."}</span></Banner>}
+      {queue?.agents_paused && items.some((i) => i.by === "agent") && (
+        <Banner tone="info"><span id="agent-jobs-held" className="flex flex-wrap items-center gap-2">
+          <span className="mr-auto">Agents are paused, so jobs they queued wait; yours run first.</span>
+          <Button variant="quiet" className="h-7 px-2" tooltip="Opens what the agent did, with Pause agents and Undo all" onClick={() => setAgentOpen(true)}>Agent activity</Button>
+          <Button variant="secondary" className="h-7 px-2" tooltip="Lets agents change things again and starts the jobs they queued" onClick={() => void setAgentsPaused(false)}>Turn agents back on</Button>
+        </span></Banner>
+      )}
       {!items.length ? <p className="text-[13px] text-muted-foreground">Nothing waiting. Previews always run before descriptions.</p> : (
         <ol id="up-next" className="grid gap-1.5">
           <AnimatePresence initial={false}>
@@ -112,6 +132,7 @@ function UpNext() {
               <motion.li key={item.id} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-[13px]" data-action={item.action}>
                 <span className="mr-auto min-w-0 truncate">{item.title || ACTION[item.action]} · {item.label}</span>
+                <ByAgent item={item} held={!!queue?.agents_paused} />
                 {item.estimate?.seconds && <span className="text-[11.5px] text-muted-foreground tabular-nums">~{Math.round(item.estimate.seconds[1] / 60)} min</span>}
                 <Pressable aria-label="Move up" tooltip="Runs this one step earlier" disabled={index === 0} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, Math.max(0, index - 1))}><ArrowUp className="size-3.5" /></Pressable>
                 <Pressable aria-label="Move down" tooltip="Runs this one step later" disabled={index === items.length - 1} className="rounded p-1 hover:bg-surface disabled:opacity-30" onClick={() => void queueControl("move", item.id, index + 1)}><ArrowDown className="size-3.5" /></Pressable>

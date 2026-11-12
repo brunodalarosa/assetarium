@@ -180,7 +180,7 @@ def apply(config, key, pack, rules, origin):
 
     ``origin``: ``{'by': 'owner' | 'agent' | 'import' | 'revert', 'agent'?: name, 'model'?: name, 'approved'?: 'auto' | 'owner'}``.
     Rescan rules that need a current suggestion (export groups, texture folder) are checked first; nothing is saved
-    when one no longer matches.
+    when one no longer matches, or while the library folder has an operation running (``sources.Busy``).
     """
     from .library_store import replace_answers
     from .sources import get_source
@@ -192,6 +192,8 @@ def apply(config, key, pack, rules, origin):
     if not changed:
         return {'status': 'unchanged', 'version': _latest(config, source, pack), 'rescan': False, 'changed': []}
     plan = _rescan_plan(config, source, pack, before, rules) if changed & set(RESCAN) else None
+    if plan:
+        plan()  # First: a running operation refuses this step, and a refusal must leave the pack as it was.
     if not _latest(config, source, pack):
         _record(config, source, pack, before, {'by': 'earlier'})  # Version 1: how the pack stood before its first profile.
     rows = []
@@ -208,16 +210,17 @@ def apply(config, key, pack, rules, origin):
         elif rule['kind'] in {'pack', 'image_kind'}:
             rows.append((path, rule['kind'], rule['value']))
     replace_answers(config, source['id'], ANSWERED, pack, rows)
-    if plan:
-        plan()
     version = _record(config, source, pack, rules, origin)
     return {'status': 'saved', 'version': version, 'rescan': bool(changed & set(RESCAN + ('pack',))), 'changed': sorted(changed)}
 
 
 def _rescan_plan(config, source, pack, before, rules):
     """Check the scan-applied rules against current suggestions; returns the function that saves them."""
-    from .sources import (_change_source_settings, bound, excluded_folders, export_decisions, source_status, texture_folder)
+    from .source_operations import active_operation
+    from .sources import (Busy, _change_source_settings, bound, excluded_folders, export_decisions, source_status, texture_folder)
     scoped = bound(config, source)
+    if active_operation(scoped):
+        raise Busy("Wait for this library folder's operation to finish before changing its packs")
     status = source_status(config, source)
     excluded = [p for p in excluded_folders(scoped) if '*' in p or _relative(p, pack) is None]
     excluded += [_absolute(r['folder'], pack) for r in rules if r['kind'] in {'exclude', 'engine_copy'}]

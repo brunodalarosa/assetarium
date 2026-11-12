@@ -1,9 +1,10 @@
 """Verify Agent activity and pack proposals (decision 0029) in the real WebView2 shell with a synthetic pack.
 
 An in-process MCP gateway plays the agent (the same Gateway.call path a STDIO client uses, so every call lands in
-data/mcp/runs/<run>/calls.jsonl): say, get_pack_outline, an instant proposal (applied at once, Undo in a toast and the
-feed) and rescan proposals for two packs (they wait; the top-bar button counts them; the drawer groups the shared engine
-copy rule, the owner accepts and rejects rules, sees a preview and applies both with one scan). Checks the live feed,
+data/mcp/runs/<run>/calls.jsonl): say, get_pack_outline and a proposal (applied at once, Undo in a toast and the feed).
+Held rescan proposals for two packs (the review that older waiting rows and the practice import keep) show the staged
+review: the top-bar button counts them, the drawer groups the shared engine copy rule, the owner accepts and rejects
+rules, sees a preview and applies both with one scan. Checks the live feed,
 the connection line, Undo, the narrow layout, untouched originals and that no model loads.
 Writes data/gui/<run-name>/verification.json.
 """
@@ -20,7 +21,7 @@ import traceback
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from test_sources import managed  # noqa: E402
-from local_asset_library import pack_profiles, sources  # noqa: E402
+from local_asset_library import pack_agent, pack_profiles, sources  # noqa: E402
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome  # noqa: E402
 from local_asset_library.mcp_server import Gateway  # noqa: E402
 from local_asset_library.publication import atomic_json  # noqa: E402
@@ -120,7 +121,7 @@ def verify():
         copy = {'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}
         for pack, rules in (('Kit_1.0', [{'kind': 'variant_axis', 'folder': 'Rocks', 'values': ['numbers']}, copy]),
                             ('Kit_2.0', [copy, {'kind': 'exclude', 'folder': 'Samples', 'note': 'screenshots'}])):
-            pending = tool('propose_profile', library_folder=KEY, pack=pack, rules=rules)
+            pending = pack_agent.propose(config, {'library_folder': KEY, 'pack': pack, 'rules': rules}, agent.client, hold=True)
             assert pending['status'] == 'pending', pending
         review = ".proposal-review"
         group = lambda packs, text: f"[...document.querySelectorAll('{review} .proposal-group[data-packs=\"{packs}\"]')].find(g=>g.textContent.includes('{text}'))"
@@ -128,7 +129,7 @@ def verify():
         assert ui.js(f"{group(2, 'engine copy')}.textContent.includes('In 2 packs')")
         assert ui.js(f"{group(1, 'Samples')}.textContent.includes('Only in Kit_2.0')")
         assert ui.js(f"document.querySelector('{review} [data-action=apply-staged]').disabled")
-        report['checks'].append('Two waiting proposals show as one folder review: the shared engine copy rule is one group "In 2 packs", '
+        report['checks'].append('Two held proposals show as one folder review: the shared engine copy rule is one group "In 2 packs", '
                                 'each pack-only rule says where it applies, and Apply stays disabled until rules are decided')
         ui.js(f"{group(2, 'engine copy')}.querySelector('[data-choice=accept]').click()")
         ui.js(f"{group(1, 'Variants')}.querySelector('[data-choice=accept]').click()")
@@ -144,11 +145,11 @@ def verify():
         assert scans == [KEY], scans
         assert pack_profiles.history(config, KEY, 'Kit_2.0')[0]['origin']['left_out'] == [{'kind': 'exclude', 'folder': 'Samples', 'note': 'screenshots'}]
         report['checks'].append('One Apply saves both packs (Samples left out and recorded), scans the library folder once and clears the badge')
+        before = pack_profiles.current(config, sources.get_source(config, KEY), 'Kit_1.0')
         ui.js("[...document.querySelectorAll('#agent-feed [data-kind=change] button')][0].click()")
-        wait("[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Undone'))", 30)
-        rules = pack_profiles.current(config, sources.get_source(config, KEY), 'Kit_1.0')
-        assert rules == [{'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}] or rules == [], rules
-        report['checks'].append('Undo restores the version before the agent change')
+        wait("[...document.querySelectorAll('.toast')].some(t=>t.textContent.includes('Not undone')&&t.textContent.includes('changed since this proposal'))", 30)
+        assert pack_profiles.current(config, sources.get_source(config, KEY), 'Kit_1.0') == before
+        report['checks'].append('Undo of the first agent change is refused with the reason once the owner applied a later change to the pack; nothing is erased')
         window.resize(680, 900)
         wait('innerWidth<761')
         ui.js("lal.setAgentOpen(true)")

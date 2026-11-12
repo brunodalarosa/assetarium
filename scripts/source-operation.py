@@ -63,6 +63,11 @@ else:
         # Every operation ends by starting the next queued item, so one that found this folder busy (a scan,
         # a speed test) never waits for someone to touch the queue.
         from local_asset_library.processing_queue import advance
+        from local_asset_library.source_operations import start_wanted
+        try:
+            start_wanted(config)  # A rescan an agent's profile asked for while this folder was busy (decision 0029).
+        except Exception as exc:
+            print(f'Scan: a remembered rescan did not start: {exc}', flush=True)
         try:
             advance(config)
         except Exception as exc:  # The queue shows the item's outcome; a start fault is recorded there.

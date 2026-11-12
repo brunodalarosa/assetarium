@@ -34,7 +34,7 @@ When decisions are alike, let people decide them together and commit them once, 
 
 | What the action does | Pattern |
 | --- | --- |
-| Cheap and undoable (tags, labels, agent rules that need no scan) | Apply at once, offer **Undo** |
+| Cheap and undoable (tags, labels, pack rules that need no scan) | Apply at once, offer **Undo** |
 | Costly or coupled (rescans, renders, reprocessing) | Stage, preview, commit once |
 | Anything a connected agent does (P6) | Runs at once, shown in Agent activity with **Stop** / **Undo** |
 | Irreversible (owner-only deletions) | One at a time, never batched |

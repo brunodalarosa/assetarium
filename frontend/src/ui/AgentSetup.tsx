@@ -1,4 +1,5 @@
 import { Bot, Check, CircleAlert, Copy, PlugZap, Wrench } from "lucide-react";
+import { AGENT_FREEDOM } from "./AgentActivity";
 import { type ReactNode, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { cn } from "@/lib/utils";
@@ -252,6 +253,9 @@ export function AgentPanel() {
         <ConnectionLine connections={agent.connections || []} blocked={(agent.registrations || []).some((item: Json) => PROBLEM[item.state])} />
         <p id="agent-privacy" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />Your agent’s model receives this computer’s OS, GPU, free space and Blender paths. If that model runs in the cloud, they leave this computer. Your agent runs install commands only with your permission.
+        </p>
+        <p id="agent-freedom" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
+          <Bot className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />{AGENT_FREEDOM}
         </p>
       </Card>
       <Card title="What your agent has set" help="Every change also raises a notice. You can change anything in the review.">

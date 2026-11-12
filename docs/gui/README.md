@@ -26,12 +26,23 @@ buttons do the same), **Home**,
 bottom; every icon has a label and a focus/hover tooltip. Across the app, hovering or focusing a control,
 badge or count shows a tooltip that says what it is or what it will do; plain buttons such as Cancel or
 Back, whose text already says it, have none. The Library lets you add
-folders, organize packs and review agent proposals. The top bar holds the background
-activity indicator (only while something runs), the notifications bell and the
+folders and organize packs. The top bar holds the background
+activity indicator (only while something runs), the **Agent** button, the notifications bell and the
 inspection toggle. At launch the library opens from its last scan at once and shows
 **Checking for changes** while it looks for new, changed or removed files; if it finds
 any, one small note says what changed ("Library updated · 3 new"), otherwise nothing appears. Asset processing shows a dot while a source needs
 processing or an operation runs.
+
+**Agent activity** ([decision 0029](../../Assetarium%20KnowledgeBase/Decisions/0029-agent-trust.md)). A connected
+agent changes things on its own: it reorganizes packs (applied at once; rules that change what a scan reads start one
+scan), edits tags and collections, changes settings and starts Make previews or Generate descriptions (a long job
+shows its estimate first). The **Agent** button in the top bar opens what agents did, line by line, with **Undo** on
+pack changes. **Pause agents** refuses every agent change until you turn it off; agents can still search and read,
+and jobs they queued wait (Asset processing says so, with **Turn agents back on**). **Sessions that changed
+something** lists each connected run with **Undo all**: its tags, collections, pack profiles and jobs still waiting
+go back, newest first; anything changed after it is kept and named, settings stay as they are and finished
+processing keeps its results. Jobs an agent started show its name in Asset processing, and **Cancel** stops them like
+yours. Older proposals still waiting (and the practice import) keep the review with one Apply.
 
 **Try your agent.** In Settings → General or optional setup, connect your agent and choose **Try your agent**.
 Assetarium generates small practice packs and opens the Library import wizard. Choose **Let my agent finish**,

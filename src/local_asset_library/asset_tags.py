@@ -65,6 +65,7 @@ def change(config, asset_ids, add=(), remove=(), replace=None):
     replacement = None if replace is None else unique(replace)
     with lease(config, 'tags', resource='collections'):
         value = load(config)
+        before = {i: list(value['assets'].get(i, [])) for i in asset_ids}
         for identifier in asset_ids:
             current = replacement if replacement is not None else [
                 t for t in value['assets'].get(identifier, []) if t.casefold() not in removed] + add
@@ -75,7 +76,28 @@ def change(config, asset_ids, add=(), remove=(), replace=None):
                 value['assets'].pop(identifier, None)
         value['revision'] = value.get('revision', 0) + 1
         atomic_json(path(config), value)
+        from .agent_sessions import note
+        note(config, 'tags', before=before, after={i: value['assets'].get(i, []) for i in asset_ids})
     return {'status': 'saved', 'tags': {i: value['assets'].get(i, []) for i in asset_ids}, 'revision': value['revision']}
+
+
+def undo(config, before, after):
+    """Undo all (decision 0029): each asset gets its earlier tags back unless they changed since. Returns a skip reason."""
+    with lease(config, 'tags', resource='collections'):
+        value = load(config)
+        changed = [i for i in before if value['assets'].get(i, []) != after.get(i, [])]
+        for identifier, tags in before.items():
+            if identifier in changed:
+                continue
+            if tags:
+                value['assets'][identifier] = list(tags)
+            else:
+                value['assets'].pop(identifier, None)
+        value['revision'] = value.get('revision', 0) + 1
+        atomic_json(path(config), value)
+    if changed:
+        return f"{len(changed)} of {len(before)} asset{'s' if len(before) != 1 else ''} changed tags since, so their tags were kept"
+    return None
 
 
 def known(config, value=None):

@@ -10,9 +10,19 @@ from local_asset_library.config import ConfigError
 from local_asset_library.mcp_assets import SCHEMAS, validate
 
 
-def call(config, name, **args):
+def call(config, name, hold=False, **args):
+    """``hold``: the practice import's review, where a rescanning profile waits for the owner's Apply."""
     validate(name, args)
-    return pack_agent.execute(config, name, args, {'name': 'test-agent'})
+    return pack_agent.execute(config, name, args, {'name': 'test-agent'}, hold=hold)
+
+
+@pytest.fixture
+def scans(monkeypatch):
+    """Scans a profile starts, recorded instead of spawning the scan worker."""
+    started = []
+    from local_asset_library import source_operations
+    monkeypatch.setattr(source_operations, 'start', lambda config, operation, key=None, **_: started.append((operation, key)) or {'status': 'started'})
+    return started
 
 
 def test_names_collapse_into_short_patterns():
@@ -58,12 +68,47 @@ def test_undoing_a_first_proposal_restores_the_owners_earlier_answers(kit):
     assert pack_profiles.current(config, one, 'Kit_1.0') == [{'kind': 'pack_name', 'value': 'Starter Kit'}]
 
 
-def test_rescan_proposals_wait_for_the_owner_and_a_newer_one_replaces_them(kit):
+def test_rescan_proposals_apply_at_once_and_start_one_scan(kit, scans):
+    config, one = kit
+    result = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    assert result['status'] == 'applied' and result['scan'] == 'started' and scans == [('scan', one['key'])]
+    assert sources.excluded_folders(sources.bound(config, one)) == ['Kit_1.0/Unity FBX'] and pack_agent.proposals(config) == []
+    undone = pack_agent.decide(config, result['proposal_id'], 'undo')
+    assert undone['rescan'] and sources.excluded_folders(sources.bound(config, one)) == []
+
+
+def test_a_rescan_profile_on_a_busy_folder_scans_when_the_running_operation_ends(kit, monkeypatch):
+    config, one = kit
+    from local_asset_library import source_operations
+    monkeypatch.setattr(source_operations, 'start', lambda *a, **k: {'status': 'busy', 'reason': 'This operation is already running'})
+    result = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    assert result['status'] == 'applied' and result['scan'] == 'busy' and 'running operation ends' in result['note']
+    started = []
+    monkeypatch.setattr(source_operations, 'start', lambda config, operation, key=None, **_: started.append(key) or {'status': 'started'})
+    assert source_operations.start_wanted(config) == [one['key']] and source_operations.start_wanted(config) == []
+
+
+def test_a_rescan_profile_refused_by_a_running_operation_changes_nothing(kit, scans):
+    import os
+    from local_asset_library import agent_sessions
+    from local_asset_library.source_operations import state
+    config, one = kit
+    named = [{'kind': 'pack_name', 'value': 'Owner name'}]
+    pack_profiles.apply(config, one['key'], 'Kit_1.0', named, {'by': 'owner'})
+    state(sources.bound(config, one), token='fixture', pid=os.getpid(), status='scanning')
+    with agent_sessions.active('b' * 32), pytest.raises(sources.Busy, match='Wait for this library folder'):
+        call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    assert pack_profiles.current(config, one, 'Kit_1.0') == named  # The rules before the refusal are kept.
+    assert sources.excluded_folders(sources.bound(config, one)) == [] and not scans
+    assert pack_agent.proposals(config, state=None) == [] and agent_sessions.summary(config, 'b' * 32) is None
+
+
+def test_held_rescan_proposals_wait_for_the_owner_and_a_newer_one_replaces_them(kit):
     config, one = kit
     copy = [{'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}]
-    first = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=copy)
+    first = call(config, 'propose_profile', hold=True, library_folder=one['key'], pack='Kit_1.0', rules=copy)
     assert first['status'] == 'pending' and sources.excluded_folders(sources.bound(config, one)) == []
-    second = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    second = call(config, 'propose_profile', hold=True, library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
     waiting = pack_agent.proposals(config)
     assert [p['id'] for p in waiting] == [second['proposal_id']]
     assert call(config, 'finish_structure', library_folder=one['key'], pack='Kit_1.0')['status'] == 'waiting'
@@ -114,8 +159,8 @@ def test_staged_decisions_save_together_with_one_rescan_per_library_folder(kit):
     config, one = kit
     pack(config, one, 'License.txt', 'Props/Barrel.obj', 'Unity FBX/Props/Barrel.obj', 'Samples/Shot.obj', root='Kit_2.0')
     copy = {'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': ''}
-    first = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[copy])
-    second = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_2.0', rules=[copy, {'kind': 'exclude', 'folder': 'Samples'}])
+    first = call(config, 'propose_profile', hold=True, library_folder=one['key'], pack='Kit_1.0', rules=[copy])
+    second = call(config, 'propose_profile', hold=True, library_folder=one['key'], pack='Kit_2.0', rules=[copy, {'kind': 'exclude', 'folder': 'Samples'}])
     stored = next(p['rules'] for p in pack_agent.proposals(config) if p['id'] == second['proposal_id'])  # Indexes follow the stored list.
     samples = next(i for i, r in enumerate(stored) if r['kind'] == 'exclude')
     staged = [{'id': first['proposal_id'], 'decision': 'apply'}, {'id': second['proposal_id'], 'decision': 'apply', 'leave_out': [samples]}]
@@ -131,7 +176,7 @@ def test_staged_decisions_save_together_with_one_rescan_per_library_folder(kit):
 
 def test_a_failing_staged_decision_stays_waiting_and_the_rest_save(kit):
     config, one = kit
-    waiting = call(config, 'propose_profile', library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
+    waiting = call(config, 'propose_profile', hold=True, library_folder=one['key'], pack='Kit_1.0', rules=[{'kind': 'exclude', 'folder': 'Unity FBX'}])
     staged = [{'id': 'prop_gone', 'decision': 'apply'}, {'id': waiting['proposal_id'], 'decision': 'apply', 'leave_out': [0]}]
     assert pack_agent.preview(config, staged)['packs'][0]['status'] == 'faulty'
     saved = pack_agent.commit(config, staged)

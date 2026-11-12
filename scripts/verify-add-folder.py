@@ -2,7 +2,7 @@
 
 Checks the live quick look (the tree fills in by names), What we found (counts, reasons, How did we decide?), Let my
 agent finish (the folder is added and scanned, the copy-paste prompt, the connection line), an in-process agent
-working through the MCP gateway (its lines in the take-over feed, a waiting proposal accepted and applied in place, progress to
+working through the MCP gateway (its lines in the take-over feed, its profile applied at once with one scan, progress to
 "every pack has a structure"), Minimize, the narrow layout, untouched originals and that no model loads.
 Writes data/gui/<run-name>/verification.json.
 """
@@ -19,7 +19,7 @@ import traceback
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from test_sources import managed  # noqa: E402
-from local_asset_library import sources  # noqa: E402
+from local_asset_library import pack_profiles, source_operations, sources  # noqa: E402
 from local_asset_library.desktop import DesktopBridge, create_window, profile_path, record_profile_outcome  # noqa: E402
 from local_asset_library.mcp_server import Gateway  # noqa: E402
 from local_asset_library.publication import atomic_json  # noqa: E402
@@ -57,6 +57,19 @@ class FixtureBridge(DesktopBridge):
         assert operation == 'scan'  # No runtimes in the fixture project: the same scan, in-process.
         sources.scan_source(config, sources.get_source(config, key))
         return {'status': 'ready', 'reason': 'Scanned'}
+
+
+scans = []
+
+
+def scan(config_, operation, key=None, **_):
+    assert operation == 'scan'  # An agent's profile scans its folder (decision 0029); in-process here as well.
+    scans.append(key)
+    sources.scan_source(config, sources.get_source(config, key))
+    return {'status': 'started', 'token': 'scan'}
+
+
+source_operations.start = scan
 
 
 agent = Gateway(config)
@@ -111,20 +124,17 @@ def verify():
         listed = tool('list_packs', library_folder=key, status='needs_structure')
         pack = listed['packs'][0]['pack']
         tool('get_pack_outline', library_folder=key, path=pack)
-        pending = tool('propose_profile', library_folder=key, pack=pack, note='Unity FBX repeats FBX for Unity',
+        applied = tool('propose_profile', library_folder=key, pack=pack, note='Unity FBX repeats FBX for Unity',
                        rules=[{'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': 'FBX'}])
-        assert pending['status'] == 'pending', pending
-        wait("document.querySelectorAll('#take-over-feed li').length>=3&&document.querySelector('#add-folder-wizard .proposal-review')", 30)
+        assert applied['status'] == 'applied' and applied['scan'] == 'started' and scans == [key], (applied, scans)
+        assert pack_profiles.current(config, sources.get_source(config, key), pack) == [{'kind': 'engine_copy', 'folder': 'Unity FBX', 'of': 'FBX'}]
+        wait("document.querySelectorAll('#take-over-feed li').length>=4&&!document.querySelector('#add-folder-wizard .proposal-review')", 30)
         ui.capture('02-take-over.png')
-        report['checks'].append("The agent's lines and its waiting proposal appear in the take-over")
-        ui.js("document.querySelector('#add-folder-wizard .proposal-review [data-action=accept-all]').click()")
-        wait("!document.querySelector('#add-folder-wizard [data-action=apply-staged]').disabled", 10)
-        ui.js("document.querySelector('#add-folder-wizard [data-action=apply-staged]').click()")
-        wait("!document.querySelector('#add-folder-wizard .proposal-review')", 30)
+        report['checks'].append("The agent's lines appear in the take-over and its profile applies at once with one scan (no review step)")
         tool('finish_structure', library_folder=key, pack=pack)
         wait(f"{WIZARD}.dataset.step==='done'&&$('add-folder-done')", 30)
         ui.capture('03-done.png')
-        report['checks'].append('Accept all and Apply in place, then finish_structure: the wizard says every pack has a structure and offers Make previews')
+        report['checks'].append('After finish_structure the wizard says every pack has a structure and offers Make previews')
         window.resize(680, 900)
         wait('innerWidth<761')
         wait(f"{WIZARD}.querySelector('section').getBoundingClientRect().right<=innerWidth+1", 10)

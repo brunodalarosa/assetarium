@@ -265,6 +265,8 @@ export interface AppState {
   notificationsOpen: boolean;
   /** What agents do (decision 0029): the live feed, who is connected and proposals waiting for the owner. */
   agent: { open: boolean; loaded: boolean; entries: Json[]; connected: Json[]; working: boolean; lastUtc: string | null; proposals: Json[];
+    /** Pause agents (decision 0029): their writes are refused and their queued jobs wait. */
+    paused: boolean; sessions: Json[]; undoing: string | null;
     staged: Record<string, Record<number, RuleChoice>>; committing: string | null };
   /** The Add library folder wizard (decision 0035). */
   addFolder: AddFolder;
@@ -330,7 +332,7 @@ let state: AppState = {
   sourcesView: emptySourcesView(),
   queue: null,
   sources: [], globalScan: null, sourcesLoaded: false, sourcesRevision: null, sourcesMessage: "", sourcesError: null, notifications: [], notificationsOpen: false, toasts: [],
-  agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [], staged: {}, committing: null },
+  agent: { open: false, loaded: false, entries: [], connected: [], working: false, lastUtc: null, proposals: [], paused: false, sessions: [], undoing: null, staged: {}, committing: null },
   addFolder: { open: false, step: "look", job: null, look: null, key: null, name: "", prompt: "", copiedAt: null, signals: null, error: null, busy: false, practice: false, practiceState: null, result: null },
   practiceResult: null,
   failures: { loading: false, assets: 0, paths: [], unavailable: [], error: null, loaded: false },
@@ -2320,8 +2322,8 @@ export async function exportCollection(id: string, kind: "json" | "png" | "md" |
 
 let toastId = 0;
 /* ----------------------------- agent activity ----------------------------- */
-// Decision 0029: every agent call becomes a line here; rules that need no scan apply at once with Undo,
-// the others wait as proposals for the owner's Apply.
+// Decision 0029: every agent call becomes a line here; pack profiles apply at once with Undo, and each session can be
+// undone as a whole. Proposals still waiting (older ones, the practice import) keep the owner's review.
 
 let agentLoading = false;
 export async function loadAgentActivity() {
@@ -2336,6 +2338,10 @@ export async function loadAgentActivity() {
     if (state.agent.loaded && !state.agent.open && !(state.addFolder.open && state.addFolder.step === "agent")) {
       for (const entry of fresh.filter((e) => e.kind === "change" && e.proposal_id))
         pushToast({ tone: "info", title: "Your agent changed a pack", body: entry.text, actions: [{ label: "Undo", run: () => void decideAgentProposal(entry.proposal_id, "undo") }] });
+      // An agent's job says so in its notice (decision 0029), with the one-click control next to it.
+      for (const entry of fresh.filter((e) => e.kind === "change" && e.tool === "start_processing"))
+        pushToast({ tone: "info", title: "Your agent started processing", body: entry.text + ". You can stop it in Asset processing.",
+          actions: [{ label: "Pause agents", run: () => void setAgentsPaused(true) }] });
       // Design principle P1: several proposals arriving together make one notice, not one each.
       const waiting = fresh.filter((e) => e.kind === "waiting" && e.proposal_id);
       if (waiting.length)
@@ -2344,6 +2350,7 @@ export async function loadAgentActivity() {
     }
     setState((s) => ({ agent: { ...s.agent, loaded: true, entries: [...s.agent.entries, ...fresh].slice(-200), connected: result.connected,
       working: result.working, lastUtc: result.last_utc || s.agent.lastUtc, proposals: result.proposals,
+      paused: !!result.paused, sessions: result.sessions || [],
       staged: Object.fromEntries(Object.entries(s.agent.staged).filter(([id]) => result.proposals.some((p: Json) => p.id === id)
         || s.addFolder.practiceState?.proposals?.some((p: Json) => p.id === id))) } }));
   } finally {
@@ -2353,6 +2360,43 @@ export async function loadAgentActivity() {
 export function setAgentOpen(open: boolean) {
   setState((s) => ({ agent: { ...s.agent, open }, ...(open ? { notificationsOpen: false } : {}) }));
   if (open) void loadAgentActivity();
+}
+/** Pause agents, or turn them back on: an owner gesture, so it applies at once (a switch) and says what it means. */
+export async function setAgentsPaused(paused: boolean) {
+  setState((s) => ({ agent: { ...s.agent, paused } }));
+  const result = await api().agent_pause(paused);
+  if (result.status === "faulty") {
+    setState((s) => ({ agent: { ...s.agent, paused: !paused } }));
+    pushToast({ tone: "fault", title: paused ? "Agents not paused" : "Agents not turned back on", body: result.reason });
+    return;
+  }
+  pushToast({ tone: "info", title: paused ? "Agents paused" : "Agents are on again",
+    body: paused ? "Their changes are refused and jobs they queued wait. They can still search and read." : "Jobs they queued can start now." });
+  await loadAgentActivity();
+}
+/** Undo all of one agent session, after the owner confirms; what changed since is kept and listed with why. */
+export function undoAgentSession(session: Json) {
+  askConfirm({ tone: "neutral", title: `Undo everything ${session.agent || "this agent"} changed?`,
+    body: `${plural(session.to_undo, "change", "changes")} from this session go back, newest first: tags, collections, pack profiles, and jobs still waiting. `
+      + "Anything changed after it is kept, and finished processing keeps its results. Settings stay as they are.",
+    confirmLabel: "Undo all", run: async () => {
+      setState((s) => ({ agent: { ...s.agent, undoing: session.run_id } }));
+      try {
+        const result = await api().agent_session_undo(session.run_id);
+        if (result.status === "faulty") throw Error(result.reason);
+        const kept = result.skipped as Json[];
+        pushToast({ tone: kept.length ? "info" : "success", title: `Undid ${plural(result.undone.length, "change", "changes")}`,
+          body: [kept.length ? `Kept ${kept.length}: ` + kept.map((k) => `${k.what} (${k.reason})`).join("; ") : "",
+            result.rescan.length ? "Scanning again; nothing is rendered or described." : ""].filter(Boolean).join(" ") });
+        await loadAgentActivity();
+        await loadLibraryTree();
+        if (state.sourcesView.key) void refreshFolder();
+      } catch (error) {
+        pushToast({ tone: "fault", title: "Not undone", body: (error as Error).message });
+      } finally {
+        setState((s) => ({ agent: { ...s.agent, undoing: null } }));
+      }
+    } });
 }
 /** Apply or reject a waiting proposal, or undo one that was applied. */
 export async function decideAgentProposal(id: string, decision: "apply" | "reject" | "undo") {

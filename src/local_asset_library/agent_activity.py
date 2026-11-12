@@ -45,7 +45,8 @@ def sentence(tool, args, response, error):
     if tool == 'propose_profile':
         effect = '; '.join(response.get('effect') or [])
         if status == 'applied':
-            return 'change', f'Applied rules to {_where(args)}: {effect}'
+            scan = {'started': ' · rescanning', None: ''}.get(response.get('scan'), ' · scan not started')
+            return 'change', f'Applied rules to {_where(args)}: {effect}{scan}'
         if status == 'pending':
             return 'waiting', f'Proposed rules for {_where(args)}, waiting for you: {effect}'
         return 'read', f'Proposed rules for {_where(args)}: nothing would change'
@@ -59,6 +60,11 @@ def sentence(tool, args, response, error):
         return 'read', 'Read collections'
     if tool in {'edit_collection', 'tag_assets'}:
         return 'change', 'Changed a collection' if tool == 'edit_collection' else 'Changed tags'
+    if tool == 'start_processing':
+        verb = 'Make previews' if args.get('action') == 'previews' else 'Generate descriptions'
+        if status == 'confirm':
+            return 'read', f"Asked for the estimate of {verb} for {_where(args)}"
+        return 'change', f"Started {verb} for {response.get('job') or _where(args)}" if status == 'started' else             f"Queued {verb} for {response.get('job') or _where(args)}"
     if tool == 'get_setup_status':
         return 'read', 'Checked the setup status'
     if tool == 'validate_blender':

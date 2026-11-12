@@ -6,6 +6,16 @@ All notable changes to Assetarium are listed here. The project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Agents act freely, in the open** (decision 0029): a connected agent can start Make previews and Generate
+  descriptions (`start_processing`; a long job shows its estimate first), and its pack profiles apply at once,
+  including rules that rescan. Agent activity has a **Pause agents** switch (agent changes are refused, reads keep
+  working, jobs agents queued wait) and lists each agent session with **Undo all** for its tags, collections, pack
+  profiles and waiting jobs; anything changed since is kept and named. Jobs an agent started carry its name in
+  Asset processing. Connecting an agent now says what it may change on its own. CLI: `local-assets agents
+  status|pause|resume|undo` (interactive terminal only). Codex users add `start_processing` to `enabled_tools`.
+
 ### Changed
 
 - **Tooltips everywhere**: every icon button, non-obvious action and informative icon, badge or count shows a

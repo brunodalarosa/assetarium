@@ -197,13 +197,17 @@ def export_decisions(config):
     return value
 
 
+class Busy(ConfigError):
+    """The library folder has an operation running; the same request can succeed once it ends."""
+
+
 def _change_source_settings(config, key, change, busy_reason):
     from .gpu_queue import lease
     from .source_operations import active_operation
     source = get_source(config, key)
     scoped = bound(config, source)
     if active_operation(scoped):
-        raise ConfigError(busy_reason)
+        raise Busy(busy_reason)
     with lease(config, 'source-settings', resource='sources'):
         path = scoped.output_path('data', 'source.json')
         value = read_versioned(path, SOURCE_SETTINGS, 1)

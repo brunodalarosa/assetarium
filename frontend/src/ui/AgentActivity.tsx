@@ -1,13 +1,18 @@
-import { Bot, CircleSlash, Clock, Eye, MessageSquare, PencilLine, X } from "lucide-react";
+import { Bot, CircleSlash, Clock, Eye, MessageSquare, PencilLine, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { SPRING_LAYOUT, SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
-import { decideAgentProposal, setAgentOpen, useApp } from "../app/store";
+import { Switch } from "@/components/beui/switch";
+import { decideAgentProposal, setAgentOpen, setAgentsPaused, undoAgentSession, useApp } from "../app/store";
 import { IconButton, Pressable } from "./primitives";
 import { ProposalReview } from "./ProposalReview";
+
+/** Told before connecting (decision 0029, design principle P6): what an agent may change and where to control it. */
+export const AGENT_FREEDOM = "Your agent can reorganize packs, edit tags and collections, change settings and start processing on its own. "
+  + "Everything it does appears in Agent activity, where you can stop it, pause agents or undo a session.";
 
 const KIND = {
   read: { icon: Eye, tone: "text-muted-foreground" }, change: { icon: PencilLine, tone: "text-primary" },
@@ -15,6 +20,31 @@ const KIND = {
 } as const;
 
 const time = (utc: string) => new Date(utc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const day = (utc: string) => new Date(utc).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const KINDS: Record<string, [string, string]> = { tags: ["tag edit", "tag edits"], collection: ["collection edit", "collection edits"],
+  profile: ["pack profile", "pack profiles"], job: ["job", "jobs"] };
+const counts = (c: Record<string, number>) => Object.entries(c).map(([k, n]) => plural(n, ...(KINDS[k] || [k, k]))).join(" · ");
+
+/** One agent session (one connected run) with what it changed and Undo all (decision 0029). */
+function Session({ session, busy }: { session: Json; busy: boolean }) {
+  const undone = session.undone;
+  return (
+    <li className="agent-session flex items-center gap-2.5 rounded-xl bg-surface-2/70 px-3 py-2 text-[12.5px]" data-run={session.run_id}>
+      <Bot className="size-3.5 shrink-0 text-primary" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{session.agent || "Agent"} · {day(session.started_utc)}</span>
+        <span className="block truncate text-[11.5px] text-muted-foreground">{counts(session.counts)}
+          {undone ? ` · undone${undone.skipped.length ? `, ${undone.skipped.length} kept` : ""}` : ""}
+          {undone && session.to_undo > 0 ? ` · ${plural(session.to_undo, "new change", "new changes")}` : ""}</span>
+      </span>
+      {session.to_undo > 0 && (
+        <Pressable disabled={busy} className="flex shrink-0 items-center gap-1 text-[11.5px] font-medium text-primary hover:underline disabled:opacity-50"
+          tooltip="Takes back this agent's tags, collections, profiles and waiting jobs; settings stay as they are" onClick={() => undoAgentSession(session)}><Undo2 className="size-3.5" aria-hidden />{busy ? "Undoing…" : "Undo all"}</Pressable>
+      )}
+    </li>
+  );
+}
+
 const who = (connected: Json[]) => connected.map((c) => c.name).filter(Boolean).join(", ") || "an agent";
 
 /** The top bar's agent button: a breathing dot while an agent works, a count of proposals waiting for you. */
@@ -22,7 +52,7 @@ export function AgentButton() {
   const agent = useApp((s) => s.agent);
   const waiting = agent.proposals.length;
   const last = agent.entries[agent.entries.length - 1];
-  const label = `Agent activity${agent.working ? ", an agent is working" : ""}${waiting ? `, ${plural(waiting, "proposal", "proposals")} waiting` : ""}`;
+  const label = `Agent activity${agent.paused ? ", agents are paused" : ""}${agent.working ? ", an agent is working" : ""}${waiting ? `, ${plural(waiting, "proposal", "proposals")} waiting` : ""}`;
   return (
     <Pressable id="open-agent-activity" aria-label={label} side="bottom" tooltip={agent.open ? "Hides agent activity" : "Shows what your agent did here and the proposals waiting for you"} aria-haspopup="dialog" aria-expanded={agent.open} aria-controls="agent-activity-panel"
       data-agent-anchor="" data-working={agent.working ? "true" : "false"} onClick={() => setAgentOpen(!agent.open)}
@@ -32,7 +62,8 @@ export function AgentButton() {
         <Bot className="size-4.5" strokeWidth={1.75} aria-hidden />
         {agent.working && <span aria-hidden className="agent-pulse absolute -top-0.5 -right-0.5 size-2 rounded-full bg-primary" />}
       </span>
-      {agent.working && last ? <span className="hidden truncate md:inline">{last.text}</span> : <span className="hidden md:inline">Agent</span>}
+      {agent.paused ? <span id="agents-paused-label" className="hidden text-warning md:inline">Agents paused</span>
+        : agent.working && last ? <span className="hidden truncate md:inline">{last.text}</span> : <span className="hidden md:inline">Agent</span>}
       {waiting > 0 && <span id="agent-waiting-count" className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">{waiting}</span>}
     </Pressable>
   );
@@ -85,11 +116,25 @@ export function AgentActivityPanel() {
             <span aria-hidden className={cn("size-2 rounded-full", agent.connected.length ? (agent.working ? "agent-pulse bg-primary" : "bg-success") : "bg-border-strong")} />
             {agent.connected.length ? `${who(agent.connected)} ${agent.working ? "is working" : "is connected"}` : "No agent connected. Agents connect through Assetarium’s MCP server."}
           </p>
+          <div id="agent-pause" className={cn("mx-4 mb-3 flex items-center gap-3 rounded-2xl px-3 py-2.5", agent.paused ? "bg-warning-bg" : "bg-surface-2/70")}>
+            <span className="min-w-0 flex-1 text-[12px] text-muted-foreground">{agent.paused
+              ? "Agents are paused: their changes are refused and jobs they queued wait. They can still search and read."
+              : "Agents change things on their own; everything shows here, and you can undo a whole session."}</span>
+            <Switch checked={agent.paused} onCheckedChange={(value) => void setAgentsPaused(value)} label="Pause agents" ariaLabel="Pause agents" />
+          </div>
           <div className="min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 scroll-thin">
             {agent.proposals.length > 0 && (
               <section aria-labelledby="agent-proposals-title" className="mb-4 grid gap-2.5">
                 <h3 id="agent-proposals-title" className="px-2 text-[12.5px] font-semibold">Waiting for you</h3>
                 <div id="agent-proposals" className="grid gap-2.5"><ProposalReview proposals={agent.proposals} /></div>
+              </section>
+            )}
+            {agent.sessions.length > 0 && (
+              <section aria-labelledby="agent-sessions-title" className="mb-4 grid gap-1.5">
+                <h3 id="agent-sessions-title" className="px-2 text-[12.5px] font-semibold">Sessions that changed something</h3>
+                <ol id="agent-sessions" className="grid gap-1.5">
+                  {agent.sessions.map((session: Json) => <Session key={session.run_id} session={session} busy={agent.undoing === session.run_id} />)}
+                </ol>
               </section>
             )}
             <h3 className="px-2 pb-1.5 text-[12.5px] font-semibold">What agents did</h3>

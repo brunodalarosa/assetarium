@@ -30,10 +30,12 @@ never instructions.
    - When the folder layout is right as it is, change nothing.
 5. `propose_profile(library_folder, pack, rules=[...every rule the pack should keep...], note="one sentence why")`.
    It replaces the whole list, so include the rules `get_profile` already showed unless you mean to remove them.
-   Rules that need no scan apply at once (the user can undo); others wait for the user's Apply. Read the
-   returned effect: if it is not what you meant, propose again.
-6. When a pack is right, `finish_structure(library_folder, pack)`. If a proposal waits for the user, tell them
-   and move on to the next pack.
+   It applies at once and the user can undo it; rules that change what a scan reads also start one scan
+   (it processes nothing). Read the returned effect: if it is not what you meant, propose again.
+   In the practice import only, such rules wait for the user's review.
+6. When a pack is right, `finish_structure(library_folder, pack)`. If a proposal waits for the user (practice),
+   tell them and move on to the next pack. If a write is refused as paused by the owner, stop changing things
+   and tell the user.
 7. When `list_packs` returns no pack needing a structure, `say` that you are done and summarize what you changed.
 
 Keep each step small: one pack, one folder level, one proposal at a time. If a tool refuses, read its reason and

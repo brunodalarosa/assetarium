@@ -1,4 +1,5 @@
-import { Check, CircleAlert, Cpu, HardDrive, Monitor } from "lucide-react";
+import { Bot, Check, CircleAlert, Cpu, HardDrive, Monitor } from "lucide-react";
+import { AGENT_FREEDOM } from "./AgentActivity";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { Checkbox } from "@/components/beui/checkbox";
 import { Switch } from "@/components/beui/switch";
@@ -336,7 +337,8 @@ function AgentStep() {
   }, []);
   return (
     <>
-      <Paragraph>Assetarium has an MCP server: AI agents such as Claude Code or Codex can search your library, read pack structures and propose fixes, which you approve here. Add the configuration for your agent, then restart it. No agent? Skip this step; you can connect one any time from Settings → General.</Paragraph>
+      <Paragraph>Assetarium has an MCP server: AI agents such as Claude Code or Codex can search your library and organize it with you. Add the configuration for your agent, then restart it. No agent? Skip this step; you can connect one any time from Settings → General.</Paragraph>
+      <p id="agent-freedom" className="flex items-start gap-2 text-[12.5px] leading-relaxed text-muted-foreground"><Bot className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />{AGENT_FREEDOM}</p>
       {!agent ? <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status"><Spinner />Reading agent configurations…</p> : (
         <Card title="Add Assetarium to your agent">
           <div id="setup-agent-connect" className="grid gap-4">

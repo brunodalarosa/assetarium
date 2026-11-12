@@ -541,7 +541,23 @@ class DesktopBridge:
     def _agent_activity(self, since):
         from .agent_activity import recent
         from .pack_agent import proposals
-        return {**recent(self._config, since), 'proposals': proposals(self._config, 'pending')}
+        from .agent_sessions import paused, sessions
+        return {**recent(self._config, since), 'proposals': proposals(self._config, 'pending'),
+                'paused': paused(self._config), 'sessions': sessions(self._config)}
+
+    # Pause agents and Undo all for a session (decision 0029): owner gestures in Agent activity.
+    def agent_pause(self, value):
+        from .agent_sessions import set_paused
+        return self._wait(self._present(set_paused, self._config, bool(value), guarded=False))
+
+    def agent_session_undo(self, run_id):
+        return self._wait(self._present(self._agent_session_undo, run_id, guarded=False))
+
+    def _agent_session_undo(self, run_id):
+        from .agent_sessions import undo
+        result = undo(self._config, run_id)
+        result['operations'] = [self._start_source_operation('scan', key) for key in result['rescan']]
+        return result
 
     def agent_proposal(self, proposal_id, decision):
         return self._wait(self._present(self._agent_proposal, proposal_id, decision, guarded=False))

@@ -168,8 +168,12 @@ def _pending(config, source, pack):
     return {'id': row[0], 'utc': row[1]} if row else None
 
 
-def propose(config, args, client=None):
-    """Validate, measure and record an agent's profile; apply it at once when it needs no scan, else wait for the owner."""
+def propose(config, args, client=None, hold=False):
+    """Validate, measure, record and apply an agent's profile at once (decision 0029); the owner can undo it.
+
+    A profile that rescans starts one scan of the library folder (scans never process). ``hold`` keeps a rescanning
+    profile waiting for the owner's Apply instead: the practice import still walks through that review.
+    """
     from .library_store import now
     from .pack_profiles import RESCAN, _latest, effect, validate
     source = _source(config, args.get('library_folder'))
@@ -177,22 +181,53 @@ def propose(config, args, client=None):
     seen = effect(config, source['key'], pack, rules)
     if not seen['changed']:
         return {'status': 'unchanged', 'reason': 'These rules are already the pack profile'}
+    from .agent_sessions import current, note
+    session = current()
     agent = {'by': 'agent', **({'agent': client['name']} if client and client.get('name') else {}),
+             **({'session': session['run']} if session else {}),
              **({'note': args['note'].strip()[:SAY]} if isinstance(args.get('note'), str) and args['note'].strip() else {})}
     identifier = 'prop_' + uuid.uuid4().hex[:16]
-    instant = not set(seen['changed']) & set(RESCAN)
+    scans = bool(set(seen['changed']) & set(RESCAN))
     previous = _latest(config, source, pack)
+    held = scans and hold
+
+    def supersede(db):
+        db.execute("UPDATE proposals SET state='superseded', decided_utc=? WHERE folder_id=? AND pack=? AND state='pending' AND id<>?",
+                   (now(), source['id'], pack, identifier))
     with closing(_db(config)) as db, db:
-        db.execute("UPDATE proposals SET state='superseded', decided_utc=? WHERE folder_id=? AND pack=? AND state='pending'",
-                   (now(), source['id'], pack))
+        if held:
+            supersede(db)
         db.execute('INSERT INTO proposals VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', (identifier, source['id'], source['key'], pack,
                    json.dumps(rules), json.dumps(agent), json.dumps(seen), 'pending', now(), None, None, previous))
-    if instant:
+    if held:
+        return {'status': 'pending', 'proposal_id': identifier, 'effect': seen['lines'],
+                'note': 'Waits for the owner to Apply in the app (it rescans the library folder; nothing is processed).'}
+    try:
         result = decide(config, identifier, 'apply', approved='auto')
-        return {'status': 'applied', 'proposal_id': identifier, 'version': result['version'], 'effect': seen['lines'],
-                'note': 'Applied at once (no scan needed); the owner can undo it in the app.'}
-    return {'status': 'pending', 'proposal_id': identifier, 'effect': seen['lines'],
-            'note': 'Waits for the owner to Apply in the app (it rescans the library folder; nothing is processed).'}
+    except ConfigError:
+        # Refused (a running operation, a stale suggestion): apply saved nothing, so the proposal leaves no trace either.
+        with closing(_db(config)) as db, db:
+            db.execute('DELETE FROM proposals WHERE id=?', (identifier,))
+        raise
+    with closing(_db(config)) as db, db:
+        supersede(db)
+    note(config, 'profile', proposal=identifier, library_folder=source['key'], pack=pack)
+    payload = {'status': 'applied', 'proposal_id': identifier, 'version': result['version'], 'effect': seen['lines'],
+               'note': 'Applied at once; the owner can undo it in the app.'}
+    if result.get('rescan'):
+        from .source_operations import start, want_scan
+        try:
+            scan = start(config, 'scan', source['key'])
+        except ConfigError as exc:
+            scan = {'status': 'faulty', 'reason': str(exc)}
+        if scan.get('status') == 'busy':
+            want_scan(config, source['key'])  # Starts when the folder's running operation ends.
+        payload['scan'] = scan.get('status')
+        payload['note'] = {'started': 'Applied at once; a scan of the library folder started (it processes nothing). The owner can undo it.',
+                           'busy': 'Applied at once; the library folder is busy, so its scan starts when the running operation ends.'}.get(
+            scan.get('status'), 'Applied at once, but its scan could not start (' + str(scan.get('reason')) + '); the rules take effect '
+                                'at the next scan of this library folder.')
+    return payload
 
 
 def proposals(config, state='pending', limit=50):
@@ -242,8 +277,10 @@ def decide(config, identifier, decision, approved='owner', leave_out=()):
         if own is None:
             raise ConfigError('This proposal changed nothing, so there is nothing to undo')
         # Undo restores the version before it, so it is refused once anything changed since: it would erase that too.
+        # The rules decide, not the version number: undoing a later proposal first (Undo all) adds a version that
+        # brings this proposal's rules back, and this one may then be undone.
         from .sources import get_source
-        if versions[0]['version'] != own or _lanes(current(config, get_source(config, key), pack), version_rules(config, key, pack, own)):
+        if _lanes(current(config, get_source(config, key), pack), version_rules(config, key, pack, own)):
             raise ConfigError('This pack changed since this proposal, so undoing it would also undo those changes. '
                               'Undo the later changes first, or change the pack in its profile.')
         result, state = revert(config, key, pack, own - 1, {'by': 'owner', 'undid': identifier}), 'undone'
@@ -367,9 +404,9 @@ def counts(config, key):
             'scanning': _current(config, source) is None}
 
 
-def execute(config, name, args, client=None):
+def execute(config, name, args, client=None, hold=False):
     handlers = {'list_packs': lambda: list_packs(config, args), 'get_pack_outline': lambda: outline(config, args),
-                'get_profile': lambda: get_profile(config, args), 'propose_profile': lambda: propose(config, args, client),
+                'get_profile': lambda: get_profile(config, args), 'propose_profile': lambda: propose(config, args, client, hold),
                 'finish_structure': lambda: finish(config, args, client), 'say': lambda: say(args)}
     return handlers[name]()
 

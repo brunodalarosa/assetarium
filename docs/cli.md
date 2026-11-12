@@ -210,7 +210,15 @@ Replacing an existing export file asks the same way.
 
 ## Agents (MCP)
 
-Agents use the STDIO MCP server for search, asset detail, collections and tags
-([MCP setup](mcp/README.md)). The owner commands above are not MCP tools: sources and
-processing stay owner actions. Agents can apply setup values and pack rules that need no scan
-(labeled, noticed, undoable); the Blender path and pack rules that rescan are proposals you approve.
+Agents use the STDIO MCP server for search, asset detail, collections, tags, pack structure, setup values and
+processing ([MCP setup](mcp/README.md), decision 0029); the Blender path stays a proposal you approve, and
+deletions and retrying failures stay yours. Everything an agent changes is in the app's Agent activity.
+
+| Command | Does |
+| --- | --- |
+| `agents status` | Whether agents are paused, and the recent sessions that changed something (with their IDs) |
+| `agents pause` / `agents resume` | Refuse every agent change (reads keep working; jobs agents queued wait), or turn agents back on |
+| `agents undo SESSION` | Undo all of one session: tags, collections, pack profiles and waiting jobs; what changed since is kept |
+
+All three changes ask you to type `yes` and refuse to run without an interactive terminal, so an agent with a
+shell cannot run them.

@@ -1,7 +1,7 @@
 ---
 area: MCP
 tags: [system]
-code: [mcp_server.py, mcp_assets.AssetService, mcp_assets.bounded, search_policy.search_character_cap, asset_collections.py, asset_tags.py, scripts/asset-worker.py]
+code: [mcp_server.py, mcp_server.PAUSABLE, agent_sessions.py, mcp_assets.AssetService, mcp_assets.bounded, search_policy.search_character_cap, asset_collections.py, asset_tags.py, scripts/asset-worker.py]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -19,7 +19,13 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
   see [Agent setup sessions](Agent%20setup%20sessions.md)). Pack structure (decision 0035): `list_packs`,
   `get_pack_outline`, `get_profile` (read), `propose_profile`, `finish_structure`, `say` (`pack_agent.py`,
   dispatched by `Gateway.call` with the client's name; see [Pack profiles](../Sources%20and%20Catalog/Pack%20profiles.md)).
-  One prompt: `set_up_assetarium`.
+  Processing: `start_processing` (`processing_queue.add(by='agent')`). One prompt: `set_up_assetarium`.
+- Agent sessions (`agent_sessions.py`, decision 0029): `Gateway.call` runs an `mcp` server's calls inside
+  `agent_sessions.active(run_id)` (a context variable that `asyncio.to_thread` carries), and refuses `PAUSABLE`
+  tools while paused. The modules that save owner data journal each agent write inside their own lease
+  (`asset_tags.change`, `asset_collections._edit(subject=…)`, `pack_agent.propose`, `processing_queue.add`) to
+  `data/mcp/runs/<run>/journal.jsonl`; Undo all writes `undo.json` next to it. The app's own gateway (`gui`) is
+  never a session.
 - Semantic queries go to one private embedding worker (`scripts/asset-worker.py`, started on the
   first semantic query; only the desktop pre-starts its own). The worker returns query vectors only;
   verification, scoring and fusion stay in the server process (the Search embedders note).
@@ -39,10 +45,14 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
 - Existing Codex registrations list `enabled_tools` explicitly, so a new tool is invisible to them
   until added there; `register-mcp.py` refuses to overwrite an existing entry.
 - The MCP call log (`data/mcp/runs/<run>/calls.jsonl`) is what the app's Agent activity shows (`agent_activity.recent`); keep its fields stable.
-- Exception: [Agent practice](Agent%20practice.md) keeps its activity in the disposable session, never in the permanent call log.
+- Exception: [Agent practice](Agent%20practice.md) keeps its activity in the disposable session, never in the permanent call log,
+  and holds rescanning profiles for the owner's review (`pack_agent.execute(hold=True)`).
+- A new write that agents can make must journal itself through `agent_sessions.note` and have an undo, or Undo all
+  silently misses it (decision 0029 → Keep true).
 
 ## Gotchas
 
+- The session is a context variable, so it follows `asyncio.to_thread` but not a plain `threading.Thread`: an agent write made on a thread you start yourself is not journaled and Undo all misses it. Run such work through `asyncio.to_thread`, or enter `agent_sessions.active(run_id)` in the thread.
 - A preview reference, a successful render or an image transport test is not proof that the agent's
   model looked at the image.
 - MCP servers and desktop windows each run their own embedding worker and can contend for GPU memory;
