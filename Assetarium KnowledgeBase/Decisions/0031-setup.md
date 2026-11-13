@@ -3,7 +3,7 @@ tags: [decision]
 decided: 2026-11-07
 area: Setup and Engines
 replaces: [0014, 0016, 0026]
-code: [setup_core.py, setup_core.first_run, setup_core.save_setup, setup_core.check_blender, setup_agent.py, search_check.record, source_operations.search_check, source_operations.ensure_search_check, sources.include_samples, engines.search_readiness, settings.uses, frontend/src/ui/SetupWizard.tsx]
+code: [setup_core.py, setup_core.first_run, setup_core.save_setup, setup_core.check_blender, setup_core.keeps_inspections, setup_agent.py, search_check.record, source_operations.search_check, source_operations.ensure_search_check, sources.include_samples, engines.search_readiness, settings.uses, frontend/src/ui/SetupWizard.tsx]
 ---
 # 0031 — Setup: short checks that leave every core feature working
 
@@ -65,7 +65,8 @@ yourself** as equal paths; Settings → General offers **Run setup** and **Run s
 - **Blender** is saved as `[tools].blender` in `config.local.toml` by a minimal edit (keeps every other line and
   the line endings, re-parsed, replaced atomically; unusual TOML is refused with the line to add by hand), only
   after a passing check in the same process. A Blender that was only discovered is saved too. Changing it asks
-  first while the Blender path is part of the inspection key ([decision 0028](0028-result-identity.md)).
+  first only for another major version, the part of Blender in the inspection key
+  ([decision 0028](0028-result-identity.md)); a moved, reinstalled or minor-updated Blender saves without asking.
 - **`descriptions_enabled`** (default on). Off is enforced by the backend: Generate descriptions is refused, the
   caption stage does no work, no *ready to generate* notice. Existing descriptions stay stored and searchable;
   nothing is deleted or re-queued.
@@ -117,3 +118,7 @@ library. Agents with a shell can resolve what the wizard can only describe.
 - Rules live in `setup_core` and the backend, identical for app, CLI and agent.
 - An unchecked Blender path is never written; an agent only proposes one.
 - Turning descriptions off never deletes, hides or re-queues results.
+
+## Changes
+
+- 2026-11-13: changing Blender asks to confirm a re-render only for another major version ([decision 0028](0028-result-identity.md), E7).

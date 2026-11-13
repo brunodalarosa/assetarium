@@ -28,8 +28,8 @@ A short list of actions stays owner-only.
 | Control | — | **Pause agents**, Undo, Stop |
 
 Why recheck stays owner-only: failures are retried only on the owner's explicit request (`AGENTS.md` → Fault
-handling); an agent may suggest a recheck. Why the Blender path stays owner-only: it decides which program Assetarium runs, and a change re-renders every
-3D asset until it is keyed by version ([decision 0028](0028-result-identity.md)). Installs and
+handling); an agent may suggest a recheck. Why the Blender path stays owner-only: it decides which program Assetarium runs, and another major version
+re-renders every 3D asset ([decision 0028](0028-result-identity.md)). Installs and
 downloads never happen inside Assetarium; an agent with its own shell runs them with the user's approval there.
 
 ## In the open: what the owner always has
@@ -87,3 +87,4 @@ directly. Say so rather than claiming more.
 
 - 2026-11-07: named the export-folder groups and the texture folder as agent-applicable pack rules (0019, 0021 updated to match), and made recheck owner-only (PR review).
 - 2026-11-11: built the rest (agent processing, rescanning profiles at once, Pause agents, Undo all, the sentence before connecting); Undo all named as covering tags, collections, profiles and waiting jobs, not settings; removed the Today and target table.
+- 2026-11-13: the Blender path reason now says only another major version re-renders (decision 0028, E7).

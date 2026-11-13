@@ -23,7 +23,7 @@ from .publication import atomic_json, generation, line_ending_hashes, read_only
 from .store_versions import checked
 from .captions import file_hash, image_inputs, input_state
 from .caption_quality import caption_summary
-from .inspection import choose_source, discover_blender, validate_result
+from .inspection import blender_major, choose_source, discover_blender, validate_result
 
 STAGES = ("inspection", "caption", "embeddings")
 COVERAGE_STAGES = ('inventory','inspection','previews','caption','embeddings')
@@ -158,14 +158,20 @@ def inspection_input(config, record, resolution=640, content_only=False, formats
     code = config.project_root / "src/local_asset_library"
     files = {"worker": code / "blender_worker.py", "render_math": code / "render_math.py"}
     worker = file_hash(files["worker"])
+    # Blender by major version only: where it is installed never changes a render (decision 0028, E7).
     settings = {"source": content, "resolution": resolution,
         "worker": EQUIVALENT_WORKERS.get(worker, worker), "render_math": file_hash(files["render_math"]),
-        "blender": str(config.blender), "blender_mtime": config.blender.stat().st_mtime_ns if config.blender and config.blender.exists() else None}
+        "blender_major": blender_major(config)}
     if repair:
         files['repair_worker'] = code / ('blender_shared_dependency_worker.py' if repair.get('kind') == 'shared_dependency_paths'
                                         else 'blender_repair_worker.py')
         settings['repair_worker'] = file_hash(files['repair_worker'])
-    return asset, source, reason, recorded_fingerprint(settings, files, recorded, EQUIVALENT_WORKERS)
+    current = recorded_fingerprint(settings, files, recorded, EQUIVALENT_WORKERS)
+    if recorded and current != recorded:
+        from .library_migration import recognized
+        if recognized(config, settings, files, recorded, EQUIVALENT_WORKERS):
+            return asset, source, reason, recorded
+    return asset, source, reason, current
 
 
 def recorded_fingerprint(value, files, recorded=None, equivalents=None):

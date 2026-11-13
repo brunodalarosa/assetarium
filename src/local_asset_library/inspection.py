@@ -2,11 +2,14 @@
 
 from contextlib import closing
 from datetime import datetime, timezone
+import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import subprocess
+import threading
 import time
 
 from .catalog import detail, encoded, file_hash, save_json
@@ -102,6 +105,106 @@ def discover_blender(config):
             save_json(config.output_path("data", "inspection/blender-runtime.json"), probe)
             return path.resolve(), probe
     raise ConfigError("No usable installed Blender; see discovery attempts before considering a project-local portable release: " + encoded(attempts))
+
+
+BLENDER_VERSION = re.compile(r"Blender (\d+)\.(\d+)(?:\.(\d+))?")
+_versions, _versions_lock = {}, threading.Lock()
+
+
+class BlenderVersionError(RuntimeError):
+    """The configured Blender's version is unknown: a visible fault, never a guessed key input.
+
+    Not a ValueError, so key computation never turns it into a per-asset precondition fault."""
+
+
+def blender_versions_path(config):
+    return Path(config.project_root) / "data/inspection/blender-versions.json"
+
+
+def _executable(path):
+    """(path as configured, size, mtime): what a remembered Blender is recognized by."""
+    info = Path(path).stat()
+    return str(Path(path)), info.st_size, info.st_mtime_ns
+
+
+def remembered_blenders(config):
+    """Every Blender executable this checkout has seen, with the version it reported (decision 0028)."""
+    path = blender_versions_path(config)
+    try:
+        stamp = path.stat()
+    except FileNotFoundError:
+        return []
+    cached = _versions.get(("file", str(path)))
+    if cached and cached[0] == (stamp.st_mtime_ns, stamp.st_size):
+        return cached[1]
+    try:
+        entries = json.loads(path.read_text(encoding="utf-8"))["executables"]
+        for entry in entries:
+            if not (isinstance(entry["path"], str) and isinstance(entry["size"], int) and isinstance(entry["mtime_ns"], int)
+                    and BLENDER_VERSION.fullmatch("Blender " + entry["version"])):
+                raise ValueError("invalid entry")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise BlenderVersionError(f"{path} is unreadable ({exc}); it lists the Blender versions finished 3D "
+                                  "inspections were keyed with, so restore it rather than delete it") from exc
+    _versions[("file", str(path))] = ((stamp.st_mtime_ns, stamp.st_size), entries)
+    return entries
+
+
+def remember_blender(config, path, version):
+    """Record ``version`` for this executable (path, size, mtime); written once per executable.
+
+    The read, merge and write hold an interprocess lease: the app and an MCP/CLI process appending at once
+    must not drop each other's entry, or that Blender's old keys stop being recognized after it moves."""
+    from .gpu_queue import lease
+    from .publication import atomic_json
+    name, size, mtime = _executable(path)
+    try:
+        with _versions_lock, lease(config, "blender-versions", resource="blender_versions"):
+            _versions.pop(("file", str(blender_versions_path(config))), None)  # Read what the last holder wrote.
+            entries = remembered_blenders(config)
+            if any((e["path"], e["size"], e["mtime_ns"], e["version"]) == (name, size, mtime, version) for e in entries):
+                return
+            entry = {"path": name, "size": size, "mtime_ns": mtime, "version": version,
+                     "seen_utc": datetime.now(timezone.utc).isoformat()}
+            atomic_json(blender_versions_path(config), {"schema_version": 1, "executables": entries + [entry]})
+    except ConfigError as exc:  # The lease stayed busy: a visible fault, never a key without its history.
+        raise BlenderVersionError(f"Could not record Blender {version} for {name}: {exc}") from exc
+
+
+def blender_version(config, path=None):
+    """The full version the configured Blender (or ``path``) reports, e.g. "5.2.2"; None when there is no file.
+
+    ``blender --version`` runs at most once per executable (path, size, mtime): the answer is remembered
+    in data/inspection/blender-versions.json, which also lets old keys survive a move (library_migration).
+    """
+    path = config.blender if path is None else path
+    if not path or not Path(path).is_file():
+        return None
+    try:
+        name, size, mtime = _executable(path)
+    except OSError as exc:
+        raise BlenderVersionError(f"{path} could not be read ({exc}); check it in Settings") from exc
+    known = _versions.get((name, size, mtime)) or next(
+        (e["version"] for e in remembered_blenders(config) if (e["path"], e["size"], e["mtime_ns"]) == (name, size, mtime)), None)
+    if known is None:
+        try:
+            result = run_process([name, "--version"], config.project_root, environment(config), 30)
+        except OSError as exc:  # Not launchable (damaged, no execute permission): the same fault as no version.
+            raise BlenderVersionError(f"{name} could not be started ({exc}); check it in Settings") from exc
+        found = BLENDER_VERSION.search(result["output"])
+        if result["timed_out"] or result["returncode"] or not found:
+            raise BlenderVersionError(f"{name} did not report a Blender version (exit code {result['returncode']}"
+                                      f"{', timed out' if result['timed_out'] else ''}); check it in Settings")
+        known = ".".join(g for g in found.groups() if g)
+        remember_blender(config, name, known)
+    _versions[(name, size, mtime)] = known
+    return known
+
+
+def blender_major(config, path=None):
+    """The major version 3D inspection keys hold (decision 0028, E7): 5.1 and 5.5 render alike."""
+    version = blender_version(config, path)
+    return int(version.split(".")[0]) if version else None
 
 
 def source_evidence(config, assets, additional=()):

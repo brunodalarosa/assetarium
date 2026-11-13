@@ -3,7 +3,7 @@ tags: [decision]
 decided: 2026-11-07
 area: Processing
 replaces: [0004, 0007, 0014, 0015, 0022, 0023]
-code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, result_store.adopt, result_store.location_free, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py]
+code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, inspection.blender_major, library_migration.recognized, library_migration.legacy_inspection_input, result_store.adopt, result_store.location_free, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
 ---
 # 0028 — Result identity: what makes finished work run again
 
@@ -21,7 +21,7 @@ An exception that is not on this list is a bug.
 
 | Result | In the key | Never in the key |
 | --- | --- | --- |
-| **3D inspection** (views, technical facts) | Source content and format; each required dependency's content and path *relative to the model*; texture-repair recipe (location-free); resolution; `blender_worker.py` (through `EQUIVALENT_WORKERS`), `render_math.py`, the repair worker when one applies; **Blender path and its executable's mtime** (see [Over-keyed](#over-keyed-blender-path)) | Asset ID, pack, absolute path, library folder; render device; renders at a time; the kept-open host process |
+| **3D inspection** (views, technical facts) | Source content and format; each required dependency's content and path *relative to the model*; texture-repair recipe (location-free); resolution; `blender_worker.py` (through `EQUIVALENT_WORKERS`), `render_math.py`, the repair worker when one applies; **Blender's major version** as it reports it (see [Blender](#blender-major-version-only)) | Asset ID, pack, absolute path, library folder; Blender's install path, minor and patch version (E7); render device; renders at a time; the kept-open host process |
 | **2D image inspection** | Content of every available file; chosen format; adapter version; image policy; its code files; SVG renderer version for SVG | Path, name, asset ID |
 | **Description** (built-in engine) | View image contents (not paths); model id and revision; prompt bytes; `caption_backend.py`; `runtime/caption/uv.lock`; generation policy; `caption_batching.py` for batched work | Batch size; which assets shared the batch; the engine configured today |
 | **Description** (local-server engine) | View contents; the engine identity **the server reports** (engine, model); adapter file hash; prompt; policy | The model file's bytes |
@@ -58,19 +58,25 @@ means hashing the bytes again.
 | E4 | **File identity instead of bytes** (see [Verifying files](#verifying-files)). | A tool that rewrites NTFS ChangeTime on purpose can hide a same-size edit. | Re-hashing ~20,000 files on every search cost 7–35 s. | Run a `require_fresh()` byte audit. |
 | E5 | **Line endings.** | None in practice: an LF/CRLF-only difference in a fingerprinted file is ignored. | A CRLF checkout nearly re-queued 11,635 results. | Any other byte change still counts. |
 | E6 | **Proven-equivalent worker edits.** | An edit to `blender_worker.py` keeps old keys. | Only when `scripts/check-render-stability.py` shows identical CPU renders. | `EQUIVALENT_WORKERS` lists each mapping. |
+| E7 | **Blender minor and patch version.** 5.1 and 5.5 produce the same key. | A rendering or importer change within one major version goes unnoticed: a few pixels, a triangle count, or a file that now imports (or no longer does) keeps its old result or fault. | Cycles and the Standard view are pinned, so minor releases render near-identically; re-rendering then re-describing the library costs hours (owner, November 13, 2026). | Every result records the full version (`technical.blender_version`). |
 
 **Why devices differ between renders and vectors:** vectors from CPU and CUDA measurably differ (0.998 cosine)
 and one index cannot mix them, so search keys the device (E1 does not apply to vectors). Previews stand alone.
 
-## Over-keyed: Blender path
+## Blender: major version only
 
-The Blender **path** and its executable's mtime are in the inspection key. Moving, reinstalling or updating
-the same Blender re-renders every 3D asset, although the path alone changes no pixel.
+3D inspection keys hold the **major version** Blender reports (`inspection.blender_major`), never where it is
+installed: moving, reinstalling or a minor update (5.1 → 5.5) re-renders nothing; 6.x renders anew (E7).
+Setup asks to confirm a re-render only for another major version (`setup_core.keeps_inspections`).
 
-**Owner direction (November 7, 2026):** key Blender by its **version** (what it reports), not by where it is
-installed. This needs a code change that re-keys existing results so nothing is re-queued, and
-the setup confirmation then asks only when the version changes. **Not implemented yet**; until it is, the path
-stays in the key and setup keeps asking before saving a different Blender.
+- **Versions are remembered.** `blender --version` runs once per executable (path, size, mtime); the answer is
+  kept in the ignored `data/inspection/blender-versions.json`. Never at app startup: only when a key is computed
+  or setup checks a Blender.
+- **Older keys** held the install path and its mtime. They stay current, never re-keyed or re-queued: an old key
+  that matches any remembered Blender of today's major version counts (`library_migration.recognized`). A
+  Blender never seen by this checkout cannot be recognized, so after upgrading, let the app compute keys once
+  (open it, scan or process) before moving Blender. Deleting the file loses that memory for moved Blenders.
+- A damaged file or a Blender that reports no version is a visible fault, never a guessed key.
 
 ## The quick answer: what re-queues work?
 
@@ -81,7 +87,7 @@ stays in the key and setup keeps asking before saving a different Blender.
   workers, caption prompts, `caption_backend.py`, `caption_batching.py`, the image code files, the embedding
   adapter, any `runtime/*/uv.lock`.
 - The caption model revision changes.
-- The Blender path or executable changes (until the version change above lands).
+- Blender changes major version (5.x → 6.x).
 - Search device switches between `cpu` and `cuda` (search data only).
 - A format is turned off and an asset's previews came from it while another of its formats is on: it becomes
   pending from that format ([decision 0030](0030-counted-exclusions.md); not built yet). Its old results are kept,
@@ -89,17 +95,18 @@ stays in the key and setup keeps asking before saving a different Blender.
 
 **Does not run again (on purpose):**
 - A file moves, is renamed, duplicated or reorganized; a folder joins or splits.
+- Blender moves, is reinstalled or gets a minor or patch update (E7).
 - Render device, renders at a time, batch size, search threads, or the configured engine changes: finished
   work is checked against what it recorded.
-- A fingerprint **definition** changes: existing results are re-keyed, never re-queued.
+- A fingerprint **definition** changes: existing results are recognized or re-keyed, never re-queued.
 - An unchanged failure: it is kept and skipped, never retried automatically.
 
 ## Keep true
 
 - Keys hold inputs, never locations or IDs. New result kinds get a row in the table above.
 - An input left out of a key needs a new row in the exceptions table, with its risk, before it ships.
-- Changing how a key is computed re-keys existing results, never re-queues them. The change ships its own
-  re-keying code and a check, run on copies of real ledgers, that nothing becomes newly pending.
+- Changing how a key is computed never re-queues existing results: old keys are recognized
+  (`library_migration.recognized`) or re-keyed, proven by `scripts/check-rekey.py` on copies of real ledgers.
 - Switching an engine, device or performance setting never invalidates another engine's or device's
   finished results.
 - Engine refactors keep fingerprints (`scripts/check-engine-stability.py --compare`).
@@ -107,3 +114,4 @@ stays in the key and setup keeps asking before saving a different Blender.
 ## Changes
 
 - 2026-11-10: the Keep true line on re-keying no longer names code. The only re-keying code translated 0.1.0 keys and was removed with the 0.1.0 migration (owner: 0.2.0 is a fresh start; migrations are supported from 0.2.0 on).
+- 2026-11-13: Blender is keyed by major version, not path and mtime (E7, owner); the Over-keyed section became [Blender: major version only](#blender-major-version-only). The Keep true line on key changes names `library_migration.recognized` and `scripts/check-rekey.py`.

@@ -1,7 +1,7 @@
 ---
 area: Processing
 tags: [system]
-code: [inspection.discover_blender, blender_worker.py, blender_batch_worker.py, render_pool.plan, render_pool.run, render_pool.RECYCLE_AFTER, render_devices.run, render_devices.STEPS, render_math.py, data/library/rendering.json]
+code: [inspection.discover_blender, inspection.blender_version, blender_worker.py, blender_batch_worker.py, render_pool.plan, render_pool.run, render_pool.RECYCLE_AFTER, render_devices.run, render_devices.STEPS, render_math.py, data/library/rendering.json]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -25,6 +25,9 @@ scripts disabled, measures it and renders preview views. Start at `incremental.r
   memory (measured by the speed test when available).
 - Blender is the saved `[tools].blender` in `config.local.toml`. `inspection.discover_blender` finds
   one for processing when none is saved, but the speed test and render pool use the saved one only.
+- Inspection keys hold the saved Blender's **major version** only (decision 0028, E7). `inspection.blender_version`
+  runs `blender --version` once per executable (path, size, mtime) and remembers the answer in
+  `data/inspection/blender-versions.json`; with no saved Blender the key holds none.
 
 ## Rules
 
@@ -36,6 +39,8 @@ scripts disabled, measures it and renders preview views. Start at `incremental.r
 
 ## Gotchas
 
+- A Blender that reports no version raises `BlenderVersionError`, a `RuntimeError` on purpose: the pending pass
+  turns `ValueError`s into per-asset precondition keys, which would quietly re-queue the whole library.
 - A discovered but unsaved Blender looked "unchanged" to setup until October 28, 2026, so the speed
   test stayed blocked on a fresh clone; setup now writes a discovered Blender after its check.
 - The desktop's launch `Config` is frozen; `config.with_saved_blender` lets the speed test read a

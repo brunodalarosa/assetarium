@@ -737,7 +737,8 @@ def wizard(args, config):
         show_checks(args, result)
         if result['status'] in {'passed', 'warning'}:
             choices['blender_path'] = path
-            if setup_core.blender_change(config, path) == 'write' and blender['processed_models']:
+            if (setup_core.blender_change(config, path) == 'write' and blender['processed_models']
+                    and not setup_core.keeps_inspections(config, result['version'])):
                 say(args, f"   Changing Blender marks {blender['processed_models']:,} finished 3D inspections as needing processing again.")
                 choices['confirm_rerender'] = ask('   Accept that? (yes/no)', 'no').lower() == 'yes'
                 if not choices['confirm_rerender']:
