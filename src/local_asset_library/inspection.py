@@ -151,16 +151,24 @@ def remembered_blenders(config):
 
 
 def remember_blender(config, path, version):
-    """Record ``version`` for this executable (path, size, mtime); written once per executable."""
+    """Record ``version`` for this executable (path, size, mtime); written once per executable.
+
+    The read, merge and write hold an interprocess lease: the app and an MCP/CLI process appending at once
+    must not drop each other's entry, or that Blender's old keys stop being recognized after it moves."""
+    from .gpu_queue import lease
     from .publication import atomic_json
     name, size, mtime = _executable(path)
-    with _versions_lock:
-        entries = remembered_blenders(config)
-        if any((e["path"], e["size"], e["mtime_ns"], e["version"]) == (name, size, mtime, version) for e in entries):
-            return
-        entry = {"path": name, "size": size, "mtime_ns": mtime, "version": version,
-                 "seen_utc": datetime.now(timezone.utc).isoformat()}
-        atomic_json(blender_versions_path(config), {"schema_version": 1, "executables": entries + [entry]})
+    try:
+        with _versions_lock, lease(config, "blender-versions", resource="blender_versions"):
+            _versions.pop(("file", str(blender_versions_path(config))), None)  # Read what the last holder wrote.
+            entries = remembered_blenders(config)
+            if any((e["path"], e["size"], e["mtime_ns"], e["version"]) == (name, size, mtime, version) for e in entries):
+                return
+            entry = {"path": name, "size": size, "mtime_ns": mtime, "version": version,
+                     "seen_utc": datetime.now(timezone.utc).isoformat()}
+            atomic_json(blender_versions_path(config), {"schema_version": 1, "executables": entries + [entry]})
+    except ConfigError as exc:  # The lease stayed busy: a visible fault, never a key without its history.
+        raise BlenderVersionError(f"Could not record Blender {version} for {name}: {exc}") from exc
 
 
 def blender_version(config, path=None):
@@ -172,11 +180,17 @@ def blender_version(config, path=None):
     path = config.blender if path is None else path
     if not path or not Path(path).is_file():
         return None
-    name, size, mtime = _executable(path)
+    try:
+        name, size, mtime = _executable(path)
+    except OSError as exc:
+        raise BlenderVersionError(f"{path} could not be read ({exc}); check it in Settings") from exc
     known = _versions.get((name, size, mtime)) or next(
         (e["version"] for e in remembered_blenders(config) if (e["path"], e["size"], e["mtime_ns"]) == (name, size, mtime)), None)
     if known is None:
-        result = run_process([name, "--version"], config.project_root, environment(config), 30)
+        try:
+            result = run_process([name, "--version"], config.project_root, environment(config), 30)
+        except OSError as exc:  # Not launchable (damaged, no execute permission): the same fault as no version.
+            raise BlenderVersionError(f"{name} could not be started ({exc}); check it in Settings") from exc
         found = BLENDER_VERSION.search(result["output"])
         if result["timed_out"] or result["returncode"] or not found:
             raise BlenderVersionError(f"{name} did not report a Blender version (exit code {result['returncode']}"

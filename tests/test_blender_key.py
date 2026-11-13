@@ -6,6 +6,9 @@ Blender of the same major version, and setup asks to re-render only across major
 from contextlib import closing
 from dataclasses import replace
 import json
+from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
@@ -15,6 +18,7 @@ from local_asset_library.library_migration import legacy_inspection_input
 from local_asset_library.membership import records
 from test_incremental import library  # noqa: F401  (fixture)
 
+REAL_RUN_PROCESS = inspection.run_process
 VERSIONS = {'a': 'Blender 5.1.0', 'b': 'Blender 5.5.2\nbuild hash: synthetic', 'c': 'Blender 6.0.0', 'bad': 'Python 3.13.0'}
 
 
@@ -104,6 +108,59 @@ def test_an_unreadable_version_is_a_visible_fault_not_a_precondition(library, bl
     inspection._versions.clear()  # Another process, reading the damaged file.
     with pytest.raises(inspection.BlenderVersionError, match='restore it'):
         keys(config, blenders['a'])
+
+
+def test_a_blender_that_cannot_start_stops_processing_and_keeps_finished_work(library, blenders, monkeypatch):
+    config, _ = library
+    monkeypatch.setattr(incremental, 'run_inspection', lambda c, r, fp, resolution=640, formats=None: {'status': 'complete'})
+    monkeypatch.setattr(render_devices, 'ensure', lambda *a, **k: None)
+    before = replace(config, blender=blenders['a'])
+    process(before, 'inspection', 6)
+    work = working(before)
+    with closing(ledger(before)) as db, db:
+        for record in records(work):
+            db.execute("UPDATE jobs SET fingerprint=? WHERE asset_id=? AND stage='inspection'",
+                       (legacy_inspection_input(work, record)[3], record['asset_id']))
+        finished = db.execute("SELECT asset_id, fingerprint, status FROM jobs WHERE stage='inspection' ORDER BY 1").fetchall()
+    damaged = blenders['a'].parent.parent / 'damaged' / 'blender.exe'
+    damaged.parent.mkdir()
+    damaged.write_bytes(b'not a program')  # Real launch: WinError 193 on Windows, PermissionError elsewhere.
+    monkeypatch.setattr(inspection, 'run_process', REAL_RUN_PROCESS)
+    for dry_run in (True, False):
+        with pytest.raises(inspection.BlenderVersionError, match='could not be started'):
+            process(replace(config, blender=damaged), 'inspection', 6, dry_run=dry_run)
+    with closing(ledger(before)) as db:
+        assert db.execute("SELECT asset_id, fingerprint, status FROM jobs WHERE stage='inspection' ORDER BY 1").fetchall() == finished
+
+
+WRITER = r'''
+import sys, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from local_asset_library import inspection
+class Config:
+    project_root = Path(sys.argv[2])
+    def output_path(self, area, relative):
+        return self.project_root / area / relative
+read = inspection.remembered_blenders
+def slow(config):
+    entries = read(config)
+    time.sleep(1.5)  # Long enough for the other writer to read the same old list without a lease.
+    return entries
+inspection.remembered_blenders = slow
+inspection.remember_blender(Config(), sys.argv[3], '5.2.2')
+'''
+
+
+def test_concurrent_processes_keep_every_remembered_blender(tmp_path, blenders):
+    root = tmp_path / 'checkout'
+    root.mkdir()
+    src = str(Path(inspection.__file__).parents[1])
+    writers = [subprocess.Popen([sys.executable, '-c', WRITER, src, str(root), str(blenders[name])])
+               for name in ('a', 'b')]
+    assert [w.wait(timeout=60) for w in writers] == [0, 0]
+    saved = json.loads((root / 'data/inspection/blender-versions.json').read_text(encoding='utf-8'))['executables']
+    assert sorted(e['path'] for e in saved) == sorted([str(blenders['a']), str(blenders['b'])])
 
 
 def test_no_blender_configured_keeps_a_key(library, blenders):
