@@ -45,7 +45,8 @@ read it first. Up: [Notebook](Notebook.md).
   `asset_structure`, `image_catalog`, `membership`, `recheck`, `texture_folders`. The October 14
   migration script was removed in November 2026; in git history at commit `af02e91`. See [Sources and Catalog](Sources%20and%20Catalog/Sources%20and%20Catalog.md).
 - **Processing:** `incremental` (stage ledger and publication), `result_store` (results keyed by
-  inputs, the result index, reuse for duplicates and moved files), `processing_queue` (Make
+  inputs, the result index, reuse for duplicates and moved files), `library_migration` (old key definitions,
+  recognized so finished work is never re-queued; proven by `scripts/check-rekey.py`), `processing_queue` (Make
   previews / Generate descriptions queue), `inspection`, `blender_worker`,
   `blender_batch_worker`, `render_pool`, `render_devices`, `render_math`, `texture_repair`,
   `blender_repair_worker`, `blender_shared_dependency_worker`, `dependency_resolution`,

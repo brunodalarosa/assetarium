@@ -30,7 +30,7 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
   dependency fingerprint, attempted state and outcome; the ledger keeps append-only history.
 - The **inspection** fingerprint hashes the source content, the render resolution, the raw bytes of
   `blender_worker.py` and `render_math.py` (plus the repair worker when a texture repair applies),
-  **the Blender path and its executable's mtime**. The **caption** fingerprint covers the prompt
+  and **Blender's major version** (decision 0028, E7; read once per executable by `inspection.blender_major`). The **caption** fingerprint covers the prompt
   bytes (`prompts/caption-v*.txt`), `caption_backend.py`, `caption_batching.py` and the caption
   runtime lock. The **embedding** contract covers the adapter and the embedding runtime lock.
 - Readiness uses saved outcomes: failed or unsupported stages block dependent work; other unfinished
@@ -38,10 +38,14 @@ when its fingerprint changes. Start at `incremental.inspection_input` and `incre
 
 ## Rules
 
-- **A fingerprint-definition change re-keys, never re-queues** (decision 0028). No re-keying code exists right
-  now: the one for the 0.1.0 → store move left with that move in November 2026 (commit `af02e91` has it). What it taught: recompute the old fingerprint verbatim, give the new key only to a
-  row the old one still matches, leave stale rows pending, and translate a stale *failed* row's `fault_content`
-  or the unchanged fault looks changed and is retried. Prove it on copies of the ledgers before shipping.
+- **A fingerprint-definition change never re-queues** (decision 0028). Either recognize old keys, as
+  `library_migration.recognized` does for the old Blender path+mtime key (the ledger keeps the old key), or
+  re-key: recompute the old fingerprint verbatim, give the new key only to a row the old one still matches, leave
+  stale rows pending, and translate a stale *failed* row's `fault_content` or the unchanged fault looks changed
+  and is retried (the 0.1.0 re-keying, commit `af02e91`). Prove it with `scripts/check-rekey.py` on copies of real
+  ledgers before shipping; keep its `legacy_*` definition verbatim.
+- **Old keys can only be recognized for a Blender the checkout has seen.** The old key hashed the install path
+  and mtime, which results do not record, so `data/inspection/blender-versions.json` is the only memory of them.
 
 - **Editing a fingerprinted file re-queues every finished result that depends on it.** That covers
   `blender_worker.py`, `render_math.py`, the repair workers, caption code and prompts, the embedding

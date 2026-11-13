@@ -18,6 +18,12 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- **Moving or updating Blender no longer re-renders your 3D assets** (decision 0028): previews are keyed by
+  Blender's major version, not where it is installed. A moved, reinstalled or minor-updated Blender (5.1 → 5.5)
+  keeps every finished preview, and setup asks to confirm a re-render only for another major version (5.x → 6.x).
+  Previews made before keep counting as finished once the app has seen that Blender, so open the app (or scan)
+  once after upgrading, before you move Blender.
+
 - **Tooltips everywhere**: every icon button, non-obvious action and informative icon, badge or count shows a
   tooltip on hover and keyboard focus that says what it is or what will happen (the variant count on asset cards,
   queue controls, folder actions, setup steps…). Native browser tooltips are gone outside the 3D viewer; truncated names and

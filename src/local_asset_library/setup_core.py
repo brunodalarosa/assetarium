@@ -371,6 +371,11 @@ def validate_blender(config, path):
     result = end(status)
     if result['status'] in {'passed', 'warning'}:
         _validated[_identity(candidate)] = {'status': status, 'version': version}
+        from .inspection import BlenderVersionError, remember_blender
+        try:
+            remember_blender(config, candidate, version)  # Spares inspection keys a second --version run.
+        except (OSError, BlenderVersionError):
+            pass  # The check stands; keys read the version themselves and report a damaged list there.
     return result
 
 
@@ -434,12 +439,34 @@ def blender_change(config, path):
     return 'unchanged' if configured and _same(path, configured) else 'write'
 
 
+def keeps_inspections(config, version):
+    """Whether saving a Blender that reports ``version`` keeps finished 3D inspections current.
+
+    Their keys hold only Blender's major version (decision 0028, E7): moving, reinstalling or a minor update
+    re-renders nothing. The saved Blender's version is read (once per executable) or, when that file is gone,
+    taken from the Blenders this checkout remembers at that path. Unknown means a re-render is possible.
+    """
+    from .inspection import BlenderVersionError, blender_major, remembered_blenders
+    fresh, configured, _ = configured_blender(config)
+    if not configured or not version:
+        return False
+    try:
+        current = blender_major(fresh)
+        if current is None:
+            known = [e for e in remembered_blenders(fresh) if e['path'] == str(Path(configured))]
+            current = int(known[-1]['version'].split('.')[0]) if known else None
+    except BlenderVersionError:
+        return False
+    return current == int(version.split('.')[0])
+
+
 def check_blender(config, path):
     """validate_blender plus what saving it would do ('unchanged' or 'write') and what that re-renders."""
     result = validate_blender(config, path)
     if result['status'] in {'passed', 'warning'}:
         change = blender_change(config, result['path'])
-        result.update(change=change, rerender=processed_models(config) if change == 'write' else 0)
+        count = processed_models(config) if change == 'write' else 0
+        result.update(change=change, rerender=count if count and not keeps_inspections(config, result['version']) else 0)
     return result
 
 
@@ -451,7 +478,8 @@ def blender_plan(config, path, confirm_rerender=False):
     if change == 'write':
         if (_cached(path) or {}).get('status') not in {'passed', 'warning'}:
             raise ConfigError('Check this Blender executable before saving it')
-        if confirm_rerender is not True and processed_models(config):
+        if (confirm_rerender is not True and processed_models(config)
+                and not keeps_inspections(config, _cached(path).get('version'))):
             raise ConfigError('Confirm that finished previews will be rendered again with the new Blender')
     return change
 

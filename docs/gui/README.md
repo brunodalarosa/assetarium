@@ -271,7 +271,7 @@ downloads, installs, processes or starts a model. *Welcome* shows the system, GP
 (NVIDIA with VRAM and driver; other adapters by name) and free space. *Blender* lists
 discovered executables and **Choose executable…**; **Check Blender** runs the version,
 headless-start and importer checks (Cancel stops the probe), says when saving writes
-nothing (only for the Blender already saved; a discovered one is always written), and asks to confirm when a change would re-render finished 3D previews.
+nothing (only for the Blender already saved; a discovered one is always written), and asks to confirm only when a change would re-render finished 3D previews: another major version (5.x → 6.x), never a moved, reinstalled or minor-updated Blender.
 *Formats* suggests formats per target engine. *Storage budget* explains exactly what is
 counted, shows free space and current use (newest receipt or **Measure now**), presets
 with a recommendation and a whole-GiB field. *Descriptions* turns them on or off and

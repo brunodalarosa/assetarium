@@ -186,9 +186,11 @@ interactive terminal and has no flag, so an agent running commands cannot approv
 list (`docs/caption-model-files.json`, `docs/embedding-model-files.json`) and writes the same receipt a
 verified download writes; a file that differs is named and nothing is recorded.
 
-`setup blender set` writes nothing when the path is already what Assetarium uses. A
-changed Blender marks finished 3D inspections as pending again (the path is part of
-their fingerprint), so it needs `--confirm-rerender` when processed assets exist.
+`setup blender set` writes nothing when the path is already what Assetarium uses. Finished
+3D inspections are keyed by Blender's major version, not its path: a moved, reinstalled or
+minor-updated Blender (5.1 → 5.5) saves without re-rendering anything. Only another major
+version (5.x → 6.x) marks them pending again, so then it needs `--confirm-rerender` when
+processed assets exist.
 
 ## Collections
 

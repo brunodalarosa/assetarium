@@ -222,9 +222,11 @@ def propose_blender(config, path, now=None):
         return {'status': 'already_applied', 'path': path, 'version': checked['version'],
                 'reason': 'This is already the Blender Assetarium uses and it passed the check; nothing for the user to approve'}
     info = Path(resolved).stat()
+    rerender = setup_core.processed_models(config)
+    rerender = 0 if rerender and setup_core.keeps_inspections(config, checked['version']) else rerender
     proposal = {'id': uuid.uuid4().hex[:16], 'key': 'blender', 'path': path, 'resolved': resolved, 'version': checked['version'],
                 'check': checked['status'], 'identity': [info.st_size, info.st_mtime_ns],
-                'rerender': setup_core.processed_models(config), 'state': 'pending', 'notice_id': change['id'],
+                'rerender': rerender, 'state': 'pending', 'notice_id': change['id'],
                 'proposed_utc': stamp(now or clock()), 'decided_utc': None, 'reason': None}
     superseded = []
     def update(value):

@@ -165,7 +165,7 @@ function ProposalCard({ proposal }: { proposal: Json }) {
       <p className="text-[12.5px] text-muted-foreground">Apply checks it again on this computer, then saves it to config.local.toml. Make previews uses it from its next run.</p>
       {proposal.rerender > 0 && (
         <Banner tone="warning" role="status" className="grid gap-3">
-          <span>Changing Blender marks {plural(proposal.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (the Blender path is part of each result’s fingerprint). Current previews stay visible until Make previews renders them again.</span>
+          <span>Changing Blender marks {plural(proposal.rerender, "finished 3D inspection", "finished 3D inspections")} as needing processing again (this Blender has another major version, and each result’s fingerprint holds it). Current previews stay visible until Make previews renders them again.</span>
           <Checkbox id={"agent-confirm-" + proposal.id} label="I understand; render them again with this Blender" checked={confirmed} onCheckedChange={setConfirmed} />
         </Banner>
       )}
