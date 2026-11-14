@@ -167,7 +167,8 @@ def verify():
           const at=lal.state.historyIndex;b.click();await frame();
           b.dispatchEvent(new PointerEvent('pointerenter',{pointerId:1,pointerType:'mouse',buttons:0}));
           await until(()=>tipText(),8000);const hover=tipText();
-          b.dispatchEvent(new PointerEvent('pointerleave',{pointerId:1,pointerType:'mouse',buttons:0,clientX:innerWidth-2,clientY:innerHeight-2}));
+          // Leave from the corner, then move well away from the corridor toward the tooltip.
+          b.dispatchEvent(new PointerEvent('pointerleave',{pointerId:1,pointerType:'mouse',buttons:0,clientX:0,clientY:0}));
           document.dispatchEvent(new PointerEvent('pointermove',{pointerId:1,pointerType:'mouse',clientX:innerWidth-2,clientY:innerHeight-2}));
           await until(()=>!tipText(),8000);
           window.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true}));b.focus();
