@@ -15,6 +15,10 @@ Hub: [Desktop App](Desktop%20App.md). The right sidebar that inspects one asset:
 - One scroll: header, fault line (only when something is faulty), preview, fact chips, variants or
   collection entry, description, tags, then the collapsible File & license, Geometry (Image for images)
   and Processing record sections. A model's preview is the live 3D view ([3D preview](3D%20preview.md)).
+- A 2D image's preview is the image viewer (`ImageViewer.tsx`, pixels from `DesktopService.image_view`). An image
+  still waiting to be processed opens there too, from its original file like its card (decision 0032):
+  `image_view` returns `processed: false` with the size and pixel-art hint measured for the view only (nothing
+  recorded), and the inspector adds one "Not processed yet" line. Failed and unsupported images show their reason.
 - While the inspector shows an asset, arrow keys in a result grid select the card they move to
   (`AssetGrid` `onKeyDown`); with the panel hidden they only move focus.
 - **The description section is one line and one action per state** (`description_edit` in the detail payload:

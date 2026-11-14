@@ -339,3 +339,40 @@ def test_an_image_without_its_results_is_inspected_again_not_recorded_as_corrupt
     update_record(work, potion)
     outcomes = inspect_images(config, source)['outcomes']
     assert [(o['asset_id'], o['status']) for o in outcomes] == [(potion['asset_id'], 'complete')]
+
+
+def test_an_unprocessed_image_opens_from_its_original_and_its_work_is_counted_apart_from_models(art):
+    from local_asset_library import library_view
+    from local_asset_library.interactive_preview import InteractivePreviewService
+    from local_asset_library.source_browser import SourceBrowser
+    config, _, source, root = art
+    sources.scan_source(config, source)
+    before = originals(root)
+    found = scoped_records(config, source)
+    potion = found['image:Pixel/potion']
+    assert potion['processing']['inspection'] == 'pending' and not potion.get('technical')
+    contents = SourceBrowser(config, InteractivePreviewService(DesktopService(config)))
+    view = contents.call('image_view', source['key'], potion['asset_id'])
+    # Seen like its card, from the original; the size and pixel hint only steer the view.
+    assert view['status'] == 'image' and view['processed'] is False and view['note'] == 'Original source pixels'
+    assert view['size'] == view['native_size'] == [16, 16] and view['pixel_art_candidate'] and not view['vector']
+    assert Image.open(BytesIO(base64.b64decode(view['image']))).getpixel((0, 0)) == (40, 90, 230, 255)
+    vector = contents.call('image_view', source['key'], found['image:Vector/box']['asset_id'], 400)
+    assert vector['status'] == 'image' and vector['vector'] and vector['size'] == [400, 200] and not vector['processed']
+    service = contents.session(source['key'])[0]
+    for name in ('Pixel/damaged', 'Pixel/blink', 'Vector/linked'):
+        # Undecodable before processing: the view says why; recording the fault is left to processing.
+        shown = contents.call('image_view', source['key'], found['image:' + name]['asset_id'])
+        assert shown['status'] == 'unavailable' and shown['reason'].startswith('This image cannot be shown before processing')
+    assert not service.item_faults
+    assert scoped_records(config, source)['image:Pixel/potion']['processing']['inspection'] == 'pending'  # Nothing recorded.
+    pixel = library_view.folder_items(config, source['key'], 'Pixel', show_files=False)
+    assert pixel['counts']['no_previews'] and pixel['pending_models'] == 0
+    nodes = {n['path']: n for n in library_view.folder_tree(config, sources.get_source(config, source['key']))['nodes']}
+    assert nodes['Pixel']['pending'] and nodes['Pixel']['pending_models'] == 0
+    assert nodes['Models']['pending_models'] == nodes['Models']['pending']
+    whole = library_view.folder_items(config, source['key'], show_files=False)['pending_models']
+    assert whole == nodes['Models']['pending_models']
+    # The header's action queues the whole place, so a type filter never makes a mixed folder look image-only.
+    assert library_view.folder_items(config, source['key'], show_files=False, filters={'types': ['image']})['pending_models'] == whole
+    assert originals(root) == before

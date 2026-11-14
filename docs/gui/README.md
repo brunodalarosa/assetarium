@@ -210,6 +210,9 @@ viewer instead of the 3D preview: **Fit**, **1:1**, zoom out/in (12.5–3,200%),
 and **Hard pixel edges**; with the image focused, `+`, `-`, `0` and `1` work too.
 SVGs are re-rendered at the zoom level. Damaged, animated or externally linked
 images keep their cards and explain the recorded reason instead of a preview.
+An image that is not processed yet opens in the same viewer from its original
+file, with a line saying that processing measures it and prepares it for
+descriptions and search by meaning.
 
 **Notifications.** The bell opens a panel over any view: *Descriptions ready to
 generate* (**Generate descriptions** / **Not now**) and one report per
@@ -227,7 +230,8 @@ same cards and inspection as Home for the selected folder or pack, and the folde
 last, faded. Cards show one work state (No previews yet, Queued, Making previews, Ready, Blocked, Recorded
 failure, Missing) and overlays as labeled icons; "no previews yet" is a designed card, and 2D images show
 their original file before any processing. A pack header shows the cover, license and counts with the one
-action its state calls for (**312 without previews · Make previews**). Clicking a folder, pack or library
+action its state calls for (**312 without previews · Make previews**, or **312 not processed · Process
+images** when only images wait: they are measured, never rendered). Clicking a folder, pack or library
 folder shows its panel in inspection: Make this a pack, Merge into parent pack, Rename, Treat images here as
 textures / 2D assets, Exclude folder, Show in Explorer, Copy path, and for a library folder the search
 switch, **Rescan**, **Remove…**, **Forget missing**, duplicate-export answers, **Textures not found**

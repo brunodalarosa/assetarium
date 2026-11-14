@@ -110,8 +110,8 @@ def folder_tree(config, source, blocked=None):
         return {'offline': False, 'scanned': True, 'reading': True, 'nodes': []}
     state, params, _, _ = state_sql(blockers(config) if blocked is None else blocked)
     with closing(view):
-        groups = view.execute(f'SELECT asset_folders.folder, {state}, has_preview, COUNT(*) FROM assets '
-                              'JOIN asset_folders USING(asset_id) WHERE asset_folders.visible GROUP BY 1, 2, 3', params).fetchall()
+        groups = view.execute(f'SELECT asset_folders.folder, {state}, has_preview, COUNT(*), asset_type IS NOT ? FROM assets '
+                              'JOIN asset_folders USING(asset_id) WHERE asset_folders.visible GROUP BY 1, 2, 3, 5', params + ['image']).fetchall()
         # Files in formats that are off: counted per folder for one quiet line, never listed or offered as work.
         hidden = view.execute('SELECT asset_folders.folder, COUNT(*) FROM assets JOIN asset_folders USING(asset_id) '
                               'WHERE NOT asset_folders.visible GROUP BY 1').fetchall()
@@ -120,13 +120,13 @@ def folder_tree(config, source, blocked=None):
                              (json.dumps(_new_ids(config, source)),)).fetchall()
         folders = [r[0] for r in view.execute('SELECT path FROM folders')]
         detected = structure(config, source, view)
-    nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0, 'skipped': 0,
-                  'hidden': 0}}
+    nodes = {'': {'path': '', 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'pending_models': 0, 'blocked': 0, 'failed': 0,
+                  'skipped': 0, 'hidden': 0}}
 
     def node(path):
         if path not in nodes:
-            nodes[path] = {'path': path, 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'blocked': 0, 'failed': 0,
-                           'skipped': 0, 'hidden': 0}
+            nodes[path] = {'path': path, 'children': set(), 'assets': 0, 'previews': 0, 'new': 0, 'pending': 0, 'pending_models': 0, 'blocked': 0,
+                           'failed': 0, 'skipped': 0, 'hidden': 0}
             parent = PurePosixPath(path).parent.as_posix()
             node('' if parent == '.' else parent)['children'].add(path)
         return nodes[path]
@@ -136,11 +136,13 @@ def folder_tree(config, source, blocked=None):
         return [node('/'.join(parts[:depth])) for depth in range(len(parts) + 1)]
     for folder in folders:  # Folders only; files are listed in the grid.
         node(folder)
-    for folder, state, preview, count in groups:
+    for folder, state, preview, count, model in groups:
         for entry in [node(folder)]:
             entry['assets'] += count
             entry['previews'] += count * (state == 'ready' or (state != 'failed' and bool(preview)))
             entry['pending'] += count * (state == 'no_previews')
+            # Waiting 3D models need Blender renders; waiting images only an inspection (the header words it so).
+            entry['pending_models'] += count * (state == 'no_previews' and bool(model))
             entry['blocked'] += count * (state == 'blocked')
             entry['failed'] += count * (state == 'failed')
             entry['skipped'] += count * (state == 'skipped')
@@ -237,7 +239,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     if current is None:
         counts['missing'] = len(missing)
         return {'status': 'ready', 'key': key, 'path': path, 'items': missing[offset:offset + page_size], 'total': len(missing), 'cards': len(missing),
-                'assets': len(missing), 'files': 0, 'counts': counts, 'offset': offset, 'page_size': page_size}
+                'assets': len(missing), 'files': 0, 'counts': counts, 'pending_models': 0, 'offset': offset, 'page_size': page_size}
     try:
         view = connect(current)
     except Reading as exc:
@@ -246,6 +248,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
     state, state_params, reason, reason_params = state_sql(blockers(config))
     where, params = asset_scope_sql(path)
     where += ' AND NOT hidden'  # Formats that are off do not exist for Assetarium (decision 0030).
+    scope_where, scope_params = where, list(params)  # What the header's action queues: the whole place, not the filters.
     if filters.get('types'):
         where += f" AND kind IN ({','.join('?' * len(filters['types']))})"
         params += list(filters['types'])
@@ -258,6 +261,8 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
         listed = view.execute(f'SELECT COUNT(DISTINCT card) FROM assets WHERE {where}', params).fetchone()[0]
         assets = sum(counts.values()) + len(missing)
         counts['missing'] += len(missing)
+        pending_models = view.execute(f"SELECT COUNT(*) FROM assets WHERE {scope_where} AND {state} = 'no_previews' "
+                                      "AND asset_type IS NOT 'image'", scope_params + state_params).fetchone()[0]
         cards = listed + len(missing)
         files_where, files_params = inside_sql(path)
         files = view.execute(f'SELECT COUNT(*) FROM files WHERE {files_where}', files_params).fetchone()[0] if show_files else 0
@@ -313,7 +318,7 @@ def folder_items(config, key, path='', offset=0, page_size=60, filters=None, sho
                 f'SELECT path, name, folder, role, excluded FROM files WHERE {files_where} ORDER BY folder_key, name_key, path LIMIT ? OFFSET ?',
                 files_params + [page_size - len(page), max(0, offset - cards)])]
     return {'status': 'ready', 'key': key, 'path': path, 'items': page, 'total': cards + files, 'cards': cards,
-            'assets': assets, 'files': files, 'counts': counts, 'offset': offset, 'page_size': page_size}
+            'assets': assets, 'files': files, 'counts': counts, 'pending_models': pending_models, 'offset': offset, 'page_size': page_size}
 
 
 def unavailable(config, key, path='', offset=0, page_size=30):

@@ -199,11 +199,16 @@ class DesktopService(AssetService):
                 self.thumbnails.popitem(last=False)
         return preview,image
 
+    @staticmethod
+    def _original_source(record):
+        from .image_media import image_format
+        return next((f for f in record['files'] if f.get('availability')=='available' and image_format(f['path'])),None)
+
     def _original_thumbnail(self, record):
         """A 2D image is seen from its original file, before any processing (decision 0032). Read only, bounded."""
         import base64
-        from .image_media import decode, image_format, png_bytes, thumbnail
-        source=next((f for f in record['files'] if f.get('availability')=='available' and image_format(f['path'])),None)
+        from .image_media import decode, png_bytes, thumbnail
+        source=self._original_source(record)
         if source is None:
             return None
         key=('original',source['path'],source.get('sha256'))
@@ -397,15 +402,33 @@ class DesktopService(AssetService):
             return {'status': 'stale', 'generation': version, 'reason': 'Published library changed; refresh this view.'}
         validate('get_asset', {'asset_id': identifier})
         record = self.record(identifier)
-        if record.get('asset_type') != 'image' or record['processing'].get('inspection') != 'complete':
-            return {'status': 'unavailable', 'reason': 'Only processed 2D images have a zoomable image view.'}
+        inspection = record['processing'].get('inspection')
+        if record.get('asset_type') != 'image' or inspection not in {'complete', 'pending'}:
+            return {'status': 'unavailable', 'reason': 'Only 2D images that are processed or waiting to be processed have a zoomable image view.'}
         if edge is not None and (type(edge) is not int or not 16 <= edge <= IMAGE_VIEW_EDGE):
             raise ConfigError(f'Image view edge must be 16–{IMAGE_VIEW_EDGE} pixels')
         import base64
-        from .image_media import decode_svg, png_bytes
+        from .image_media import decode, decode_svg, png_bytes
         technical = record.get('technical') or {}
         try:
             source_check(self.config, record)
+            if inspection == 'pending':
+                # Seen from the original before processing, like its card (decision 0032). The measured
+                # size and pixel hint only steer this view; nothing is recorded.
+                source = self._original_source(record)
+                if source is None:
+                    raise ConfigError('No available image file to show')
+                image, measured = decode(self.config.source_file(source['path']), source['format'], edge or 1024)
+                vector = measured['format'] == 'svg'
+                note = 'Rendered from the SVG source' if vector else 'Original source pixels'
+                if max(image.size) > IMAGE_VIEW_EDGE:
+                    from PIL import Image
+                    image.thumbnail((IMAGE_VIEW_EDGE, IMAGE_VIEW_EDGE), Image.Resampling.LANCZOS)
+                    note = f'Reduced to {IMAGE_VIEW_EDGE} px for viewing; the original file is unchanged'
+                return {'status': 'image', 'image': base64.b64encode(png_bytes(image)).decode('ascii'), 'size': list(image.size),
+                        'native_size': [measured['width'], measured['height']], 'note': note, 'vector': vector,
+                        'pixel_art_candidate': bool(measured.get('pixel_art_candidate')), 'processed': False,
+                        'generation': version}
             if technical.get('format') == 'svg':
                 image, measured = decode_svg(self.config.source_file(technical['inspected_path']), edge or 1024)
                 note = 'Rendered from the SVG source by ' + measured['vector']['renderer']
@@ -420,9 +443,12 @@ class DesktopService(AssetService):
                     image.thumbnail((IMAGE_VIEW_EDGE, IMAGE_VIEW_EDGE), Image.Resampling.LANCZOS)
                     note = f'Reduced to {IMAGE_VIEW_EDGE} px for viewing; the original file is unchanged'
         except (OSError, ValueError) as exc:
+            if inspection == 'pending':  # Like its card: processing records the fault, the view only says why.
+                return {'status': 'unavailable', 'reason': f'This image cannot be shown before processing: {str(exc)[:300]}',
+                        'processed': False, 'generation': version}
             self._record_fault(identifier, 'image_view', exc)
             return {'status': 'faulty', 'reason': str(exc)[:400], 'generation': version}
         return {'status': 'image', 'image': base64.b64encode(png_bytes(image)).decode('ascii'), 'size': list(image.size),
                 'native_size': [technical.get('width'), technical.get('height')], 'note': note,
                 'vector': technical.get('format') == 'svg', 'pixel_art_candidate': bool(technical.get('pixel_art_candidate')),
-                'generation': version}
+                'processed': True, 'generation': version}
