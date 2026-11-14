@@ -227,6 +227,16 @@ function TooltipRoot({
     self.current.close = close;
   }, [close]);
 
+  // A controlled tooltip opened by its owner (not through openNow) still takes part in the one-at-a-time rule:
+  // it dismisses whichever tooltip is showing, and the next one to open dismisses it.
+  useLayoutEffect(() => {
+    if (controlledOpen === undefined) return;
+    if (controlledOpen) {
+      if (current && current !== self.current) current.close();
+      current = self.current;
+    } else if (current === self.current) current = null;
+  }, [controlledOpen]);
+
   const requestOpen = useCallback(() => {
     clearTimers();
     if (latest.current.open || latest.current.disabled || latest.current.empty) return;
