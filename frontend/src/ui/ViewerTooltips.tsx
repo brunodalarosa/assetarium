@@ -22,7 +22,8 @@ export function ViewerTooltips() {
   useEffect(() => {
     watchModality();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let keyboard = false;
+    // The control keyboard focus rests on: its label stays while the pointer comes and goes.
+    let focused: HTMLElement | null = null;
     const control = (node: EventTarget | null) => (node instanceof Element ? node.closest<HTMLElement>(SELECTOR) : null);
     const read = (element: HTMLElement): Tip => {
       const dialog = element.closest("dialog");
@@ -44,7 +45,6 @@ export function ViewerTooltips() {
     };
     const hide = () => {
       clearTimeout(timer);
-      keyboard = false;
       anchorRef.current?.removeAttribute("aria-describedby");
       setTip(null);
     };
@@ -62,7 +62,9 @@ export function ViewerTooltips() {
       const element = control(event.target);
       if (!element || element.contains(event.relatedTarget as Node | null)) return;
       clearTimeout(timer);
-      if (!(keyboard && element === anchorRef.current)) hide();
+      // Back to the keyboard-focused control's label, if there is one.
+      if (focused?.isConnected) show(focused);
+      else hide();
     };
     // A press dismisses the label; the control's own action is what matters now.
     const onDown = (event: PointerEvent) => {
@@ -71,12 +73,14 @@ export function ViewerTooltips() {
     const onFocusIn = (event: FocusEvent) => {
       const element = control(event.target);
       if (!element || !focusFromKeyboard()) return;
-      keyboard = true;
+      focused = element;
       show(element);
     };
     const onFocusOut = (event: FocusEvent) => {
       const element = control(event.target);
-      if (element && element === anchorRef.current && !element.contains(event.relatedTarget as Node | null)) hide();
+      if (!element || element.contains(event.relatedTarget as Node | null)) return;
+      if (element === focused) focused = null;
+      if (element === anchorRef.current) hide();
     };
     document.addEventListener("pointerover", onOver);
     document.addEventListener("pointerout", onOut);

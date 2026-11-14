@@ -68,6 +68,8 @@ true"""
 # Hover, then keyboard focus, on the viewer's fullscreen button: the tooltip shows its label, describes the button and
 # is the topmost element where it is drawn (outside the top layer a fullscreen dialog would cover it).
 AUDIT_VIEWER = r"""window.viewerTip=async(fullscreen)=>{const p=LALPreview.current,b=p.full,label=fullscreen?'Exit fullscreen':'Fullscreen';
+  // Start from no focus and no label: mounting and entering fullscreen move focus themselves.
+  document.activeElement?.blur();await until(()=>!tipText(),4000).catch(()=>0);
   const seen=()=>{const t=document.querySelector('[role=tooltip]');if(!t)return false;const r=t.getBoundingClientRect();
     return t.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};
   const described=()=>(b.getAttribute('aria-describedby')||'').split(' ').includes(document.querySelector('[role=tooltip]')?.id);
@@ -182,10 +184,8 @@ def verify():
         # No live view here: stopping keeps the toolbar and its stills, so nothing loads in the background.
         js("until(()=>window.LALPreview?.current?.full?.isConnected,20000).then(()=>{LALPreview.current.stop();return frame()}).then(()=>true)", 40)
         ui.check('viewer_tooltip_inline', "viewerTip(false)", 40)
-        ui.capture('08-viewer-tooltip.png')
         js("(async()=>{await LALPreview.current.enterFullscreen();await frame();return true})()", 20)
         ui.check('viewer_tooltip_fullscreen', "viewerTip(true)", 40)
-        ui.capture('09-viewer-tooltip-fullscreen.png')
         js("(async()=>{document.activeElement?.blur();await LALPreview.current.exitFullscreen();return true})()", 20)
         result = js("(()=>{const p=LALPreview.current,b=p.more;return {no_title:![...p.dialog.querySelectorAll('[title]')].some(e=>e.tagName!=='IFRAME'),"
                     "reason:b.getAttribute('aria-disabled')==='true'&&b.dataset.tooltipText==='Display options are available once the live view loads'}})()")

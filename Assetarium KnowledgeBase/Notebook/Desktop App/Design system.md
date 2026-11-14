@@ -2,8 +2,8 @@
 area: Desktop App
 tags: [system]
 code: [frontend/src/ui/primitives.tsx, frontend/src/ui/ViewerTooltips.tsx, src/local_asset_library/ui/interactive-preview.js, tests/test_ui_tooltips.py, scripts/verify-tooltips.py, frontend/src/ui/CommandBlock.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
-verified: 2026-11-01
-branch: feature/library-view
+verified: 2026-11-14
+branch: night/beui-tooltips-in-the-3d-viewer-and-on-di-20261114-0800
 ---
 # Design system
 
