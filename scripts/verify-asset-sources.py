@@ -186,6 +186,18 @@ def verify():
         # Make previews: through the queue, with a toast.
         ui.js(f"{ROW % (added['key'], 'Tiny Pack_1.0')}.click()")
         wait("$('make-previews')")
+        assert ui.js("$('make-previews').textContent.trim()==='3 not processed · Process images'"), ui.js("$('make-previews').textContent")
+        check('A pack with only images waiting says "3 not processed · Process images", not previews')
+        wait("lal.state.sourcesView.path==='Tiny Pack_1.0'&&!lal.state.source.loading&&lal.state.source.items.some(i=>i.name.startsWith('sprite_'))")
+        inspector_was_open = ui.js("lal.state.inspector.open")
+        sprite = ui.js("lal.state.source.items.find(i=>i.name.startsWith('sprite_')).asset_id")
+        ui.js(f"lal.selectAsset('source','{sprite}',null)")
+        wait("$('detail').querySelector('.image-stage img')?.naturalWidth===32&&$('image-pending-note')")
+        assert ui.js("$('detail').querySelector('.image-note').textContent.startsWith('Original source pixels · showing 32 × 32 px')")
+        assert ui.js("$('detail').querySelector('.image-pixelated [role=checkbox]').getAttribute('aria-checked')==='true'")
+        ui.capture('02b-pending-image.png')
+        check('The inspector shows an unprocessed image from its original file at native size, with hard pixel edges for a small sprite')
+        ui.js(f"lal.setInspectorOpen({'true' if inspector_was_open else 'false'});true")  # Later checks expect the panel as it was.
         ui.js("$('make-previews').click()")
         wait("lal.state.queue&&(lal.state.queue.running||lal.state.queue.recent.length)", 30)
         assert started and started[0]['operation'] == 'process' and started[0]['assets'] == 3, started

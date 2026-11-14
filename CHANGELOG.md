@@ -83,6 +83,16 @@ All notable changes to Assetarium are listed here. The project follows
   (`caption_review.py`), the never-called schema 1 → 2 catalog migration (`catalog_migration.py`) and the desktop
   bridge's unused `source_browse` call. Nothing the app, the CLI or the MCP server does changes.
 
+### Fixed
+
+- **Unprocessed 2D images open in the inspector.** The inspector showed "This image has not been processed yet"
+  for an image whose card already showed it; it now opens the image from its original file in the image viewer
+  (zoom, background, hard pixel edges for small art), with a line saying what processing adds. Nothing is
+  recorded until the image is processed.
+- **Image-only work is no longer called previews.** A library folder, pack or folder whose waiting assets are
+  all images offers **N not processed · Process images** (and **Process images** in its menu) instead of
+  **N without previews · Make previews**: images are measured and prepared for search, never rendered.
+
 ## [0.2.0] — 2026-11-05
 
 **Upgrading from 0.1.0:** start with a fresh library. 0.2.0 changes where results live and doesn't upgrade a 0.1.0

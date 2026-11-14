@@ -134,7 +134,7 @@ Each card has one state and a few overlays, shown as labeled icons (never color 
 
 | State | Meaning | What you can do |
 | --- | --- | --- |
-| No previews yet | Found, not processed. 2D images already show their original file | Make previews |
+| No previews yet | Found, not processed. 2D images already show their original file, on the card and in the inspector | Make previews (Process images) |
 | Search data pending | Previews exist; search data is missing | Make previews |
 | Queued / Making previews | In the processing queue / running | Cancel on Asset processing |
 | Ready | Previews and search data done | — |
@@ -161,7 +161,8 @@ Files that are not assets (readmes, HTML, licenses) are listed after the cards, 
 
 **Make previews** (inspection, preview images and search data, never split) and **Generate descriptions**
 (only when descriptions are on in Settings → General) act on a library folder, a pack, a folder or picked
-assets. They start at once or wait in line on **Asset processing**:
+assets. Where only images wait, the header and the folder menu call it **Process images**: images are measured
+and prepared for search, never rendered. Both start at once or wait in line on **Asset processing**:
 
 - What an item covers is decided when it starts: "whatever in this pack still lacks previews".
 - Previews always run before descriptions; otherwise items run in your order (move or remove them in **Up next**).

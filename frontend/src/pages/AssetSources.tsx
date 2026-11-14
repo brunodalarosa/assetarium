@@ -106,6 +106,8 @@ function FolderHeader() {
   const node = (folder.nodes || []).find((n: Json) => n.path === view.path) || {};
   const name = view.path ? node.name : folder.name;
   const pending = view.counts?.no_previews ?? node.pending ?? 0;
+  // Waiting images need only an inspection (no renders), so image-only work is not called previews.
+  const imagesOnly = (view.counts?.pending_models ?? node.pending_models) === 0;
   const kind = view.path ? node.kind : "library";
   return (
     <div id="folder-header" className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[22px] border border-border bg-surface p-4">
@@ -126,8 +128,8 @@ function FolderHeader() {
         </p>
       </div>
       {pending > 0 && !folder.offline && (
-        <Button id="make-previews" tooltip="Queues preview renders for the assets here that have none; follow them in Processing" onClick={() => void makePreviews({ key: folder.key, path: view.path }, pending)}>
-          {plural(pending, "without previews", "without previews").replace(/^(\d[\d,]*) /, "$1 ")} · Make previews
+        <Button id="make-previews" tooltip={imagesOnly ? "Measures these images and prepares them for descriptions and search by meaning (no rendering); follow it in Processing" : "Queues preview renders for the assets here that have none; follow them in Processing"} onClick={() => void makePreviews({ key: folder.key, path: view.path }, pending)}>
+          {pending.toLocaleString()} {imagesOnly ? "not processed · Process images" : "without previews · Make previews"}
         </Button>
       )}
     </div>

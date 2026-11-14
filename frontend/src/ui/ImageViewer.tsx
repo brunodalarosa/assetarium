@@ -25,11 +25,15 @@ export function ImageViewer({ assetId, name, image, api, version, native, pixelA
   const [smooth, setSmooth] = useState(!pixelArt);
   const [src, setSrc] = useState(image);
   const [note, setNote] = useState(vector ? "Rendered from the SVG source." : "Original source pixels.");
+  // An image waiting to be processed that cannot be decoded gets its reason, not an empty viewer.
+  const [unshown, setUnshown] = useState<string | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const request = useRef(0);
-  const [width, height] = native;
+  // An image waiting to be processed has no recorded size; the view measures it from the original.
+  const [measured, setMeasured] = useState<[number | null, number | null]>(native);
+  const [width, height] = native[0] && native[1] ? native : measured;
 
-  const load = useCallback(async (edge: number | null) => {
+  const load = useCallback(async (edge: number | null, initial = false) => {
     const token = ++request.current;
     let result;
     try {
@@ -41,12 +45,15 @@ export function ImageViewer({ assetId, name, image, api, version, native, pixelA
     if (result.status === "image") {
       setSrc(result.image);
       setNote(result.note + (result.size ? ` · showing ${result.size[0]} × ${result.size[1]} px` : ""));
-    } else setNote((result.reason || "Full-resolution image unavailable.") + " The preview above is reduced.");
-  }, [api, assetId, version]);
+      if (result.processed === false) setMeasured((prev) => (prev[0] && prev[1] ? prev : result.native_size || [null, null]));
+      if (result.processed === false && initial) setSmooth(!result.pixel_art_candidate);
+    } else if (result.processed === false && initial) setUnshown(result.reason || "This image cannot be shown before processing.");
+    else setNote((result.reason || "Full-resolution image unavailable.") + (image ? " The preview above is reduced." : ""));
+  }, [api, assetId, version, image]);
 
   useEffect(() => {
     setSrc(image);
-    void load(vector ? 1024 : null);
+    void load(vector ? 1024 : null, true);
     return () => {
       request.current++;
     };
@@ -69,6 +76,8 @@ export function ImageViewer({ assetId, name, image, api, version, native, pixelA
     if (next) setZoom(next);
   };
   const style = zoom === "fit" || !width || !height ? undefined : { width: width * zoom, height: height * zoom };
+  if (unshown && !src)
+    return <div className="image-unshown grid min-h-40 place-items-center rounded-2xl bg-thumb p-6 text-center text-[12.5px] text-muted-foreground">{unshown}</div>;
   return (
     <div className="image-viewer grid gap-3">
       <div
