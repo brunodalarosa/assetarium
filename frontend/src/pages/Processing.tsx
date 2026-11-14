@@ -66,7 +66,7 @@ function Running() {
             <p className="mr-auto text-[13.5px] font-medium">{item.title || ACTION[item.action]} · {item.label}{item.resolved ? ` · ${plural(item.resolved, "asset", "assets")}` : ""}</p>
             <ByAgent item={item} />
             <span className="text-[12px] text-muted-foreground">{since(item.started_utc)}</span>
-            <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} tooltip="Stops this work. Assets already finished keep their results" onClick={() => void queueControl("remove", item.id)}>
+            <Button variant="secondary" className="h-8 px-3" disabled={item.status === "cancelling"} disabledReason="Already stopping" tooltip="Stops this work. Assets already finished keep their results" onClick={() => void queueControl("remove", item.id)}>
               <X className="size-3.5" aria-hidden />{item.status === "cancelling" ? "Stopping…" : "Cancel"}
             </Button>
           </div>

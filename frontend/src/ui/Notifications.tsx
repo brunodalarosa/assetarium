@@ -95,7 +95,7 @@ function RunningItem({ source }: { source: Json }) {
       <OperationProgress operation={operation} label={"Description progress for " + source.name} />
       <p className="notification-body text-[12px] text-muted-foreground">{phase}</p>
       <div className="notification-actions flex gap-2">
-        <Button variant="secondary" className="h-9 px-4 text-[12.5px]" data-notification={"running-" + source.key} data-action="cancel" disabled={operation.status === "cancelling"} tooltip="Stops generating; descriptions already written are kept" onClick={() => void sourceAction("cancel", source.key)}>
+        <Button variant="secondary" className="h-9 px-4 text-[12.5px]" data-notification={"running-" + source.key} data-action="cancel" disabled={operation.status === "cancelling"} disabledReason="Already stopping; descriptions already written are kept" tooltip="Stops generating; descriptions already written are kept" onClick={() => void sourceAction("cancel", source.key)}>
           {operation.status === "cancelling" ? "Cancelling…" : "Cancel"}
         </Button>
         <Button variant="quiet" className="h-9 px-4 text-[12.5px]" tooltip={false} onClick={() => void openProcessing(source.key)}>Open Asset processing</Button>

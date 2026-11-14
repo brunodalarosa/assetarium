@@ -1,7 +1,7 @@
 ---
 area: Desktop App
 tags: [system]
-code: [frontend/src/ui/primitives.tsx, tests/test_ui_tooltips.py, scripts/verify-tooltips.py, frontend/src/ui/CommandBlock.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
+code: [frontend/src/ui/primitives.tsx, frontend/src/ui/ViewerTooltips.tsx, src/local_asset_library/ui/interactive-preview.js, tests/test_ui_tooltips.py, scripts/verify-tooltips.py, frontend/src/ui/CommandBlock.tsx, frontend/src/components/beui, frontend/src/styles.css, frontend/src/lib/ease.ts, frontend/src/ui/ProposalReview.tsx]
 verified: 2026-11-01
 branch: feature/library-view
 ---
@@ -28,6 +28,16 @@ behind it are in the [Design language](../../Architecture/Desktop%20App/Design%2
   truncated text get a `Hint`. No raw `<button>` outside `ui/primitives.tsx` and no native `title=` tooltips:
   `tests/test_ui_tooltips.py` fails on both, and `scripts/verify-tooltips.py` fails on any visible control
   without `data-tooltip` / `data-no-tooltip` (form fields with a visible label and select triggers excepted).
+- **A disabled control says why.** `Button` and `IconButton` render `disabled` as `aria-disabled="true"`: dimmed,
+  focusable, the click swallowed (Enter, Space and a form's implicit submission arrive as that click, so a disabled
+  submit button never submits). Their tooltip shows on hover and focus; pass `disabledReason` when the condition
+  names a reason the owner can act on. Test a disabled `Button` with `:disabled,[aria-disabled=true]`, never
+  `.disabled`. `Pressable`, `MotionPressable` and beUI's own controls still use the native attribute.
+- **The 3D viewer uses the same tooltip.** `ui/interactive-preview.js` is plain JS: its controls carry their text in
+  `data-tooltip-text` (never a native `title`; the iframe's `title` is its accessible name), and
+  `ui/ViewerTooltips.tsx`, mounted once in `App.tsx`, shows one controlled beUI tooltip for them. In fullscreen the
+  viewer is a modal `<dialog>` in the top layer, so the tooltip is portaled into it (`TooltipContent`'s
+  `container`); anything outside would be hidden and inert.
 
 ## How it works
 

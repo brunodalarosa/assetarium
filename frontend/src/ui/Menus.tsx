@@ -643,7 +643,7 @@ export function CreateCollectionDialog() {
           {error && <p role="alert" id="create-collection-error" className="rounded-xl bg-fault-bg px-4 py-3 text-[12.5px] text-fault">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" disabled={busy} tooltip={false} onClick={closeCreateCollection}>Cancel</Button>
-            <Button type="submit" id="create-collection-submit" disabled={busy || !name.trim()} tooltip={false}>{busy && <Spinner className="size-3.5" />}{adding ? "Create and add" : "Create collection"}</Button>
+            <Button type="submit" id="create-collection-submit" disabled={busy || !name.trim()} disabledReason={name.trim() ? undefined : "Type a name first"} tooltip={false}>{busy && <Spinner className="size-3.5" />}{adding ? "Create and add" : "Create collection"}</Button>
           </div>
         </form>
       )}

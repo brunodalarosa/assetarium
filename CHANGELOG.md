@@ -18,6 +18,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- **Disabled buttons say why**: a greyed-out button can now be focused with Tab and shows its tooltip on hover and
+  focus, with the reason it is unavailable where the app knows it (Forward, Rescan on an offline folder, Apply with
+  no decisions…). Clicking it still does nothing. The 3D viewer's buttons (Fullscreen, Display options, the view
+  switcher) show the same tooltips as the rest of the app, in fullscreen too, instead of the system's.
 - **Moving or updating Blender no longer re-renders your 3D assets** (decision 0028): previews are keyed by
   Blender's major version, not where it is installed. A moved, reinstalled or minor-updated Blender (5.1 → 5.5)
   keeps every finished preview, and setup asks to confirm a re-render only for another major version (5.x → 6.x).
