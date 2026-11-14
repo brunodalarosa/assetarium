@@ -254,15 +254,22 @@ function Preview({ grid, result, assetId, format, view }: { grid: GridId; result
     <SelectField id={prefix + "detail-format"} label="Source format" value={formatValue} onChange={(value) => void selectAsset(grid, assetId, value, nextView, false)} options={formats.map((f): [string, string] => [f, formatLabel(f)])} />
   );
   if (info.asset_type === "image") {
-    const processed = info.processing?.inspection === "complete";
+    const inspection = info.processing?.inspection;
+    // A waiting image is still seen from its original file, as on its card (decision 0032).
+    const viewable = inspection === "complete" || inspection === "pending";
     return (
       <>
         <div className="detail-preview">
-          {processed ? (
-            <ImageViewer key={assetId + formatValue} assetId={assetId} name={info.name || p.name || assetId} image={result.image} api={gridApi(grid, assetId)} version={result.generation ?? null} native={[t.width, t.height]} pixelArt={Boolean(t.pixel_art_candidate)} vector={t.format === "svg"} />
+          {viewable ? (
+            <>
+              <ImageViewer key={assetId + formatValue} assetId={assetId} name={info.name || p.name || assetId} image={result.image} api={gridApi(grid, assetId)} version={result.generation ?? null} native={[t.width ?? null, t.height ?? null]} pixelArt={Boolean(t.pixel_art_candidate)} vector={(t.format || formatValue) === "svg"} />
+              {inspection === "pending" && (
+                <p id="image-pending-note" className="mt-2 text-[12px] leading-relaxed text-muted-foreground">Not processed yet. Processing measures the image and prepares it for descriptions and search by meaning.</p>
+              )}
+            </>
           ) : (
             <div className="grid min-h-40 place-items-center rounded-2xl bg-thumb p-6 text-center text-[12.5px] text-muted-foreground">
-              {({ pending: "This image has not been processed yet. Process this source in Asset processing to measure it and prepare image search.", failed: "This image could not be processed; the recorded fault is in the Processing record.", unsupported: "This image is recognized but not supported yet; the reason is in the Processing record." } as Record<string, string>)[info.processing?.inspection] || p.preview?.reason || "Image unavailable."}
+              {({ failed: "This image could not be processed; the recorded fault is in the Processing record.", unsupported: "This image is recognized but not supported yet; the reason is in the Processing record." } as Record<string, string>)[info.processing?.inspection] || p.preview?.reason || "Image unavailable."}
             </div>
           )}
         </div>

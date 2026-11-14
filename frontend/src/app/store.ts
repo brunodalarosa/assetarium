@@ -957,7 +957,7 @@ export async function loadFolderItems(generation = state.source.generation) {
     }
     const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
     patchGrid("source", (s) => ({ items: s.items.concat(assets), total: result.total }));
-    patchSources((v) => ({ files: v.files.concat(files), counts: result.counts }));
+    patchSources((v) => ({ files: v.files.concat(files), counts: folderCounts(result) }));
     patchGrid("source", (s) => ({
       finished: s.items.length + state.sourcesView.files.length >= result.total,
       status: plural(result.assets, "asset", "assets") + (result.files ? ` · ${plural(result.files, "other file", "other files")}` : ""),
@@ -973,6 +973,8 @@ export async function loadFolderItems(generation = state.source.generation) {
 /** Reload the shown folder in place after a scan or a finished item: states update, nothing jumps. */
 let refreshing = false;
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b);
+/** State counts plus how many waiting assets are 3D models (the header words image-only work differently). */
+const folderCounts = (result: Json) => ({ ...result.counts, pending_models: result.pending_models ?? null });
 /** Some operation runs and every running one is a scan. */
 const onlyScans = () => {
   const running = [state.globalScan, ...state.sources.map((source) => source.operation)].filter(operationActive);
@@ -987,13 +989,13 @@ async function refreshFolder() {
     const result = await api().library_items(s.key, s.path, 0, Math.min(200, shown), { types: s.types, states: s.states }, s.showFiles);
     if (result.status !== "ready" || state.sourcesView.key !== s.key || state.sourcesView.path !== s.path) return;
     const assets = result.items.filter((item: Json) => !item.file), files = result.items.filter((item: Json) => item.file);
-    if (result.total === state.source.total && same(assets, state.source.items) && same(files, s.files) && same(result.counts, s.counts)) return;
+    if (result.total === state.source.total && same(assets, state.source.items) && same(files, s.files) && same(folderCounts(result), s.counts)) return;
     // Thumbnails of assets whose state changed are asked for again (a finished preview fades in).
     const before: Record<string, string> = Object.fromEntries(state.source.items.map((item: Json) => [item.asset_id, item.state]));
     for (const item of assets) if (before[item.asset_id] !== item.state) requested.delete(`source:${state.source.generation}:${item.asset_id}`);
     patchGrid("source", (g) => ({ items: assets, total: result.total, finished: assets.length + files.length >= result.total,
       thumbs: Object.fromEntries(Object.entries(g.thumbs).filter(([id]) => before[id] === assets.find((a: Json) => a.asset_id === id)?.state)) }));
-    patchSources({ files, counts: result.counts });
+    patchSources({ files, counts: folderCounts(result) });
   } catch {
     /* The next change poll tries again. */
   } finally {
