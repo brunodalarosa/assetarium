@@ -132,7 +132,7 @@ export function SourceFolders({ source, busy }: { source: Json; busy: boolean })
         )}
         <form className="flex flex-wrap items-end gap-2" onSubmit={(event) => { event.preventDefault(); if (pattern.trim()) void run("exclusions", [...exclusions, pattern.trim()]); }}>
           <TextField id={`exclude-${source.id}`} label="Folder name or path" value={pattern} disabled={disabled} spellCheck={false} placeholder="Unity*  or  Models/Unity FBX" onChange={(e) => setPattern(e.target.value)} className="min-w-[220px] flex-1" />
-          <Button type="submit" variant="secondary" className="h-10 px-4" disabled={disabled || !pattern.trim()} tooltip="Stops scanning folders that match and scans the source again; nothing on disk is deleted">Exclude</Button>
+          <Button type="submit" variant="secondary" className="h-10 px-4" disabled={disabled || !pattern.trim()} disabledReason={pattern.trim() ? undefined : "Type a folder name or pattern first"} tooltip="Stops scanning folders that match and scans the source again; nothing on disk is deleted">Exclude</Button>
         </form>
         <p className="hint text-[11.5px] leading-relaxed text-subtle">
           {exclusions.length ? `${files.toLocaleString()} files in ${excluded.length} excluded ${excluded.length === 1 ? "folder" : "folders"} are not scanned. ` : ""}
@@ -334,7 +334,7 @@ export function FolderPanel() {
         <>
           <section className="flex flex-wrap items-center gap-3">
             <Switch checked={source.enabled} onCheckedChange={(checked) => void sourceAction("enabled", folder.key, null, checked)} label="Included in search" ariaLabel={"Include " + folder.name + " in search"} />
-            <Button variant="secondary" className="h-9 px-3" data-action="rescan" disabled={busy || folder.offline} tooltip="Looks for added, changed and removed files; scans never render or run models" onClick={() => void sourceAction("scan", folder.key)}><RefreshCw className="size-4" aria-hidden />Rescan</Button>
+            <Button variant="secondary" className="h-9 px-3" data-action="rescan" disabled={busy || folder.offline} disabledReason={folder.offline ? "This folder can’t be reached; reconnect its drive to rescan" : undefined} tooltip="Looks for added, changed and removed files; scans never render or run models" onClick={() => void sourceAction("scan", folder.key)}><RefreshCw className="size-4" aria-hidden />Rescan</Button>
             <Button variant="danger" className="h-9 px-3" data-action="remove" disabled={busy} tooltip="Asks first, then stops listing this source; its files and results stay on disk" onClick={() => confirmRemoveSource(source)}><Trash2 className="size-4" aria-hidden />Remove…</Button>
           </section>
           <SourceFolders source={source} busy={busy} />

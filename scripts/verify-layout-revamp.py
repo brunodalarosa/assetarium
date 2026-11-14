@@ -99,7 +99,7 @@ def verify():
           noGrid:!$('grid'),query:!!$('query'),theme:['light','dark'].includes(document.documentElement.dataset.theme),
           font:getComputedStyle(document.body).fontFamily.includes('Geist'),noChips:!document.querySelector('[data-chip]'),
           rail:['nav-home','nav-collections','nav-processing','nav-settings'].every(id=>$(id))&&!$('nav-library'),
-          backDisabled:document.querySelector('[aria-label=Back]').disabled}))()""")
+          backDisabled:document.querySelector('[aria-label=Back]').matches(':disabled,[aria-disabled=true]')}))()""")
         js("lal.setAppearance('light')")
         capture('01-home-light.png')
 
@@ -169,9 +169,9 @@ def verify():
         capture('14-asset-processing.png')
 
         check('history', """(async()=>{lal.goBack();await until(()=>$('library-view'));const back=!!document.querySelector('#grid .card');
-          const fwd=!document.querySelector('[aria-label=Forward]').disabled;lal.goForward();await until(()=>$('processing-view'));
+          const fwd=!document.querySelector('[aria-label=Forward]').matches(':disabled,[aria-disabled=true]');lal.goForward();await until(()=>$('processing-view'));
           lal.navigate({page:'library'});await until(()=>$('library-view'));lal.navigate({page:'collections'});await until(()=>$('collections-view'));
-          lal.goBack();lal.goBack();await until(()=>$('processing-view'));return {back,fwd,forwardAfter:!document.querySelector('[aria-label=Forward]').disabled}})()""")
+          lal.goBack();lal.goBack();await until(()=>$('processing-view'));return {back,fwd,forwardAfter:!document.querySelector('[aria-label=Forward]').matches(':disabled,[aria-disabled=true]')}})()""")
         js("lal.navigate({page:'home'})")
         js("until(()=>$('library-view'))")
         js("lal.clearSearch()")

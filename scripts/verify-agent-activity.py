@@ -128,7 +128,7 @@ def verify():
         wait(f"$('agent-waiting-count')&&$('agent-waiting-count').textContent==='2'&&document.querySelectorAll('{review} .proposal-group').length===3", 30)
         assert ui.js(f"{group(2, 'engine copy')}.textContent.includes('In 2 packs')")
         assert ui.js(f"{group(1, 'Samples')}.textContent.includes('Only in Kit_2.0')")
-        assert ui.js(f"document.querySelector('{review} [data-action=apply-staged]').disabled")
+        assert ui.js(f"document.querySelector('{review} [data-action=apply-staged]').matches(':disabled,[aria-disabled=true]')")
         report['checks'].append('Two held proposals show as one folder review: the shared engine copy rule is one group "In 2 packs", '
                                 'each pack-only rule says where it applies, and Apply stays disabled until rules are decided')
         ui.js(f"{group(2, 'engine copy')}.querySelector('[data-choice=accept]').click()")

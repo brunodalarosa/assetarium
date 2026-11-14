@@ -166,7 +166,7 @@ def verify():
         wait("$('processing-view')&&document.querySelectorAll('.source-descriptions').length===2")
         summary = js("[...document.querySelectorAll('.source-descriptions-summary')].map(x=>x.textContent)")
         assert summary == ['Descriptions 2 missing · 1 failed', 'Descriptions 3 descriptions written'], summary
-        assert js("[...document.querySelectorAll('[data-action=describe]')].map(b=>b.disabled).join()==='false,true'")
+        assert js("[...document.querySelectorAll('[data-action=describe]')].map(b=>b.matches(':disabled,[aria-disabled=true]')).join()==='false,true'")
         capture('03-processing-descriptions.png')
         report['checks'].append('Asset processing shows written/missing/failed counts; Generate is enabled only where descriptions are missing')
         js("$('nav-home').click()")
@@ -194,7 +194,7 @@ def verify():
              + "&&document.activeElement?.dataset.source===" + json.dumps(one['key']))
         wait("document.querySelector('[data-source=" + json.dumps(one['key']) + "] .source-descriptions-summary').textContent==='Descriptions 2 descriptions written · 1 failed'")
         card = "document.querySelector('article[data-source=" + json.dumps(one['key']) + "]')"
-        assert js(card + ".querySelector('[data-action=describe]').disabled&&" + card + ".querySelector('.source-descriptions .hint').textContent.includes('Failed descriptions are recorded and not retried')")
+        assert js(card + ".querySelector('[data-action=describe]').matches(':disabled,[aria-disabled=true]')&&" + card + ".querySelector('.source-descriptions .hint').textContent.includes('Failed descriptions are recorded and not retried')")
         assert js(card + ".querySelector('.source-descriptions').textContent.includes('Last run finished.')")
         capture('06-processing-after-run.png')
         report['checks'].append('View in Asset processing opens the source; nothing left to generate and failures are not retried')

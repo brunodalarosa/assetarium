@@ -76,7 +76,7 @@ def verify():
     try:
         ui.wait_ready()
         ui.js("lal.navigate({page:'settings'})")
-        wait("$('try-agent-start')&&!$('try-agent-start').disabled")
+        wait("$('try-agent-start')&&!$('try-agent-start').matches(':disabled,[aria-disabled=true]')")
         ui.check('old_checker_removed', "!$('model-check-card')")
         ui.js("$('try-agent-start').click()")
         wait("lal.state.addFolder.step==='found'")
@@ -107,7 +107,7 @@ def verify():
         ui.check('narrow_layout_fits', "$('add-folder-wizard').querySelector('section').getBoundingClientRect().right<=innerWidth+1")
         ui.capture('03-narrow-review.png')
         ui.js("document.querySelector('#add-folder-wizard [data-action=accept-all]').click()")
-        wait("!document.querySelector('#add-folder-wizard [data-action=apply-staged]').disabled")
+        wait("!document.querySelector('#add-folder-wizard [data-action=apply-staged]').matches(':disabled,[aria-disabled=true]')")
         ui.js("document.querySelector('#add-folder-wizard [data-action=apply-staged]').click()")
         wait("!!$('agent-practice-result')", 60)
         ui.check('outcomes_and_cleanup', "lal.state.addFolder.result.cleaned&&lal.state.addFolder.result.checks.every(c=>c.passed)&&!$('add-folder-done')")
@@ -124,7 +124,7 @@ def verify():
         assert not agent_practice._parent(config).exists()
         report['checks']['cancel_cleanup'] = True
         ui.js("(async()=>{await lal.openSetup();lal.goToSetupStep(lal.SETUP_STEPS.indexOf('practice'))})()")
-        wait("$('setup-try-agent-start')&&!$('setup-try-agent-start').disabled")
+        wait("$('setup-try-agent-start')&&!$('setup-try-agent-start').matches(':disabled,[aria-disabled=true]')")
         ui.js("$('setup-try-agent-start').click()")
         wait("lal.state.addFolder.step==='found'")
         ui.check('setup_reuses_same_practice', "lal.state.setup.open&&lal.state.addFolder.practice&&Number(getComputedStyle($('add-folder-wizard')).zIndex)>Number(getComputedStyle($('setup-wizard')).zIndex)")

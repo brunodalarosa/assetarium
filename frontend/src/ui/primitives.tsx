@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { AnimatePresence, type HTMLMotionProps, motion, useReducedMotion } from "motion/react";
-import { cloneElement, type ComponentProps, type ReactElement, type ReactNode, useId, useState } from "react";
+import { cloneElement, type ComponentProps, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode, useId, useState } from "react";
 import { Button as BeButton, type ButtonProps } from "@/components/beui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/beui/select";
 import { Tooltip, type TooltipSide } from "@/components/beui/tooltip";
@@ -13,40 +13,62 @@ import { cn } from "@/lib/utils";
  * is silently without one. The marker (`data-tooltip` / `data-no-tooltip`) is what `verify-tooltips.py` audits.
  */
 export type TooltipText = string | ReactElement | false;
-const TOOLTIP_DELAY = 350;
+export const TOOLTIP_DELAY = 350;
 const marker = (tooltip: TooltipText) => (tooltip === false ? { "data-no-tooltip": "" } : tooltip ? { "data-tooltip": "" } : {});
 
-/** beUI's spring-pressed button with Assetarium sizes: primary, secondary (outlined) and quiet. Its tooltip is required. */
-export function Button({ variant = "primary", tooltip, side = "top", className, ...props }: Omit<ButtonProps, "variant"> & { variant?: "primary" | "secondary" | "quiet" | "danger" | "destructive"; tooltip: TooltipText; side?: TooltipSide }) {
+/**
+ * A disabled `Button` / `IconButton` stays focusable so its tooltip can say why: `aria-disabled` replaces the native
+ * attribute and the click is swallowed. Enter, Space and a form's implicit submission all arrive as that click, and
+ * cancelling it cancels the submission.
+ */
+const swallow = (event: ReactMouseEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+};
+const inert = { "aria-disabled": true, onClick: swallow } as const;
+
+/** beUI's spring-pressed button with Assetarium sizes: primary, secondary (outlined) and quiet. Its tooltip is required; `disabledReason` replaces it while disabled. */
+export function Button({ variant = "primary", tooltip, disabledReason, disabled, onClick, side = "top", className, ...props }: Omit<ButtonProps, "variant"> & { variant?: "primary" | "secondary" | "quiet" | "danger" | "destructive"; tooltip: TooltipText; disabledReason?: string; side?: TooltipSide }) {
   const tone = {
-    primary: "bg-primary text-primary-foreground hover:bg-primary-hover",
-    secondary: "border border-border bg-surface text-foreground hover:bg-surface-2",
-    quiet: "bg-transparent text-foreground hover:bg-surface-2",
-    danger: "border border-border bg-surface text-fault hover:bg-fault-bg",
+    primary: "bg-primary text-primary-foreground hover:bg-primary-hover aria-disabled:hover:bg-primary",
+    secondary: "border border-border bg-surface text-foreground hover:bg-surface-2 aria-disabled:hover:bg-surface",
+    quiet: "bg-transparent text-foreground hover:bg-surface-2 aria-disabled:hover:bg-transparent",
+    danger: "border border-border bg-surface text-fault hover:bg-fault-bg aria-disabled:hover:bg-surface",
     // Solid red: only the button that confirms a deletion.
-    destructive: "bg-danger text-danger-foreground hover:bg-danger-hover",
+    destructive: "bg-danger text-danger-foreground hover:bg-danger-hover aria-disabled:hover:bg-danger",
   }[variant];
+  const shown = (disabled && disabledReason) || tooltip;
   return (
-    <Tooltip content={tooltip || null} side={side} delay={TOOLTIP_DELAY}>
-      <BeButton variant="ghost" size="md" pressScale={0.96} className={cn("h-10 gap-2 px-5 text-[13px] font-medium", tone, className)} {...marker(tooltip)} {...props} />
+    <Tooltip content={shown || null} side={side} delay={TOOLTIP_DELAY}>
+      <BeButton
+        variant="ghost"
+        size="md"
+        pressScale={0.96}
+        className={cn("h-10 gap-2 px-5 text-[13px] font-medium aria-disabled:cursor-default aria-disabled:opacity-50", tone, className)}
+        {...marker(shown)}
+        {...props}
+        // A disabled button neither springs on hover nor on press.
+        {...(disabled ? { ...inert, whileHover: undefined, whileTap: undefined } : { onClick })}
+      />
     </Tooltip>
   );
 }
 
-/** Icon-only action with a required accessible label that also shows as its focus/hover tooltip. */
-export function IconButton({ label, tooltip, active, className, children, side = "bottom", ...props }: ComponentProps<"button"> & { label: string; tooltip?: string | ReactElement; active?: boolean; side?: TooltipSide }) {
+/** Icon-only action with a required accessible label that also shows as its focus/hover tooltip; `disabledReason` replaces it while disabled. */
+export function IconButton({ label, tooltip, disabledReason, disabled, onClick, active, className, children, side = "bottom", ...props }: ComponentProps<"button"> & { label: string; tooltip?: string | ReactElement; disabledReason?: string; active?: boolean; side?: TooltipSide }) {
   return (
-    <Tooltip content={tooltip ?? label} side={side} delay={TOOLTIP_DELAY}>
+    <Tooltip content={(disabled && disabledReason) || (tooltip ?? label)} side={side} delay={TOOLTIP_DELAY}>
       <button
         type="button"
         aria-label={label}
         data-tooltip=""
         className={cn(
-          "relative grid size-10 place-items-center rounded-xl text-foreground transition-colors hover:bg-surface-2 disabled:pointer-events-none disabled:text-subtle",
+          "relative grid size-10 place-items-center rounded-xl text-foreground transition-colors hover:bg-surface-2 aria-disabled:cursor-default aria-disabled:text-subtle aria-disabled:hover:bg-transparent aria-disabled:hover:text-subtle",
           active && "bg-accent-soft text-accent-soft-foreground hover:bg-accent-soft",
           className,
         )}
         {...props}
+        {...(disabled ? inert : { onClick })}
       >
         {children}
       </button>

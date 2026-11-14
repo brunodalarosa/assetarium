@@ -46,10 +46,10 @@ export function Rail() {
   return (
     <nav aria-label="Main" className="flex w-24 shrink-0 flex-col items-center bg-rail pt-4 pb-5">
       <div className="flex gap-1">
-        <IconButton label="Back" onClick={goBack} disabled={!canBack} side="right" className="size-8 rounded-lg text-muted-foreground hover:text-foreground">
+        <IconButton label="Back" onClick={goBack} disabled={!canBack} disabledReason="No earlier view to go back to" side="right" className="size-8 rounded-lg text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-4" />
         </IconButton>
-        <IconButton label="Forward" onClick={goForward} disabled={!canForward} side="right" className="size-8 rounded-lg text-muted-foreground hover:text-foreground">
+        <IconButton label="Forward" onClick={goForward} disabled={!canForward} disabledReason="No later view to go forward to" side="right" className="size-8 rounded-lg text-muted-foreground hover:text-foreground">
           <ArrowRight className="size-4" />
         </IconButton>
       </div>
