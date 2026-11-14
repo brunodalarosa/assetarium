@@ -33,7 +33,7 @@ export function SearchCheckButton({ onReady }: { onReady?: () => void }) {
   return (
     <div className="search-check grid gap-1.5" data-state={check.status}>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="secondary" className="h-8 px-3 text-[12px]" data-action="run-search-check" disabled={check.status === "running"} tooltip="Runs search on built-in sample assets to confirm it works on this computer; your assets are not used" onClick={() => void run()}>
+        <Button variant="secondary" className="h-8 px-3 text-[12px]" data-action="run-search-check" disabled={check.status === "running"} disabledReason="The check is running" tooltip="Runs search on built-in sample assets to confirm it works on this computer; your assets are not used" onClick={() => void run()}>
           {check.status === "running" ? <Spinner /> : <Play className="size-3.5" aria-hidden />}{check.status === "failed" ? "Run check again" : "Run check"}
         </Button>
         {check.status === "running" && <span role="status" className="text-[12px] text-muted-foreground">{check.phase || "Running…"}</span>}

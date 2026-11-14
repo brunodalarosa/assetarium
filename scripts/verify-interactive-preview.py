@@ -367,7 +367,7 @@ def verify():
         select(blend['asset_id'])
         time.sleep(.5)
         assert 'isn’t available for .blend' in window.evaluate_js('LALPreview.current.status.textContent')
-        assert window.evaluate_js('LALPreview.current.viewButtons[3].disabled && LALPreview.current.more.disabled')
+        assert window.evaluate_js("LALPreview.current.viewButtons[3].getAttribute('aria-disabled')==='true' && LALPreview.current.more.getAttribute('aria-disabled')==='true'")
         assert stats()==before
         capture('09-blend-renders.png')
         window.evaluate_js("LALPreview.current.viewButtons[1].click()")

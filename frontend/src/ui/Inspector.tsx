@@ -699,7 +699,7 @@ function TagsSection({ assetId }: { assetId: string }) {
             className="h-9 min-w-0 flex-1 rounded-xl border border-border bg-surface px-3 text-[12.5px] outline-none hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25"
           />
           <datalist id={listId}>{known.filter((t) => !tags.includes(t.tag)).map((t) => <option key={t.tag} value={t.tag} />)}</datalist>
-          <Button type="submit" variant="secondary" className="h-9 px-3.5 text-[12.5px]" disabled={!draft.trim()} tooltip="Adds the tag to this asset; tags are shared app-wide and searchable">Add</Button>
+          <Button type="submit" variant="secondary" className="h-9 px-3.5 text-[12.5px]" disabled={!draft.trim()} disabledReason="Type a tag first" tooltip="Adds the tag to this asset; tags are shared app-wide and searchable">Add</Button>
         </form>
       )}
       {error && <p role="alert" className="text-[12px] text-fault">{error}</p>}

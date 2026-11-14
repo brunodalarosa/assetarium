@@ -75,7 +75,7 @@ def verify():
         ui.js("(async()=>{$('nav-home').click();await until(()=>$('library-view'));$('nav-settings').click();return true})()")
         # Settings reloads on return; Save stays disabled until the reload finishes.
         wait("$('settings-search-device')&&$('settings-search-device').querySelector('[data-value=cpu]').getAttribute('aria-checked')==='true'"
-             "&&!$('save-general-settings').disabled")
+             "&&!$('save-general-settings').matches(':disabled,[aria-disabled=true]')")
         ui.js("(async()=>{$('save-general-settings').click();return true})()")
         wait("$('general-settings-message').textContent.startsWith('Saved.')")
         assert ui.js("!$('general-settings-message').textContent.includes('Search now runs')")

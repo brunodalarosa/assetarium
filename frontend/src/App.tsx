@@ -14,6 +14,7 @@ import { AgentActivityPanel } from "./ui/AgentActivity";
 import { AddFolderWizard } from "./ui/AddFolderWizard";
 import { SetupWizard } from "./ui/SetupWizard";
 import { Rail, StoppedBanner, TopBar } from "./ui/Shell";
+import { ViewerTooltips } from "./ui/ViewerTooltips";
 
 function Page() {
   const current = useApp((s) => s.history[s.historyIndex]);
@@ -114,6 +115,7 @@ export function App() {
       <AppMenus />
       <ConfirmDialog />
       <CreateCollectionDialog />
+      <ViewerTooltips />
     </TooltipProvider>
   );
 }

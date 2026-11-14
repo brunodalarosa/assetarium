@@ -223,7 +223,7 @@ def fresh():
               "&&lal.state.render.values&&lal.state.render.values.blender);await frame();return true})()")
         ui.check('settings_shows_saved_blender_and_speed_test_is_available', """(async()=>({saved:$('blender-status').dataset.status==='Saved',
           path:$('blender-status').textContent.includes(%s), closed:!$('settings-blender-choice'),
-          test:!$('render-test-start').disabled}))()""" % json.dumps(found[0]))
+          test:!$('render-test-start').matches(':disabled,[aria-disabled=true]')}))()""" % json.dumps(found[0]))
         ui.js("(async()=>{$('blender-card').scrollIntoView({block:'start'});await frame();return true})()")
         shoot('07b-settings-blender-saved')
         ui.js("(async()=>{$('change-blender').click();await until(()=>$('settings-blender-choice'));await frame();return true})()")

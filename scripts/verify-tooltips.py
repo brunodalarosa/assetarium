@@ -4,7 +4,9 @@ Walks Home (grid and filters), Library (inspector and folder panel), Asset proce
 Settings, the notifications and agent panels and every setup step. On each, every visible button, switch, tab,
 checkbox and radio outside an open menu or listbox must carry `data-tooltip` or `data-no-tooltip` (set by the
 primitives in frontend/src/ui/primitives.tsx). Form fields with a visible label (beUI Switch and Checkbox) and select
-triggers, which show their value, count as labeled. Then one tooltip is opened by hover and one by keyboard focus.
+triggers, which show their value, count as labeled. Then one tooltip is opened by hover and one by keyboard focus,
+a disabled control (Forward) must stay focusable, ignore its click and show its reason, and the plain-JS 3D viewer's
+fullscreen button must show the same tooltip by hover and focus, inline and in fullscreen (inside the modal dialog).
 Small isolated synthetic sources; no model or Blender run. Writes data/gui/<run-name>/report.json.
 """
 import argparse
@@ -61,6 +63,27 @@ AUDIT = r"""window.tipAudit=()=>{
     self_explaining:controls.filter(e=>e.matches('[data-no-tooltip]')).length,missing};
 };
 window.tipText=()=>[...document.querySelectorAll('[role=tooltip]')].map(t=>t.textContent.trim()).join(' / ');
+true"""
+
+# Hover, then keyboard focus, on the viewer's fullscreen button: the tooltip shows its label, describes the button and
+# is the topmost element where it is drawn (outside the top layer a fullscreen dialog would cover it).
+AUDIT_VIEWER = r"""window.viewerTip=async(fullscreen)=>{const p=LALPreview.current,b=p.full,label=fullscreen?'Exit fullscreen':'Fullscreen';
+  // Start from no focus and no label: mounting and entering fullscreen move focus themselves.
+  document.activeElement?.blur();await until(()=>!tipText(),4000).catch(()=>0);
+  const seen=()=>{const t=document.querySelector('[role=tooltip]');if(!t)return false;const r=t.getBoundingClientRect();
+    return t.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))};
+  const described=()=>(b.getAttribute('aria-describedby')||'').split(' ').includes(document.querySelector('[role=tooltip]')?.id);
+  b.dispatchEvent(new PointerEvent('pointerover',{pointerId:1,pointerType:'mouse',bubbles:true}));
+  await until(()=>tipText(),8000);await frame();
+  const hover={text:tipText()===label,seen:seen(),described:described(),inside:Boolean(document.querySelector('[role=tooltip]').closest('dialog'))===fullscreen};
+  b.dispatchEvent(new PointerEvent('pointerout',{pointerId:1,pointerType:'mouse',bubbles:true,relatedTarget:document.body}));
+  await until(()=>!tipText(),8000);const closes=!tipText();
+  window.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true}));b.blur();b.focus();
+  await until(()=>tipText(),4000);await frame();
+  const focus={text:tipText()===label,seen:seen(),described:described()};
+  b.blur();await until(()=>!tipText(),4000);
+  return {hover_text:hover.text,hover_seen:hover.seen,hover_described:hover.described,hover_in_dialog_when_fullscreen:hover.inside,
+    closes,focus_text:focus.text,focus_seen:focus.seen,focus_described:focus.described,no_title:!b.hasAttribute('title')}};
 true"""
 
 os.environ.update(PYTHONNET_RUNTIME='netfx', TEMP=str(ROOT / 'scratch/tmp-mcp'), TMP=str(ROOT / 'scratch/tmp-mcp'))
@@ -136,6 +159,39 @@ def verify():
           await frame();return {opens:text==='Shows only assets with a recorded failure',described}})()""", 30)
         ui.capture('07-keyboard-tooltip.png')
         js("document.activeElement.blur();true")
+
+        # A disabled control stays focusable, ignores its click and says why it is disabled, by hover and by focus.
+        ui.check('disabled_control_explains_itself', """(async()=>{lal.navigate({page:'home'});
+          await until(()=>document.querySelector('[aria-label=Forward]'));
+          const b=document.querySelector('[aria-label=Forward]');await until(()=>b.getAttribute('aria-disabled')==='true');
+          const at=lal.state.historyIndex;b.click();await frame();
+          b.dispatchEvent(new PointerEvent('pointerenter',{pointerId:1,pointerType:'mouse',buttons:0}));
+          await until(()=>tipText(),8000);const hover=tipText();
+          // Leave from the corner, then move well away from the corridor toward the tooltip.
+          b.dispatchEvent(new PointerEvent('pointerleave',{pointerId:1,pointerType:'mouse',buttons:0,clientX:0,clientY:0}));
+          document.dispatchEvent(new PointerEvent('pointermove',{pointerId:1,pointerType:'mouse',clientX:innerWidth-2,clientY:innerHeight-2}));
+          await until(()=>!tipText(),8000);
+          window.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true}));b.focus();
+          await until(()=>tipText(),4000);const focus=tipText(),tip=document.querySelector('[role=tooltip]');
+          const described=(b.getAttribute('aria-describedby')||'').split(' ').includes(tip.id);
+          const out={hover:hover==='No later view to go forward to',focus:focus==='No later view to go forward to',described,
+            focusable:document.activeElement===b,native_disabled_absent:!b.disabled,click_ignored:lal.state.historyIndex===at};
+          b.blur();await until(()=>!tipText(),4000);return out})()""", 40)
+
+        # The plain-JS 3D viewer's toolbar shows the same tooltip (ui/ViewerTooltips.tsx), inline and in fullscreen,
+        # where it must render inside the modal dialog's top layer to be seen.
+        js(AUDIT_VIEWER)
+        js(f"lal.openSources({json.dumps(one['key'])},'',{json.dumps(ASSETS[0])});lal.setInspectorOpen(true);true")
+        # No live view here: stopping keeps the toolbar and its stills, so nothing loads in the background.
+        js("until(()=>window.LALPreview?.current?.full?.isConnected,20000).then(()=>{LALPreview.current.stop();return frame()}).then(()=>true)", 40)
+        ui.check('viewer_tooltip_inline', "viewerTip(false)", 40)
+        js("(async()=>{await LALPreview.current.enterFullscreen();await frame();return true})()", 20)
+        ui.check('viewer_tooltip_fullscreen', "viewerTip(true)", 40)
+        js("(async()=>{document.activeElement?.blur();await LALPreview.current.exitFullscreen();return true})()", 20)
+        result = js("(()=>{const p=LALPreview.current,b=p.more;return {no_title:![...p.dialog.querySelectorAll('[title]')].some(e=>e.tagName!=='IFRAME'),"
+                    "reason:b.getAttribute('aria-disabled')==='true'&&b.dataset.tooltipText==='Display options are available once the live view loads'}})()")
+        report['checks']['viewer_has_no_native_titles'] = result
+        assert all(result.values()), result
         report['status'] = 'passed'
     except Exception as exc:
         report.update(status='faulty', reason=str(exc), traceback=traceback.format_exc())

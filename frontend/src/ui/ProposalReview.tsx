@@ -130,7 +130,7 @@ function FolderReview({ folder, proposals }: { folder: string; proposals: Json[]
         </p>
         {faulty.map((p: Json) => <p key={p.id} className="text-[12px] text-fault">{p.reason}</p>)}
         <div className="flex flex-wrap items-center gap-3">
-          <Button className="h-9 px-4" data-action="apply-staged" disabled={!decisions.length || committing !== null} tooltip="Saves your accepted and rejected rules together; the arrows above show what changes" onClick={() => void commitStaged(folder, decisions)}>
+          <Button className="h-9 px-4" data-action="apply-staged" disabled={!decisions.length || committing !== null} disabledReason={decisions.length ? undefined : "Accept or reject a rule first"} tooltip="Saves your accepted and rejected rules together; the arrows above show what changes" onClick={() => void commitStaged(folder, decisions)}>
             {committing === folder ? "Applying…" : decisions.length ? `Apply decisions for ${plural(decisions.length, "pack", "packs")}` : "Apply"}
           </Button>
           <p className="text-[11.5px] text-muted-foreground">

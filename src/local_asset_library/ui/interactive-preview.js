@@ -22,6 +22,7 @@ window.LALPreview = (() => {
     return element;
   };
   const icon = name => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+  const off = element => element?.getAttribute('aria-disabled') === 'true';
   const paint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const mib = bytes => (bytes / 1048576).toFixed(1) + ' MiB';
 
@@ -94,8 +95,9 @@ window.LALPreview = (() => {
     }
     iconButton(name, label, action) {
       const button = make('button', undefined, 'model-icon'); button.type = 'button';
-      button.innerHTML = icon(name); button.setAttribute('aria-label', label); button.title = label;
-      button.dataset.tooltip = '';  // Its title is its tooltip (verify-tooltips.py audits the marker).
+      button.innerHTML = icon(name); button.setAttribute('aria-label', label);
+      // The app's tooltip shows data-tooltip-text (ViewerTooltips.tsx); verify-tooltips.py audits the marker.
+      button.dataset.tooltip = ''; button.dataset.tooltipText = label;
       button.onclick = action; return button;
     }
     buildMenu() {
@@ -127,19 +129,23 @@ window.LALPreview = (() => {
     }
     setControls(enabled) {
       for (const control of this.menuControls) control.disabled = !enabled;
-      this.more.disabled = !enabled;
-      this.more.title = enabled ? 'Display options' : 'Display options are available once the live view loads';
+      // aria-disabled, not disabled: the control stays focusable and its tooltip says why it is off.
+      this.more.setAttribute('aria-disabled', String(!enabled));
+      this.more.dataset.tooltipText = enabled ? 'Display options' : 'Display options are available once the live view loads';
       if (!enabled) this.closeMenu(false);
       // Before the live view, 3/4 · Front · Side switch the stills; there is no top still.
       const top = this.viewButtons[3];
-      top.disabled = !enabled; top.title = enabled ? '' : 'Top is available in the live view';
+      top.setAttribute('aria-disabled', String(!enabled));
+      if (enabled) { delete top.dataset.tooltip; delete top.dataset.tooltipText; top.dataset.noTooltip = ''; }
+      else { delete top.dataset.noTooltip; top.dataset.tooltip = ''; top.dataset.tooltipText = 'Top is available in the live view'; }
     }
     markView() { for (const b of this.viewButtons) b.setAttribute('aria-pressed', String(b.dataset.view === this.view)); }
     chooseView(name) {
+      if (off(this.viewButtons.find(b => b.dataset.view === name))) return;
       if (this.ready) { this.view = name; this.markView(); this.command('view', name); return; }
       if (name !== 'top' && name !== this.view) this.item.onView?.(name);
     }
-    toggleMenu() { if (this.menu.hidden) this.openMenu(); else this.closeMenu(true); }
+    toggleMenu() { if (off(this.more)) return; if (this.menu.hidden) this.openMenu(); else this.closeMenu(true); }
     openMenu() {
       if (!this.ready) return;
       if (!this.hint.hidden) this.retireHint();  // Opening the menu shows the controls were found.
@@ -311,7 +317,7 @@ window.LALPreview = (() => {
     setFullIcon() {
       const label = this.fullscreen ? 'Exit fullscreen' : 'Fullscreen';
       this.full.innerHTML = icon(this.fullscreen ? 'shrink' : 'expand');
-      this.full.setAttribute('aria-label', label); this.full.title = label;
+      this.full.setAttribute('aria-label', label); this.full.dataset.tooltipText = label;
     }
     toggleFullscreen() { if (this.fullscreen) return this.exitFullscreen(); return this.enterFullscreen(); }
     release(keepTicket = false) {

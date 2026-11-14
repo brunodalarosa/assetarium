@@ -218,7 +218,7 @@ function SpeedTest() {
         {running ? (
           <Button type="button" variant="secondary" id="render-test-cancel" disabled={render.busy} tooltip="Stops the speed test; the last finished result stays" onClick={() => void renderTest("cancel")}>Cancel test</Button>
         ) : (
-          <Button type="button" variant="secondary" id="render-test-start" disabled={render.busy || !values.blender} tooltip="A 2–3 minute test with synthetic shapes, never your assets, that picks the Automatic render and search settings" onClick={() => void renderTest("start")}>
+          <Button type="button" variant="secondary" id="render-test-start" disabled={render.busy || !values.blender} disabledReason={values.blender ? undefined : "Set up Blender first; the test renders with it"} tooltip="A 2–3 minute test with synthetic shapes, never your assets, that picks the Automatic render and search settings" onClick={() => void renderTest("start")}>
             {test ? "Test again" : "Test speed"}
           </Button>
         )}

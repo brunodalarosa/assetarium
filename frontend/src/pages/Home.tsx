@@ -24,7 +24,7 @@ function ResultsHeader() {
       <div className="flex flex-wrap items-center gap-2">
         <Hint content={browsing ? "No search: the library, narrowed by the filters" : "How these results were found"}><span className="inline-flex"><Badge className="h-7 px-2.5">{browsing ? "Browse" : modeLabel(search.modeUsed)}</Badge></span></Hint>
         {!browsing && (
-          <Button id="copy-settings" variant="quiet" className="h-8 px-3 text-[12px]" disabled={!search.lastSettings} tooltip="Copies this search’s exact settings so an agent can repeat it with MCP search_assets" onClick={() => search.lastSettings && void copyText(JSON.stringify(search.lastSettings, null, 2), "Exact MCP search_assets settings copied. Use the same catalog and index versions.")}>
+          <Button id="copy-settings" variant="quiet" className="h-8 px-3 text-[12px]" disabled={!search.lastSettings} disabledReason="Run a search first; this copies its exact settings" tooltip="Copies this search’s exact settings so an agent can repeat it with MCP search_assets" onClick={() => search.lastSettings && void copyText(JSON.stringify(search.lastSettings, null, 2), "Exact MCP search_assets settings copied. Use the same catalog and index versions.")}>
             <Copy className="size-3.5" aria-hidden />Copy search settings
           </Button>
         )}

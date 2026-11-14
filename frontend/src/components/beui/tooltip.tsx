@@ -227,6 +227,16 @@ function TooltipRoot({
     self.current.close = close;
   }, [close]);
 
+  // A controlled tooltip opened by its owner (not through openNow) still takes part in the one-at-a-time rule:
+  // it dismisses whichever tooltip is showing, and the next one to open dismisses it.
+  useLayoutEffect(() => {
+    if (controlledOpen === undefined) return;
+    if (controlledOpen) {
+      if (current && current !== self.current) current.close();
+      current = self.current;
+    } else if (current === self.current) current = null;
+  }, [controlledOpen]);
+
   const requestOpen = useCallback(() => {
     clearTimers();
     if (latest.current.open || latest.current.disabled || latest.current.empty) return;
@@ -360,12 +370,14 @@ function TooltipRoot({
 
   // While open, a trigger that turns disabled loses focus without a blur event,
   // and a window that loses focus never reports the pointer leaving.
+  // Assetarium: only native `disabled` closes it; an `aria-disabled` control stays
+  // focusable and its label says why it is disabled.
   useEffect(() => {
     if (!open || anchorRef || !trigger) return;
     const observer = new MutationObserver(() => {
-      if (trigger.matches(":disabled, [aria-disabled='true']")) close();
+      if (trigger.matches(":disabled")) close();
     });
-    observer.observe(trigger, { attributes: true, attributeFilter: ["disabled", "aria-disabled"] });
+    observer.observe(trigger, { attributes: true, attributeFilter: ["disabled"] });
     window.addEventListener("blur", close);
     return () => {
       observer.disconnect();
@@ -541,6 +553,12 @@ export interface TooltipContentProps {
   arrow?: boolean;
   /** Point within the anchor, as fractions of its rendered width and height. */
   anchorPoint?: TooltipPoint;
+  /**
+   * Assetarium: where the tooltip is portaled (default `document.body`). An anchor
+   * inside a modal `<dialog>` needs the dialog itself: the top layer hides and
+   * makes inert everything outside it.
+   */
+  container?: Element | null;
   className?: string;
 }
 
@@ -551,6 +569,7 @@ export function TooltipContent({
   sideOffset,
   arrow = false,
   anchorPoint,
+  container,
   className,
 }: TooltipContentProps) {
   const {
@@ -621,7 +640,7 @@ export function TooltipContent({
         ) : null}
       </AnimatePresence>
     </>,
-    document.body,
+    container ?? document.body,
   );
 }
 
@@ -651,6 +670,7 @@ export function Tooltip(props: TooltipProps) {
     sideOffset,
     arrow,
     anchorPoint,
+    container,
     className,
     ...root
   } = props;
@@ -664,6 +684,7 @@ export function Tooltip(props: TooltipProps) {
         sideOffset={sideOffset}
         arrow={arrow}
         anchorPoint={anchorPoint}
+        container={container}
         className={className}
       >
         {content}
