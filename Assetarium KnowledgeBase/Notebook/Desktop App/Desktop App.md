@@ -20,6 +20,14 @@ committed bundle. Linux has no desktop app yet (decision 0013). Up: [Notebook](.
 - [Collections and tags](../../Architecture/Desktop%20App/Collections%20and%20tags.md) *(gap)*:
   `asset_collections.py`, `asset_tags.py`, `collection_export.py`.
 
+## Rules
+
+- **Modal overlays** remember their opener before any `await` (a native dialog or a disabled button drops
+  focus), make the shell `inert`, and restore focus in the effect cleanup, after `inert` lifts. Tab also wraps
+  inside the overlay, because `inert` doesn't cover sibling overlays. A window-level key handler must yield
+  while a native `dialog:modal` is open (the close confirmation can stack over a wizard), or it steals that
+  dialog's Tab and Escape. Anchors: `rememberAddFolderOpener`, `restoreAddFolderFocus`.
+
 ## Read first
 
 - [Desktop app design](../../Architecture/Desktop%20App/Desktop%20app%20design.md) (Architecture) and the user guide
