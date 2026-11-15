@@ -28,3 +28,9 @@ committed bundle. Linux has no desktop app yet (decision 0013). Up: [Notebook](.
   [0031](../../Decisions/0031-setup.md), [Design language](../../Architecture/Desktop%20App/Design%20language.md).
 - `AGENTS.md` → User experience: keep actions clear, never offer an action that can't resolve the
   displayed state, keep pending work and recorded failures apart.
+
+## Gotchas
+
+- **A flyout portaled out of a beUI menu still receives the menu's React key handling**: portals bubble
+  synthetic events through the component tree. Stop propagation in the flyout's own key handler
+  (`frontend/src/ui/Menus.tsx`).
