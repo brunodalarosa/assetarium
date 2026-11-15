@@ -241,7 +241,7 @@ export function RunReport() {
       aria-labelledby="run-report-title"
       closedby="closerequest"
       onCancel={(event) => { event.preventDefault(); close(); }}
-      onClose={() => { if (getState().runReport) close(); }}
+      onClose={(event) => { if (!event.currentTarget.open && getState().runReport) close(); }}
       className="m-auto w-[min(640px,calc(100vw-32px))] rounded-[28px] border border-border bg-surface p-0 text-foreground shadow-panel backdrop:bg-black/30"
     >
       {report && content && (

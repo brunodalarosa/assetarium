@@ -86,6 +86,11 @@ def verify():
             ui.check(f'{name}: idle closedby is closerequest', f"{dialog}.closedBy==='closerequest'&&{dialog}.getAttribute('closedby')==='closerequest'")
             ui.check(f'{name}: idle requestClose() closes and clears', closed_by_browser(dialog, field, 'requestClose'))
             ui.check(f'{name}: reopens after requestClose()', opened(dialog, open_it, field))
+            # close() queues its close event; a request arriving before it fires must survive it.
+            ui.check(f'{name}: a request made before the close event fires stays open', f"""(async()=>{{
+              {dialog}.close();{open_it};const request={field};
+              await new Promise(r=>setTimeout(r,200));await frame();
+              return {{open:{dialog}.open,kept:Boolean(request)&&{field}===request}}}})()""")
             if name == 'confirm':
                 ui.capture('01-confirm.png')
             ui.js(f"{dialog}.close()")

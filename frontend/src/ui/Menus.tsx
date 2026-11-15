@@ -496,27 +496,30 @@ export function AppMenus() {
   );
 }
 
-function useModal(open: boolean) {
+/** Keyed on the request, not on open/closed: a new request reopens a dialog the browser closed meanwhile. */
+function useModal(request: object | null) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (open && !dialog.current?.open) {
+    if (request && !dialog.current?.open) {
       dialog.current?.showModal();
       // showModal focuses the first control (the close button); the intended field wins.
       dialog.current?.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     }
-    if (!open && dialog.current?.open) dialog.current.close();
-  }, [open]);
+    if (!request && dialog.current?.open) dialog.current.close();
+  }, [request]);
   return dialog;
 }
 // The browser may close a modal on its own (a repeated Esc ignores preventDefault), so every close
 // clears the request the store still holds; otherwise the next request could never reopen it.
+// The close event is queued, so one arriving after the dialog reopened for a newer request is ignored.
 // While busy, closedby="none" keeps Esc from closing it; onCancel still guards requestClose().
 const closedBy = (busy: boolean) => (busy ? "none" : "closerequest");
+const reopened = (event: { currentTarget: HTMLDialogElement }) => event.currentTarget.open;
 
 /** Every deletion is confirmed here; only the red button deletes. */
 export function ConfirmDialog() {
   const request = useApp((s) => s.confirm);
-  const dialog = useModal(Boolean(request));
+  const dialog = useModal(request);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -546,7 +549,7 @@ export function ConfirmDialog() {
       aria-describedby="confirm-body"
       closedby={closedBy(busy)}
       onCancel={(event) => { event.preventDefault(); if (!busy) closeConfirm(); }}
-      onClose={() => { if (getState().confirm) closeConfirm(); }}
+      onClose={(event) => { if (!reopened(event) && getState().confirm) closeConfirm(); }}
       className="m-auto w-[min(460px,calc(100vw-32px))] rounded-[24px] border border-border bg-surface p-0 text-foreground shadow-panel backdrop:bg-black/35"
     >
       {request && (
@@ -579,7 +582,7 @@ export function ConfirmDialog() {
 export function CreateCollectionDialog() {
   const request = useApp((s) => s.create);
   const page = useApp((s) => s.history[s.historyIndex].page);
-  const dialog = useModal(Boolean(request));
+  const dialog = useModal(request);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -614,7 +617,7 @@ export function CreateCollectionDialog() {
       aria-labelledby="create-collection-title"
       closedby={closedBy(busy)}
       onCancel={(event) => { event.preventDefault(); if (!busy) closeCreateCollection(); }}
-      onClose={() => { if (getState().create) closeCreateCollection(); }}
+      onClose={(event) => { if (!reopened(event) && getState().create) closeCreateCollection(); }}
       className="m-auto w-[min(520px,calc(100vw-32px))] rounded-[24px] border border-border bg-surface p-0 text-foreground shadow-panel backdrop:bg-black/35"
     >
       {request && (
