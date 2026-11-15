@@ -30,12 +30,20 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   scripts and from `desktop.py` (`askClose`). "No importer in `frontend/src`" does not mean unused: search
   `scripts/` and `src/` for the name too.
 
+- **`closedby="none"` stops Esc but not `dialog.requestClose()`**, which still fires a cancelable `cancel`. A busy
+  dialog stays open under `requestClose()` only through its `onCancel` `preventDefault()`. Native closes fire
+  `close`, so dialogs clear their store request in `onClose` (`frontend/src/ui/Menus.tsx`).
+
 - **Routes are not in `location.hash`.** Wait on `lal.state.history[lal.state.historyIndex].page` (for example `'sources'`) to see where `navigate` went.
 
 - **A restart can be simulated.** Set a flag (`window.__beforeRestart=true`), call
   `window.load_html(page_html(config)[0])`, then `ui.wait_ready(extra='!window.__beforeRestart')`. A bridge
   poll still in flight then logs a harmless `_returnValuesCallbacks … is not a function` traceback.
   See `scripts/verify-inspector-layout.py`.
+
+- **To test IME-safe Enter**, dispatch `new KeyboardEvent('keydown',{key:'Enter',isComposing:true})`; for the
+  legacy path override `keyCode` with `Object.defineProperty(e,'keyCode',{get:()=>229})`. See
+  `scripts/verify-collection-flyout.py`.
 
 - **Timers are throttled in the verify window.** It runs in the background, so `setInterval` /
   `setTimeout` can fire far less often than asked. To count UI changes during fast input, use a
@@ -49,9 +57,15 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   the page behind it inert (nothing there takes focus). It opens shortly *after* `ui.wait_ready()` returns, so
   wait for `lal.state.setup.open` before `lal.closeSetup()` (see `scripts/verify-library-gui.py`).
 
-- `verify-setup-wizard.py`'s opening-focus check (`opens_by_itself_on_a_fresh_install` → `focus`)
-  failed on unchanged `develop` when launched from an agent session on 2026-10-28; treat a failure there
-  as possibly environmental before blaming a change *(unverified: cause)*.
+- **Setup focuses `#setup-step-title` in a `SetupWizard` mount effect**, so `verify-setup-wizard.py`'s
+  opening-focus check covers the fresh-install auto-open too. Its old failure was real: focus came only from
+  `openSetup` after loading.
+
+- **Real key presses need trusted input.** A synthetic `KeyboardEvent` never moves focus or runs Space/Enter
+  defaults, and `element.click()` doesn't focus either. For Tab, Space or Enter send DevTools
+  `Input.dispatchKeyEvent` (`rawKeyDown`/`keyUp`) through `CoreWebView2.CallDevToolsProtocolMethodAsync`, as
+  `scripts/verify-interactive-preview.py` and `scripts/verify-wizard-focus.py` do. Enter needs `text: '\r'` to
+  click a button.
 
 ## Related
 

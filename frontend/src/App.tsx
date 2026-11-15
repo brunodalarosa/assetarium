@@ -90,10 +90,11 @@ function useGlobalKeys() {
 export function App() {
   useGlobalKeys();
   const setupOpen = useApp((s) => s.setup.open);
+  const addFolderOpen = useApp((s) => s.addFolder.open);
   return (
     <TooltipProvider>
-      {/* Setup covers the whole window; the app behind it is inert until setup closes. */}
-      <div className="flex h-full bg-background text-foreground" inert={setupOpen || undefined}>
+      {/* Setup and the add-folder wizard are modal; the app behind them is inert until they close. */}
+      <div className="flex h-full bg-background text-foreground" inert={setupOpen || addFolderOpen || undefined}>
         <Rail />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />

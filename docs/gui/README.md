@@ -75,7 +75,9 @@ the inspector for that asset, otherwise its primary file. The backend resolves t
 window only names the asset), nothing is opened or hashed, and a missing original is a visible fault toast without a retry.
 The flyout searches collections, ticks those that already hold the asset (choosing
 one again removes it, with Undo), and **Create new collection**; typing an unused
-name offers **Create “name”**, which creates it and adds the asset in one step.
+name offers **Create “name”**, which creates it and adds the asset in one step
+(an Enter that confirms IME input only confirms the text). Arrow keys move between
+the search, Create and the collections; Escape (or ← on a row) goes back to the menu, Tab closes both.
 While any of these menus is open, the window behind it (except the item the menu
 came from, which stays sharp and clickable) dims slightly with a light
 blur and is shielded: a click outside only closes the menu (it never reaches the

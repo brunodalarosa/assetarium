@@ -405,7 +405,12 @@ const TITLES: Record<SetupStep, string> = {
 
 export function SetupWizard() {
   const setup = useApp((s) => s.setup);
+  const addFolderOpen = useApp((s) => s.addFolder.open);
   const titleId = useId();
+  // Focus starts on the step title however setup opened (from Settings, by itself on a fresh install, after a fault).
+  useEffect(() => {
+    if (setup.open && !document.getElementById("setup-wizard")?.contains(document.activeElement)) document.getElementById("setup-step-title")?.focus({ preventScroll: true });
+  }, [setup.open]);
   if (!setup.open) return null;
   const step = SETUP_STEPS[setup.step];
   const Content = CONTENT[step];
@@ -416,7 +421,7 @@ export function SetupWizard() {
   const review = setup.info?.record?.state === "review";
   // Welcome offers its two paths as cards, so it needs no footer.
   return (
-    <div id="setup-wizard" role="dialog" aria-modal="true" aria-labelledby={titleId} data-step={step} className="fixed inset-0 z-[45] flex bg-background text-foreground">
+    <div id="setup-wizard" role="dialog" aria-modal="true" aria-labelledby={titleId} data-step={step} inert={addFolderOpen || undefined} className="fixed inset-0 z-[45] flex bg-background text-foreground">
       <aside className="hidden w-[248px] shrink-0 flex-col gap-6 border-r border-border bg-surface px-5 py-7 md:flex">
         <div className="grid gap-1 px-2">
           <span className="text-[12px] font-medium tracking-wide text-muted-foreground uppercase">Assetarium</span>
