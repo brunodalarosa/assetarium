@@ -30,6 +30,10 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   scripts and from `desktop.py` (`askClose`). "No importer in `frontend/src`" does not mean unused: search
   `scripts/` and `src/` for the name too.
 
+- **`closedby="none"` stops Esc but not `dialog.requestClose()`**, which still fires a cancelable `cancel`. A busy
+  dialog stays open under `requestClose()` only through its `onCancel` `preventDefault()`. Native closes fire
+  `close`, so dialogs clear their store request in `onClose` (`frontend/src/ui/Menus.tsx`).
+
 - **Routes are not in `location.hash`.** Wait on `lal.state.history[lal.state.historyIndex].page` (for example `'sources'`) to see where `navigate` went.
 
 - **A restart can be simulated.** Set a flag (`window.__beforeRestart=true`), call
