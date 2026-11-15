@@ -2,8 +2,8 @@
 
 Uses real key input (DevTools Input.dispatchKeyEvent), since synthetic KeyboardEvents never move focus: the wizard
 opened with Enter puts focus on its title, the app behind is inert, Tab and Shift+Tab stay inside on the What we found
-and Finish steps, and focus returns to Add library folder on Escape (close) and on Minimize. Setup opened from Settings
-puts focus on its step title. Writes data/gui/<run-name>/verification.json.
+and Finish steps, the close confirmation stacked over the wizard keeps Tab and Escape for itself, and focus returns to
+Add library folder on Escape (close) and on Minimize. Setup opened from Settings puts focus on its step title. Writes data/gui/<run-name>/verification.json.
 """
 import argparse
 import json
@@ -139,6 +139,18 @@ def verify():
         stops = walk(12) + walk(12, shift=True)
         report['checks']['agent_tab_stops'] = sorted({s['id'] or s['text'] for s in stops})
         ui.capture('02-agent-focus.png')
+        # Closing the window while processing stacks the native close confirmation over the wizard: it owns Tab and Escape.
+        ui.js("lal.askClose({title:'Stop processing and close?',body:'Synthetic close question.'})")
+        wait("$('confirm-dialog').open&&document.activeElement===$('confirm-cancel')", 10)
+        press('Tab')
+        ui.check('confirm_over_wizard_tab_reaches_accept', "document.activeElement===$('confirm-accept')")
+        press('Tab', shift=True)
+        ui.check('confirm_over_wizard_shift_tab_back', "document.activeElement===$('confirm-cancel')")
+        ui.capture('02b-confirm-over-wizard.png')
+        press('Escape')  # Closes only the confirmation; the wizard stays on Finish.
+        wait("!$('confirm-dialog').open&&!lal.state.confirm", 10)
+        ui.check('confirm_escape_keeps_wizard', f"!!{WIZARD}&&{WIZARD}.dataset.step==='agent'")
+        ui.js(f"{WIZARD}.querySelector('h2').focus()")
         assert ui.js(f"{WIZARD}.dataset.step") == 'agent'
         press('Escape')  # On Finish, Escape minimizes; the agent keeps working.
         wait(f"!{WIZARD}", 10)

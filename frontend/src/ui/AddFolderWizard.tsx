@@ -230,6 +230,8 @@ export function AddFolderWizard() {
   useEffect(() => {
     if (!add.open) return;
     const onKey = (event: KeyboardEvent) => {
+      // A native modal on top (the close confirmation) owns Tab and Escape; the wizard behind it is inert until it closes.
+      if (document.querySelector("dialog:modal")) return;
       // The app behind is inert; Tab also wraps here so it never leaves for toasts or the window edge.
       if (event.key === "Tab" && panel.current) {
         const items = [...panel.current.querySelectorAll<HTMLElement>(TABBABLE)].filter((el) => el.getClientRects().length > 0);
