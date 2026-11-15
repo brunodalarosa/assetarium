@@ -27,6 +27,7 @@ const GAP = 8; // Between the menu and the flyout, covered by the bridge.
 /**
  * The "Add to a collection" flyout: find, create, and tick collections for one asset.
  * It sits beside the menu as its own layer so typing in its search never reaches the menu's typeahead.
+ * A non-modal dialog, not a menu: a menu may hold only menu items, and screen readers in menu mode may not let you type.
  */
 function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTMLElement; grid: GridId; item: Json; onBack: () => void; onEnter: () => void }) {
   const menu = useContextMenuState();
@@ -74,10 +75,11 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
   };
   const focusables = () => [...(panel.current?.querySelectorAll<HTMLElement>("[data-flyout-item]") || [])];
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    // A portal still bubbles through the React tree: keep the menu's arrows and typeahead out of the flyout.
+    event.stopPropagation();
     const inInput = event.target === input.current;
     if (event.key === "Escape" || (event.key === "ArrowLeft" && !inInput)) {
       event.preventDefault();
-      event.stopPropagation();
       onBack();
       return;
     }
@@ -89,7 +91,8 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
       (next < 0 ? input.current : list[next])?.focus();
       return;
     }
-    if (event.key === "Enter" && inInput) {
+    // The IME's confirming Enter (composing, or keyCode 229) belongs to the text, never to the flyout.
+    if (event.key === "Enter" && inInput && !event.nativeEvent.isComposing && event.keyCode !== 229) {
       event.preventDefault();
       if (shown.length === 1 && words) choose(shown[0]);
       else create();
@@ -111,7 +114,7 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
       ref={panel}
       data-context-menu-layer={menu.menuId}
       id="collection-flyout"
-      role="menu"
+      role="dialog"
       aria-label="Add to a collection"
       initial={reduce ? { opacity: 0 } : { opacity: 0, x: -6, scale: 0.98 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -137,7 +140,6 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
         />
       </label>
       <Pressable
-        role="menuitem"
         tooltip={false}
         data-flyout-item=""
         id="collection-flyout-create"
@@ -166,9 +168,8 @@ function CollectionFlyout({ anchor, grid, item, onBack, onEnter }: { anchor: HTM
         {shown.map((collection) => (
           <Pressable
             key={collection.collection_id}
-            role="menuitemcheckbox"
             side="right"
-            aria-checked={Boolean(collection.contains)}
+            aria-pressed={Boolean(collection.contains)}
             data-flyout-item=""
             data-collection={collection.collection_id}
             tooltip={collection.contains ? "Already in this collection; choose it to take the asset out" : `Adds the asset to ${collection.name}`}
@@ -227,7 +228,7 @@ function AssetMenuItems({ request }: { request: MenuRequest }) {
         <ScanSearch className={ICON} aria-hidden />Inspect
       </ContextMenuItem>
       <div ref={trigger} data-menu-action="add-to-collection">
-        <ContextMenuItem textValue="Add to a collection" closeOnSelect={false} onSelect={() => setFlyout(true)} className={flyout ? "bg-foreground/[0.065]" : undefined}>
+        <ContextMenuItem textValue="Add to a collection" ariaHasPopup="dialog" ariaExpanded={flyout} closeOnSelect={false} onSelect={() => setFlyout(true)} className={flyout ? "bg-foreground/[0.065]" : undefined}>
           <FolderPlus className={ICON} aria-hidden />
           <span className="flex-1">Add to a collection</span>
           <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />

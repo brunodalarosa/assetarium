@@ -92,6 +92,11 @@ All notable changes to Assetarium are listed here. The project follows
 - **Image-only work is no longer called previews.** A library folder, pack or folder whose waiting assets are
   all images offers **N not processed · Process images** (and **Process images** in its menu) instead of
   **N without previews · Make previews**: images are measured and prepared for search, never rendered.
+- **Typing in the collection flyout with an IME or a screen reader.** Confirming Japanese, Chinese or Korean
+  input with Enter no longer creates a collection from half-typed text in **Add to a collection ›**, or leaves
+  the inspector's collection label field mid-word. Arrow keys and letters typed in the flyout's search stay in
+  the flyout instead of jumping to the menu behind it, and screen readers now treat the flyout as a dialog you
+  can type in, with toggle buttons for the collections.
 
 ## [0.2.0] — 2026-11-05
 
