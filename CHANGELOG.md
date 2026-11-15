@@ -89,6 +89,9 @@ All notable changes to Assetarium are listed here. The project follows
   run report dialog while the app still thought it was open, so the same request never reopened it and a later
   error stayed hidden. Every way a dialog closes now resets it, and while a dialog is working (Delete, Create
   collection…) Esc no longer closes it.
+- **Keyboard focus stays in the add-folder wizard.** Opening it moves focus to its title, Tab and Shift+Tab
+  stay inside it and the app behind can't be reached; closing or minimizing it returns focus to **Add library
+  folder**. Setup also starts with focus on its step title however it opens.
 - **Unprocessed 2D images open in the inspector.** The inspector showed "This image has not been processed yet"
   for an image whose card already showed it; it now opens the image from its original file in the image viewer
   (zoom, background, hard pixel edges for small art), with a line saying what processing adds. Nothing is

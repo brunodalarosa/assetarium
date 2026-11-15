@@ -50,9 +50,15 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   the page behind it inert (nothing there takes focus). It opens shortly *after* `ui.wait_ready()` returns, so
   wait for `lal.state.setup.open` before `lal.closeSetup()` (see `scripts/verify-library-gui.py`).
 
-- `verify-setup-wizard.py`'s opening-focus check (`opens_by_itself_on_a_fresh_install` → `focus`)
-  failed on unchanged `develop` when launched from an agent session on 2026-10-28; treat a failure there
-  as possibly environmental before blaming a change *(unverified: cause)*.
+- **Setup focuses `#setup-step-title` in a `SetupWizard` mount effect**, so `verify-setup-wizard.py`'s
+  opening-focus check covers the fresh-install auto-open too. Its old failure was real: focus came only from
+  `openSetup` after loading.
+
+- **Real key presses need trusted input.** A synthetic `KeyboardEvent` never moves focus or runs Space/Enter
+  defaults, and `element.click()` doesn't focus either. For Tab, Space or Enter send DevTools
+  `Input.dispatchKeyEvent` (`rawKeyDown`/`keyUp`) through `CoreWebView2.CallDevToolsProtocolMethodAsync`, as
+  `scripts/verify-interactive-preview.py` and `scripts/verify-wizard-focus.py` do. Enter needs `text: '\r'` to
+  click a button.
 
 ## Related
 
