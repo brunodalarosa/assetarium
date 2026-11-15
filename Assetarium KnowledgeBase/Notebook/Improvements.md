@@ -35,6 +35,9 @@ Format: `- **<what gets in the way>**: why it hurts, what would improve it. Seen
 - **Verify scripts move to wizard steps by number**: `verify-agent-setup.py` used `goToSetupStep(6)`,
   which stopped being Review when the model step was added. Look steps up by name, as
   `verify-setup-wizard.py` does (`STEPS.index(name)`). Seen: 2026-11-01
+- **Two GUI verify scripts fail on `develop`**: `verify-recheck.py` (no Recheck button on the kit card) and
+  `verify-notifications.py` (fixture item-name assertion), so a run can't tell a new failure from an old one
+  there. Fix the scripts or the fixture. Seen: 2026-11-15
 
 ## Agent setup
 
