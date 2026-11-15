@@ -335,11 +335,14 @@ Enabled library folders are scanned at startup; the app watches cheap file stamp
 1.5 s and reloads library or folder data only when one changes (decision 0027).
 Processing never starts automatically.
 
-**Keyboard.** Tab/Shift+Tab move between controls, arrows/Home/End move within
-the grid, Enter/Space activate, Ctrl+F focuses search (from any view), and Escape
+**Keyboard.** Tab/Shift+Tab move between controls; the asset grid and the folder
+tree are each one Tab stop (Tab returns to the card or folder you left), with
+arrows/Home/End moving within them. Enter/Space activate, Ctrl+F focuses search (from any view), and Escape
 closes the open panel, then hides inspection. Controls have accessible names,
 live status/error announcements and visible focus. Native keyboard checks are
-separate from a full screen-reader audit and Bruno's usability approval.
+separate from a full screen-reader audit and Bruno's usability approval:
+`scripts/verify-grid-keyboard.py --run-name <unique-name>` checks the grid's Tab
+stop, arrows and edges, and folder-tree Space/Enter with real key input.
 
 Native verification of the layout itself, in both themes:
 `scripts/verify-layout-revamp.py --run-name <unique-name>` (synthetic assets;

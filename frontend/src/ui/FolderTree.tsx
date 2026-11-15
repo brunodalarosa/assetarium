@@ -154,6 +154,8 @@ export function FolderTree() {
   const scroller = useRef<HTMLDivElement>(null);
   const [scroll, setScroll] = useState({ top: 0, height: 600 });
   const [focus, setFocus] = useState<string | null>(null);
+  // Space acts on keyup like a native button, and only when it was pressed here.
+  const space = useRef(false);
   // Rows reveal once; rows that scroll back into view (or re-render) appear without replaying it.
   const shown = useRef(new Set<string>());
   const selectedId = view.key ? view.key + ":" + view.path : null;
@@ -195,7 +197,8 @@ export function FolderTree() {
     } else if (event.key === "ArrowLeft") {
       if (row.open) toggleFolder(row.id, false);
       else if (row.parent) move(rows.findIndex((r) => r.id === row.parent));
-    } else if (event.key === "Enter" || event.key === " ") inspectFolder(row.key, row.path);
+    } else if (event.key === "Enter") inspectFolder(row.key, row.path);
+    else if (event.key === " ") space.current = true;
     else if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
       const element = document.getElementById("tree-" + row.id.replace(/[^a-zA-Z0-9_-]/g, "_"));
       const rect = element?.getBoundingClientRect();
@@ -212,6 +215,13 @@ export function FolderTree() {
       aria-label="Library folders"
       onScroll={(event) => setScroll({ top: event.currentTarget.scrollTop, height: event.currentTarget.clientHeight })}
       onKeyDown={onKeyDown}
+      onKeyUp={(event) => {
+        if (event.key !== " " || !space.current) return;
+        space.current = false;
+        const row = rows.find((r) => r.id === focused);
+        if (row) inspectFolder(row.key, row.path);
+      }}
+      onBlur={() => (space.current = false)}
       className="h-full overflow-y-auto overscroll-contain px-2 pb-6 scroll-thin"
     >
       <div style={{ height: rows.length * ROW, position: "relative" }}>

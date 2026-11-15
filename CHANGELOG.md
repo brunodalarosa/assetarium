@@ -18,6 +18,11 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- **The asset grid is one Tab stop**: Tab enters the results at the card you last focused or selected and the next
+  Tab leaves them (a variant group's chips come first); arrows, Home and End move between cards and scroll the card
+  into view, and an arrow with no card that way scrolls the page instead. Screen readers hear the grid as the
+  "Asset results" group, and cards no longer announce a menu on click. In the folder tree, Space opens a folder when
+  released, like a button; Enter still opens it on press.
 - **Disabled buttons say why**: a greyed-out button can now be focused with Tab and shows its tooltip on hover and
   focus, with the reason it is unavailable where the app knows it (Forward, Rescan on an offline folder, Apply with
   no decisions…). Clicking it still does nothing. The 3D viewer's buttons (3D controls, Fullscreen, Display options, and Top

@@ -1,6 +1,6 @@
 import { Ban, Box, Check, Circle, CircleAlert, CircleSlash, Clock, FileQuestion, FileText, FileX, Image as ImageIcon, Layers, Loader, SwatchBook, ToggleLeft, TriangleAlert, Unlink } from "lucide-react";
 import { useReducedMotion } from "motion/react";
-import { type ComponentType, type CSSProperties, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type ComponentType, type CSSProperties, type FocusEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
@@ -76,7 +76,7 @@ function badges(item: Json, thumb?: Thumb) {
   return list;
 }
 
-function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId; item: Json; selected: string | null; index: number }) {
+function AssetCard({ grid, item: card, selected: chosen, index, active }: { grid: GridId; item: Json; selected: string | null; index: number; active: boolean }) {
   // A variant group is one card (decision 0035): chips pick the variant shown; hovering a chip previews it.
   const variants: Json[] = card.variants || [];
   const [shown, setShown] = useState<string>(card.asset_id);
@@ -121,15 +121,15 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
     if (selected) void selectAsset(grid, id, null, "three_quarter", false);
   };
   return (
-    <div className="card-wrap relative min-w-0">
+    <div className="card-wrap relative min-w-0" data-card={card.asset_id}>
     <MotionPressable
       ref={ref}
       data-id={item.asset_id}
+      tabIndex={active ? 0 : -1}
       aria-pressed={choosing ? ticked : selected}
       aria-label={(choosing ? (ticked ? "Selected: " : "Not selected: ") : "") + label + (item.label ? `, labeled ${item.label}` : "")
         + (variants.length ? `, ${variants.length} variants, showing ${item.variant}` : "")}
       aria-describedby={describedBy}
-      aria-haspopup="menu"
       // The card shows the asset; selecting it to inspect needs no label, a recorded fault does.
       tooltip={thumb?.presentation?.faults?.length ? "Recorded faults: select the card to see them in detail" : false}
       onClick={(event) => {
@@ -219,7 +219,7 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
       <span className="variant-chips absolute bottom-3 left-5 right-5 flex gap-1 overflow-hidden" role="radiogroup" aria-label={`Variants of ${card.name}`}
         onMouseLeave={() => setPeek(null)}>
         {variants.map((v) => (
-          <Pressable key={v.asset_id} role="radio" aria-checked={v.asset_id === shown} tooltip={v.name} delay={250} tabIndex={v.asset_id === shown ? 0 : -1}
+          <Pressable key={v.asset_id} role="radio" aria-checked={v.asset_id === shown} tooltip={v.name} delay={250} tabIndex={active && v.asset_id === shown ? 0 : -1}
             onMouseEnter={() => setPeek(v.asset_id)} onFocus={() => setPeek(v.asset_id)} onBlur={() => setPeek(null)} onClick={() => pick(v.asset_id)}
             className={cn("h-6 min-w-7 shrink-0 rounded-full border px-2 text-[11px] transition-colors",
               v.asset_id === shown ? "border-primary bg-accent-soft text-accent-soft-foreground" : "border-border bg-surface text-muted-foreground hover:border-border-strong hover:text-foreground")}>
@@ -232,8 +232,13 @@ function AssetCard({ grid, item: card, selected: chosen, index }: { grid: GridId
   );
 }
 
+/** The card showing an asset id: the card itself or the variant group holding it. */
+const cardOf = (items: Json[], id: string | null) =>
+  id ? items.find((item) => item.asset_id === id || item.variants?.some((v: Json) => v.asset_id === id))?.asset_id ?? null : null;
+
 /**
- * Responsive card grid with arrow-key movement between cards. While it loads it shows ghost
+ * Responsive card grid, one Tab stop with arrow-key movement between cards (roving tabindex: the card
+ * last focused or selected, else the first, takes Tab). While it loads it shows ghost
  * cards (`append` adds a row of them after the cards already shown) or dims the cards it is
  * about to replace; `pending` overrides the grid's own loading flag.
  */
@@ -245,6 +250,20 @@ export function AssetGrid({ grid, id, pending, append }: { grid: GridId; id: str
   const shown = useShownWhile(loading);
   const ghosts = !shown ? 0 : !items.length ? 8 : append ? 4 : 0;
   const gridRef = useRef<HTMLDivElement>(null);
+  // The card that takes Tab; a new selection moves it there. Resolved during render so a card that
+  // left the results (paging, a new search) hands the stop on at once.
+  const [focus, setFocus] = useState<string | null>(null);
+  const [seen, setSeen] = useState(selected);
+  if (seen !== selected) {
+    setSeen(selected);
+    const card = cardOf(items, selected);
+    if (card) setFocus(card);
+  }
+  const active = items.some((item) => item.asset_id === focus) ? focus : cardOf(items, selected) ?? items[0]?.asset_id ?? null;
+  const onFocus = (event: FocusEvent<HTMLDivElement>) => {
+    const card = (event.target as Element).closest<HTMLElement>(".card-wrap")?.dataset.card;
+    if (card && card !== focus) setFocus(card);
+  };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const card = (event.target as Element).closest(".card");
     const element = gridRef.current;
@@ -252,20 +271,24 @@ export function AssetGrid({ grid, id, pending, append }: { grid: GridId; id: str
     const cards = [...element.querySelectorAll<HTMLElement>(".card")];
     const index = cards.indexOf(card as HTMLElement);
     const columns = Math.max(1, getComputedStyle(element).gridTemplateColumns.split(" ").length);
+    const row = Math.floor(index / columns), rows = Math.ceil(cards.length / columns);
     let next = index;
     if (event.key === "ArrowRight") next++;
     else if (event.key === "ArrowLeft") next--;
-    else if (event.key === "ArrowDown") next += columns;
+    else if (event.key === "ArrowDown") next = row < rows - 1 ? Math.min(cards.length - 1, index + columns) : -1;
     else if (event.key === "ArrowUp") next -= columns;
     else if (event.key === "Home") next = 0;
     else if (event.key === "End") next = cards.length - 1;
     else return;
+    // At an edge there is no card that way: the key keeps its default, so the page scrolls.
+    const target = cards[next];
+    if (!target || target === card) return;
     event.preventDefault();
-    const target = cards[Math.max(0, Math.min(cards.length - 1, next))];
-    target?.focus();
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "nearest" });
     // While the inspector shows an asset, arrows browse: the still shows at once and the live 3D view
     // waits until the selection rests (ui/interactive-preview.js), so passing assets loads no viewer.
-    const s = getState(), assetId = target?.dataset.id;
+    const s = getState(), assetId = target.dataset.id;
     if (assetId && assetId !== selected && selected && s.inspector.open && !(grid === "collection" && s.selection.active)) {
       void selectAsset(grid, assetId, null, "three_quarter", false);
     }
@@ -276,11 +299,13 @@ export function AssetGrid({ grid, id, pending, append }: { grid: GridId; id: str
       id={id}
       tabIndex={-1}
       aria-busy={loading}
+      role="group"
       aria-label="Asset results"
+      onFocus={onFocus}
       onKeyDown={onKeyDown}
       className={cn("grid grid-cols-[repeat(auto-fill,minmax(min(100%,232px),1fr))] content-start gap-5 outline-none", shown && items.length > 0 && !append && "refreshing")}
     >
-      {items.map((item, index) => <AssetCard key={item.asset_id} grid={grid} item={item} index={index} selected={selected} />)}
+      {items.map((item, index) => <AssetCard key={item.asset_id} grid={grid} item={item} index={index} selected={selected} active={item.asset_id === active} />)}
       {Array.from({ length: ghosts }, (_, index) => <AssetCardGhost key={"ghost-" + index} index={index} />)}
     </div>
   );
