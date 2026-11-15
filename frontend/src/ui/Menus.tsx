@@ -14,7 +14,7 @@ import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import {
   addToCollection, assetMenuSource, closeConfirm, closeCreateCollection, closeMenu, collectionsFor, confirmDeleteCollection,
-  createCollection, exportCollection, type GridId, type MenuRequest, openCollection, openCreateCollection, pushToast, removeFromCollection, revealAsset, selectAsset,
+  createCollection, exportCollection, getState, type GridId, type MenuRequest, openCollection, openCreateCollection, pushToast, removeFromCollection, revealAsset, selectAsset,
   startSelection, useApp, pathAction, folderAction, makePreviews, makeDescriptions, showInPack, sourceAction, confirmRemoveSource, expandAll,
   inspectFolder, navigate, copyText, recheckFailures, confirmForgetMissing,
 } from "../app/store";
@@ -508,6 +508,10 @@ function useModal(open: boolean) {
   }, [open]);
   return dialog;
 }
+// The browser may close a modal on its own (a repeated Esc ignores preventDefault), so every close
+// clears the request the store still holds; otherwise the next request could never reopen it.
+// While busy, closedby="none" keeps Esc from closing it; onCancel still guards requestClose().
+const closedBy = (busy: boolean) => (busy ? "none" : "closerequest");
 
 /** Every deletion is confirmed here; only the red button deletes. */
 export function ConfirmDialog() {
@@ -526,8 +530,10 @@ export function ConfirmDialog() {
     try {
       const result = (await request.run()) as Json;
       if (result && result.status === "faulty") throw Error(result.reason);
-      closeConfirm();
+      if (getState().confirm === request) closeConfirm();
     } catch (reason) {
+      // A run that ends after its dialog was closed leaves a newer request alone.
+      if (getState().confirm !== request) return;
       setError((reason as Error).message);
       setBusy(false);
     }
@@ -538,7 +544,9 @@ export function ConfirmDialog() {
       id="confirm-dialog"
       aria-labelledby="confirm-title"
       aria-describedby="confirm-body"
+      closedby={closedBy(busy)}
       onCancel={(event) => { event.preventDefault(); if (!busy) closeConfirm(); }}
+      onClose={() => { if (getState().confirm) closeConfirm(); }}
       className="m-auto w-[min(460px,calc(100vw-32px))] rounded-[24px] border border-border bg-surface p-0 text-foreground shadow-panel backdrop:bg-black/35"
     >
       {request && (
@@ -588,10 +596,12 @@ export function CreateCollectionDialog() {
     setBusy(true);
     try {
       const result = await createCollection(name, description, request.assetIds, request.sourceKey);
+      if (getState().create !== request) return;
       closeCreateCollection();
       // From the Collections tab the new, empty collection opens and explains how to fill it.
       if (!request.assetIds.length && page === "collections") openCollection(result.collection_id);
     } catch (reason) {
+      if (getState().create !== request) return;
       setError((reason as Error).message);
       setBusy(false);
     }
@@ -602,7 +612,9 @@ export function CreateCollectionDialog() {
       ref={dialog}
       id="create-collection-dialog"
       aria-labelledby="create-collection-title"
+      closedby={closedBy(busy)}
       onCancel={(event) => { event.preventDefault(); if (!busy) closeCreateCollection(); }}
+      onClose={() => { if (getState().create) closeCreateCollection(); }}
       className="m-auto w-[min(520px,calc(100vw-32px))] rounded-[24px] border border-border bg-surface p-0 text-foreground shadow-panel backdrop:bg-black/35"
     >
       {request && (
