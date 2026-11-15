@@ -37,8 +37,9 @@ Short, current summary. Detailed dated history, test counts and evidence are in
 
 ## Open work and pending reviews
 
+- **Next release, 0.3.0:** quality of life and bug fixes.
 - **Safe upgrades, second part** (store coordinator, backups, recovery UI, skipped-release tests) gates the
-  first release that changes a store format, likely 0.3.0 with audio. That release raises the
+  first release that changes a store format. That release raises the
   format number and ships the migration. 0.1.0 installs are not migrated: the 0.1.0 → store code was removed
   in November 2026.
 - **Asset library rework (decision 0032), provisional choices:** a pack without a preview image shows a
