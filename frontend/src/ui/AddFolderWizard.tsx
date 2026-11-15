@@ -1,18 +1,19 @@
 import { Bot, Check, CircleCheck, CircleDashed, Copy, Folder, FolderOpen, Minimize2, Package, TriangleAlert, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { SPRING_LAYOUT, SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import {
-  closeAddFolder, copyAgentPrompt, finishAddFolder, finishPractice, makePreviews, minimizeAddFolder, openSources, startAgentPractice, undoPractice, useApp,
+  closeAddFolder, copyAgentPrompt, finishAddFolder, finishPractice, makePreviews, minimizeAddFolder, openSources, restoreAddFolderFocus, startAgentPractice, undoPractice, useApp,
 } from "../app/store";
 import { ProposalReview } from "./ProposalReview";
 import { Banner, Button, IconButton, Spinner } from "./primitives";
 
 const STEPS = [["look", "Quick look"], ["found", "What we found"], ["agent", "Finish"]] as const;
 const IDLE_MS = 120_000;
+const TABBABLE = "a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [tabindex]:not([tabindex='-1'])";
 const MARKER: Record<string, string> = { license: "license", readme: "readme", preview: "preview image", shortcut: "web link", versioned_name: "version in name" };
 
 function Steps({ step }: { step: string }) {
@@ -214,9 +215,30 @@ export function AddFolderWizard() {
   const add = useApp((s) => s.addFolder);
   const titleId = useId();
   const reduce = useReducedMotion();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const panel = useRef<HTMLElement>(null);
+  // A modal: focus starts on the title (read first by screen readers) and goes back to the opener on close or minimize.
+  useEffect(() => {
+    if (!add.open) return;
+    heading.current?.focus({ preventScroll: true });
+    return () => void requestAnimationFrame(restoreAddFolderFocus);
+  }, [add.open]);
+  // A step change can unmount the focused button; the title takes focus instead of the page behind.
+  useEffect(() => {
+    if (add.open && !panel.current?.contains(document.activeElement)) heading.current?.focus({ preventScroll: true });
+  }, [add.open, add.step]);
   useEffect(() => {
     if (!add.open) return;
     const onKey = (event: KeyboardEvent) => {
+      // The app behind is inert; Tab also wraps here so it never leaves for toasts or the window edge.
+      if (event.key === "Tab" && panel.current) {
+        const items = [...panel.current.querySelectorAll<HTMLElement>(TABBABLE)].filter((el) => el.getClientRects().length > 0);
+        const first = items[0] || heading.current, last = items[items.length - 1] || heading.current;
+        const inside = panel.current.contains(document.activeElement);
+        if (!inside || (event.shiftKey && (document.activeElement === first || document.activeElement === heading.current))) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        return;
+      }
       if (event.key !== "Escape") return;
       event.preventDefault();
       if (add.step === "agent" && !add.practice) minimizeAddFolder();
@@ -231,11 +253,11 @@ export function AddFolderWizard() {
         <motion.div id="add-folder-wizard" role="dialog" aria-modal="true" aria-labelledby={titleId} data-step={add.step}
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="fixed inset-0 z-[55] grid place-items-center bg-background/70 p-4 backdrop-blur-sm">
-          <motion.section initial={reduce ? false : { y: 16, scale: 0.98 }} animate={{ y: 0, scale: 1 }} transition={SPRING_PANEL}
+          <motion.section ref={panel} initial={reduce ? false : { y: 16, scale: 0.98 }} animate={{ y: 0, scale: 1 }} transition={SPRING_PANEL}
             className="flex max-h-[88vh] w-[min(760px,100%)] flex-col overflow-hidden rounded-[28px] border border-border bg-surface shadow-panel">
             <header className="flex items-start justify-between gap-4 px-7 pt-6 pb-4">
               <div className="grid min-w-0 gap-2">
-                <h2 id={titleId} className="truncate text-[19px] font-semibold">{add.practice ? "Try your agent" : `${add.step === "look" ? "Reading" : "Adding"} ${add.name}`}</h2>
+                <h2 id={titleId} ref={heading} tabIndex={-1} className="truncate text-[19px] font-semibold outline-none">{add.practice ? "Try your agent" : `${add.step === "look" ? "Reading" : "Adding"} ${add.name}`}</h2>
                 <Steps step={add.step} />
               </div>
               <div className="flex items-center gap-1">
