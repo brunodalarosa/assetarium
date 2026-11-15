@@ -77,7 +77,7 @@ The flyout searches collections, ticks those that already hold the asset (choosi
 one again removes it, with Undo), and **Create new collection**; typing an unused
 name offers **Create “name”**, which creates it and adds the asset in one step
 (an Enter that confirms IME input only confirms the text). Arrow keys move between
-the search, Create and the collections; Escape or ← goes back to the menu, Tab closes both.
+the search, Create and the collections; Escape (or ← on a row) goes back to the menu, Tab closes both.
 While any of these menus is open, the window behind it (except the item the menu
 came from, which stays sharp and clickable) dims slightly with a light
 blur and is shielded: a click outside only closes the menu (it never reaches the
