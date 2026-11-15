@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { ago, describeActive, notificationContent, plural, type Tone } from "../app/format";
 import {
-  dismissToast, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
+  dismissToast, getState, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
 } from "../app/store";
 import { Reason } from "./CommandBlock";
 import { Button, IconButton, Pressable, Spinner, type TooltipText } from "./primitives";
@@ -239,7 +239,9 @@ export function RunReport() {
     <dialog
       ref={dialog}
       aria-labelledby="run-report-title"
+      closedby="closerequest"
       onCancel={(event) => { event.preventDefault(); close(); }}
+      onClose={(event) => { if (!event.currentTarget.open && getState().runReport) close(); }}
       className="m-auto w-[min(640px,calc(100vw-32px))] rounded-[28px] border border-border bg-surface p-0 text-foreground shadow-panel backdrop:bg-black/30"
     >
       {report && content && (

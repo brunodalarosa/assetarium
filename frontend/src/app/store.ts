@@ -1111,8 +1111,23 @@ const closedAddFolder = (): AddFolder => ({ open: false, step: "look", job: null
   practice: false, practiceState: null, result: null });
 export const patchAddFolder = (patch: Partial<AddFolder>) => setState((s) => ({ addFolder: { ...s.addFolder, ...patch } }));
 let lookTimer: ReturnType<typeof setTimeout> | undefined;
+// What opened the wizard, taken before the folder dialog or a disabled button can move focus; restored on close.
+let addFolderOpener: { element: HTMLElement | null; id: string } = { element: null, id: "" };
+function rememberAddFolderOpener() {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || active === document.body || active.closest("#add-folder-wizard")) return;
+  addFolderOpener = { element: active, id: active.id };
+}
+const focusable = (el: HTMLElement | null): el is HTMLElement => !!el?.isConnected && !el.closest("[inert]") && !el.matches(":disabled") && el.getClientRects().length > 0;
+/** Focus back on the opener (or its re-rendered twin), else the page heading or the search field. */
+export function restoreAddFolderFocus() {
+  const { element, id } = addFolderOpener;
+  const target = [element, id ? document.getElementById(id) : null, ...document.querySelectorAll<HTMLElement>("main h1[tabindex='-1']"), document.getElementById("query")].find(focusable);
+  target?.focus({ preventScroll: true });
+}
 /** Choose a folder and start the quick look; the wizard shows the tree as it is read. */
 export async function startAddFolder() {
+  rememberAddFolderOpener();
   const directory = await chooseSourceDirectory();
   if (!directory) return;
   const result = await api().quick_look_start(directory);
@@ -1495,7 +1510,6 @@ export async function openSetup() {
       draft: savedDraft(info),
       error: info.settings_fault || info.record_fault || null,
     });
-    requestAnimationFrame(() => document.getElementById("setup-step-title")?.focus());
     // A proposal from the user's agent is waiting: show the agent panel instead of the choice.
     void loadAgentSetup().then((agent) => (agent?.proposals || []).some((p: Json) => p.state === "pending") && patchSetup({ agentMode: true }));
     const [env, storage] = await Promise.all([api().setup_environment(), api().setup_storage_use(false)]);
@@ -1613,6 +1627,7 @@ export async function measureSetupStorage() {
 /* ------------------------------ try your agent ----------------------------- */
 export async function startAgentPractice() {
   if (state.addFolder.open) return;
+  rememberAddFolderOpener();
   const result = await api().practice_action("start");
   if (result.status === "faulty") {
     pushToast({ tone: "fault", title: "Practice not started", body: result.reason });
