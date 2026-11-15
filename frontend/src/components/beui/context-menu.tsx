@@ -579,6 +579,9 @@ export interface ContextMenuItemProps {
   inset?: boolean;
   className?: string;
   textValue?: string;
+  /** Assetarium: an item that opens its own layer (a flyout) names its kind and whether it is open. */
+  ariaHasPopup?: "dialog" | "menu";
+  ariaExpanded?: boolean;
 }
 
 function ContextMenuItemBase({
@@ -592,6 +595,8 @@ function ContextMenuItemBase({
   textValue,
   role = "menuitem",
   ariaChecked,
+  ariaHasPopup,
+  ariaExpanded,
 }: ContextMenuItemProps & {
   role?: "menuitem" | "menuitemcheckbox" | "menuitemradio";
   ariaChecked?: boolean;
@@ -608,6 +613,8 @@ function ContextMenuItemBase({
       id={id}
       role={role}
       {...checkedProps}
+      aria-haspopup={ariaHasPopup}
+      aria-expanded={ariaHasPopup ? Boolean(ariaExpanded) : undefined}
       disabled={disabled}
       data-context-menu-item="true"
       data-disabled={disabled ? "true" : undefined}

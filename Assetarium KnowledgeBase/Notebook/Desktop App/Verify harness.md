@@ -41,6 +41,10 @@ Hub: [Desktop App](Desktop%20App.md). UI changes are checked in the real WebView
   poll still in flight then logs a harmless `_returnValuesCallbacks … is not a function` traceback.
   See `scripts/verify-inspector-layout.py`.
 
+- **To test IME-safe Enter**, dispatch `new KeyboardEvent('keydown',{key:'Enter',isComposing:true})`; for the
+  legacy path override `keyCode` with `Object.defineProperty(e,'keyCode',{get:()=>229})`. See
+  `scripts/verify-collection-flyout.py`.
+
 - **Timers are throttled in the verify window.** It runs in the background, so `setInterval` /
   `setTimeout` can fire far less often than asked. To count UI changes during fast input, use a
   `MutationObserver` (for example on `aria-pressed`), not a sampling timer. See the browsing check in

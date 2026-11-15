@@ -802,7 +802,7 @@ function CollectionEntry({ assetId }: { assetId: string }) {
           maxLength={60}
           onChange={(event) => { setLabel(event.target.value); edit({ label: event.target.value }); }}
           onBlur={flush}
-          onKeyDown={(event) => event.key === "Enter" && (event.currentTarget as HTMLInputElement).blur()}
+          onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && event.keyCode !== 229 && (event.currentTarget as HTMLInputElement).blur()}
           placeholder="Where it is used, e.g. Coin pickup"
           className="h-10 rounded-xl border border-border bg-surface px-3 text-[13px] outline-none hover:border-border-strong focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25"
         />
