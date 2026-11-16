@@ -1,7 +1,7 @@
 ---
 area: MCP
 tags: [system]
-code: [mcp_server.py, mcp_server.PAUSABLE, agent_sessions.py, mcp_assets.AssetService, mcp_assets.bounded, search_policy.search_character_cap, asset_collections.py, asset_tags.py, scripts/asset-worker.py]
+code: [mcp_server.py, mcp_server.PAUSABLE, agent_sessions.py, mcp_assets.AssetService, mcp_assets.bounded, mcp_assets.detail_character_cap, search_policy.search_character_cap, asset_collections.py, asset_tags.py, scripts/asset-worker.py]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -33,7 +33,9 @@ The full contract for users is [docs/mcp/README.md](../../../docs/mcp/README.md)
   the call log is a user-facing contract: keep `tool`, `arguments`, `response` and `utc` in each line.
 - Search folds each variant group to its best-ranked member (`variant_groups.collapse`).
 - Responses are bounded: the search character cap scales with the limit, detail is capped at
-  16,000 characters and 64 dependencies, previews at 512 × 512 px and 512 KiB.
+  64 dependencies and 16,000 characters plus 1,500 per dependency (`mcp_assets.detail_character_cap`),
+  previews at 512 × 512 px and 512 KiB. The desktop inspector builds the same detail without the
+  character limit (`AssetService.detail_payload`); only agents get it bounded (`AssetService.get`).
 
 ## Rules
 

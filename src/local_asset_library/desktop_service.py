@@ -234,8 +234,8 @@ class DesktopService(AssetService):
         if expected_version and expected_version != version:
             return {'status': 'stale', 'generation': version, 'reason': 'Published library changed; refresh this view.'}
         started = time.perf_counter()
-        # Desktop presentation below already carries full evidence. The bounded
-        # agent metadata envelope must not gate desktop sources or image delivery.
+        # Desktop presentation below already carries full evidence. The agent response
+        # limit must not gate desktop sources or image delivery, so the detail is built unbounded.
         args = {'asset_id': identifier, 'include_preview': True, 'preview_view': view}
         if source_format is not None:
             args['source_format'] = source_format
@@ -250,7 +250,7 @@ class DesktopService(AssetService):
         try:
             if (identifier, 'source') in self.item_faults:
                 raise ConfigError(self.item_faults[(identifier, 'source')]['reason'])
-            payload, image, evidence = self.execute('get_asset', args)
+            payload, image, evidence = self.detail_payload(args)
         except (OSError, ValueError) as exc:
             payload, image, evidence = error_payload(exc, identifier), None, {'fault': str(exc)}
             self._record_fault(identifier, 'detail', exc)
