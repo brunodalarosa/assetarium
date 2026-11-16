@@ -3,7 +3,7 @@ tags: [decision]
 decided: 2026-11-07
 area: Processing
 replaces: [0004, 0007, 0014, 0015, 0022, 0023]
-code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, inspection.blender_major, library_migration.recognized, library_migration.legacy_inspection_input, result_store.adopt, result_store.location_free, hash_cache.file_identity, publication.verified_hash, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
+code: [incremental.inspection_input, image_inspection.inspection_input, incremental.caption_input, incremental.recorded_fingerprint, incremental.EQUIVALENT_WORKERS, retrieval.recorded_contract, inspection.blender_major, library_migration.recognized, library_migration.legacy_inspection_input, result_store.adopt, result_store.location_free, hash_cache.file_identity, publication.verified_hash, retrieval.checked_candidates, scripts/check-render-stability.py, scripts/check-engine-stability.py, scripts/check-rekey.py]
 ---
 # 0028 — Result identity: what makes finished work run again
 
@@ -44,6 +44,10 @@ means hashing the bytes again.
 - **Thumbnails** show the verified preview image only (cached by preview identity, 320 px). Asset detail and agent
   `get_asset` still verify the source files.
 - Changed, replaced or missing files are still excluded and recorded as faults.
+- **Search checks only the candidates that can reach the results** (`retrieval.checked_candidates`): it ranks
+  first, then checks files in rank order until the shortlist is full, re-ranking after each failure. Its fault
+  count covers those checked candidates; library-wide faults stay in the Library and the queue (owner,
+  November 15, 2026). Accepted: an unchecked broken asset far down one channel can shift fused ranks slightly.
 - Why: every search re-hashed about 8,000 source files and 11,500 preview PNGs (keyword 7 s, combined 19.5 s warm,
   34 s cold); the scanner already trusted file identity, and NTFS ChangeTime catches an edit that restores the
   modification time (`tests/test_hash_cache.py`).
@@ -115,3 +119,4 @@ Setup asks to confirm a re-render only for another major version (`setup_core.ke
 
 - 2026-11-10: the Keep true line on re-keying no longer names code. The only re-keying code translated 0.1.0 keys and was removed with the 0.1.0 migration (owner: 0.2.0 is a fresh start; migrations are supported from 0.2.0 on).
 - 2026-11-13: Blender is keyed by major version, not path and mtime (E7, owner); the Over-keyed section became [Blender: major version only](#blender-major-version-only). The Keep true line on key changes names `library_migration.recognized` and `scripts/check-rekey.py`.
+- 2026-11-16: search checks files only for candidates that can reach the results (Verifying files; owner, November 15). Per-request checks of every member cost 3–12 s on an 11,000-asset library.

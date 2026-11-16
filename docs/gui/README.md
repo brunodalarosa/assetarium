@@ -96,7 +96,8 @@ edits arrive live and raise a notice with **Open collection**. Every deletion
 **Home and search.** Home is a centred search pill. Type a description or name
 and press **Enter** or the arrow button; results compact the search to the top
 and show the count, the query, the search mode and the status line (candidates,
-seconds, truncation and recorded exclusion faults). Pressing Enter on an empty
+seconds, truncation and recorded exclusion faults: broken assets that would
+otherwise have been in the results). Pressing Enter on an empty
 search browses the filtered library forty cards at a time with Previous/Next; the
 **×** in the pill clears the search and returns Home to its idle state (filters
 are kept). The sliders button opens **Filters & search options**: Asset type,
@@ -122,8 +123,10 @@ must use the same catalog/index versions (shown on Asset processing).
 
 While a search runs, a spinner with a polite **Searching…** announcement appears
 in the pill, the arrow button is disabled and earlier cards stay visible. The
-status line says when the worker is preparing its runtime or loading the model
-(first semantic search only). Repeated identical submissions are ignored; a
+status line counts the seconds (**Searching… 14 s**) and says when the worker is
+preparing its runtime or loading the model (first semantic search only). The
+window waits up to 110 s; after that it says **Search took longer than 110 s.
+Processing may be slowing it down.** with a **Search again** button. Repeated identical submissions are ignored; a
 different request supersedes the old one, and obsolete completions cannot hide a
 newer busy state. Reduced-motion preferences stop the animation.
 

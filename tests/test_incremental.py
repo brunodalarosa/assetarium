@@ -333,8 +333,10 @@ def test_new_prompt_keeps_completed_v2_captions_and_new_jobs_use_v4(library):
 def test_source_changes_are_reverified_between_requests_even_with_restored_mtime(library):
     config,backend=library;work=ready(config);index_library(work,backend);publish(config)
     service=AssetService(config)
-    args={'query':'item','mode':'keyword','filters':{},'limit':5}
+    # The whole library is the shortlist: search checks only candidates that can reach the results.
+    args={'query':'obj','mode':'keyword','filters':{},'limit':6}
     first=service.execute('search_assets',args)[0]
+    assert len(first['results'])==6
     record=records(config)[0]
     path=config.source_file(record['files'][0]['path']);original=path.read_bytes();stamp=path.stat()
     changed=original.replace(b'v 1 0 0',b'v 2 0 0')
@@ -449,8 +451,10 @@ def test_corrupt_catalog_item_isolated_without_repair(library):
     items=records(work)
     bad=next(r for r in items if r['asset_id']==record['asset_id'])
     assert bad['availability']=='faulty' and bad['description'] is None and bad['metadata_fault']['raw_record_sha256']
-    payload=AssetService(work).execute('search_assets',{'query':'item','mode':'keyword','limit':5})[0]
+    # Every asset matches "obj" and fits the shortlist, so the corrupt one is a checked candidate.
+    payload=AssetService(work).execute('search_assets',{'query':'obj','mode':'keyword','limit':6})[0]
     assert record['asset_id'] not in {r['asset_id'] for r in payload['results']} and payload['fault_count']==1
+    assert len(payload['results'])==5
     assert len(DesktopService(work).browse()['items'])==6
     with closing(sqlite3.connect(work.output_path('data','catalog.sqlite'))) as db:
         assert db.execute('SELECT record FROM assets WHERE asset_id=?',(record['asset_id'],)).fetchone()[0]=='{broken JSON'

@@ -22,6 +22,7 @@ from .search_policy import DEFAULT_MODE
 
 log = logging.getLogger(__name__)
 SLOW_MS = 2000  # A call this slow is worth a line at the default level.
+WAIT_SECONDS = 110  # The window stops waiting for a call after this many seconds.
 
 
 def show_in_explorer(path):
@@ -120,21 +121,23 @@ class DesktopBridge:
         self._loop.close()
         self._diagnostics.close()
 
-    def _wait(self, coroutine):
+    def _wait(self, coroutine, timeout_reason=None):
+        """The call's result, else a faulty dict; after WAIT_SECONDS it carries ``timeout_reason`` and ``timed_out``."""
         if self._closed:
             coroutine.close()
             return {'status': 'faulty', 'reason': 'App is closing; request not executed'}
         future = asyncio.run_coroutine_threadsafe(coroutine, self._loop)
         try:
-            return future.result(timeout=110)
+            return future.result(timeout=WAIT_SECONDS)
         except Exception as exc:
-            if isinstance(exc, FutureTimeout):
+            timed_out = isinstance(exc, FutureTimeout)
+            if timed_out:
                 future.cancel()
-            payload = error_payload(exc)
-            log.error('Call failed · %s', kv(reason=payload['reason']), exc_info=not isinstance(exc, FutureTimeout))
+            payload = error_payload(ConfigError(timeout_reason) if timed_out and timeout_reason else exc)
+            log.error('Call failed · %s', kv(reason=payload['reason']), exc_info=not timed_out)
             with (self._gateway.audit_root / 'desktop-faults.jsonl').open('a', encoding='utf-8') as stream:
                 stream.write(encoded(payload) + '\n')
-            return {'status': 'faulty', 'reason': payload['reason'], 'payload': payload}
+            return {'status': 'faulty', 'reason': payload['reason'], 'payload': payload, **({'timed_out': True} if timed_out else {})}
 
     async def _present(self, operation, *args, guarded=True, shared=False):
         if shared:
@@ -886,7 +889,8 @@ class DesktopBridge:
 
     def search(self, settings):
         # Do not call a public bridge parameter "arguments": it shadows JavaScript's arguments object.
-        return self._wait(self._search(settings))
+        return self._wait(self._search(settings),
+                          timeout_reason=f'Search took longer than {WAIT_SECONDS} s. Processing may be slowing it down.')
 
     # Collections and tags are owner organization data (decision 0036); originals are never touched.
     def collections(self, query='', containing=None):

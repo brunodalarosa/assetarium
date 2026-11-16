@@ -59,8 +59,9 @@ recorded renderer. `include_metadata` adds measured image facts and
 `type_metadata` (generic purpose, folder-name suggestion, identical copies).
 A reference search from an image uses its recorded model input, as indexed. Unknown filter keys/types/formats or path-like pack
 names are rejected. Technical filters require inspected evidence for the
-requested format. Every source and required dependency is boundary-resolved and
-hash-verified; stale/unavailable inputs are excluded. Index/model/input contract
+requested format. Every candidate that can reach the results has its sources and
+required dependencies boundary-resolved and hash-verified; stale/unavailable ones
+are excluded and the next candidate takes their place. Index/model/input contract
 mismatches are errors, with no synthetic vectors or ranking fallback.
 
 Query-time ranking policy is centrally defined in
@@ -74,7 +75,7 @@ The legacy CLI omitted-mode keyword baseline is unchanged.
 
 Search returns compact candidate summaries, ID preview references, matching
 channels, caption/source fault flags, counts and a small sample of exclusion
-faults. Full exclusion evidence lives in the local call audit. Its serialized
+faults (`fault_count` covers checked candidates only, not the whole library). Full exclusion evidence lives in the local call audit. Its serialized
 text budget is **6,000 characters for limits 1–5**, and
 **2,000 + 1,000 × requested limit characters for limits 6–40**,
 including size fields and fault summaries. Budgets for limits 5, 10, 20, 30 and 40

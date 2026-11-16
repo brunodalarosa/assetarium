@@ -1,7 +1,7 @@
 ---
 area: Search
 tags: [system]
-code: [retrieval.SearchEngine, retrieval.MODES, retrieval.source_check, retrieval.recorded_contract, search_policy.RRF_WEIGHTS, search_policy.RRF_K, search_policy.MAX_LIMIT, search_policy.search_character_cap, mcp_assets.AssetService, mcp_assets.bounded]
+code: [retrieval.SearchEngine, retrieval.MODES, retrieval.source_check, retrieval.checked_candidates, retrieval.recorded_contract, search_policy.RRF_WEIGHTS, search_policy.RRF_K, search_policy.MAX_LIMIT, search_policy.search_character_cap, mcp_assets.AssetService, mcp_assets.bounded]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -22,8 +22,13 @@ live in `search_policy.py`.
   response cap scales with the limit (`search_character_cap`: 6,000 characters up to 5 results, then
   2,000 + 1,000 per result) and is shared by the inner layers, so they never cut a larger shortlist
   under a fixed cap.
-- Each request reads one pinned publication generation; results are boundary-resolved and their
-  files verified, with stale or unavailable inputs excluded and counted.
+- Each request reads one pinned publication generation. Rankings are built without touching files;
+  `retrieval.checked_candidates` then walks the ranked list and checks only the candidates that can
+  reach the results (`source_check`, then each channel's best view: description input, preview input
+  and file), re-ranking after each failure, until the shortlist is full. A failed asset leaves every
+  channel and is counted; a failed view gives way to the asset's next view; a stale description only
+  leaves its channel (decision 0033). `excluded` (MCP `fault_count`) counts checked candidates only
+  ([decision 0028](../../Decisions/0028-result-identity.md) → Verifying files).
 
 ## Rules
 
@@ -42,8 +47,10 @@ live in `search_policy.py`.
 - `library_records` returns the shared slim records from `library_cache`; `build_search_index`
   (CLI `embed-index`) rebuilds a legacy single-source index.
 - Search used to re-hash every member's files on every request (about 8,000 files per search on the
-  original library). [Hash reuse and caches](Hash%20reuse%20and%20caches.md) explains what replaced it;
-  don't reintroduce per-request full verification.
+  original library). [Hash reuse and caches](Hash%20reuse%20and%20caches.md) explains what replaced it.
+  Even with cached hashes, checking every member cost 3 s warm on 11,000 assets (path checks dominate),
+  so search checks candidates only; don't reintroduce a per-request loop over every member's files.
+  `evidence["channel_rankings"]` holds checked heads and unchecked tails.
 - "Query/index embedding contract mismatch": before reindexing, diff the published index contract
   (`data/library/embedding-contract.json`) with `engines.embedder_contract`. If only
   `adapter_sha256` or `runtime_lock_sha256` differ, it is almost always line endings (hash the LF

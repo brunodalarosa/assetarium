@@ -148,9 +148,9 @@ def test_unavailable_and_stale_sources_excluded(indexed):
     config, backend, records = indexed
     (config.source_root / "pack/item00.obj").unlink()
     (config.source_root / "pack/item01.obj").write_text("changed", encoding="utf-8")
-    response, evidence = SearchEngine(config, backend).search("item00", "combined")
+    response, evidence = SearchEngine(config, backend).search("item00", "combined", limit=40)
     assert all(r["asset_id"] not in {records[0]["asset_id"], records[1]["asset_id"]} for r in response["results"])
-    assert len(evidence["excluded"]) == 2
+    assert len(evidence["excluded"]) == 2  # Both reach a 40-asset shortlist; the candidate tests cover shorter ones.
     with pytest.raises(ConfigError):
         resolved_detail(config, records[0]["asset_id"])
 
