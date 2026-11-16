@@ -191,6 +191,28 @@ def test_desktop_rejects_coercible_non_object_and_false_source_format(indexed):
         DesktopService(config).asset(records[0]['asset_id'], source_format=0)
 
 
+def test_slow_search_times_out_with_a_clear_reason(indexed, monkeypatch):
+    from local_asset_library import desktop
+    config, _, _ = indexed
+    monkeypatch.setattr(desktop, 'WAIT_SECONDS', 0.3)
+    bridge = DesktopBridge(config, prestart_worker=False)
+    async def slow(_):
+        await asyncio.sleep(5)
+    bridge._search = slow
+    try:
+        response = bridge.search({'query': 'red object'})
+        assert response['status'] == 'faulty' and response['timed_out']
+        assert response['reason'] == 'Search took longer than 0.3 s. Processing may be slowing it down.'
+        assert response['payload']['reason'] == response['reason'] and 'TimeoutError' not in json.dumps(response)
+        # Other calls keep the generic reason and never claim a timeout they did not have.
+        async def failing():
+            raise RuntimeError('broken')
+        failed = bridge._wait(failing())
+        assert failed['status'] == 'faulty' and failed['reason'] == 'broken' and 'timed_out' not in failed
+    finally:
+        bridge._close()
+
+
 def test_desktop_default_exact_shared_shortlist_and_close(indexed, monkeypatch):
     config, backend, _ = indexed
     real_init = Gateway.__init__

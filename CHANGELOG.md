@@ -90,6 +90,12 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- **Search time no longer grows with the library**: search checks files only for the candidates that can reach
+  the results, not every asset (a keyword search on an 11,000-asset library went from 3.2 s to 0.4 s warm). The
+  count of left-out assets now covers those candidates; library-wide faults stay in the Library and the queue.
+  While a search runs, the status line counts the seconds, and a search the window stops waiting for (110 s) says
+  so with **Search again** instead of `TimeoutError`.
+
 - **Dialogs no longer get stuck closed.** Pressing Esc repeatedly could close a confirmation, New collection or
   run report dialog while the app still thought it was open, so the same request never reopened it and a later
   error stayed hidden. Every way a dialog closes now resets it, and while a dialog is working (Delete, Create

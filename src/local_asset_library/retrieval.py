@@ -506,15 +506,6 @@ def keyword_ranking(config, text, allowed):
     return [{"asset_id": identifier, "score": float(score)} for identifier, score in rows if identifier in allowed]
 
 
-def aggregate_views(rows, scores):
-    best = {}
-    for row, score in zip(rows, scores):
-        candidate = {"asset_id": row[1], "score": float(score), "input": json.loads(row[11])}
-        if row[1] not in best or score > best[row[1]]["score"]:
-            best[row[1]] = candidate
-    return sorted(best.values(), key=lambda r: (-r["score"], r["asset_id"]))
-
-
 def fuse(rankings, weights=None):
     scores = {}
     for channel, ranking in rankings.items():
@@ -522,6 +513,67 @@ def fuse(rankings, weights=None):
             identifier = candidate["asset_id"]
             scores[identifier] = scores.get(identifier, 0) + (weights or {}).get(channel, 1) / (RRF_K + rank)
     return [{"asset_id": identifier, "score": score} for identifier, score in sorted(scores.items(), key=lambda r: (-r[1], r[0]))]
+
+
+def scored_views(rows, scores):
+    """{asset_id: [(score, row), …]}, best view first; equal scores keep row order."""
+    views = {}
+    for row, score in zip(rows, scores):
+        views.setdefault(row[1], []).append((float(score), row))
+    for value in views.values():
+        value.sort(key=lambda view: -view[0])
+    return views
+
+
+def view_ranking(views):
+    """A channel ranking from each asset's best remaining view; ties break by asset ID."""
+    return sorted(({"asset_id": identifier, "score": value[0][0], "input": json.loads(value[0][1][11])}
+                   for identifier, value in views.items() if value), key=lambda r: (-r["score"], r["asset_id"]))
+
+
+def checked_candidates(rankings, views, limit, rank, check_asset, check_view, fault):
+    """Check files only for candidates that can reach the results, so search time does not grow with the library.
+
+    Walk the ranked list in order until ``limit`` candidates pass. A failed asset leaves every channel; a failed
+    view gives way to the asset's next view, or the asset leaves that channel. Failures re-rank the rest and the
+    walk starts again; no check repeats. Returns the final rankings, the ranked list and the eligible rankings.
+    """
+    passed, failed, good_views = set(), set(), set()
+    while True:
+        ranked, eligible = rank(rankings)
+        changed, found = set(), 0
+        for candidate in ranked:
+            if found == limit:
+                break
+            identifier = candidate["asset_id"]
+            if identifier not in passed:
+                try:
+                    check_asset(identifier)
+                except (OSError, ValueError) as exc:
+                    failed.add(identifier)
+                    changed.update(rankings)
+                    fault(identifier, "all", exc)
+                    continue
+                passed.add(identifier)
+            for channel, by_asset in views.items():
+                remaining = by_asset.get(identifier) or []
+                while remaining and remaining[0][1][0] not in good_views:
+                    try:
+                        check_view(channel, identifier, remaining[0][1])
+                        good_views.add(remaining[0][1][0])
+                    except (OSError, ValueError) as exc:
+                        remaining.pop(0)
+                        changed.add(channel)
+                        fault(identifier, channel, exc)
+            found += 1
+        if not changed:
+            return rankings, ranked, eligible
+        for identifier in failed:
+            for by_asset in views.values():
+                by_asset.pop(identifier, None)
+        rankings = {channel: view_ranking(views[channel]) if channel in views and channel in changed
+                    else [r for r in ranking if r["asset_id"] not in failed]
+                    for channel, ranking in rankings.items()}
 
 
 class SearchEngine:
@@ -550,19 +602,13 @@ class SearchEngine:
             raise ConfigError("Reference image is only accepted in reference mode")
         if min_similarity is not None and (not math.isfinite(min_similarity) or not -1 <= min_similarity <= 1):
             raise ConfigError("Evaluation cosine floor must be finite in [-1,1]")
-        records, source_fingerprints, excluded = {}, {}, []
+        excluded = []
         allowed = scope(self.config, filters)
         from .settings import used_formats
         formats = used_formats(self.config) if self.config.sources_registry else None
-        for record in library_records(self.config):
-            if not matches(record, filters, allowed, formats):
-                continue
-            try:
-                source_fingerprints[record["asset_id"]] = source_check(self.config, record)
-                records[record["asset_id"]] = record
-            except (OSError, ValueError) as exc:
-                excluded.append({"asset_id": record["asset_id"], "channel": "all", "reason": str(exc)})
-        rankings = {}
+        # Rank without touching files; only the candidates that can reach the results are checked below.
+        records = {r["asset_id"]: r for r in library_records(self.config) if matches(r, filters, allowed, formats)}
+        rankings, views, metadata = {}, {}, {}
         if mode in {"keyword", "combined", "keyword_description"}:
             rankings["keyword"] = keyword_ranking(self.config, text, records)
         if mode != "keyword" and records:
@@ -596,39 +642,50 @@ class SearchEngine:
                 for position, row in enumerate(rows):
                     if row[2] != channel or row[1] not in records:
                         continue
-                    try:
-                        record = records[row[1]]
-                        if row[5] != source_fingerprints[row[1]]:
-                            raise ConfigError("Source/index fingerprint mismatch")
-                        if channel == "description":
-                            text_value, current = description_input(self.config, record)
-                            legacy = digest({"text": text_value, "caption": (record.get("caption_provenance") or {}).get("fingerprint"), "input_views": (record.get("caption_provenance") or {}).get("input_views")})
-                            if row[3] != current and (metadata.get("input_policy") or row[3] != legacy):
-                                raise ConfigError("Description/index input fingerprint mismatch")
-                        else:
-                            ref = json.loads(row[11])
-                            if ref["sha256"] in exclude_image_hashes:
-                                excluded.append({"asset_id": row[1], "channel": channel,
-                                                 "reason": "Reference evaluation parent image excluded", "sha256": ref["sha256"]})
-                                continue
-                            preview = next((p for p in record["previews"] if p.get("path") == ref.get("path") and p.get("source_path") == ref.get("source_path")), None)
-                            if preview is None or (image_input(preview) != row[3] and (metadata.get('image_input_policy') or digest(preview)!=row[3])):
-                                raise ConfigError("Preview/index input fingerprint mismatch")
-                            preview_file(self.config, preview)
-                        selected.append(row)
-                        values.append(position)
-                    except (OSError, ValueError) as exc:
-                        # Descriptions are optional (decision 0033): a stale or invalid one
-                        # only leaves its channel; the asset still ranks by image and keyword.
-                        if channel != "description":
-                            excluded.append({"asset_id": row[1], "channel": channel, "reason": str(exc)})
-                scores = matrix[values] @ query_vector if values else []
-                ranking = aggregate_views(selected, scores)
+                    if channel == "image" and exclude_image_hashes:
+                        ref = json.loads(row[11])
+                        if ref["sha256"] in exclude_image_hashes:
+                            excluded.append({"asset_id": row[1], "channel": channel,
+                                             "reason": "Reference evaluation parent image excluded", "sha256": ref["sha256"]})
+                            continue
+                    selected.append(row)
+                    values.append(position)
+                views[channel] = scored_views(selected, matrix[values] @ query_vector if values else [])
                 # Preserve *unthresholded* channel rankings for later evaluation.
-                rankings[channel] = ranking
-        eligible = {channel: [r for r in ranking if channel == "keyword" or min_similarity is None or r["score"] >= min_similarity]
-                    for channel, ranking in rankings.items()}
-        ranked = fuse(eligible, RRF_WEIGHTS[mode]) if mode in {"combined", "keyword_description"} else next(iter(eligible.values()), [])
+                rankings[channel] = view_ranking(views[channel])
+        source_fingerprints = {}
+
+        def check_asset(identifier):
+            source_fingerprints[identifier] = source_check(self.config, records[identifier])
+
+        def check_view(channel, identifier, row):
+            record = records[identifier]
+            if row[5] != source_fingerprints[identifier]:
+                raise ConfigError("Source/index fingerprint mismatch")
+            if channel == "description":
+                text_value, current = description_input(self.config, record)
+                legacy = digest({"text": text_value, "caption": (record.get("caption_provenance") or {}).get("fingerprint"), "input_views": (record.get("caption_provenance") or {}).get("input_views")})
+                if row[3] != current and (metadata.get("input_policy") or row[3] != legacy):
+                    raise ConfigError("Description/index input fingerprint mismatch")
+            else:
+                ref = json.loads(row[11])
+                preview = next((p for p in record["previews"] if p.get("path") == ref.get("path") and p.get("source_path") == ref.get("source_path")), None)
+                if preview is None or (image_input(preview) != row[3] and (metadata.get('image_input_policy') or digest(preview)!=row[3])):
+                    raise ConfigError("Preview/index input fingerprint mismatch")
+                preview_file(self.config, preview)
+
+        def rank(rankings):
+            eligible = {channel: [r for r in ranking if channel == "keyword" or min_similarity is None or r["score"] >= min_similarity]
+                        for channel, ranking in rankings.items()}
+            return (fuse(eligible, RRF_WEIGHTS[mode]) if mode in {"combined", "keyword_description"} else next(iter(eligible.values()), [])), eligible
+
+        def fault(identifier, channel, exc):
+            # Descriptions are optional (decision 0033): a stale or invalid one
+            # only leaves its channel; the asset still ranks by image and keyword.
+            if channel != "description":
+                excluded.append({"asset_id": identifier, "channel": channel, "reason": str(exc)})
+
+        rankings, ranked, eligible = checked_candidates(rankings, views, limit, rank, check_asset, check_view, fault)
         results = []
         for candidate in ranked[:limit]:
             record = records[candidate["asset_id"]]

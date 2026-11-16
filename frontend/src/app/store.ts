@@ -92,6 +92,10 @@ export interface SearchState {
   queryUsed: string;
   modeUsed: string;
   count: number;
+  /** When the running search started (ms), for the elapsed seconds; null when none runs. */
+  startedAt: number | null;
+  /** The window stopped waiting (desktop `timed_out`): the error offers Search again. */
+  timedOut: boolean;
 }
 export interface Toast {
   id: number;
@@ -314,7 +318,7 @@ function emptySetup(): SetupState {
 }
 const idleSearch: SearchState = {
   phase: "idle", busy: false, title: "", status: "", statusTitle: "", error: null, lastSettings: null,
-  candidateNote: false, queryUsed: "", modeUsed: "combined", count: 0,
+  candidateNote: false, queryUsed: "", modeUsed: "combined", count: 0, startedAt: null, timedOut: false,
 };
 
 const boot = window.LAL_BOOT || { appearance: "system", inspector_width: 440 };
@@ -477,7 +481,7 @@ export async function browse(resetPage = true) {
   activeSearchSettings = null;
   if (resetPage) patchGrid("library", { offset: 0 });
   const generation = ++searchGeneration;
-  patchSearch({ phase: "browse", busy: false, lastSettings: null, candidateNote: false, error: null, title: "Library assets", status: "Loading this page…", queryUsed: "", modeUsed: state.filters.mode });
+  patchSearch({ phase: "browse", busy: false, startedAt: null, timedOut: false, lastSettings: null, candidateNote: false, error: null, title: "Library assets", status: "Loading this page…", queryUsed: "", modeUsed: state.filters.mode });
   patchGrid("library", { loading: true });
   try {
     const result = await api().browse(filterArgs(), state.library.offset, 40);
@@ -505,8 +509,9 @@ export async function search() {
   const generation = ++searchGeneration;
   activeSearchSettings = JSON.stringify(args);
   patchSearch({
-    phase: "search", busy: true, lastSettings: null, candidateNote: args.mode !== "keyword", error: null, title: "Search shortlist",
-    status: args.mode === "keyword" ? "Searching the library…" : "Searching the library… First model load can take longer; the window remains available.",
+    phase: "search", busy: true, startedAt: Date.now(), timedOut: false, lastSettings: null, candidateNote: args.mode !== "keyword", error: null, title: "Search shortlist",
+    // Shown after "Searching… 14 s" while busy (Home → ResultsHeader).
+    status: args.mode === "keyword" ? "" : "First model load can take longer; the window remains available.",
     statusTitle: "", queryUsed: args.mode === "reference" ? "" : args.query, modeUsed: args.mode,
   });
   patchGrid("library", { loading: true });
@@ -514,6 +519,10 @@ export async function search() {
     const result = await api().search(args);
     if (generation !== searchGeneration) return;
     const payload = result.payload || {};
+    if (result.timed_out) {
+      patchSearch({ error: result.reason, timedOut: true, status: "The search did not finish. Earlier cards are retained." });
+      return;
+    }
     if (result.is_error || result.status === "faulty" || payload.status === "faulty") throw Error(payload.reason || result.reason || "Search failed");
     if (payload.generation !== state.context?.generation) throw Error("Published version changed; refresh the view.");
     showResults("library", payload.results, generation);
@@ -528,7 +537,7 @@ export async function search() {
   } finally {
     if (generation === searchGeneration) {
       activeSearchSettings = null;
-      patchSearch({ busy: false });
+      patchSearch({ busy: false, startedAt: null });
       patchGrid("library", { loading: false });
     }
   }

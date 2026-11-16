@@ -1,25 +1,41 @@
 import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
 import { SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import { modeLabel, plural } from "../app/format";
-import { copyText, pageBrowse, useApp } from "../app/store";
+import { copyText, pageBrowse, search as runSearch, useApp } from "../app/store";
 import { AssetGrid } from "../ui/AssetGrid";
 import { Badge, Banner, Button, Hint, IconButton } from "../ui/primitives";
 import { FiltersPanel, SearchBar } from "../ui/Search";
+
+/** Whole seconds since ``startedAt``, ticking once a second; 0 when nothing runs. */
+function useElapsedSeconds(startedAt: number | null) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (startedAt === null) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
+  return startedAt === null ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000));
+}
 
 function ResultsHeader() {
   const search = useApp((s) => s.search);
   const library = useApp((s) => s.library);
   const browsing = search.phase === "browse";
   const count = browsing ? library.total : search.count;
+  const elapsed = useElapsedSeconds(search.busy ? search.startedAt : null);
   const heading = search.busy && !library.items.length ? "Searching…" : browsing ? plural(count, "asset", "assets") : plural(count, "result", "results");
   return (
     <div className="results-bar flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <h2 id="results-title" className="text-[21px] font-semibold text-foreground" aria-label={search.title}>{heading}</h2>
         <p className="mt-1.5 truncate text-[13px] text-muted-foreground">{browsing ? "Browsing the filtered library" : search.queryUsed || (search.modeUsed === "reference" ? "Similar to the reference asset" : "")}</p>
-        <Hint content={search.statusTitle} focusable><p id="status" role="status" aria-live="polite" className="mt-1 text-[11.5px] text-subtle">{search.status}</p></Hint>
+        <Hint content={search.statusTitle} focusable><p id="status" role="status" aria-live="polite" className="mt-1 text-[11.5px] text-subtle">
+          {search.busy && !browsing ? <>Searching…<span id="search-elapsed" className="tabular-nums" aria-hidden> {elapsed} s</span>{search.status && ` · ${search.status}`}</> : search.status}
+        </p></Hint>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Hint content={browsing ? "No search: the library, narrowed by the filters" : "How these results were found"}><span className="inline-flex"><Badge className="h-7 px-2.5">{browsing ? "Browse" : modeLabel(search.modeUsed)}</Badge></span></Hint>
@@ -43,6 +59,7 @@ function ResultsHeader() {
 export function Home() {
   const phase = useApp((s) => s.search.phase);
   const error = useApp((s) => s.search.error);
+  const timedOut = useApp((s) => s.search.timedOut);
   const candidateNote = useApp((s) => s.search.candidateNote);
   const startupError = useApp((s) => s.startupError);
   const empty = useApp((s) => !s.library.loading && s.library.items.length === 0);
@@ -62,7 +79,12 @@ export function Home() {
         <section aria-label="Library assets" className="collection grid gap-5 px-8 pb-10">
           <ResultsHeader />
           {candidateNote && <p className="-mt-2 text-[11.5px] text-muted-foreground">Ranked suggestions may include unrelated assets—even when the requested object is absent. Review the previews.</p>}
-          {error && <Banner className="error" role="alert"><span id="error">{error}</span></Banner>}
+          {error && (
+            <Banner className="error flex flex-wrap items-center justify-between gap-3" role="alert">
+              <span id="error">{error}</span>
+              {timedOut && <Button id="search-again" variant="secondary" className="h-8 px-3 text-[12px]" tooltip="Runs the same search again; earlier cards stay until it finishes" onClick={() => void runSearch()}>Search again</Button>}
+            </Banner>
+          )}
           <AssetGrid grid="library" id="grid" />
           {empty && !error && <p id="empty" className="py-16 text-center text-[13px] text-muted-foreground">No assets match these settings.</p>}
         </section>

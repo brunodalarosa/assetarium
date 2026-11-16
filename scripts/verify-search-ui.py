@@ -71,7 +71,11 @@ def verify():
           busyChecks.immediate=!$('search-busy').hidden&&$('submit').disabled&&$('grid').getAttribute('aria-busy')==='true';
           busyChecks.preserved=lal.state.library.items.length===20&&document.querySelectorAll('#grid .card').length===20;
           busyChecks.announcement=$('search-busy').getAttribute('role')==='status'&&$('search-busy').textContent.includes('Searching');
-          lal.search();busyChecks.duplicate=pending.length===1;return true})()""")
+          lal.search();busyChecks.duplicate=pending.length===1;
+          // Elapsed seconds count up while the search runs (P5: no silent wait).
+          busyChecks.elapsed_shown=$('status').textContent.startsWith('Searching… 0 s');
+          await new Promise(resolve=>setTimeout(resolve,1300));
+          busyChecks.elapsed_ticks=$('status').textContent.startsWith('Searching… 1 s');return true})()""")
         ui.capture('searching.png', settle=.3)
         assert ui.js("getComputedStyle(document.querySelector('#search-busy .search-spinner')).animationName") == 'search-spin'
         outcomes = ui.js("""(async()=>{const assert=(value,name)=>{busyChecks[name]=Boolean(value);if(!value)throw Error(name)};
@@ -95,6 +99,14 @@ def verify():
           assert(idle()&&lal.state.search.lastSettings.query==='refresh race','refresh_supersedes');
           lal.setQuery('success');const successful=lal.search();finish(pending[6],[{asset_id:'fixture',name:'fixture',pack:'synthetic',caption_owner_review:'pending'}]);await successful;await frame();
           assert(idle()&&lal.state.library.items[0].asset_id==='fixture'&&document.querySelector('#grid .card')?.dataset.id==='fixture','success_completion');
+          // The window stops waiting at 110 s: a clear message and Search again, never TimeoutError.
+          const reason='Search took longer than 110 s. Processing may be slowing it down.';
+          lal.setQuery('slow again');const timing=lal.search();pending[7].resolve({status:'faulty',timed_out:true,reason,payload:{status:'faulty',reason}});await timing;await frame();
+          assert(idle()&&$('error').textContent===reason&&$('search-again')&&!document.body.textContent.includes('TimeoutError')&&lal.state.library.items[0].asset_id==='fixture','timeout_message');
+          $('search-again').click();await frame();
+          assert(pending.length===9&&pending[8].args.query==='slow again'&&!$('search-busy').hidden&&!$('error'),'search_again');
+          finish(pending[8]);await new Promise(resolve=>setTimeout(resolve,50));await frame();
+          assert(idle()&&!$('search-again'),'search_again_completion');
           return busyChecks;})()""")
         assert all(outcomes.values()), outcomes
         report['lifecycle'] = outcomes
@@ -110,7 +122,8 @@ def verify():
         assert not bridge._gateway.model_requested
         report['checks_summary'] = ['Actual packaged WebView2 startup/default options', 'Shared bridge copied settings reproduce 20 results',
             'Slow busy display and preserved cards', 'Duplicate suppression and responsive JavaScript',
-            'Success/empty/error/clear/new search/refresh lifecycle', 'Accessible live status and static reduced-motion indicator']
+            'Success/empty/error/clear/new search/refresh lifecycle', 'Accessible live status and static reduced-motion indicator',
+            'Elapsed seconds while searching; timeout message with Search again']
         report['status'] = 'passed'
     except Exception as exc:
         report.update(status='faulty', reason=str(exc), traceback=traceback.format_exc())
