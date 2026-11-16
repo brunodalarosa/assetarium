@@ -525,9 +525,17 @@ def scored_views(rows, scores):
     return views
 
 
+def view_input(row):
+    """The view's stored reference, or None when it cannot be read; checking the view reports that fault."""
+    try:
+        return json.loads(row[11])
+    except (TypeError, ValueError):
+        return None
+
+
 def view_ranking(views):
     """A channel ranking from each asset's best remaining view; ties break by asset ID."""
-    return sorted(({"asset_id": identifier, "score": value[0][0], "input": json.loads(value[0][1][11])}
+    return sorted(({"asset_id": identifier, "score": value[0][0], "input": view_input(value[0][1])}
                    for identifier, value in views.items() if value), key=lambda r: (-r["score"], r["asset_id"]))
 
 
@@ -536,7 +544,8 @@ def checked_candidates(rankings, views, limit, rank, check_asset, check_view, fa
 
     Walk the ranked list in order until ``limit`` candidates pass. A failed asset leaves every channel; a failed
     view gives way to the asset's next view, or the asset leaves that channel. Failures re-rank the rest and the
-    walk starts again; no check repeats. Returns the final rankings, the ranked list and the eligible rankings.
+    walk starts again; no check repeats. A candidate with a failure does not count toward ``limit``, so one walk
+    takes in any number of failures instead of re-ranking after every ``limit`` of them. Returns the final rankings, the ranked list and the eligible rankings.
     """
     passed, failed, good_views = set(), set(), set()
     while True:
@@ -555,6 +564,7 @@ def checked_candidates(rankings, views, limit, rank, check_asset, check_view, fa
                     fault(identifier, "all", exc)
                     continue
                 passed.add(identifier)
+            clean = True
             for channel, by_asset in views.items():
                 remaining = by_asset.get(identifier) or []
                 while remaining and remaining[0][1][0] not in good_views:
@@ -564,8 +574,9 @@ def checked_candidates(rankings, views, limit, rank, check_asset, check_view, fa
                     except (OSError, ValueError) as exc:
                         remaining.pop(0)
                         changed.add(channel)
+                        clean = False
                         fault(identifier, channel, exc)
-            found += 1
+            found += clean
         if not changed:
             return rankings, ranked, eligible
         for identifier in failed:
@@ -643,8 +654,8 @@ class SearchEngine:
                     if row[2] != channel or row[1] not in records:
                         continue
                     if channel == "image" and exclude_image_hashes:
-                        ref = json.loads(row[11])
-                        if ref["sha256"] in exclude_image_hashes:
+                        ref = view_input(row)
+                        if isinstance(ref, dict) and ref.get("sha256") in exclude_image_hashes:
                             excluded.append({"asset_id": row[1], "channel": channel,
                                              "reason": "Reference evaluation parent image excluded", "sha256": ref["sha256"]})
                             continue
@@ -668,7 +679,9 @@ class SearchEngine:
                 if row[3] != current and (metadata.get("input_policy") or row[3] != legacy):
                     raise ConfigError("Description/index input fingerprint mismatch")
             else:
-                ref = json.loads(row[11])
+                ref = view_input(row)
+                if not isinstance(ref, dict):
+                    raise ConfigError("Preview reference in the index is unreadable")
                 preview = next((p for p in record["previews"] if p.get("path") == ref.get("path") and p.get("source_path") == ref.get("source_path")), None)
                 if preview is None or (image_input(preview) != row[3] and (metadata.get('image_input_policy') or digest(preview)!=row[3])):
                     raise ConfigError("Preview/index input fingerprint mismatch")

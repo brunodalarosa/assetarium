@@ -143,3 +143,44 @@ def test_stale_view_gives_way_to_the_next_view(indexed):
     # With no usable view the asset leaves the image channel; it is not excluded from search as a whole.
     assert ids(response) != [record['asset_id']] and {e['channel'] for e in evidence['excluded']} == {'image'}
     assert record['asset_id'] not in {r['asset_id'] for r in evidence['channel_rankings']['image']}
+
+
+def test_many_unusable_views_are_taken_in_one_walk(indexed, monkeypatch):
+    config, backend, records = indexed
+    full = order(config, backend, 'image')
+    for record in records:
+        if record['asset_id'] != full[-1]:
+            for preview in record['previews']:
+                config.output_path('data', preview['path'][5:]).write_bytes(b'changed')
+    rebuilds = []
+    original = retrieval.view_ranking
+    def counted(views):
+        rebuilds.append(1)
+        return original(views)
+    monkeypatch.setattr(retrieval, 'view_ranking', counted)
+    response, evidence = search(config, backend, 'image', limit=1)
+    assert ids(response) == [full[-1]]
+    assert len(evidence['excluded']) == 78 and {e['channel'] for e in evidence['excluded']} == {'image'}
+    # The first ranking, then one re-rank per walk that met failures; it does not grow with the failures.
+    assert len(rebuilds) <= 3
+
+
+def test_unreadable_preview_reference_only_drops_its_view(indexed):
+    import sqlite3
+    config, backend, records = indexed
+    full = order(config, backend, 'image')
+    _, evidence = search(config, backend, 'image', limit=1)
+    path = next(r for r in evidence['channel_rankings']['image'] if r['asset_id'] == full[0])['input']['path']
+    with sqlite3.connect(config.output_path('data', 'embeddings/index.sqlite')) as db:
+        changed = db.execute("UPDATE vectors SET preview='{bad' WHERE asset_id=? AND channel='image' AND preview LIKE ?",
+                             (full[0], f'%{path}%')).rowcount
+        last = db.execute("UPDATE vectors SET preview='{bad' WHERE asset_id=? AND channel='image'", (full[-1],)).rowcount
+    assert changed == 1 and last == 2
+    response, evidence = search(config, backend, 'image', limit=1)
+    # The search still answers; the candidate's unreadable view is recorded and its other view is used.
+    assert len(ids(response)) == 1
+    assert [(e['asset_id'], e['channel']) for e in evidence['excluded']] == [(full[0], 'image')]
+    best = next(r for r in evidence['channel_rankings']['image'] if r['asset_id'] == full[0])
+    assert best['input'] and best['input']['path'] != path
+    # An unreadable reference outside the shortlist is not checked and does not stop the search.
+    assert full[-1] in {r['asset_id'] for r in evidence['channel_rankings']['image']}
