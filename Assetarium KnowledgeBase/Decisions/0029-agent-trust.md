@@ -67,7 +67,8 @@ directly. Say so rather than claiming more.
 
 ## Guards that stay (they limit damage, not freedom)
 
-- Responses are bounded (16,000 characters); folders are paged.
+- Responses are bounded (16,000 characters; asset detail adds 1,500 per dependency, up to 64 dependencies,
+  so a complete source package fits; a response over its limit is still refused, never cut); folders are paged.
 - Pack rules come from a closed, validated vocabulary (`pack_profiles.KINDS`); agents choose rules, never
   patterns. Nothing is ever written into a pack or an original file.
 - The local model server is loopback only. `validate_blender` runs only files named `blender.exe` / `blender`.
@@ -88,3 +89,4 @@ directly. Say so rather than claiming more.
 - 2026-11-07: named the export-folder groups and the texture folder as agent-applicable pack rules (0019, 0021 updated to match), and made recheck owner-only (PR review).
 - 2026-11-11: built the rest (agent processing, rescanning profiles at once, Pause agents, Undo all, the sentence before connecting); Undo all named as covering tags, collections, profiles and waiting jobs, not settings; removed the Today and target table.
 - 2026-11-13: the Blender path reason now says only another major version re-renders (decision 0028, E7).
+- 2026-11-16: the asset detail limit grows with the dependency count (owner). A fixed 16,000 characters refused assets with about 14 or more textures, though up to 64 dependencies are allowed.

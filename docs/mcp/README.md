@@ -106,8 +106,11 @@ Labels come from the asset's own files; paths are never accepted. A file that ca
 ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md)). It returns the actual source path/hash, all known logical-asset
 dependencies with referring-source evidence, completeness limitations and faults.
 `include_metadata=true` requests observations, measured summary, license evidence,
-processing states and caption fault evidence. No incomplete dependency package is
-declared usable when the 64-dependency or **16,000-character** detail cap is exceeded.
+processing states and caption fault evidence. The detail cap grows with the package:
+**16,000 characters plus 1,500 per dependency**, so an asset with many textures still
+returns every dependency and texture override (`character_cap` in the response states
+the limit used). No incomplete dependency package is declared usable when the
+64-dependency limit or that cap is exceeded.
 Unknown binary/alternate dependency completeness remains explicit.
 
 `include_preview=true` requests one named view (`three_quarter` by default,

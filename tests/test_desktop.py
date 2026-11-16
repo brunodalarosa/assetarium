@@ -88,6 +88,20 @@ def test_detail_separates_measured_observations_suggestions_review(indexed):
     assert info['scale'].startswith('Unknown physical scale')
 
 
+def test_desktop_detail_is_not_gated_by_the_agent_response_limit(indexed):
+    from local_asset_library.mcp_assets import detail_character_cap
+    from test_mcp_assets import many_textures
+    config, _, records = indexed
+    _, record = png(config, records[0])
+    record = many_textures(config, record, 60)
+    result = DesktopService(config).asset(record['asset_id'])
+    payload = result['payload']
+    assert payload['usable'] and result['image'] and payload['selected_source']['format'] == 'obj'
+    assert len(payload['texture_overrides']) == 60 and 'character_cap' not in payload
+    assert not payload['presentation']['faults']
+    assert len(json.dumps(payload['dependencies'])) > detail_character_cap(0)
+
+
 def test_desktop_large_evidence_does_not_disable_preview(indexed):
     config, _, records = indexed
     _, record = png(config, records[0])

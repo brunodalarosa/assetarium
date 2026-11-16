@@ -25,6 +25,7 @@ VIEWS = ["three_quarter", "front", "side", "image"]
 MODES = [DEFAULT_MODE, "keyword_description", "keyword", "description", "image", "reference"]
 SEARCH_CAP = 6000
 DETAIL_CAP = 16000
+DETAIL_PER_DEPENDENCY = 1500  # One dependency row plus its texture override row, with room for long paths.
 IMAGE_CAP = 512 * 1024
 FILTER_SCHEMA = {"type": "object", "additionalProperties": False, "properties": {
     "asset_type": {"type": "string", "enum": list(ASSET_TYPES)},
@@ -237,11 +238,17 @@ def bounded(payload, cap, removable=None):
             raise ConfigError("Response exceeds deterministic cap; no incomplete usable package returned")
 
 
+def detail_character_cap(dependencies):
+    """16,000 for the asset itself plus 1,500 per dependency, so the limit fits a package of up to 64 with ordinary paths."""
+    return DETAIL_CAP + DETAIL_PER_DEPENDENCY * dependencies
+
+
 def bounded_detail(payload):
     """Optional evidence must not discard a verified, complete source package."""
+    cap = detail_character_cap(len(payload.get('dependencies') or []))
     while True:
         try:
-            return bounded(payload, DETAIL_CAP)
+            return bounded(payload, cap)
         except ConfigError:
             metadata = payload.get('metadata', {})
             optional = set(metadata) - {'formats', 'processing'}
@@ -445,6 +452,11 @@ class AssetService:
         return bounded(response, search_character_cap(args.get("limit", 5)), "results"), None, {"excluded": faults, "elapsed_seconds": evidence["elapsed_seconds"]}
 
     def get(self, args):
+        payload, image, evidence = self.detail_payload(args)
+        return bounded_detail(payload), image, evidence
+
+    def detail_payload(self, args):
+        """The whole verified detail, before any response limit: agents get it bounded (``get``), the desktop as is."""
         record = self.record(args["asset_id"])
         result = resolved_detail(self.config, record["asset_id"], args.get("source_format"), args.get("source_variant"))
         deps = result["dependencies"]
@@ -501,7 +513,7 @@ class AssetService:
         faults = []
         if args.get("include_preview", False):
             payload["preview"], image, faults = self.preview_content(record, args.get("preview_view", default_view(record)))
-        return bounded_detail(payload), image, {"excluded": faults}
+        return payload, image, {"excluded": faults}
 
     def preview_content(self, record, view, size=512, optimize=True):
         """Requested view as derived PNG, or its pending/excluded/faulty state; no substitute view."""

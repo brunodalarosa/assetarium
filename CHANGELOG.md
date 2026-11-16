@@ -90,6 +90,10 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- **Assets with many textures open again**: an asset with about 14 or more textures (and library texture overrides)
+  showed "Response exceeds deterministic cap" in the inspector, with no live 3D view, and agents could not fetch
+  it. The inspector no longer goes through the agent response limit, and for agents the `get_asset` limit grows
+  with the package: 16,000 characters plus 1,500 per dependency, up to 64 dependencies.
 - **Search time no longer grows with the library**: search checks files only for the candidates that can reach
   the results, not every asset (a keyword search on an 11,000-asset library went from 3.2 s to 0.4 s warm). The
   count of left-out assets now covers those candidates; library-wide faults stay in the Library and the queue.

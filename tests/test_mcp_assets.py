@@ -102,6 +102,37 @@ def test_optional_large_metadata_keeps_verified_source_and_preview(indexed):
     assert len(encoded(response)) <= 16000
 
 
+def many_textures(config, record, count=20):
+    """A repaired model: ``count`` texture dependencies, each also a library texture override."""
+    from local_asset_library.captions import file_hash
+    source = record['files'][0]
+    record['texture_repair'] = {'schema_version': 1, 'asset_id': record['asset_id'], 'source_path': source['path'],
+                                'source_sha256': source['sha256'], 'originals_modified': False, 'bindings': []}
+    for index in range(count):
+        texture = config.source_file(source['path']).parent / f'texture_{index:02d}_{"x" * 100}.png'
+        texture.write_bytes(b'synthetic image %d' % index)
+        path = texture.relative_to(config.source_root).as_posix()
+        record['dependencies'].append({'path': path, 'sha256': file_hash(texture), 'status': 'available',
+                                       'from': source['path'], 'role': 'texture', 'required_for_render': True})
+        record['texture_repair']['bindings'].append({'image': f'map{index}', 'original_path': f'X:/author/{texture.name}',
+                                                     'path': path, 'sha256': file_hash(texture), 'evidence': {}})
+    update(config, record)
+    return record
+
+
+def test_many_texture_dependencies_keep_the_complete_package(indexed):
+    from local_asset_library.mcp_assets import DETAIL_CAP, bounded_detail, detail_character_cap
+    config, _, records = indexed
+    record = many_textures(config, deepcopy(records[0]))
+    response, _, _ = AssetService(config).execute('get_asset', {'asset_id': record['asset_id']})
+    assert response['usable'] and len(response['dependencies']) >= 20 and len(response['texture_overrides']) == 20
+    assert DETAIL_CAP < response['serialized_characters'] <= response['character_cap']
+    assert response['character_cap'] == detail_character_cap(len(response['dependencies']))
+    # The limit grows per dependency, not without end: oversized rows still fail closed.
+    with pytest.raises(ConfigError, match='deterministic cap'):
+        bounded_detail({'dependencies': ['x' * 20000, 'y'], 'usable': True})
+
+
 def test_fault_output_bounded_for_arbitrary_malformed_id():
     from local_asset_library.mcp_assets import error_payload
     result=error_payload(ConfigError('bad input'),'x'*100000)
