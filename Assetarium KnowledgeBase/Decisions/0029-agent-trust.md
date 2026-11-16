@@ -68,7 +68,7 @@ directly. Say so rather than claiming more.
 ## Guards that stay (they limit damage, not freedom)
 
 - Responses are bounded (16,000 characters; asset detail adds 1,500 per dependency, up to 64 dependencies,
-  so a complete source package is never refused for its size); folders are paged.
+  so a complete source package fits; a response over its limit is still refused, never cut); folders are paged.
 - Pack rules come from a closed, validated vocabulary (`pack_profiles.KINDS`); agents choose rules, never
   patterns. Nothing is ever written into a pack or an original file.
 - The local model server is loopback only. `validate_blender` runs only files named `blender.exe` / `blender`.

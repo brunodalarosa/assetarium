@@ -239,7 +239,7 @@ def bounded(payload, cap, removable=None):
 
 
 def detail_character_cap(dependencies):
-    """16,000 for the asset itself plus 1,500 per dependency: a complete package of up to 64 always has room."""
+    """16,000 for the asset itself plus 1,500 per dependency, so the limit fits a package of up to 64 with ordinary paths."""
     return DETAIL_CAP + DETAIL_PER_DEPENDENCY * dependencies
 
 
