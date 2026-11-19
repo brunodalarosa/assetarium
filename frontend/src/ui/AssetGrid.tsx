@@ -66,7 +66,7 @@ import { AssetCardGhost, Skeleton, useShownWhile } from "./Loading";
 import { Badge, Hint, MotionPressable, Pressable } from "./primitives";
 
 function badges(item: Json, thumb?: Thumb) {
-  const latest = { ...item, ...(thumb?.presentation || {}) };
+  const latest = { ...item, ...thumb?.presentation };
   const list: { label: string; tone: "neutral" | "warning" | "fault" }[] = [];
   if (item.asset_type === "image") list.push({ label: (item.formats || []).includes("svg") && item.formats.length === 1 ? "SVG image" : "2D image", tone: "neutral" });
   if (item.source_faulty) list.push({ label: "Source fault", tone: "fault" });
@@ -110,7 +110,7 @@ function AssetCard({ grid, item: card, selected: chosen, index, active }: { grid
     return () => observer.disconnect();
   }, [grid, item, thumb]);
   const list = badges(item, thumb);
-  const latest = { ...item, ...(thumb?.presentation || {}) };
+  const latest = { ...item, ...thumb?.presentation };
   const label = `${item.name}, ${packLabel(item)}${item.source_faulty ? ", source fault" : ""}${latest.caption_status === "warning" ? ", caption warning" : ""}`;
   const describedBy = thumb?.reason ? `${grid}-preview-state-${item.asset_id}` : undefined;
   const meta = cardMeta(item, thumb?.card);

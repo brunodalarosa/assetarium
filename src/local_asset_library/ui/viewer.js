@@ -115,7 +115,7 @@ window.addEventListener('message', async event => {
     if (['three_quarter','front','side','top'].includes(message.view)) initialView = message.view;
     if (['studio','white','dark'].includes(message.background)) background = message.background;
     let parentAccess = false;
-    try { parentAccess = Boolean(parent.document); } catch (_) { /* Opaque origin is expected. */ }
+    try { parentAccess = Boolean(parent.document); } catch { /* Opaque origin is expected. */ }
     send('ready',{desktopBridge:Boolean(window.pywebview?.api),parentAccess});
     return;
   }

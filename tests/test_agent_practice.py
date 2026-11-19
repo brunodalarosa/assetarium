@@ -146,7 +146,8 @@ def test_gateway_uses_same_connection_without_permanent_audit(owner):
         practice.action(owner, 'cancel', key)
         result = await gateway.call('say', {'message': 'A late call'})
         assert result.is_error and not list(root.iterdir())
-        assert gateway._practice_key is None  # Later unscoped calls reach the real library again.
+        result = await gateway.call('list_packs', {})  # Later unscoped calls reach the real library again.
+        assert not result.is_error and all(p['library_folder'] != key for p in json.loads(result.content[0].text)['packs'])
         await gateway.close()
     asyncio.run(run())
     assert not practice._parent(owner).exists()

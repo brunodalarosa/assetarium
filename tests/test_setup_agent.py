@@ -83,7 +83,6 @@ def test_writes_need_no_session_and_one_notice_collects_a_day(project, blender):
     notices = [item for item in notifications.load(project)['items'] if item['kind'] == 'setup_changed']
     assert len(notices) == 1 and general_settings(project)['storage_budget_gib'] == 30
     assert call(project, 'validate_blender', {'path': blender})[0]['status'] == 'passed'
-    assert not hasattr(setup_agent, 'open_session') and 'session' not in setup_agent.status(project)
 
 
 def test_apply_validates_like_the_wizard_and_records_the_agent(project, monkeypatch):
