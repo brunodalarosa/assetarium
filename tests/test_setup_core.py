@@ -79,11 +79,13 @@ def test_blender_check_fails_a_program_that_is_not_blender(tmp_path):
     project = tmp_path / 'project'
     for area in ('data', 'cache', 'scratch'):
         (project / area).mkdir(parents=True)
-    config = SimpleNamespace(project_root=project, output_path=lambda area, rel: project / area / rel)
+    config = SimpleNamespace(project_root=project, output_path=lambda area, rel: project / area / rel,
+                             blender=None, sources_registry=None)
     result = setup_core.validate_blender(config, str(fake))
     assert result['status'] == 'failed'
     assert [c['id'] for c in result['checks']] == ['file', 'version'] and result['checks'][1]['status'] == 'failed'
-    assert setup_core._cached(fake) is None
+    with pytest.raises(ConfigError, match='Check this Blender'):
+        setup_core.blender_plan(config, str(fake))  # A failed check never lets it be saved.
 
 
 def test_real_blender_passes_every_check(tmp_path, request):
@@ -93,12 +95,13 @@ def test_real_blender_passes_every_check(tmp_path, request):
             pytest.fail(f'Real Blender unavailable ({BLENDER}) (LAL_REQUIRE_BLENDER=1)')
         pytest.skip(f'Real Blender unavailable ({BLENDER})')
     project = tmp_path / 'project'
-    config = SimpleNamespace(project_root=project, output_path=lambda area, rel: project / area / rel)
+    config = SimpleNamespace(project_root=project, output_path=lambda area, rel: project / area / rel,
+                             blender=None, sources_registry=None)
     result = setup_core.validate_blender(config, str(BLENDER))
     assert result['status'] in {'passed', 'warning'}, result
     assert [c['id'] for c in result['checks']] == ['file', 'version', 'headless', 'importers']
     assert result['checks'][3]['status'] == 'passed'
-    assert setup_core._cached(BLENDER)['version'] == result['version']
+    assert setup_core.blender_plan(config, str(BLENDER)) == 'write'  # The passed check is remembered for saving.
 
 
 def test_cancel_stops_only_setup_probes(tmp_path):

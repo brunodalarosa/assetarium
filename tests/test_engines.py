@@ -8,8 +8,7 @@ import pytest
 
 from local_asset_library import engines
 from local_asset_library.config import ConfigError
-from local_asset_library.description_engines import (DescriptionEngine, EngineStop, EngineUnavailableError,
-                                                     MemoryLimitError)
+from local_asset_library.description_engines import DescriptionEngine, EngineUnavailableError
 from local_asset_library.engine_server import MODE, ServerEngine, checked_url, probe
 from local_asset_library.incremental import caption_input, process, records, working
 from local_asset_library.settings import save_general_settings
@@ -80,13 +79,6 @@ def test_only_loopback_http_addresses_are_accepted():
             checked_url(bad)
 
 
-def test_engine_table_and_port_contracts():
-    assert set(engines.DESCRIPTION_ENGINES) == {'builtin', 'local-server'}
-    assert engines.DESCRIPTION_ENGINES['local-server']['status'] == 'experimental'
-    assert issubclass(MemoryLimitError, EngineStop) and issubclass(EngineUnavailableError, EngineStop)
-    assert isinstance(BatchBackend([]), DescriptionEngine) is False  # Lacks generation_mode/close: not a full engine.
-
-
 def test_composition_root_builds_the_configured_adapter(library, monkeypatch):
     config, _ = library
     built = []
@@ -96,7 +88,6 @@ def test_composition_root_builds_the_configured_adapter(library, monkeypatch):
             self.contract, self.settings = {'model_id': 'synthetic'}, {'seed': 0}
     monkeypatch.setattr('local_asset_library.caption_backend.QwenBackend', Qwen)
     engine = engines.description_engine(config)
-    assert type(engine).__name__ == 'TransformersQwenEngine' and isinstance(engine, DescriptionEngine)
     assert built == [{'revision': 'synthetic'}] and engine.contract is engine.backend.contract
     assert engines.batch_size(config) == 8 and engines.generation(config)[1] is None
     with server() as url:

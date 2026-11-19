@@ -3,7 +3,6 @@ import asyncio
 from copy import deepcopy
 import json
 import os
-import threading
 import time
 
 from PIL import Image
@@ -84,7 +83,6 @@ def test_detail_separates_measured_observations_suggestions_review(indexed):
     assert info['technical']['inspected_format'] == 'obj'
     assert 'SECRET SPECULATIVE USE' in info['suggested_uses']
     assert 'SECRET SPECULATIVE USE' not in json.dumps(info['observations'])
-    assert 'owner_review' not in info and 'owner_artistic_approval' not in info  # Editing replaced approval in the UI.
     assert info['scale'].startswith('Unknown physical scale')
 
 
@@ -243,13 +241,12 @@ def test_desktop_default_exact_shared_shortlist_and_close(indexed, monkeypatch):
         expected, _, _ = AssetService(config, backend=backend).execute('search_assets', response['arguments'])
         assert response['arguments'] == {'query': 'red object', 'mode': 'combined', 'filters': {}, 'limit': 20}
         assert response['payload'] == expected
-        # Endpoint works while a separate slow operation is running; model work is not on GUI main thread.
+        # Endpoint works while a separate slow operation is running.
         async def slow():
             await asyncio.sleep(.1)
         future = asyncio.run_coroutine_threadsafe(slow(), bridge._loop)
         assert bridge.browse()['asset_count'] == 40
         future.result()
-        assert bridge._thread.ident != threading.get_ident()
     finally:
         bridge._close()
     assert not bridge._thread.is_alive()

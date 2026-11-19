@@ -13,6 +13,9 @@ from local_asset_library.sources import read_records
 from test_sources import managed  # noqa: F401 (fixture)
 
 NAMES = ('crate', 'barrel', 'lantern')
+HEALTHY_FINGERPRINTS = {'barrel': '2b7d302e6f0de2b27ac53a6c4847e536fba20601c9b7401d1cf006f6f9d6cfb4',
+                        'crate': '4719e06a26fb5141839b957cec8a57058e4c97835e126edbda768a308e605c30',
+                        'lantern': '654670a7e451930c5c7c01c0754c0e0629927c60e171e1cf1a8d3158c59873a2'}
 
 
 def kit(root, broken=True):
@@ -25,9 +28,9 @@ def kit(root, broken=True):
             path.write_bytes(data)
         obj = root / 'Set' / 'OBJ' / (name + '.obj')
         obj.parent.mkdir(parents=True, exist_ok=True)
-        obj.write_text(f'mtllib {name}.mtl\nv 0 0 0\n')
+        obj.write_bytes(f'mtllib {name}.mtl\nv 0 0 0\n'.encode())  # Same bytes on every OS: fingerprints are pinned.
         texture = 'C:/Users/author/Desktop/atlas.png' if broken else 'atlas.png'
-        (obj.parent / (name + '.mtl')).write_text(f'newmtl m\nmap_Kd {texture}\n')
+        (obj.parent / (name + '.mtl')).write_bytes(f'newmtl m\nmap_Kd {texture}\n'.encode())
     (root / 'Set' / 'OBJ' / 'atlas.png').write_bytes(b'png')
     return root
 
@@ -51,8 +54,6 @@ def test_a_broken_alternate_fails_alone_and_is_recorded(source):
     problems = retrieval.file_problems(work, record)
     [(path, reason)] = problems.items()
     assert path.endswith('/OBJ/crate.obj') and 'Absolute or remote dependency is not permitted' in reason
-    with pytest.raises(ConfigError):
-        retrieval._source_check(work, record)  # The old whole-asset rule.
     assert retrieval.used_file(work, record).endswith('/gLTF/crate.gltf')
     usable = retrieval.source_check(work, record)
     assert usable and usable == retrieval.source_check(work, record)  # Stable fingerprint, no reprocessing loop.
@@ -70,9 +71,11 @@ def test_healthy_assets_keep_exactly_their_fingerprint(managed, tmp_path):
     added = sources.add(config, str(kit(tmp_path / 'healthy', broken=False)))
     sources.scan_source(config, added)
     work = working(sources.bound(config, added))
+    found = {}
     for record in read_records(work):
         assert retrieval.file_problems(work, record) == {}
-        assert retrieval.source_check(work, record) == retrieval._source_check(work, record)
+        found[record['display_name']] = retrieval.source_check(work, record)
+    assert found == HEALTHY_FINGERPRINTS  # Pinned: a changed formula would send every finished asset back to be redone.
 
 
 def test_dependencies_belong_to_their_file_through_materials(source):

@@ -235,7 +235,8 @@ def test_estimates_use_the_speed_test_and_recent_runs_or_say_no_measurement(fake
     value = queue.estimate(config, 'previews', found)
     assert value['seconds'] is None and 'no measurement yet' in queue.describe_estimate(value)
     monkeypatch.setattr(queue, '_render_rate', lambda config: 4.0)
-    assert queue.estimate(config, 'previews', found)['seconds'][1] > 0
+    tested = queue.estimate(config, 'previews', found)['seconds']
+    assert tested[1] > 0
     batches = config.library_store() / 'folders' / one['id'] / 'library/batches'
     atomic_json(batches / 'inspection-a.json', {'elapsed_seconds': 100, 'complete': 10, 'failed': 0})
-    assert queue._batch_rate(config, 'inspection') == 10
+    assert queue.estimate(config, 'previews', found)['seconds'][1] > tested[1]  # A recent 10 s/asset run beats the 4 s test.
