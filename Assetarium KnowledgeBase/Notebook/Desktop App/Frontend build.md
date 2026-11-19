@@ -1,7 +1,7 @@
 ---
 area: Desktop App
 tags: [system]
-code: [frontend/package.json, frontend/src/app/store.ts, frontend/src/main.tsx, frontend/src/components/beui, src/local_asset_library/ui/build, tests/test_ui_encoding.py]
+code: [frontend/package.json, frontend/.oxlintrc.json, frontend/src/app/store.ts, frontend/src/main.tsx, frontend/src/components/beui, src/local_asset_library/ui/build, tests/test_ui_encoding.py]
 verified: 2026-10-28
 branch: feature/library-view
 ---
@@ -16,6 +16,7 @@ Hub: [Desktop App](Desktop%20App.md). The UI is React 19 + TypeScript + Vite + T
 - **Commit the regenerated `ui/build/` with every frontend source change**; the app runs from it and
   never needs Node. **Never edit `ui/build/` by hand.**
 - Node 24 is a development tool only; keep npm's cache in `cache/npm` and clean it afterwards.
+- **`npm run lint` (Oxlint) must pass with no warnings** before committing frontend or `ui/*.js` changes.
 - **App-owned UI text must be valid UTF-8 with real characters (`…`, `·`, `→`), no mojibake.**
   `tests/test_ui_encoding.py` checks `frontend/src`, the bundle and the packaged HTML. Read and write
   UI files explicitly as UTF-8: Windows' default encoding corrupts punctuation and icons.

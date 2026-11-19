@@ -22,6 +22,10 @@ removes the download cache (about 250 MiB) when offline reinstalls are not neede
 Commit `src/local_asset_library/ui/build/` with every source change; the encoding test
 (`tests/test_ui_encoding.py`) covers both the sources here and the bundle.
 
+`npm run lint` runs [Oxlint](https://oxc.rs/docs/guide/usage/linter) (pinned, config in
+`.oxlintrc.json`) over `src/` and the hand-written `ui/viewer.js` and `ui/interactive-preview.js`;
+any warning fails it. It skips the generated `ui/build/` and the upstream `ui/vendor/`.
+
 ## Layout of the source
 
 - `src/app/store.ts`: application state and actions (search, browse, thumbnails,

@@ -273,10 +273,10 @@ function SourceAssetItems({ item }: { item: Json }) {
         </>
       )}
       {(item.state === "no_previews" || many) && (
-        <ContextMenuItem textValue="Make previews" onSelect={() => void makePreviews({ key, asset_ids: ids }, ids.length)}><ImageIcon className={ICON} aria-hidden />Make previews{many ? ` (${ids.length})` : ""}</ContextMenuItem>
+        <ContextMenuItem textValue="Make previews" onSelect={() => void makePreviews({ key, asset_ids: ids })}><ImageIcon className={ICON} aria-hidden />Make previews{many ? ` (${ids.length})` : ""}</ContextMenuItem>
       )}
       {descriptions && (item.overlays?.description === "missing" || many) && (
-        <ContextMenuItem textValue="Generate descriptions" onSelect={() => void makeDescriptions({ key, asset_ids: ids }, ids.length)}><FileText className={ICON} aria-hidden />Generate descriptions{many ? ` (${ids.length})` : ""}</ContextMenuItem>
+        <ContextMenuItem textValue="Generate descriptions" onSelect={() => void makeDescriptions({ key, asset_ids: ids })}><FileText className={ICON} aria-hidden />Generate descriptions{many ? ` (${ids.length})` : ""}</ContextMenuItem>
       )}
       {item.state === "blocked" && (
         <ContextMenuItem textValue="Fix" onSelect={() => navigate({ page: "processing" })}><Wrench className={ICON} aria-hidden />Fix…</ContextMenuItem>
@@ -314,7 +314,7 @@ function FolderMenuItems({ request }: { request: MenuRequest }) {
   const reveal = <ContextMenuItem textValue="Show in Explorer" onSelect={() => void pathAction("reveal", key, path)}><FolderSearch className={ICON} aria-hidden />Show in Explorer</ContextMenuItem>;
   const work = (
     <>
-      {pending > 0 && <ContextMenuItem textValue={imagesOnly ? "Process images" : "Make previews"} onSelect={() => void makePreviews({ key, path }, pending)}><ImageIcon className={ICON} aria-hidden />{imagesOnly ? "Process images" : "Make previews"} ({pending.toLocaleString()})</ContextMenuItem>}
+      {pending > 0 && <ContextMenuItem textValue={imagesOnly ? "Process images" : "Make previews"} onSelect={() => void makePreviews({ key, path })}><ImageIcon className={ICON} aria-hidden />{imagesOnly ? "Process images" : "Make previews"} ({pending.toLocaleString()})</ContextMenuItem>}
       {descriptions && item.node?.assets > 0 && <ContextMenuItem textValue="Generate descriptions" onSelect={() => void makeDescriptions({ key, path })}><FileText className={ICON} aria-hidden />Generate descriptions</ContextMenuItem>}
     </>
   );

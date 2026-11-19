@@ -128,7 +128,7 @@ function FolderHeader() {
         </p>
       </div>
       {pending > 0 && !folder.offline && (
-        <Button id="make-previews" tooltip={imagesOnly ? "Measures these images and prepares them for descriptions and search by meaning (no rendering); follow it in Processing" : "Queues preview renders for the assets here that have none; follow them in Processing"} onClick={() => void makePreviews({ key: folder.key, path: view.path }, pending)}>
+        <Button id="make-previews" tooltip={imagesOnly ? "Measures these images and prepares them for descriptions and search by meaning (no rendering); follow it in Processing" : "Queues preview renders for the assets here that have none; follow them in Processing"} onClick={() => void makePreviews({ key: folder.key, path: view.path })}>
           {pending.toLocaleString()} {imagesOnly ? "not processed · Process images" : "without previews · Make previews"}
         </Button>
       )}

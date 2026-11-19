@@ -1231,16 +1231,16 @@ export async function libraryCover(key: string, relative: string): Promise<strin
   }
 }
 /** Make previews for a folder, pack or picked assets: it starts at once or waits in line (decision 0032). */
-export async function makePreviews(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
-  return queueAction("previews", scope, count);
+export async function makePreviews(scope: { key: string; path?: string; asset_ids?: string[] }) {
+  return queueAction("previews", scope);
 }
-export async function makeDescriptions(scope: { key: string; path?: string; asset_ids?: string[] }, count = 0) {
-  return queueAction("descriptions", scope, count);
+export async function makeDescriptions(scope: { key: string; path?: string; asset_ids?: string[] }) {
+  return queueAction("descriptions", scope);
 }
 /** The inspector's description action for one asset: Generate (none), Try again (failed) or Update search (edited). */
 export async function describeAsset(id: GridId, edit: Json, mode: "generate" | "retry" | "edited" = "generate") {
   // The description line shows where the work stands, so only a refusal gets a toast.
-  const result = await queueAction("descriptions", { key: edit.key, asset_ids: [edit.asset_id], ...(mode === "generate" ? {} : { mode }) }, 1, false, true,
+  const result = await queueAction("descriptions", { key: edit.key, asset_ids: [edit.asset_id], ...(mode === "generate" ? {} : { mode }) }, false, true,
     () => refreshDescription(id));  // A confirmed add: the line follows the work it queued.
   await refreshDescription(id);
   return result;
@@ -1276,7 +1276,7 @@ export async function editDescription(id: GridId, assetId: string, fields: Json)
     // Nothing was queued yet (storage budget or no measurement): ask with the estimate; Not now keeps Update search.
     const search = result.search, scope = { key: result.key, asset_ids: [result.asset_id], mode: "edited" };
     askConfirm({ title: search.title, body: search.body, confirmLabel: search.confirm_label, cancelLabel: "Not now", tone: "neutral",
-      run: async () => { await queueAction("descriptions", scope, 1, true, true); await refreshDescription(id); } });
+      run: async () => { await queueAction("descriptions", scope, true, true); await refreshDescription(id); } });
   } else if (result.status === "saved") {
     const search = result.search || {};
     pushToast(search.status === "faulty"
@@ -1293,7 +1293,7 @@ export async function openDescriptionSetup() {
   await changeSetupStep("descriptions");
 }
 /** ``confirmedThen`` runs after a confirmed add (the caller already returned when the dialog opened). */
-export async function queueAction(action: "previews" | "descriptions", scope: Json, count = 0, confirmed = false, quiet = false,
+export async function queueAction(action: "previews" | "descriptions", scope: Json, confirmed = false, quiet = false,
                                   confirmedThen?: () => unknown): Promise<Json> {
   try {
     const result = await api().queue_add(action, scope, confirmed);
@@ -1301,7 +1301,7 @@ export async function queueAction(action: "previews" | "descriptions", scope: Js
     if (result.status === "confirm") {
       // Over 30 minutes, or the storage budget would be reached: ask first with the estimate.
       askConfirm({ title: result.title, body: result.body, confirmLabel: result.confirm_label, tone: "neutral",
-        run: async () => { await queueAction(action, scope, count, true, quiet); await confirmedThen?.(); } });
+        run: async () => { await queueAction(action, scope, true, quiet); await confirmedThen?.(); } });
       return result;
     }
     const undo = result.undo ? [{ label: "Undo", run: () => void api().queue_remove(result.item.id).then(loadQueue) }] : undefined;
@@ -2448,7 +2448,7 @@ export function stageRules(targets: { id: string; index: number }[], choice: Rul
   setState((s) => {
     const staged = { ...s.agent.staged };
     for (const { id, index } of targets) {
-      const rules = { ...(staged[id] || {}) };
+      const rules = { ...staged[id] };
       if (choice) rules[index] = choice;
       else delete rules[index];
       staged[id] = rules;
