@@ -23,7 +23,7 @@ import uuid
 
 from .config import ConfigError
 
-VERSION = 5  # 4: physical source locations and deduplicated ancestor membership. 5: format_off reasons.
+VERSION = 6  # 5: format_off reasons. 6: recorded embedding and preview failure reasons.
 VIEW_ANSWERS = ('variant_axis', 'separate_descriptions')  # Answers a view applies; they are part of its stamp.
 WAIT = 1.5
 # Heavy record fields no view column needs; SQLite drops them before Python parses a row.
@@ -149,7 +149,9 @@ def lean(row):
 _ROWS = ("SELECT asset_id, record, json_remove(record, " + ', '.join(f"'$.{k}'" for k in HEAVY) + "), "
          "json_extract(record, '$.technical.inspected_path'), "
          "(SELECT count(*) FROM json_each(record, '$.technical')) * (json_type(record, '$.technical') = 'object'), "
-         "json_extract(record, '$.description') FROM assets")
+         "json_extract(record, '$.description'), "
+         "(SELECT value FROM json_each(record, '$.inspection_run.errors') WHERE type = 'text' AND value != '' LIMIT 1) "
+         "FROM assets")
 SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE assets (asset_id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT NOT NULL, folder_key TEXT NOT NULL,
@@ -198,14 +200,26 @@ def group(db, saved):
     return oversized
 
 
+def _failure_reason(stage, recorded, embedding_error, inspection_error):
+    fault = recorded.get(stage) or {}
+    reason = fault.get('error') or fault.get('reason')
+    if stage == 'embeddings':
+        return embedding_error or reason
+    if not reason and stage in ('inspection', 'previews'):
+        # Inspection and preview rendering share a run and may share its fault evidence.
+        other = recorded.get('inspection' if stage == 'previews' else 'previews') or {}
+        return other.get('error') or other.get('reason') or inspection_error
+    return reason
+
+
 def build(current, target):
     """Stream one catalog into a new view file and swap it in; older views of this generation are removed."""
-    from .library_view import _folder, kind_of, state_of
+    from .library_view import _folder, kind_of
     from .publication import read_only
     from .settings import format_group, format_off, processing_eligible, used_formats, uses
-    from .sources import description_state, embedding_failures, import_outcome
+    from .sources import description_state, embedding_failure_reasons, import_outcome
     catalog, folder, name = _place(current)
-    key, formats, faults = current.source_key, used_formats(current), embedding_failures(current)
+    key, formats, faults = current.source_key, used_formats(current), embedding_failure_reasons(current)
     folder.mkdir(parents=True, exist_ok=True)
     temporary = folder / f'.{target.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp'
     try:
@@ -218,12 +232,15 @@ def build(current, target):
                 outcome = import_outcome(record, None if faults is None else record['asset_id'] in faults)
                 failed, stages = None, None
                 if outcome['failed_stages']:
-                    failed = state_of(record, {}, faults)[1]
                     recorded = record.get('stage_faults') or {}
+                    embedding_error = (faults or {}).get(record['asset_id'])
                     stages = {}
                     for stage in outcome['failed_stages']:
-                        fault = recorded.get(stage) or recorded.get('previews') or {}
-                        stages[stage] = str(fault.get('error') or fault.get('reason') or 'Recorded failure')[:300]
+                        reason = _failure_reason(stage, recorded, embedding_error, row[6])
+                        if reason and failed is None:
+                            failed = str(reason)
+                        stages[stage] = str(reason or 'Recorded failure')[:300]
+                    failed = failed or 'Recorded failure: ' + ', '.join(stages)
                 following = next((s for s in ('inspection', 'previews', 'embeddings') if s in outcome['pending_stages']), None)
                 review = (record.get('caption_provenance') or {}).get('findings') or []
                 files = record.get('files') or []
