@@ -542,11 +542,21 @@ def description_state(record):
 
 def embedding_failures(config):
     """Assets with failed image-vector attempts; description vectors are optional."""
+    failures = embedding_failure_reasons(config)
+    return None if failures is None else set(failures)
+
+
+def embedding_failure_reasons(config):
+    """One saved error per asset with a failed image-vector attempt, if any job has one."""
     path = config.output_path("data", "embeddings/index.sqlite")
     if not path.exists():
         return None
     with closing(read_only(path)) as db:
-        return {row[0] for row in db.execute("SELECT DISTINCT asset_id FROM jobs WHERE status='failed' AND channel='image'")}
+        # An asset can have several failed views. Pick one nonempty error consistently.
+        return dict(db.execute("""
+            SELECT asset_id, MIN(CASE WHEN json_valid(evidence) THEN NULLIF(json_extract(evidence, '$.error'), '') END)
+            FROM jobs WHERE status='failed' AND channel='image' GROUP BY asset_id
+        """))
 
 
 def importing_failures(config):

@@ -143,6 +143,54 @@ def test_queue_resolves_and_lists_failures_from_the_view(managed, monkeypatch):
     assert sources.importing_failures(config)['assets'] == 1
 
 
+def test_embedding_failure_reason_comes_from_failed_image_jobs(managed):
+    config, backend, one, _ = managed
+    work = ready_source(config, backend, one)
+    record = sources.read_records(work)[0]
+    asset_id = record['asset_id']
+    record['processing']['embeddings'] = 'partial'
+    update_record(work, record)
+    index = work.output_path('data', 'embeddings/index.sqlite')
+    with closing(sqlite3.connect(index)) as db, db:
+        db.execute("UPDATE jobs SET status='failed', evidence=? WHERE asset_id=?",
+                   (json.dumps({'error': 'Optional description failed'}), asset_id))
+        db.execute("UPDATE jobs SET evidence=? WHERE asset_id=? AND channel='image'",
+                   (json.dumps({'error': 'Preview vector could not be generated'}), asset_id))
+        db.execute("INSERT INTO jobs VALUES (?, ?, 'image', 'synthetic', 'failed', '{}')",
+                   ('reasonless-job', asset_id))
+    original = index.read_bytes()
+
+    items = library_view.folder_items(config, one['key'])['items']
+    item = next(item for item in items if item.get('asset_id') == asset_id)
+    assert (item['state'], item['reason']) == ('failed', 'Preview vector could not be generated')
+    assert [(group['stage'], group['reason']) for group in processing_queue.failures(config)] == [
+        ('embeddings', 'Preview vector could not be generated')]
+    assert index.read_bytes() == original
+
+
+@pytest.mark.parametrize('evidence, reason, card_reason', [
+    ({'stage_faults': {'previews': {'status': 'failed'}, 'inspection': {'reason': 'Broken mesh'}}}, 'Broken mesh', 'Broken mesh'),
+    ({'inspection_run': {'status': 'failed', 'errors': ['', 'Blender could not render the model']}},
+     'Blender could not render the model', 'Blender could not render the model'),
+    ({'stage_faults': {'caption': {'error': 'Optional description failed'}}}, 'Recorded failure', 'Recorded failure: previews'),
+])
+def test_preview_failure_reason_comes_from_saved_inspection(managed, evidence, reason, card_reason):
+    config, backend, one, _ = managed
+    work = ready_source(config, backend, one)
+    record = sources.read_records(work)[0]
+    record['processing']['previews'] = 'failed'
+    record.update(evidence)
+    update_record(work, record)
+    catalog = work.output_path('data', 'catalog.sqlite')
+    original = catalog.read_bytes()
+
+    items = library_view.folder_items(config, one['key'])['items']
+    item = next(item for item in items if item.get('asset_id') == record['asset_id'])
+    assert (item['state'], item['reason']) == ('failed', card_reason)
+    assert [(group['stage'], group['reason']) for group in processing_queue.failures(config)] == [('previews', reason)]
+    assert catalog.read_bytes() == original
+
+
 def test_bridge_shares_identical_calls_and_closes_with_a_read_still_running(managed):
     config, _, _, _ = managed
     bridge = DesktopBridge(config, prestart_worker=False)
