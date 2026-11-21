@@ -53,10 +53,12 @@ Start at `processing_queue.add` and `processing_queue.advance`.
   state for `local-assets queue list`.
 - **Dismissals** live in `data/library/attention.json` (`notices_path`), never in fault records. `dismiss` stores
   the failure group's asset IDs; `_returned` brings a notice back as `again` when an asset joins the group, when a
-  run after the dismissal tried an asset still in it (`_tried`, called from `_finish_running` with the operation's
-  `asset_ids`), when a later run of the same work stopped the same way (`finished_utc`), or, for a block, when
+  Make previews run after the dismissal tried a member that is in it again (`_tried`, from `_finish_running`: it keeps
+  only the operation's `asset_ids` that were in the dismissed group; previews resolve only assets without a recorded
+  failure, so a member back in the group failed in that run; description runs never count), when a later run of the same work stopped the same way (`finished_utc`), or, for a block, when
   `add`/`advance` met that block (`_hit_blocked`). It is recomputed on each read, so a stale folder view that still
-  lists a fixed asset corrects itself once rebuilt. Nothing is pruned except the oldest past 1,000 dismissals.
+  lists a fixed asset corrects itself once rebuilt. Dismissals of notices still shown are never forgotten; past 1,000, the oldest of notices that are gone are
+  dropped when the owner dismisses. The file may reach 32 MiB (`NOTICES_LIMIT`).
 - A fault recorded without an error or reason shows `folder_view.NO_REASON`; the card sets `no_reason` and the page
   says "No reason was recorded" instead of inventing one.
 

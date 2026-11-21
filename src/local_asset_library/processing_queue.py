@@ -19,7 +19,7 @@ import uuid
 
 from .config import ConfigError
 from .publication import atomic_json, read_json
-from .store_versions import read_versioned
+from .store_versions import newer_refused, read_versioned
 
 ACTIONS = ('previews', 'descriptions')
 OPERATION = {'previews': 'process', 'descriptions': 'describe'}
@@ -308,7 +308,9 @@ def _finish_running(config, queue):
             continue
         outcome = status.get('status') if status.get('token') == item.get('token') else 'interrupted'
         queue['items'].remove(item)
-        if status.get('token') == item.get('token') and status.get('asset_ids'):
+        if item['action'] == 'previews' and status.get('token') == item.get('token') and status.get('asset_ids'):
+            # Only Make previews runs the stages failures are recorded for, and it resolves only assets without a
+            # recorded failure: one of them in a failure group now failed in this run. A description run never counts.
             _tried(config, item['scope']['key'], status['asset_ids'])
         if outcome == 'complete' and item['scope'].get('mode') == 'edited':
             for asset_id in item['scope']['asset_ids']:  # Search reads the edit now, unless it was saved after the start.
@@ -555,7 +557,8 @@ def blocked_groups(config):
 # same fault is triggered again. A stopped run's reason maps to the action that resolves it; others stay in Recent.
 RUN_FIXES = (('The search check did not pass', 'run_check'), ('Storage budget reached', 'settings'),
              ('Descriptions are turned off', 'settings'), ('Processing is paused. Select formats', 'settings'))
-KEPT_DISMISSALS = 1000
+KEPT_DISMISSALS = 1000  # Dismissals of notices no longer shown; active ones are always kept.
+NOTICES_LIMIT = 32 * 2**20  # Bytes: a dismissed failure keeps its group's asset IDs.
 
 
 def notices_path(config):
@@ -564,17 +567,22 @@ def notices_path(config):
 
 def _notices(config):
     path = notices_path(config)
-    value = read_versioned(path, 'Dismissed notices', 1) if path.exists() else {}
+    value = newer_refused(read_json(path, limit=NOTICES_LIMIT), 'Dismissed notices', 1) if path.exists() else {}
     value.setdefault('schema_version', 1)
     value.setdefault('dismissed', {})  # Card id → {utc, kind, key, assets, tried, hit}.
     return value
 
 
-def _save_notices(config, value):
-    kept = sorted(value['dismissed'].items(), key=lambda kv: kv[1]['utc'], reverse=True)[:KEPT_DISMISSALS]
+def _save_notices(config, value, active=None):
+    """Save; with ``active`` (the notice ids shown now) also forget the oldest dismissals of notices that are gone.
+    A dismissal of a notice still shown is never forgotten, so it can't reappear without its fault happening again."""
+    dismissed = value['dismissed']
+    if active is not None:
+        gone = sorted((i for i in dismissed if i not in active), key=lambda i: dismissed[i]['utc'], reverse=True)
+        dismissed = {i: e for i, e in dismissed.items() if i in active or i in set(gone[:KEPT_DISMISSALS])}
     path = notices_path(config)
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_json(path, {**value, 'dismissed': dict(kept)})
+    atomic_json(path, {**value, 'dismissed': dismissed})
 
 
 def _card_id(*parts):
@@ -658,10 +666,15 @@ def _hit_blocked(config, reasons):
 def _tried(config, key, asset_ids):
     """A run in ``key`` attempted these assets: dismissed failures of that folder return if they fail again."""
     notices = _notices(config)
-    entries = [e for e in notices['dismissed'].values() if e.get('kind') == 'failure' and e.get('key') == key]
-    for entry in entries:
-        entry['tried'] = sorted(set(entry.get('tried', [])) | set(asset_ids))
-    if entries:
+    attempted, changed = set(asset_ids), False
+    for entry in notices['dismissed'].values():
+        if entry.get('kind') == 'failure' and entry.get('key') == key:
+            # Only members of the dismissed group can make it return; others would just grow the file.
+            found = attempted & set(entry.get('assets', [])) - set(entry.get('tried', []))
+            if found:
+                entry['tried'] = sorted(set(entry.get('tried', [])) | found)
+                changed = True
+    if changed:
         _save_notices(config, notices)
 
 
@@ -680,7 +693,7 @@ def dismiss(config, ids):
         for card in found:
             notices['dismissed'][card['id']] = {'utc': now(), 'kind': card['kind'], 'key': card.get('key'),
                                                 **({'assets': [a['asset_id'] for a in card['files']]} if card['kind'] == 'failure' else {})}
-        _save_notices(config, notices)
+        _save_notices(config, notices, active=set(cards))
     return state(config)
 
 

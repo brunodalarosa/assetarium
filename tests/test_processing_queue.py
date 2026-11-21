@@ -339,3 +339,31 @@ def test_the_bridge_dismisses_and_brings_back_notices(fake):
         assert refused['status'] == 'faulty' and refused['reason'] == 'That notice is no longer shown'
     finally:
         bridge._close()
+
+
+def test_only_previews_runs_of_dismissed_members_are_kept_as_tried(fake):
+    config, one, _, _, finish, monkeypatch = fake
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], ['a', 'b'])])
+    identifier = queue.dismiss(config, [queue.state(config)['attention'][0]['id']])['attention'][0]['id']
+    real = source_operations.operation_status
+    monkeypatch.setattr(source_operations, 'operation_status', lambda scoped: {**real(scoped), 'asset_ids': ['a'] + [f'x{i}' for i in range(500)]})
+    monkeypatch.setattr(queue, 'resolve', lambda config, action, scope: {'ids': ['a'], 'blocked': {}, 'kinds': {'model_3d': 1}, 'fixes': {}})
+    queue.add(config, 'descriptions', {'key': one['key']})
+    finish(one['key'])  # A description run never ran the failed stage: the dismissed failure stays hidden.
+    assert queue.state(config)['attention'][0]['dismissed']
+    queue.add(config, 'previews', {'key': one['key']})
+    finish(one['key'])
+    assert queue._notices(config)['dismissed'][identifier]['tried'] == ['a']  # Unrelated assets are not stored.
+    assert queue.state(config)['attention'][0]['again']
+
+
+def test_dismissals_of_notices_still_shown_are_never_forgotten(fake):
+    config, one, _, _, _, monkeypatch = fake
+    monkeypatch.setattr(queue, 'KEPT_DISMISSALS', 2)
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], [f'a{n}'], reason=f'R{n}') for n in range(5)])
+    ids = [c['id'] for c in queue.state(config)['attention']]
+    state = queue.dismiss(config, ids)
+    assert state['dismissed'] == 5  # Dismiss all past the limit keeps every one hidden.
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], ['a0'], reason='R0')])
+    queue.dismiss(config, [ids[0]])
+    assert len(queue._notices(config)['dismissed']) == 3  # Only dismissals of notices that are gone are trimmed.
