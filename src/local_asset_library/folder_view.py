@@ -238,7 +238,7 @@ def build(current, target):
                     for stage in outcome['failed_stages']:
                         reason = _failure_reason(stage, recorded, embedding_error, row[6])
                         if reason and failed is None:
-                            failed = str(reason)
+                            failed = str(reason)[:300]
                         stages[stage] = str(reason or 'Recorded failure')[:300]
                     failed = failed or 'Recorded failure: ' + ', '.join(stages)
                 following = next((s for s in ('inspection', 'previews', 'embeddings') if s in outcome['pending_stages']), None)
