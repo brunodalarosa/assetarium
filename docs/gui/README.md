@@ -261,7 +261,7 @@ in its header. With nothing running or waiting it says how many assets still hav
 with a way to **Asset sources**. **Needs your attention** lists only what you can resolve: work that can't run
 here (with its fix and how many assets it unblocks; it is never offered as something to process), recorded
 failures by stage and reason (**Recheck…**, [decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md),
-**Show in Library**, **Copy**) and runs that stopped for a reason you can fix (**Run check**, **Open Settings**).
+**Show in Library**, **Copy**; the reason comes from saved processing evidence when available) and runs that stopped for a reason you can fix (**Run check**, **Open Settings**).
 A failure recorded without a reason says so. Each notice has **Dismiss**, and **Dismiss all** has **Undo**;
 dismissing hides the notice and never deletes the failure, which stays recorded and is never retried
 automatically. Dismissed notices are counted (**3 dismissed · Show**, each with **Bring back**), and one comes

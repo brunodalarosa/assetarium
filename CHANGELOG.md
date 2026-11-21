@@ -96,6 +96,8 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Fixed
 
+- **Recorded processing failures show their errors**: asset cards and Asset processing recover saved reasons for
+  failed image embeddings and preview failures recorded during inspection.
 - **Assets with many textures open again**: an asset with about 14 or more textures (and library texture overrides)
   showed "Response exceeds deterministic cap" in the inspector, with no live 3D view, and agents could not fetch
   it. The inspector no longer goes through the agent response limit, and for agents the `get_asset` limit grows
