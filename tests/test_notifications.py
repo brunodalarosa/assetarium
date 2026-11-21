@@ -136,9 +136,16 @@ def test_hidden_notice_returns_marked_again_only_when_reissued_with_new_facts(co
     shown = {item['id']: item for item in items(config)}
     assert set(shown) == {'ready-fixture-id', 'collection-c1', 'setup-s1'} and all(i['again'] for i in shown.values())
     assert not shown['collection-c1']['read'] and len(shown['setup-s1']['changes']) == 2
-    # A shown notice re-issued is not "again"; reading clears the mark.
+    # Updating a returned notice before it is read keeps its mark, finishing a setup session included.
     notifications.notify_collection(config, COLLECTION, 'added', 'Added 1 asset')
+    notifications.notify_setup_change(config, 's1', [], finished=True)
+    notifications.notify_ready(config, SOURCE, 12)
+    shown = {item['id']: item for item in items(config)}
+    assert all(i['again'] for i in shown.values()) and shown['setup-s1']['finished'] and shown['ready-fixture-id']['missing'] == 12
+    # Reading clears the mark; a shown notice re-issued after that is not "again".
     notifications.act(config, 'read_all')
+    notifications.notify_collection(config, COLLECTION, 'added', 'Added 1 asset')
+    notifications.notify_setup_change(config, 's1', [], finished=True)
     assert not any(item.get('again') for item in items(config))
 
 

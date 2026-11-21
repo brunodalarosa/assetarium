@@ -78,7 +78,7 @@ def notify_ready(config, source, missing):
             if existing:
                 value['items'].append(dict(existing, missing=missing))
             return
-        returned = existing.get('hidden') if existing else source['id'] in value['dismissed']
+        returned = _returned(existing) if existing else source['id'] in value['dismissed']
         value['items'].append(dict(ready(source, missing), again=True) if returned else ready(source, missing))
     return _change(config, update)
 
@@ -95,6 +95,11 @@ def notify_report(config, source, token, outcome, **facts):
     return _change(config, update)
 
 
+def _returned(existing):
+    """A replacement of a hidden notice returns it; one of a returned notice not yet read keeps its Again mark."""
+    return bool(existing and (existing.get('hidden') or existing.get('again')))
+
+
 def clear_ready(config, source_id):
     """Starting a description run resolves the notice and forgets an earlier "Not now"."""
     def update(value):
@@ -109,9 +114,9 @@ def notify_collection(config, collection, change, summary):
             'collection_name': collection['name'], 'change': change, 'summary': summary,
             'asset_count': len(collection['items']), 'created_utc': now(), 'read': False}
     def update(value):
-        hidden = any(existing['id'] == item['id'] and existing.get('hidden') for existing in value['items'])
+        returned = any(existing['id'] == item['id'] and _returned(existing) for existing in value['items'])
         value['items'] = [existing for existing in value['items'] if existing['id'] != item['id']] + [
-            dict(item, again=True) if hidden else item]
+            dict(item, again=True) if returned else item]
     return _change(config, update)
 
 
@@ -136,7 +141,7 @@ def notify_setup_change(config, session_id, changes, finished=False):
         value['items'] = [item for item in value['items'] if item['id'] != identifier] + [{
             'id': identifier, 'kind': 'setup_changed', 'session_id': session_id, 'changes': list(merged.values()),
             'finished': finished or bool((existing or {}).get('finished')), 'created_utc': now(), 'read': False,
-            **({'again': True} if hidden else {})}]
+            **({'again': True} if _returned(existing) else {})}]
     return _change(config, update)
 
 
