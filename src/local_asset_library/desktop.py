@@ -461,6 +461,15 @@ class DesktopBridge:
         from .processing_queue import control
         return self._wait(self._present(lambda: {'status': 'saved', 'queue': control(self._config, action, identifier, value)}, guarded=False))
 
+    # Needs your attention (design principle P7): dismissing hides a notice; fault records stay as they are.
+    def attention_dismiss(self, ids):
+        from .processing_queue import dismiss
+        return self._wait(self._present(lambda: {'status': 'saved', 'queue': dismiss(self._config, ids)}, guarded=False))
+
+    def attention_restore(self, ids):
+        from .processing_queue import restore
+        return self._wait(self._present(lambda: {'status': 'saved', 'queue': restore(self._config, ids)}, guarded=False))
+
     def library_visit(self, key):
         from .library_view import record_visit
         return self._wait(self._present(record_visit, self._config, key, guarded=False))

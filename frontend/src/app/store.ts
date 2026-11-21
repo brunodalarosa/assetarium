@@ -289,7 +289,8 @@ export interface AppState {
   appearance: string;
   runReport: Json | null;
   imageBackground: string;
-  coverage: string;
+  /** Assets still waiting for previews and for descriptions (the Now and next empty state). */
+  pending: { previews: number; descriptions: number } | null;
   /** The search worker's phase (desktop `changes`): it prepares libraries at startup. */
   worker: string;
   /** Thumbnail and cover requests queued or in flight, for the activity indicator. */
@@ -345,7 +346,7 @@ let state: AppState = {
   setup: emptySetup(),
   searchCheck: { checking: false, devices: null, error: null },
   blender: emptyBlender(),
-  appearance: boot.appearance, runReport: null, imageBackground: "checker", coverage: "",
+  appearance: boot.appearance, runReport: null, imageBackground: "checker", pending: null,
   worker: "not_started", previews: 0,
 };
 
@@ -784,9 +785,8 @@ export async function refreshContext(force = false) {
 function renderCoverage(context: Json) {
   const source = context.working_coverage || context.coverage;
   const packs = Object.values(source?.packs || {}) as Json[];
-  const pending = packs.reduce((n, p) => n + (p.stages?.caption?.pending || 0), 0);
-  const failed = packs.reduce((n, p) => n + (p.stages?.caption?.failed || 0), 0);
-  setState({ coverage: `${context.coverage?.membership ?? 0} in the library · ${pending} without descriptions · ${failed} description failures` });
+  const count = (stage: string) => packs.reduce((n, p) => n + (p.stages?.[stage]?.pending || 0), 0);
+  setState({ pending: { previews: count("previews"), descriptions: count("caption") } });
 }
 
 /* --------------------------------- sources ------------------------------- */
@@ -1313,7 +1313,7 @@ export async function queueAction(action: "previews" | "descriptions", scope: Js
     return { status: "faulty", reason: (error as Error).message };
   }
 }
-/** The processing queue (Running, Up next, Blocked, Recorded failures, Recent). */
+/** The processing queue (Now and next, Needs your attention, Recent activity). */
 export async function loadQueue() {
   if (!state.api) return;
   try {
@@ -1333,6 +1333,27 @@ export async function queueControl(action: string, id: string | null = null, val
   } catch (error) {
     pushToast({ tone: "fault", title: "Queue not changed", body: (error as Error).message });
     return { status: "faulty", reason: (error as Error).message };
+  }
+}
+/** Needs your attention (design principle P7): Dismiss hides a notice and never deletes; Dismiss all offers Undo. */
+export async function dismissAttention(ids: string[], all = false) {
+  try {
+    const result = await api().attention_dismiss(ids);
+    if (result.status === "faulty") throw Error(result.reason);
+    setState({ queue: result.queue });
+    if (all) pushToast({ tone: "info", title: `Dismissed ${plural(ids.length, "notice", "notices")}`,
+      body: "Their failures stay recorded. A notice comes back if its fault happens again.", actions: [{ label: "Undo", run: () => void restoreAttention(ids) }] });
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not dismissed", body: (error as Error).message });
+  }
+}
+export async function restoreAttention(ids: string[]) {
+  try {
+    const result = await api().attention_restore(ids);
+    if (result.status === "faulty") throw Error(result.reason);
+    setState({ queue: result.queue });
+  } catch (error) {
+    pushToast({ tone: "fault", title: "Not brought back", body: (error as Error).message });
   }
 }
 export function openFolderMenu(item: Json, x: number, y: number, returnFocus: HTMLElement | null = null, keyboard = false) {

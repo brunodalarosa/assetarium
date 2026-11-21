@@ -26,6 +26,7 @@ from .config import ConfigError
 VERSION = 6  # 5: format_off reasons. 6: recorded embedding and preview failure reasons.
 VIEW_ANSWERS = ('variant_axis', 'separate_descriptions')  # Answers a view applies; they are part of its stamp.
 WAIT = 1.5
+NO_REASON = 'Recorded failure'  # A stage fault recorded without an error or reason; the app says so, never guesses one.
 # Heavy record fields no view column needs; SQLite drops them before Python parses a row.
 HEAVY = ('technical', 'dependencies', 'texture_repair', 'texture_repair_history', 'dependency_inspection',
          'provenance', 'grouping', 'license_evidence', 'effective_caption', 'inspection_run', 'description')
@@ -239,8 +240,8 @@ def build(current, target):
                         reason = _failure_reason(stage, recorded, embedding_error, row[6])
                         if reason and failed is None:
                             failed = str(reason)[:300]
-                        stages[stage] = str(reason or 'Recorded failure')[:300]
-                    failed = failed or 'Recorded failure: ' + ', '.join(stages)
+                        stages[stage] = str(reason or NO_REASON)[:300]
+                    failed = failed or NO_REASON + ': ' + ', '.join(stages)
                 following = next((s for s in ('inspection', 'previews', 'embeddings') if s in outcome['pending_stages']), None)
                 review = (record.get('caption_provenance') or {}).get('findings') or []
                 files = record.get('files') or []

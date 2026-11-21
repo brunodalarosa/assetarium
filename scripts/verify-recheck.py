@@ -60,7 +60,7 @@ window = create_window(config, bridge)
 profile = profile_path(config, bridge, window)
 report = {'status': 'running', 'checks': [], 'synthetic_only': True}
 ui = Harness(window, OUT, report)
-CARD = "document.querySelector('article[data-source=kit]')"
+CARD = "document.querySelector('.attention-card[data-kind=failure]:not([data-dismissed=true])')"
 BUTTON = CARD + ".querySelector('[data-action=recheck]')"
 
 
@@ -73,8 +73,8 @@ def verify():
         ui.wait_ready(extra="lal.state.sources.length===3")
         ui.js("$('nav-processing').click()")
         wait(f"{CARD}&&{BUTTON}")
-        assert ui.js(f"{BUTTON}.textContent.includes('Recheck failures')")
-        report['checks'].append('A source with recorded failures shows Recheck failures on its Asset processing card')
+        assert ui.js(f"{BUTTON}.textContent.includes('Recheck')&&document.querySelectorAll('.attention-card[data-kind=failure]').length===2")
+        report['checks'].append('Recorded failures show as Needs your attention cards, each with Recheck…')
         ui.js(f"{BUTTON}.click()")
         wait("$('confirm-dialog').open&&$('confirm-accept')")
         title, body = ui.js("[$('confirm-title').textContent,$('confirm-body').textContent]")

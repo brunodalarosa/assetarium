@@ -1,9 +1,9 @@
 ---
 area: Processing
 tags: [system]
-code: [processing_queue.py, processing_queue.add, processing_queue.place, processing_queue.MODES, processing_queue.advance, processing_queue.resolve, processing_queue.estimate, processing_queue.claim, processing_queue.release, processing_queue.owner_gone, source_operations.watch_owner, desktop.create_window, processing_queue.failures, folder_view.connect, source_operations.start, source_operations.worker_stage, scripts/source-operation.py, library_view.blockers]
-verified: 2026-11-04
-branch: feature/library-view
+code: [processing_queue.py, processing_queue.add, processing_queue.place, processing_queue.MODES, processing_queue.advance, processing_queue.resolve, processing_queue.estimate, processing_queue.claim, processing_queue.release, processing_queue.owner_gone, source_operations.watch_owner, desktop.create_window, processing_queue.failures, processing_queue.dismiss, processing_queue.restore, processing_queue.RUN_FIXES, folder_view.NO_REASON, folder_view.connect, source_operations.start, source_operations.worker_stage, scripts/source-operation.py, library_view.blockers]
+verified: 2026-11-21
+branch: feature/asset-processing-revamp
 ---
 # Processing queue
 
@@ -44,6 +44,23 @@ Start at `processing_queue.add` and `processing_queue.advance`.
   receipt (no new measurement). Over `LONG` seconds, past the budget, or `unmeasured` (more than
   `UNMEASURED` assets with no time estimate or no storage receipt) it returns `confirm`; between `QUICK`
   and `LONG` it marks `undo`.
+
+- **Needs your attention** (`state()['attention']`, design principle P7): `_cards` builds one notice per blocked
+  reason, per recorded-failure group (folder, stage, reason) and per latest run of a scope that ended `faulty` with
+  a reason in `RUN_FIXES` (the search check → Run check, unless `capability_ready` passes now; storage budget,
+  descriptions off, no formats → Open Settings). A run whose scope is queued again, or that ran again since, drops
+  out. Ids are hashes of those signatures, so they stay stable across polls. `blocked` and `failures` stay in the
+  state for `local-assets queue list`.
+- **Dismissals** live in `data/library/attention.json` (`notices_path`), never in fault records. `dismiss` stores
+  the failure group's asset IDs; `_returned` brings a notice back as `again` when an asset joins the group, when a
+  Make previews run after the dismissal tried a member that is in it again (`_tried`, from `_finish_running`: it keeps
+  only the operation's `asset_ids` that were in the dismissed group; previews resolve only assets without a recorded
+  failure, so a member back in the group failed in that run; description runs never count), when a later run of the same work stopped the same way (`finished_utc`), or, for a block, when
+  `add`/`advance` met that block (`_hit_blocked`). It is recomputed on each read, so a stale folder view that still
+  lists a fixed asset corrects itself once rebuilt. Dismissals of notices still shown are never forgotten; past 1,000, the oldest of notices that are gone are
+  dropped when the owner dismisses. The file may reach 32 MiB (`NOTICES_LIMIT`).
+- A fault recorded without an error or reason shows `folder_view.NO_REASON`; the card sets `no_reason` and the page
+  says "No reason was recorded" instead of inventing one.
 
 ## Rules
 

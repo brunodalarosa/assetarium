@@ -240,3 +240,130 @@ def test_estimates_use_the_speed_test_and_recent_runs_or_say_no_measurement(fake
     batches = config.library_store() / 'folders' / one['id'] / 'library/batches'
     atomic_json(batches / 'inspection-a.json', {'elapsed_seconds': 100, 'complete': 10, 'failed': 0})
     assert queue.estimate(config, 'previews', found)['seconds'][1] > tested[1]  # A recent 10 s/asset run beats the 4 s test.
+
+
+def _group(key, ids, reason='Missing texture'):
+    return {'key': key, 'folder': 'Folder', 'stage': 'previews', 'reason': reason,
+            'assets': [{'asset_id': i, 'name': i, 'path': i + '.fbx'} for i in ids]}
+
+
+def _store_files(config):
+    return {p: p.stat().st_mtime_ns for p in config.library_store().rglob('*') if p.is_file() and not p.suffix == '.lock'}
+
+
+def test_dismissing_a_failure_hides_it_counts_it_and_never_touches_records(fake):
+    config, one, _, _, _, monkeypatch = fake
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], ['a', 'b'])])
+    card = queue.state(config)['attention'][0]
+    assert card['kind'] == 'failure' and card['count'] == 2 and not card['dismissed'] and 'recheck' in card['actions']
+    before = _store_files(config)
+    state = queue.dismiss(config, [card['id']])
+    assert state['dismissed'] == 1 and state['attention'][0]['dismissed'] and state['failures'][0]['assets']
+    assert _store_files(config) == before  # Fault records, views and the queue are as they were.
+    assert queue.notices_path(config).is_file() and queue.state(config)['dismissed'] == 1  # Reloading keeps it hidden.
+    assert not queue.restore(config, [card['id']])['attention'][0]['dismissed']
+    with pytest.raises(ConfigError):
+        queue.dismiss(config, ['gone'])
+
+
+def test_a_dismissed_failure_returns_when_it_is_recorded_again(fake):
+    config, one, _, _, finish, monkeypatch = fake
+    groups = {'ids': ['a', 'b']}
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], groups['ids'])])
+    card = queue.dismiss(config, [queue.state(config)['attention'][0]['id']])['attention'][0]
+    groups['ids'] = ['a', 'b', 'c']  # A later run recorded the same step and reason for another asset.
+    again = queue.state(config)['attention'][0]
+    assert again['id'] == card['id'] and again['again'] and not again['dismissed']
+    queue.dismiss(config, [card['id']])
+    assert queue.state(config)['attention'][0]['dismissed']  # Dismissed again: hidden, "again" cleared.
+    # A run tried "a" after the dismissal: a still failing "a" brings the notice back; "b" alone, untried, does not.
+    real = source_operations.operation_status
+    monkeypatch.setattr(source_operations, 'operation_status', lambda scoped: {**real(scoped), 'asset_ids': ['a']})
+    queue.add(config, 'previews', {'key': one['key']})
+    finish(one['key'])
+    assert queue.state(config)['attention'][0]['again']
+    groups['ids'] = ['b']  # "a" succeeded this time and left the group.
+    assert queue.state(config)['attention'][0]['dismissed']
+
+
+def test_a_dismissed_block_returns_when_queued_work_hits_it(fake):
+    config, one, _, _, _, monkeypatch = fake
+    blocker = {'previews': {'reason': 'Blender is not set up', 'fix': 'Set up Blender in Settings', 'stages': ['inspection', 'previews'], 'types': ['model_3d']},
+               'search': {'reason': 'The search runtime is not installed', 'fix': 'Install it: …', 'stages': ['embeddings'], 'types': ['model_3d']}}
+    monkeypatch.setattr(library_view, 'blockers', lambda config: blocker)
+    cards = {c['reason']: c for c in queue.state(config)['attention'] if c['kind'] == 'blocked'}
+    assert cards['Blender is not set up']['actions'] == ['settings'] and cards['The search runtime is not installed']['actions'] == []
+    card = cards['Blender is not set up']
+    queue.dismiss(config, [card['id']])
+    assert next(c for c in queue.state(config)['attention'] if c['id'] == card['id'])['dismissed']
+    with pytest.raises(ConfigError):
+        queue.add(config, 'previews', {'key': one['key']})
+    assert next(c for c in queue.state(config)['attention'] if c['id'] == card['id'])['again']
+
+
+def test_a_stopped_run_with_a_fix_needs_attention_until_superseded(fake):
+    config, one, two, _, _, monkeypatch = fake
+    monkeypatch.setattr(queue, '_search_ready', lambda config: False)
+    value = queue.load(config)
+    run = {'id': 'r1', 'action': 'previews', 'scope': {'key': one['key'], 'path': '', 'asset_ids': []}, 'label': 'One', 'status': 'faulty',
+           'finished_utc': '2026-11-20T10:00:00+00:00', 'reason': 'The search check did not pass, so search data was not built: boom'}
+    other = {**run, 'id': 'r2', 'scope': {**run['scope'], 'key': two['key']}, 'reason': 'Something with no fix'}
+    value['recent'] = [other, run]
+    queue.save(config, value)
+    cards = queue.state(config)['attention']
+    assert [(c['kind'], c['actions']) for c in cards] == [('run', ['run_check'])]  # A reason with no fix stays in Recent only.
+    queue.dismiss(config, [cards[0]['id']])
+    value['recent'] = [{**run, 'id': 'r3', 'finished_utc': '2099-01-01T00:00:00+00:00'}] + value['recent']
+    queue.save(config, value)
+    assert queue.state(config)['attention'][0]['again']  # The same work stopped the same way again.
+    value['recent'] = [{**run, 'id': 'r4', 'status': 'complete', 'reason': None}] + value['recent']
+    queue.save(config, value)
+    assert not queue.state(config)['attention']  # A later run of the same work superseded it.
+    monkeypatch.setattr(queue, '_search_ready', lambda config: True)
+    value['recent'] = value['recent'][1:]
+    queue.save(config, value)
+    assert not queue.state(config)['attention']  # The check passed since: nothing left to resolve.
+
+
+def test_the_bridge_dismisses_and_brings_back_notices(fake):
+    config, one, _, _, _, monkeypatch = fake
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], ['a'])])
+    from local_asset_library.desktop import DesktopBridge
+    bridge = DesktopBridge(config)
+    try:
+        identifier = bridge.queue_state()['attention'][0]['id']
+        result = bridge.attention_dismiss([identifier])
+        assert result['status'] == 'saved' and result['queue']['dismissed'] == 1
+        assert bridge.attention_restore([identifier])['queue']['dismissed'] == 0
+        refused = bridge.attention_dismiss(['gone'])
+        assert refused['status'] == 'faulty' and refused['reason'] == 'That notice is no longer shown'
+    finally:
+        bridge._close()
+
+
+def test_only_previews_runs_of_dismissed_members_are_kept_as_tried(fake):
+    config, one, _, _, finish, monkeypatch = fake
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], ['a', 'b'])])
+    identifier = queue.dismiss(config, [queue.state(config)['attention'][0]['id']])['attention'][0]['id']
+    real = source_operations.operation_status
+    monkeypatch.setattr(source_operations, 'operation_status', lambda scoped: {**real(scoped), 'asset_ids': ['a'] + [f'x{i}' for i in range(500)]})
+    monkeypatch.setattr(queue, 'resolve', lambda config, action, scope: {'ids': ['a'], 'blocked': {}, 'kinds': {'model_3d': 1}, 'fixes': {}})
+    queue.add(config, 'descriptions', {'key': one['key']})
+    finish(one['key'])  # A description run never ran the failed stage: the dismissed failure stays hidden.
+    assert queue.state(config)['attention'][0]['dismissed']
+    queue.add(config, 'previews', {'key': one['key']})
+    finish(one['key'])
+    assert queue._notices(config)['dismissed'][identifier]['tried'] == ['a']  # Unrelated assets are not stored.
+    assert queue.state(config)['attention'][0]['again']
+
+
+def test_dismissals_of_notices_still_shown_are_never_forgotten(fake):
+    config, one, _, _, _, monkeypatch = fake
+    monkeypatch.setattr(queue, 'KEPT_DISMISSALS', 2)
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], [f'a{n}'], reason=f'R{n}') for n in range(5)])
+    ids = [c['id'] for c in queue.state(config)['attention']]
+    state = queue.dismiss(config, ids)
+    assert state['dismissed'] == 5  # Dismiss all past the limit keeps every one hidden.
+    monkeypatch.setattr(queue, 'failures', lambda config: [_group(one['key'], ['a0'], reason='R0')])
+    queue.dismiss(config, [ids[0]])
+    assert len(queue._notices(config)['dismissed']) == 3  # Only dismissals of notices that are gone are trimmed.

@@ -253,15 +253,22 @@ tab, or for one asset from the inspector) start at once or wait in **Up next**; 
 item that waits for a busy folder (a scan) starts as soon as that work ends. Jobs under 10 minutes start on
 the click, 10–30 minutes show **Started · ~18 min · Undo**, and longer ones ask first with the estimate.
 Closing the app while work runs asks first; **Stop & close** stops it at once, and the next start shows
-"2 items stopped when you closed Assetarium" with **Continue** (after a crash the items go to Recent with
-**Show log** instead). **Running** shows progress, **Cancel**
-(the running renders finish and are saved first; decision 0034) and a live log with copy buttons on errors
-and warnings. **Blocked** groups work that can't run here by reason, with the fix and how many assets it
-unblocks; it is never offered as something to process. **Recorded failures** groups faults by stage and
-reason with **Copy**, **Recheck…** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md))
-and **Show in Library**. The failure reason comes from saved processing evidence when available.
-**Recent** lists finished jobs with their outcome and duration. The page also
-shows the published library (coverage, catalog/index versions, **Refresh published view**). **Settings →
+"2 items stopped when you closed Assetarium" with **Continue** (after a crash the items go to Recent activity
+with **Show log** instead). **Now and next** is one timeline: a filled dot for what runs (progress, **Cancel**,
+which lets the running renders finish and saves them first, decision 0034, and a live log with copy buttons on
+errors and warnings), a hollow dot for each job waiting (move up, move down, remove), and **Pause** / **Resume**
+in its header. With nothing running or waiting it says how many assets still have no previews or descriptions,
+with a way to **Asset sources**. **Needs your attention** lists only what you can resolve: work that can't run
+here (with its fix and how many assets it unblocks; it is never offered as something to process), recorded
+failures by stage and reason (**Recheck…**, [decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md),
+**Show in Library**, **Copy**; the reason comes from saved processing evidence when available) and runs that stopped for a reason you can fix (**Run check**, **Open Settings**).
+A failure recorded without a reason says so. Each notice has **Dismiss**, and **Dismiss all** has **Undo**;
+dismissing hides the notice and never deletes the failure, which stays recorded and is never retried
+automatically. Dismissed notices are counted (**3 dismissed · Show**, each with **Bring back**), and one comes
+back marked **Again** when the same fault happens again; reopening the app doesn't bring them back.
+**Recent activity** is folded into one line (the last outcome, when, how many more); it opens on a click, Enter
+or scrolling on past the end of the page, scrolls inside itself and folds again when you leave the page.
+Catalog and index versions and **Refresh published view** are in **Agent activity**, for agents. **Settings →
 General → Rendering** says what renders now and why and offers the render device, renders at a time and
 memory for rendering. The **Search** card lists **What is installed** for the chosen device, with a copyable
 command for anything missing and **Check again**; it installs nothing. The **Speed test** card shows the

@@ -18,6 +18,12 @@ All notable changes to Assetarium are listed here. The project follows
 
 ### Changed
 
+- **Asset processing is redesigned**: the page is left-aligned; Running and Up next are one **Now and next**
+  timeline; Blocked, Recorded failures and runs that stopped for a fixable reason (with **Run check** for the
+  search check) are one **Needs your attention** list where every notice can be dismissed (**Dismiss all** with
+  Undo, a dismissed count with **Show** and **Bring back**, **Again** when the fault returns), and failures stay
+  recorded. A failure recorded without a reason now says so. **Recent activity** is folded until you open it or
+  scroll past the end. Catalog and index versions and **Refresh published view** moved to Agent activity.
 - **The asset grid is one Tab stop**: Tab enters the results at the card you last focused or selected and the next
   Tab leaves them (a variant group's chips come first); arrows, Home and End move between cards and scroll the card
   into view, and an arrow with no card that way scrolls the page instead. Screen readers hear the grid as the

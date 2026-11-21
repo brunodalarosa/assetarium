@@ -807,3 +807,42 @@
 }
 .agent-pulse { animation: agent-pulse 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .agent-pulse { animation: none; } }
+
+/* Asset processing: the running dot of Now and next breathes; Recent activity folds open (design principle P7 page). */
+.timeline-pulse { animation: agent-pulse 1.8s ease-in-out infinite; }
+.recent-activity summary::-webkit-details-marker { display: none; }
+.recent-chevron { transition: rotate .2s ease; }
+.recent-activity[open] .recent-chevron { rotate: 90deg; }
+/* Native disclosure animated to its natural height (Chromium 131+; elsewhere it opens at once). */
+.recent-activity { interpolate-size: allow-keywords; }
+.recent-activity::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition: block-size .32s cubic-bezier(.2, .8, .2, 1), content-visibility .32s allow-discrete;
+}
+.recent-activity[open]::details-content { block-size: auto; }
+/* Fading edges where the list scrolls on, driven by its own scroll position (no listeners). */
+@property --fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-end { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.recent-scroll {
+  --fade-size: 2.5rem;
+  mask:
+    linear-gradient(black, black) no-clip subtract,
+    linear-gradient(to bottom, black, transparent) 0 0 / 100% var(--fade-start) no-repeat no-clip,
+    linear-gradient(to bottom, transparent, black) 0 100% / 100% var(--fade-end) no-repeat no-clip;
+  /* Longhands on purpose: the minifier expands the shorthand with a 0s duration, which pins a scroll-driven
+     animation to its end; "auto" spans the scroll range. */
+  animation-name: recent-fade-start, recent-fade-end;
+  animation-duration: auto;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+  animation-timeline: scroll(self block);
+  animation-range: 0 var(--fade-size), calc(100% - var(--fade-size)) 100%;
+  scroll-padding-block: var(--fade-size);
+}
+@keyframes recent-fade-start { from { --fade-start: 0px; } to { --fade-start: var(--fade-size); } }
+@keyframes recent-fade-end { from { --fade-end: var(--fade-size); } to { --fade-end: 0px; } }
+@media (prefers-reduced-motion: reduce) {
+  .timeline-pulse { animation: none; }
+  .recent-chevron, .recent-activity::details-content { transition: none; }
+}

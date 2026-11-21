@@ -10,6 +10,7 @@ is recovered (the items go to Recent with the reason). Nothing resumes by itself
 """
 from contextlib import closing
 from datetime import datetime, timezone
+import hashlib
 from itertools import islice
 import json
 from pathlib import PurePosixPath
@@ -18,7 +19,7 @@ import uuid
 
 from .config import ConfigError
 from .publication import atomic_json, read_json
-from .store_versions import read_versioned
+from .store_versions import newer_refused, read_versioned
 
 ACTIONS = ('previews', 'descriptions')
 OPERATION = {'previews': 'process', 'descriptions': 'describe'}
@@ -246,6 +247,9 @@ def add(config, action, scope, confirmed=False, by='owner'):
         # The same request already waits; it reads the description when it starts, so one is enough.
         return {'status': 'queued', 'item': twin, 'undo': False, 'title': 'Waiting in line', 'body': MODE_TITLE[mode] + '.'}
     found = resolve(config, action, scope)
+    if found.get('blocked'):
+        with _locked(config):
+            _hit_blocked(config, found['blocked'])
     label = scope_label(config, scope)
     if mode and not found['ids']:
         raise ConfigError('This description has no recorded failure to try again' if mode == 'retry'
@@ -304,6 +308,10 @@ def _finish_running(config, queue):
             continue
         outcome = status.get('status') if status.get('token') == item.get('token') else 'interrupted'
         queue['items'].remove(item)
+        if item['action'] == 'previews' and status.get('token') == item.get('token') and status.get('asset_ids'):
+            # Only Make previews runs the stages failures are recorded for, and it resolves only assets without a
+            # recorded failure: one of them in a failure group now failed in this run. A description run never counts.
+            _tried(config, item['scope']['key'], status['asset_ids'])
         if outcome == 'complete' and item['scope'].get('mode') == 'edited':
             for asset_id in item['scope']['asset_ids']:  # Search reads the edit now, unless it was saved after the start.
                 if queue['search_pending'].get(asset_id, {}).get('utc', '') <= item.get('started_utc', ''):
@@ -327,6 +335,8 @@ def advance(config):
         from .agent_sessions import paused
         for item in _order(queue['items'], held=paused(config)):
             found = resolve(config, item['action'], item['scope'])  # The scope is resolved when the item starts.
+            if found.get('blocked'):
+                _hit_blocked(config, found['blocked'])
             if not found['ids']:
                 queue['items'].remove(item)
                 queue['recent'] = ([{**item, 'status': 'nothing_to_do', 'finished_utc': now(),
@@ -542,8 +552,167 @@ def blocked_groups(config):
     return [{**b, 'assets': total, 'folders': {k: v for k, v in counts.items() if v}} for b in found.values()]
 
 
+# Needs your attention (design principle P7): blocked work, recorded failures and stopped runs whose reason has a fix
+# the owner can apply. Dismissing hides a notice and never touches a fault record; it returns ("again") when the
+# same fault is triggered again. A stopped run's reason maps to the action that resolves it; others stay in Recent.
+RUN_FIXES = (('The search check did not pass', 'run_check'), ('Storage budget reached', 'settings'),
+             ('Descriptions are turned off', 'settings'), ('Processing is paused. Select formats', 'settings'))
+KEPT_DISMISSALS = 1000  # Dismissals of notices no longer shown; active ones are always kept.
+NOTICES_LIMIT = 32 * 2**20  # Bytes: a dismissed failure keeps its group's asset IDs.
+
+
+def notices_path(config):
+    return config.storage_root('data') / 'library/attention.json'
+
+
+def _notices(config):
+    path = notices_path(config)
+    value = newer_refused(read_json(path, limit=NOTICES_LIMIT), 'Dismissed notices', 1) if path.exists() else {}
+    value.setdefault('schema_version', 1)
+    value.setdefault('dismissed', {})  # Card id → {utc, kind, key, assets, tried, hit}.
+    return value
+
+
+def _save_notices(config, value, active=None):
+    """Save; with ``active`` (the notice ids shown now) also forget the oldest dismissals of notices that are gone.
+    A dismissal of a notice still shown is never forgotten, so it can't reappear without its fault happening again."""
+    dismissed = value['dismissed']
+    if active is not None:
+        gone = sorted((i for i in dismissed if i not in active), key=lambda i: dismissed[i]['utc'], reverse=True)
+        dismissed = {i: e for i, e in dismissed.items() if i in active or i in set(gone[:KEPT_DISMISSALS])}
+    path = notices_path(config)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_json(path, {**value, 'dismissed': dismissed})
+
+
+def _card_id(*parts):
+    return hashlib.sha1(json.dumps(parts, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _run_fix(reason):
+    return next((action for prefix, action in RUN_FIXES if (reason or '').startswith(prefix)), None)
+
+
+def _search_ready(config):
+    from .engines import capability_ready, search_device
+    try:
+        return capability_ready(config, search_device(config))['ready']
+    except (ConfigError, OSError, ValueError, KeyError):
+        return False
+
+
+def _cards(config, blocked, groups, queue):
+    """Every attention notice now, before dismissals apply (ids are stable signatures of the fault)."""
+    from .folder_view import NO_REASON
+    # Blender is chosen in Settings; a search runtime or model fix is the command its text carries (P3).
+    cards = [{'id': _card_id('blocked', b['reason']), 'kind': 'blocked', 'reason': b['reason'], 'fix': b['fix'], 'count': b['assets'],
+              'actions': ['settings'] if 'inspection' in b.get('stages', ()) else []} for b in blocked]
+    logs = {}
+    for item in queue['recent']:
+        if item.get('log'):
+            logs.setdefault(item['scope']['key'], item['log'])
+    for g in groups:
+        log = logs.get(g['key'])
+        cards.append({'id': _card_id('failure', g['key'], g['stage'], g['reason']), 'kind': 'failure', 'key': g['key'], 'folder': g['folder'],
+                      'stage': g['stage'], 'reason': g['reason'], 'no_reason': g['reason'] == NO_REASON, 'count': len(g['assets']),
+                      'files': g['assets'], 'actions': ['recheck', 'library', 'copy'] + (['log'] if log else []), **({'log': log} if log else {})})
+    seen = {json.dumps([i['action'], i['scope']], sort_keys=True) for i in queue['items']}  # Asked for again: superseded.
+    search_ready = None
+    for item in queue['recent']:  # Newest first: only the latest run of each scope counts.
+        scope = json.dumps([item['action'], item['scope']], sort_keys=True)
+        if scope in seen:
+            continue
+        seen.add(scope)
+        fix = _run_fix(item.get('reason')) if item['status'] == 'faulty' else None
+        if fix == 'run_check':
+            search_ready = _search_ready(config) if search_ready is None else search_ready
+            if search_ready:
+                continue  # The check passed since; the run's notice no longer has anything to resolve.
+        if fix:
+            cards.append({'id': _card_id('run', scope, item['reason']), 'kind': 'run', 'key': item['scope']['key'], 'action': item['action'],
+                          'title': item.get('title'), 'label': item['label'], 'reason': item['reason'], 'utc': item.get('finished_utc', ''),
+                          'actions': [fix] + (['log'] if item.get('log') else []), **({'log': item['log']} if item.get('log') else {})})
+    return cards
+
+
+def _returned(card, entry):
+    """A dismissed notice comes back when its fault is triggered again; reopening the app never brings one back."""
+    if card['kind'] == 'failure':  # An asset joined it, or a run after the dismissal tried one and it failed again.
+        ids = {a['asset_id'] for a in card['files']}
+        return bool(ids - set(entry.get('assets', [])) or ids & set(entry.get('tried', [])))
+    if card['kind'] == 'run':  # A later run of the same work stopped for the same reason.
+        return card['utc'] > entry['utc']
+    return bool(entry.get('hit'))  # Blocked: newly queued work hit the same block.
+
+
+def _settle(cards, notices):
+    for card in cards:
+        entry = notices['dismissed'].get(card['id'])
+        again = bool(entry) and _returned(card, entry)
+        card['dismissed'], card['again'] = bool(entry) and not again, again
+    return cards
+
+
+def _hit_blocked(config, reasons):
+    """Queued work met a block: a dismissed notice of it comes back. Called holding the queue lease."""
+    notices = _notices(config)
+    hits = [notices['dismissed'][i] for i in (_card_id('blocked', r) for r in reasons) if i in notices['dismissed']]
+    for entry in hits:
+        entry['hit'] = now()
+    if hits:
+        _save_notices(config, notices)
+
+
+def _tried(config, key, asset_ids):
+    """A run in ``key`` attempted these assets: dismissed failures of that folder return if they fail again."""
+    notices = _notices(config)
+    attempted, changed = set(asset_ids), False
+    for entry in notices['dismissed'].values():
+        if entry.get('kind') == 'failure' and entry.get('key') == key:
+            # Only members of the dismissed group can make it return; others would just grow the file.
+            found = attempted & set(entry.get('assets', [])) - set(entry.get('tried', []))
+            if found:
+                entry['tried'] = sorted(set(entry.get('tried', [])) | found)
+                changed = True
+    if changed:
+        _save_notices(config, notices)
+
+
+def dismiss(config, ids):
+    """Hide these notices (never deletes anything); each returns when its fault is triggered again."""
+    if not isinstance(ids, list) or not ids:
+        raise ConfigError('Choose a notice to dismiss')
+    with _locked(config):
+        queue = load(config)
+    cards = {c['id']: c for c in _cards(config, blocked_groups(config), failures(config), queue)}
+    found = [cards[i] for i in ids if i in cards]
+    if not found:
+        raise ConfigError('That notice is no longer shown')
+    with _locked(config):
+        notices = _notices(config)
+        for card in found:
+            notices['dismissed'][card['id']] = {'utc': now(), 'kind': card['kind'], 'key': card.get('key'),
+                                                **({'assets': [a['asset_id'] for a in card['files']]} if card['kind'] == 'failure' else {})}
+        _save_notices(config, notices, active=set(cards))
+    return state(config)
+
+
+def restore(config, ids):
+    """Bring dismissed notices back (Bring back, or Undo of Dismiss all)."""
+    if not isinstance(ids, list):
+        raise ConfigError('Choose a notice to bring back')
+    with _locked(config):
+        notices = _notices(config)
+        for identifier in ids:
+            notices['dismissed'].pop(str(identifier), None)
+        _save_notices(config, notices)
+    return state(config)
+
+
 def state(config):
-    """Everything the Asset processing tab shows: Running, Up next, Blocked, Recorded failures, Recent."""
+    """Everything the Asset processing tab shows: Now and next, Needs your attention, Recent activity.
+
+    ``blocked`` and ``failures`` stay for the owner CLI; the page reads them through ``attention``."""
     from .source_operations import operation_status
     from .sources import bound, get_source
     with _locked(config):
@@ -558,9 +727,13 @@ def state(config):
         except ConfigError:
             pass
     from .agent_sessions import paused
+    from .settings import descriptions_enabled
+    blocked, groups = blocked_groups(config), failures(config)
+    cards = _settle(_cards(config, blocked, groups, queue), _notices(config))
     return {'status': 'ready', 'paused': queue['paused'], 'agents_paused': paused(config), 'running': running, 'up_next': _order(queue['items']),
             'stopped_on_close': sum(bool(i.get('stopped_on_close')) for i in queue['items']),
-            'blocked': blocked_groups(config), 'failures': failures(config), 'recent': queue['recent']}
+            'attention': cards, 'dismissed': sum(c['dismissed'] for c in cards), 'descriptions': descriptions_enabled(config),
+            'blocked': blocked, 'failures': groups, 'recent': queue['recent']}
 
 
 def mark_search_pending(config, key, asset_id):
