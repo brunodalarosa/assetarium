@@ -1,4 +1,4 @@
-import { Bot, CircleSlash, Clock, Eye, MessageSquare, PencilLine, Undo2, X } from "lucide-react";
+import { Bot, CircleSlash, Clock, Eye, MessageSquare, PencilLine, RotateCcw, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { SPRING_LAYOUT, SPRING_PANEL } from "@/lib/ease";
@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { plural } from "../app/format";
 import { Switch } from "@/components/beui/switch";
-import { decideAgentProposal, setAgentOpen, setAgentsPaused, undoAgentSession, useApp } from "../app/store";
-import { IconButton, Pressable } from "./primitives";
+import { decideAgentProposal, refreshContext, setAgentOpen, setAgentsPaused, undoAgentSession, useApp } from "../app/store";
+import { Button, IconButton, Pressable } from "./primitives";
 import { ProposalReview } from "./ProposalReview";
 
 /** Told before connecting (decision 0029, design principle P6): what an agent may change and where to control it. */
@@ -72,6 +72,7 @@ export function AgentButton() {
 /** App-wide Agent activity (decision 0029): who is connected, proposals waiting for you and everything agents did. */
 export function AgentActivityPanel() {
   const agent = useApp((s) => s.agent);
+  const versions = useApp((s) => s.context?.versions);
   const panelRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const reduce = useReducedMotion();
@@ -158,6 +159,11 @@ export function AgentActivityPanel() {
             ) : (
               <p id="agent-feed-empty" className="py-10 text-center text-[13px] text-muted-foreground">Nothing yet. What agents read, change and propose shows up here as it happens.</p>
             )}
+          </div>
+          <div id="published-view" className="flex flex-wrap items-center gap-2 border-t border-border px-6 py-3">
+            <span className="min-w-0 flex-1 text-[11.5px] text-muted-foreground">What agents see:
+              {versions ? <span id="version" className="ml-1 font-mono text-subtle">catalog {String(versions.catalog).slice(0, 10)} · index {String(versions.index).slice(0, 10)}</span> : " not published yet"}</span>
+            <Button variant="quiet" className="h-7 px-2 text-[12px]" tooltip="Reloads the catalog and search index versions agents see now" onClick={() => void refreshContext(true)}><RotateCcw className="size-3.5" aria-hidden />Refresh published view</Button>
           </div>
         </motion.section>
       )}

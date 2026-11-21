@@ -47,8 +47,8 @@ def verify():
         report['library']['attention']=js(attention)
         capture('library.png')
         js("$('nav-processing').click()")
-        # Recorded failures are their own section, grouped by stage and reason, apart from pending work (decision 0032).
-        wait("$('failure-groups')&&lal.state.queue")
+        # Recorded failures are Needs your attention cards, grouped by stage and reason, apart from pending work (decision 0032).
+        wait("document.querySelector('#attention-list .attention-card[data-kind=failure]')&&lal.state.queue")
         shown=js("new Set(lal.state.queue.failures.flatMap(g=>g.assets.map(a=>a.asset_id))).size")
         assert shown==expected['assets'], (shown, expected['assets'])
         report['failures']={'assets':expected['assets'],'groups':js("lal.state.queue.failures.length"),'pending_actions':warnings}
