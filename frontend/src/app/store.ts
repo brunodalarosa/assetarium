@@ -1861,21 +1861,29 @@ let notificationKeys: Set<string> | null = null;
 function updateNotifications(items: Json[]) {
   const known = notificationKeys;
   notificationKeys = new Set(items.map(notificationKey));
-  // A toast whose notice is gone (a decided proposal, a deleted collection) offers nothing that can still work.
-  const ids = new Set(items.map((item) => item.id));
+  // A toast whose notice is gone or hidden (a decided proposal, a deleted collection) offers nothing that can still work.
+  const ids = new Set(items.filter((item) => !item.hidden).map((item) => item.id));
   setState((s) => ({ notifications: items, toasts: s.toasts.filter((toast) => !toast.notification || ids.has(toast.notification.id)) }));
   // Only notices that arrive while the app is open pop up; earlier ones wait under the bell.
   if (known && !state.notificationsOpen)
-    for (const item of items) if (!item.read && !known.has(notificationKey(item))) pushToast({ ...notificationContent(item), notification: item });
+    for (const item of items) if (!item.read && !item.hidden && !known.has(notificationKey(item))) pushToast({ ...notificationContent(item), notification: item });
 }
-export async function saveNotification(action: string, identifier: string | null = null) {
+export async function saveNotification(action: string, identifier: string | string[] | null = null) {
   const result = await api().notification_action(action, identifier);
   if (result.status === "faulty") {
     pushToast({ tone: "fault", title: "Could not update notifications", body: result.reason });
-    return;
+    return false;
   }
   notificationKeys = new Set(result.notifications.map(notificationKey));
-  setState({ notifications: result.notifications });
+  const ids = new Set(result.notifications.filter((item: Json) => !item.hidden).map((item: Json) => item.id));
+  setState((s) => ({ notifications: result.notifications, toasts: s.toasts.filter((toast) => !toast.notification || ids.has(toast.notification.id)) }));
+  return true;
+}
+/** Notifications follow design principle P7: Dismiss hides a notice and never deletes it; Dismiss all offers Undo. */
+export async function dismissNotifications(ids: string[]) {
+  if (!ids.length || !(await saveNotification("dismiss_all", ids))) return;
+  pushToast({ tone: "info", title: `Dismissed ${plural(ids.length, "notice", "notices")}`,
+    body: "Nothing was deleted. Show lists them, and a notice comes back when it has news.", actions: [{ label: "Undo", run: () => void saveNotification("restore", ids) }] });
 }
 export function setNotificationsOpen(open: boolean) {
   if (open === state.notificationsOpen) return;

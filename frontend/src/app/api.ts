@@ -33,7 +33,7 @@ export interface Bridge {
   interface_settings(): Promise<Json>;
   save_interface_settings(appearance: string | null, inspectorWidth: number | null, inspectorSections?: Record<string, boolean> | null, previewHintSeen?: boolean | null): Promise<Json>;
   importing_failures(): Promise<Json>;
-  notification_action(action: string, identifier?: string | null): Promise<Json>;
+  notification_action(action: string, identifier?: string | string[] | null): Promise<Json>;
   source_action(action: string, key?: string | null, directory?: string | null, enabled?: boolean | null): Promise<Json>;
   source_exclusions(key: string, patterns: string[]): Promise<Json>;
   source_export(key: string, suggestionId: string, decision: string): Promise<Json>;

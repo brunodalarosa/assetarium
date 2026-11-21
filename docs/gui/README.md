@@ -223,7 +223,13 @@ descriptions and search by meaning.
 generate* (**Generate descriptions** / **Not now**) and one report per
 description run (**Continue** when descriptions remain, **View in Asset
 processing**, or **View report** for stopped, interrupted or failed runs;
-dismiss ×). Running description jobs show progress with **Cancel**. New notices
+dismiss ×). Dismissing (× or **Not now**) hides a notice and never deletes it;
+**Dismiss all** hides every notice except setup proposals, which wait for your
+decision, and offers Undo. Hidden notices are counted (**2 dismissed · Show**);
+Show lists them dimmed, each with **Bring back**. A hidden notice comes back,
+marked **Again**, when it has news: more descriptions missing, a new agent edit
+to that collection, or a new change in that setup session. Reopening the app
+never brings one back. Running description jobs show progress with **Cancel**. New notices
 also appear as a toast with the same actions for 8 s (paused while hovered or
 focused). The bell shows a dot for unread notices or a running job. Escape or a
 click outside closes the panel and marks its notices read.
