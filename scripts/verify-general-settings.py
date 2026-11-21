@@ -111,6 +111,12 @@ def verify():
         ui.js("(async()=>{$('processing-format-gltf').click();['png','jpeg','svg','webp','tga','tiff','bmp','gif','avif'].forEach(f=>$('image-format-'+f).click());await frame();$('save-general-settings').click();return true})()")
         wait("$('general-settings-message').textContent.startsWith('Saved.')&&!$('processing-format').disabled")
         report['checks'].append('Reopening reloads the saved value')
+        # Main views are left-aligned: with room to spare, the content still starts at the view's left padding.
+        window.resize(2000, 900)
+        wait('innerWidth>1400')
+        offset = ui.js("(()=>{const v=$('settings-view'),c=v.firstElementChild;return [c.getBoundingClientRect().left-v.getBoundingClientRect().left,parseFloat(getComputedStyle(v).paddingLeft),v.clientWidth-c.getBoundingClientRect().width]})()")
+        assert abs(offset[0] - offset[1]) < 1 and offset[2] > 2 * offset[1] + 100, offset
+        report['checks'].append('A wide window keeps Settings left-aligned at the view padding')
         window.resize(680, 800)
         wait('innerWidth<761')
         assert ui.js("$('settings-view').scrollWidth<=$('settings-view').clientWidth+1")
