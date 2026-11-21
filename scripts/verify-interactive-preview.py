@@ -209,7 +209,7 @@ def verify():
         js("(async()=>{await lal.submitSearch();await until(()=>lal.state.library.items.length===40);lal.closeDetail('library');lal.setInspectorOpen(true);await until(()=>$('detail'));return true})()")
         assert js("$('page-info').textContent") == '1–40 of 40'
         assert js("$('detail').querySelector('.detail-empty h2').textContent") == 'No asset selected'
-        assert ' · ' in js('lal.state.coverage')
+        assert js("typeof lal.state.pending?.previews==='number'")  # Pending counts for Asset processing's empty state.
         capture('00-library-text.png')
         identifier=json.dumps(record['asset_id'])
         # The still shows at once and the live view loads by itself, without a click.

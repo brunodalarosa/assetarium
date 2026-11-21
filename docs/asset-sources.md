@@ -179,10 +179,11 @@ and prepared for search, never rendered. Both start at once or wait in line on *
   go to **Recent** as **Stopped · app closed** with **Show log**; nothing is resumed.
 - Every operation that ends (a job, a scan, a speed test) starts the next waiting item, so nothing waits for a click.
 
-**Asset processing** shows **Running** (progress, Cancel, a live log with copy buttons on errors and
-warnings), **Up next**, **Blocked** (by reason, with the fix and how many assets it unblocks), **Recorded
-failures** (by stage and reason, with Copy, Recheck and Show in Library) and **Recent**. Pending work
-and failures are never mixed in one message.
+**Asset processing** shows **Now and next** (what runs, with progress, Cancel and a live log, then what
+waits), **Needs your attention** (blocked work with its fix, recorded failures by stage and reason with Recheck,
+Show in Library and Copy, and runs that stopped for a reason you can fix) and a folded **Recent activity**.
+Any notice can be dismissed: the failure stays recorded, and the notice comes back if the same fault happens
+again. Pending work and failures are never mixed in one message.
 
 Cancel requests a graceful stop: the current asset finishes, its checkpoint is saved, and nothing else
 starts. Unchanged faults are kept with their evidence and skipped; they are never retried automatically.

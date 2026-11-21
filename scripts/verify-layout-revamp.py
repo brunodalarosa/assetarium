@@ -164,7 +164,7 @@ def verify():
             panelClosed:!$('notifications-panel')}})()""")
         capture('13-run-report.png')
         js("lal.setState({runReport:null})")
-        check('processing_page', """(async()=>{await until(()=>$('running')&&$('up-next-section')&&$('blocked')&&$('failures')&&$('recent'));
+        check('processing_page', """(async()=>{await until(()=>$('now-next')&&$('attention')&&$('recent-activity'));
           return {sections:true,attentionDot:$('nav-processing').getAttribute('aria-label').includes('attention')}})()""")
         capture('14-asset-processing.png')
 
