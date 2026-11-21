@@ -259,7 +259,8 @@ Closing the app while work runs asks first; **Stop & close** stops it at once, a
 and warnings. **Blocked** groups work that can't run here by reason, with the fix and how many assets it
 unblocks; it is never offered as something to process. **Recorded failures** groups faults by stage and
 reason with **Copy**, **Recheck…** ([decision 0020](../../Assetarium%20KnowledgeBase/Decisions/0020-alternate-file-faults-and-recheck.md))
-and **Show in Library**; **Recent** lists finished jobs with their outcome and duration. The page also
+and **Show in Library**. The failure reason comes from saved processing evidence when available.
+**Recent** lists finished jobs with their outcome and duration. The page also
 shows the published library (coverage, catalog/index versions, **Refresh published view**). **Settings →
 General → Rendering** says what renders now and why and offers the render device, renders at a time and
 memory for rendering. The **Search** card lists **What is installed** for the chosen device, with a copyable
