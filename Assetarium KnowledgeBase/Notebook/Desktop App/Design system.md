@@ -17,9 +17,15 @@ behind it are in the [Design language](../../Architecture/Desktop%20App/Design%2
   [P2 One visual sign for agents](../../Architecture/Desktop%20App/Design%20language.md#p2--one-visual-sign-for-agents) ·
   [P3 Run it, don't type it](../../Architecture/Desktop%20App/Design%20language.md#p3--run-it-dont-type-it) ·
   [P4 Make progress measurable](../../Architecture/Desktop%20App/Design%20language.md#p4--make-progress-measurable) ·
-  [P5 No silent states](../../Architecture/Desktop%20App/Design%20language.md#p5--no-silent-states).
+  [P5 No silent states](../../Architecture/Desktop%20App/Design%20language.md#p5--no-silent-states) ·
+  [P6 Agents first, in the open](../../Architecture/Desktop%20App/Design%20language.md#p6--agents-first-in-the-open) ·
+  [P7 Every notice can be cleared](../../Architecture/Desktop%20App/Design%20language.md#p7--every-notice-can-be-cleared).
 - Applying them: P4 lives in `OperationProgress`, `progressInfo` and `source_operations.scan_reporter`; P3 in
-  `CommandBlock` / `Reason`; P1 in `ProposalReview`.
+  `CommandBlock` / `Reason`; P1 in `ProposalReview`; P7 in Asset processing's Needs your attention
+  (`processing_queue.dismiss` / `restore`, `dismissAttention` in `app/store.ts`).
+- **Main views are left-aligned.** A page's content starts at the left padding and stops at a max width
+  (`grid max-w-[1120px]`, never `mx-auto`), like Collections and Asset processing. Home, with its centered search,
+  is the only exception. Settings and the Collection detail page are still centered and follow later.
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
 - **Every control says what it does.** `Button`, `Pressable` and `MotionPressable` require `tooltip`: what the

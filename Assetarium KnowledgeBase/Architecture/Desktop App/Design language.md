@@ -4,7 +4,7 @@ aliases: [Design principles]
 level: system
 parent: "[Desktop app design](Desktop%20app%20design.md)"
 status: reviewed
-code: [frontend/src/ui/ProposalReview.tsx, frontend/src/ui/CommandBlock.tsx, frontend/src/ui/OperationProgress.tsx]
+code: [frontend/src/ui/ProposalReview.tsx, frontend/src/ui/CommandBlock.tsx, frontend/src/ui/OperationProgress.tsx, frontend/src/pages/Processing.tsx, processing_queue.dismiss]
 verified:
 branch:
 ---
@@ -108,6 +108,23 @@ agent does happens in the open.
 - **Control is always one click away.** Stop, Pause agents and Undo for an agent session are never hidden
   behind a page the user has to find.
 
+## P7 — Every notice can be cleared
+
+*(Added November 19, 2026; co-designed with the owner for the Asset processing page.)* A list of warnings,
+errors or info notices is the owner's to keep tidy. Recorded evidence is never lost to make a list shorter, and a
+cleared notice is never gone for good if its cause comes back.
+
+- **Dismiss and Dismiss all.** Every notice in such a list has **Dismiss**; the list has **Dismiss all**, with
+  Undo (P1).
+- **Hide, never delete.** Dismissing hides the notice only: fault records, evidence and the state chips elsewhere
+  in the app stay as they are, and nothing is retried.
+- **Counted, with Show.** The hidden notices are counted with **Show**, which lists them dimmed, each with
+  **Bring back** (P5).
+- **It returns when it happens again.** A dismissed notice comes back, marked **Again**, when the same fault is
+  triggered again (a later run records it, newly queued work hits the same block). Reopening the app never brings
+  one back.
+- First applied to **Needs your attention** on Asset processing (`processing_queue.dismiss`, `Processing.tsx`).
+
 ## What future work must keep true
 
 - New review flows with several alike decisions group them and commit once, unless the cost table says otherwise.
@@ -117,3 +134,5 @@ agent does happens in the open.
 - A new state, skip or exclusion carries its reason and the actions that resolve it; hidden items are counted
   with their reason and **Show** (P5).
 - A new agent capability is visible in Agent activity and can be stopped or undone; connecting says what it may do (P6).
+- A new list of warnings, errors or notices offers Dismiss per item and Dismiss all; dismissing hides and never
+  deletes, the hidden ones are counted with Show, and a notice returns when its cause happens again (P7).

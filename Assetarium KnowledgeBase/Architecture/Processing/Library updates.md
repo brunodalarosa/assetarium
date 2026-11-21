@@ -119,8 +119,8 @@ agent) from running operations on the same library at once.
 ## Faults
 
 An asset that fails is marked, its reason and evidence are kept, usable partial results stay, and the run
-moves on (`AGENTS.md` → Fault handling). Failures are listed under **Recorded failures** on Asset processing,
-apart from pending work. Originals and earlier reports are never edited to make a fault disappear.
+moves on (`AGENTS.md` → Fault handling). Failures are listed under **Needs your attention** on Asset processing,
+apart from pending work; dismissing one there hides the notice and never touches the record. Originals and earlier reports are never edited to make a fault disappear.
 
 ## From a terminal
 
