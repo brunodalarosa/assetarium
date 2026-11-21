@@ -64,11 +64,12 @@ function Step({ running, children, className, ...props }: { running?: boolean; c
 
 function Pending() {
   const pending = useApp((s) => s.pending);
+  const descriptions = useApp((s) => s.queue?.descriptions !== false);  // Off: no description work to point at.
   const counts = [pending?.previews && plural(pending.previews, "asset has no previews yet", "assets have no previews yet"),
-    pending?.descriptions && plural(pending.descriptions, "asset has no description yet", "assets have no description yet")].filter(Boolean);
+    descriptions && pending?.descriptions && plural(pending.descriptions, "asset has no description yet", "assets have no description yet")].filter(Boolean);
   return (
     <div id="nothing-running" className="grid justify-items-start gap-2 text-[13px] text-muted-foreground">
-      <p>Nothing is running or waiting.{counts.length ? ` ${counts.join(" and ")}.` : ""}</p>
+      <p id="pending-counts">Nothing is running or waiting.{counts.length ? ` ${counts.join(" and ")}.` : ""}</p>
       <Button variant="secondary" className="h-8 px-3" tooltip="Opens Asset sources, where Make previews and Generate descriptions start work here" onClick={() => openSources()}>
         <FolderOpen className="size-3.5" aria-hidden />Asset sources
       </Button>
@@ -334,7 +335,9 @@ export function Processing({ focus: _focus }: { focus?: string }) {
     const scroller = view.current;
     if (!scroller) return;
     const atEnd = () => scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
-    const onWheel = (event: WheelEvent) => { if (event.deltaY > 0 && atEnd()) setRecentOpen(true); };
+    // A wheel inside a list that scrolls on its own (the live log, Recent activity) is that list's.
+    const nested = (target: EventTarget | null) => !!(target as HTMLElement | null)?.closest?.("#running-log, .recent-scroll");
+    const onWheel = (event: WheelEvent) => { if (event.deltaY > 0 && atEnd() && !nested(event.target)) setRecentOpen(true); };
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (PAST_END.has(event.key) && atEnd() && !target.closest("input, textarea, select, button, summary, [role=slider]")) setRecentOpen(true);

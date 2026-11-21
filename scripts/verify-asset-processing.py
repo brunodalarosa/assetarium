@@ -172,7 +172,7 @@ def verify():
                     {'status': 'complete', 'token': 'synthetic', 'operation': 'process', 'phase': 'Done'})
         js("(async()=>{lal.navigate({page:'collections'});await until(()=>!$('processing-view'));lal.navigate({page:'processing'});return true})()")
         check('empty_state', """until(()=>$('nothing-running')).then(()=>({asset_sources:$('nothing-running').textContent.includes('Asset sources'),
-          says:$('nothing-running').textContent.startsWith('Nothing is running or waiting.')}))""")
+          says:/^Nothing is running or waiting[.]( .+ (has|have) no (previews|description) yet[.])?$/.test($('pending-counts').textContent)}))""")
         window.resize(680, 900)
         js('until(()=>innerWidth<761)')
         check('narrow_no_overflow', "$('processing-view').scrollWidth<=$('processing-view').clientWidth+1")

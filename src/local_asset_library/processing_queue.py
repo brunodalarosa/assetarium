@@ -596,8 +596,9 @@ def _search_ready(config):
 def _cards(config, blocked, groups, queue):
     """Every attention notice now, before dismissals apply (ids are stable signatures of the fault)."""
     from .folder_view import NO_REASON
+    # Blender is chosen in Settings; a search runtime or model fix is the command its text carries (P3).
     cards = [{'id': _card_id('blocked', b['reason']), 'kind': 'blocked', 'reason': b['reason'], 'fix': b['fix'], 'count': b['assets'],
-              'actions': ['settings']} for b in blocked]
+              'actions': ['settings'] if 'inspection' in b.get('stages', ()) else []} for b in blocked]
     logs = {}
     for item in queue['recent']:
         if item.get('log'):
@@ -713,11 +714,12 @@ def state(config):
         except ConfigError:
             pass
     from .agent_sessions import paused
+    from .settings import descriptions_enabled
     blocked, groups = blocked_groups(config), failures(config)
     cards = _settle(_cards(config, blocked, groups, queue), _notices(config))
     return {'status': 'ready', 'paused': queue['paused'], 'agents_paused': paused(config), 'running': running, 'up_next': _order(queue['items']),
             'stopped_on_close': sum(bool(i.get('stopped_on_close')) for i in queue['items']),
-            'attention': cards, 'dismissed': sum(c['dismissed'] for c in cards),
+            'attention': cards, 'dismissed': sum(c['dismissed'] for c in cards), 'descriptions': descriptions_enabled(config),
             'blocked': blocked, 'failures': groups, 'recent': queue['recent']}
 
 

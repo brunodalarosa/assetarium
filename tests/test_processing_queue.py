@@ -288,15 +288,17 @@ def test_a_dismissed_failure_returns_when_it_is_recorded_again(fake):
 
 def test_a_dismissed_block_returns_when_queued_work_hits_it(fake):
     config, one, _, _, _, monkeypatch = fake
-    blocker = {'previews': {'reason': 'Blender is not set up', 'fix': 'Set up Blender in Settings', 'stages': ['inspection', 'previews'], 'types': ['model_3d']}}
+    blocker = {'previews': {'reason': 'Blender is not set up', 'fix': 'Set up Blender in Settings', 'stages': ['inspection', 'previews'], 'types': ['model_3d']},
+               'search': {'reason': 'The search runtime is not installed', 'fix': 'Install it: …', 'stages': ['embeddings'], 'types': ['model_3d']}}
     monkeypatch.setattr(library_view, 'blockers', lambda config: blocker)
-    card = next(c for c in queue.state(config)['attention'] if c['kind'] == 'blocked')
-    assert card['actions'] == ['settings']
+    cards = {c['reason']: c for c in queue.state(config)['attention'] if c['kind'] == 'blocked'}
+    assert cards['Blender is not set up']['actions'] == ['settings'] and cards['The search runtime is not installed']['actions'] == []
+    card = cards['Blender is not set up']
     queue.dismiss(config, [card['id']])
-    assert queue.state(config)['attention'][0]['dismissed']
+    assert next(c for c in queue.state(config)['attention'] if c['id'] == card['id'])['dismissed']
     with pytest.raises(ConfigError):
         queue.add(config, 'previews', {'key': one['key']})
-    assert queue.state(config)['attention'][0]['again']
+    assert next(c for c in queue.state(config)['attention'] if c['id'] == card['id'])['again']
 
 
 def test_a_stopped_run_with_a_fix_needs_attention_until_superseded(fake):

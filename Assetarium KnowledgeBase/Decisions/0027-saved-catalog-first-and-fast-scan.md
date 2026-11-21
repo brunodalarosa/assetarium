@@ -39,8 +39,9 @@ code: [catalog.py, parse_cache.py, sources.write_changed, desktop.DesktopBridge.
   token changes, or while an operation is running (worker liveness is not a file change).
 - Results arrive silently: only cards that actually changed update; a quiet status note ("3 new assets")
   replaces the spinner. A check that finds nothing changed redraws nothing.
-- There are no manual **Scan** or **Status** buttons. **Refresh published view** and the recorded
-  failures live on **Asset processing** ([decision 0011](0011-react-desktop-ui.md)).
+- There are no manual **Scan** or **Status** buttons. The recorded failures live on **Asset processing**
+  (Needs your attention); **Refresh published view**, which serves agents, lives in **Agent activity**
+  ([decision 0011](0011-react-desktop-ui.md)).
 
 **Why.** Startup used to load the library summary three or more times, every unchanged startup scan
 invalidated and reloaded the whole view, and fixed 1.5 s and 20 s polls ran expensive summaries regardless
@@ -65,3 +66,4 @@ calls (`context`, `sources`, `tree`: ~22 s) are a separate cost handled on their
 - 2026-11-06: parsed results are saved per file and parser instead of reusing a model's whole dependency result (safer, measured).
 - 2026-11-06: the second verifying walk stays (3–4% of a scan) instead of being replaced by a re-stat.
 - 2026-11-10: decision 0002 (startup scan, change tokens, no manual Scan/Status buttons; October 17, 2026) is merged in, since both covered the startup scan. No rule changed. The "Importing failures report" it named is today's recorded failures list on Asset processing.
+- 2026-11-21: **Refresh published view** moved from Asset processing to Agent activity with the catalog and index versions (the Asset processing redesign); it serves agents. No rule changed.
