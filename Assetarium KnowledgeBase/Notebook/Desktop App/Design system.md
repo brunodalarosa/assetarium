@@ -22,10 +22,11 @@ behind it are in the [Design language](../../Architecture/Desktop%20App/Design%2
   [P7 Every notice can be cleared](../../Architecture/Desktop%20App/Design%20language.md#p7--every-notice-can-be-cleared).
 - Applying them: P4 lives in `OperationProgress`, `progressInfo` and `source_operations.scan_reporter`; P3 in
   `CommandBlock` / `Reason`; P1 in `ProposalReview`; P7 in Asset processing's Needs your attention
-  (`processing_queue.dismiss` / `restore`, `dismissAttention` in `app/store.ts`).
+  (`processing_queue.dismiss` / `restore`, `dismissAttention` in `app/store.ts`) and in the Notifications panel
+  (`notifications.act` `dismiss_all` / `restore`, `dismissNotifications` in `app/store.ts`).
 - **Main views are left-aligned.** A page's content starts at the left padding and stops at a max width
-  (`grid max-w-[1120px]`, never `mx-auto`), like Collections and Asset processing. Home, with its centered search,
-  is the only exception. Settings and the Collection detail page are still centered and follow later.
+  (`grid max-w-[1120px]`, never `mx-auto`), like Collections, Settings, a collection page and Asset processing.
+  Home, with its centered search, is the only exception.
 - From `AGENTS.md` → User experience: never offer an action that can't resolve the shown state; keep pending
   work apart from recorded failures.
 - **Every control says what it does.** `Button`, `Pressable` and `MotionPressable` require `tooltip`: what the

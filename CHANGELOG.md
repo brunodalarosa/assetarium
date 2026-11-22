@@ -24,6 +24,11 @@ All notable changes to Assetarium are listed here. The project follows
   Undo, a dismissed count with **Show** and **Bring back**, **Again** when the fault returns), and failures stay
   recorded. A failure recorded without a reason now says so. **Recent activity** is folded until you open it or
   scroll past the end. Catalog and index versions and **Refresh published view** moved to Agent activity.
+- **Notifications can be cleared and brought back**: dismissing a notice (× or **Not now**) hides it instead of
+  deleting it. The panel has **Dismiss all** with Undo (setup proposals stay until you decide them), counts the
+  hidden notices with **Show**, which lists them dimmed with **Bring back**, and a hidden notice returns marked
+  **Again** when it has news (more descriptions missing, a new agent edit to the collection, a new setup change).
+  Settings and the collection page are now left-aligned like the other main views; Home stays centered.
 - **The asset grid is one Tab stop**: Tab enters the results at the card you last focused or selected and the next
   Tab leaves them (a variant group's chips come first); arrows, Home and End move between cards and scroll the card
   into view, and an arrow with no card that way scrolls the page instead. Screen readers hear the grid as the

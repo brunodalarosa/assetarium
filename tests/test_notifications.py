@@ -24,7 +24,12 @@ def status(missing, enabled=True, operation=None, **extra):
 
 
 def items(config):
-    return notifications.load(config)['items']
+    """The notices the panel lists; dismissed ones are hidden, not deleted (see ``hidden``)."""
+    return [item for item in notifications.load(config)['items'] if not item.get('hidden')]
+
+
+def hidden(config):
+    return [item['id'] for item in notifications.load(config)['items'] if item.get('hidden')]
 
 
 def test_ready_notice_is_one_per_source_and_not_now_stays_quiet_until_new_assets(config):
@@ -38,10 +43,10 @@ def test_ready_notice_is_one_per_source_and_not_now_stays_quiet_until_new_assets
     assert notice['read'] and notice['missing'] == 4
     notifications.act(config, 'dismiss', 'ready-fixture-id')
     notifications.notify_ready(config, SOURCE, 4)
-    assert not items(config)
+    assert not items(config) and hidden(config) == ['ready-fixture-id']
     notifications.notify_ready(config, SOURCE, 9)
     [notice] = items(config)
-    assert not notice['read'] and notice['missing'] == 9
+    assert not notice['read'] and notice['missing'] == 9 and notice['again'] and not hidden(config)
     # Starting a run resolves the notice and forgets the earlier "Not now".
     notifications.act(config, 'dismiss', 'ready-fixture-id')
     notifications.clear_ready(config, SOURCE['id'])
@@ -72,6 +77,78 @@ def test_list_is_bounded_without_dropping_unread_first(config):
     assert sum(i['read'] for i in kept) == 5  # Five oldest read reports were trimmed first.
 
 
+def test_list_trims_hidden_notices_before_read_ones(config):
+    for i in range(notifications.LIMIT):
+        notifications.notify_report(config, SOURCE, f'token-{i:03}', 'complete', written=i)
+    notifications.act(config, 'read', 'report-token-000')
+    notifications.act(config, 'dismiss', 'report-token-049')  # The newest, but hidden.
+    notifications.notify_report(config, SOURCE, 'token-new', 'complete', written=1)
+    ids = {item['id'] for item in notifications.load(config)['items']}
+    assert 'report-token-049' not in ids and 'report-token-000' in ids and 'report-token-new' in ids
+
+
+COLLECTION = {'id': 'c1', 'name': 'Props', 'items': ['a', 'b']}
+
+
+def test_dismiss_hides_and_restore_brings_back_without_losing_facts(config):
+    notifications.notify_report(config, SOURCE, 't1', 'stopped', written=1, failed=0, remaining=2, reason='GPU')
+    notifications.notify_collection(config, COLLECTION, 'added', 'Added 2 assets')
+    notifications.notify_setup_proposal(config, {'id': 'p1', 'key': 'k', 'path': 'p', 'version': 1})
+    notifications.notify_ready(config, SOURCE, 5)
+    notifications.act(config, 'dismiss', 'report-t1')
+    stored = {item['id']: item for item in notifications.load(config)['items']}
+    assert stored['report-t1']['hidden'] and stored['report-t1']['read'] and stored['report-t1']['reason'] == 'GPU'
+    # Dismiss all without ids hides every shown notice except the proposal, which must be decided.
+    notifications.act(config, 'dismiss_all')
+    assert [item['id'] for item in items(config)] == ['proposal-p1']
+    assert set(hidden(config)) == {'report-t1', 'collection-c1', 'ready-fixture-id'}
+    assert notifications.load(config)['dismissed'] == {'fixture-id': 5}
+    notifications.act(config, 'dismiss', 'proposal-p1')
+    assert [item['id'] for item in items(config)] == ['proposal-p1']
+    # Undo restores a list; restoring a ready notice forgets its "Not now", so the same count keeps it shown.
+    notifications.act(config, 'restore', ['collection-c1', 'ready-fixture-id'])
+    assert set(hidden(config)) == {'report-t1'} and notifications.load(config)['dismissed'] == {}
+    notifications.notify_ready(config, SOURCE, 5)
+    assert 'ready-fixture-id' in {item['id'] for item in items(config)}
+    notifications.act(config, 'dismiss_all', ['collection-c1'])
+    assert set(hidden(config)) == {'report-t1', 'collection-c1'}
+    notifications.act(config, 'restore', 'report-t1')
+    assert hidden(config) == ['collection-c1']
+
+
+def test_hidden_notice_returns_marked_again_only_when_reissued_with_new_facts(config):
+    notifications.notify_collection(config, COLLECTION, 'added', 'Added 2 assets')
+    notifications.notify_setup_change(config, 's1', [{'key': 'a', 'value': 1}])
+    notifications.notify_ready(config, SOURCE, 5)
+    notifications.act(config, 'dismiss_all')
+    # Reloading, reconciling unchanged facts or finishing a setup session brings nothing back.
+    notifications.reconcile(config, [status(5)])
+    notifications.notify_setup_change(config, 's1', [], finished=True)
+    notifications.notify_ready(config, SOURCE, 4)
+    assert not items(config) and len(hidden(config)) == 3
+    assert next(i for i in notifications.load(config)['items'] if i['id'] == 'setup-s1')['finished']
+    # Reconcile follows a growing count but keeps the notice hidden; only a re-issue shows it, marked again.
+    notifications.reconcile(config, [status(9)])
+    assert not items(config)
+    notifications.notify_ready(config, SOURCE, 9)
+    notifications.notify_collection(config, COLLECTION, 'removed', 'Removed 1 asset')
+    notifications.notify_setup_change(config, 's1', [{'key': 'b', 'value': 2}])
+    shown = {item['id']: item for item in items(config)}
+    assert set(shown) == {'ready-fixture-id', 'collection-c1', 'setup-s1'} and all(i['again'] for i in shown.values())
+    assert not shown['collection-c1']['read'] and len(shown['setup-s1']['changes']) == 2
+    # Updating a returned notice before it is read keeps its mark, finishing a setup session included.
+    notifications.notify_collection(config, COLLECTION, 'added', 'Added 1 asset')
+    notifications.notify_setup_change(config, 's1', [], finished=True)
+    notifications.notify_ready(config, SOURCE, 12)
+    shown = {item['id']: item for item in items(config)}
+    assert all(i['again'] for i in shown.values()) and shown['setup-s1']['finished'] and shown['ready-fixture-id']['missing'] == 12
+    # Reading clears the mark; a shown notice re-issued after that is not "again".
+    notifications.act(config, 'read_all')
+    notifications.notify_collection(config, COLLECTION, 'added', 'Added 1 asset')
+    notifications.notify_setup_change(config, 's1', [], finished=True)
+    assert not any(item.get('again') for item in items(config))
+
+
 def test_reconcile_seeds_existing_sources_once_and_follows_status(config):
     other = {'key': 'other', 'id': 'other-id', 'name': 'Other'}
     statuses = [status(7), {**status(3, enabled=False), **other}]
@@ -80,7 +157,7 @@ def test_reconcile_seeds_existing_sources_once_and_follows_status(config):
     notifications.act(config, 'dismiss', 'ready-fixture-id')
     # Seeding happens once; a dismissed notice does not come back on later launches.
     notifications.reconcile(config, statuses)
-    assert not items(config)
+    assert not items(config) and hidden(config) == ['ready-fixture-id']
     notifications.notify_ready(config, SOURCE, 9)
     notifications.reconcile(config, [status(6)])
     assert items(config)[0]['missing'] == 6
@@ -227,9 +304,12 @@ def test_bridge_serves_notices_with_sources_and_their_file_changes_the_token(man
         assert [(n['source_key'], n['missing']) for n in result['notifications']] == [(one['key'], 1)]
         assert bridge.changes()['sources'] != before
         saved = bridge.notification_action('dismiss', result['notifications'][0]['id'])
-        assert saved['status'] == 'saved' and saved['notifications'] == []
+        # The bridge serves hidden notices too (the panel counts them with Show); a list restores at once.
+        assert saved['status'] == 'saved' and [n['hidden'] for n in saved['notifications']] == [True]
         assert bridge.notification_action('explode')['status'] == 'faulty'
-        assert bridge.sources()['notifications'] == []
+        assert [n['hidden'] for n in bridge.sources()['notifications']] == [True]
+        restored = bridge.notification_action('restore', [saved['notifications'][0]['id']])
+        assert restored['status'] == 'saved' and not restored['notifications'][0].get('hidden')
         assert json.loads(notifications.path(config).read_text())['seeded_existing']
     finally:
         bridge._close()

@@ -1,15 +1,15 @@
-import { CircleCheck, Info, TriangleAlert, X } from "lucide-react";
+import { CircleCheck, Info, TriangleAlert, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { SPRING_PANEL } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type { Json } from "../app/api";
 import { ago, describeActive, notificationContent, plural, type Tone } from "../app/format";
 import {
-  dismissToast, getState, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
+  dismissNotifications, dismissToast, getState, notificationAction, openProcessing, saveNotification, setNotificationsOpen, setState, sourceAction, type Toast, useApp,
 } from "../app/store";
 import { Reason } from "./CommandBlock";
-import { Button, IconButton, Pressable, Spinner, type TooltipText } from "./primitives";
+import { Badge, Button, Hint, IconButton, Pressable, Spinner, type TooltipText } from "./primitives";
 import { OperationProgress } from "./OperationProgress";
 
 export function ToneIcon({ tone, className }: { tone: Tone; className?: string }) {
@@ -18,16 +18,20 @@ export function ToneIcon({ tone, className }: { tone: Tone; className?: string }
   return <Icon className={cn("size-[18px] shrink-0", color, className)} strokeWidth={1.75} aria-hidden />;
 }
 
-function Card({ tone, title, meta, children, unread, className, onDismiss, dismissLabel, ...rest }: {
-  tone: Tone; title: string; meta?: string; children?: ReactNode; unread?: boolean; className?: string; onDismiss?: () => void; dismissLabel?: string;
+function Card({ tone, title, meta, children, unread, again, className, onDismiss, onRestore, dismissLabel, ...rest }: {
+  tone: Tone; title: string; meta?: string; children?: ReactNode; unread?: boolean; again?: boolean; className?: string;
+  onDismiss?: () => void; onRestore?: () => void; dismissLabel?: string;
 } & Record<string, unknown>) {
   return (
     <div className={cn("notification grid gap-2 rounded-2xl bg-surface-2 p-4", `tone-${tone}`, unread && "unread ring-1 ring-primary/25", className)} {...rest}>
       <div className="notification-head flex items-start gap-2.5">
         <ToneIcon tone={tone} className="mt-px" />
         <h3 className="flex-1 text-[13.5px] leading-snug font-medium text-foreground">{unread && <span className="sr">Unread: </span>}{title}</h3>
-        {onDismiss && (
-          <Pressable onClick={onDismiss} aria-label={dismissLabel || "Dismiss"} tooltip="Removes this notice from the list" className="notification-dismiss -mt-1 -mr-1 grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground">
+        {again && <Hint content="You dismissed this earlier; it came back because it has news" focusable><span className="notification-again inline-flex"><Badge tone="warning">Again</Badge></span></Hint>}
+        {onRestore ? (
+          <Button variant="quiet" className="notification-restore -mt-1 -mr-1 h-7 shrink-0 px-2 text-[12px]" tooltip="Shows this notice in the list again" onClick={onRestore}><Undo2 className="size-3.5" aria-hidden />Bring back</Button>
+        ) : onDismiss && (
+          <Pressable onClick={onDismiss} aria-label={dismissLabel || "Dismiss"} tooltip="Hides this notice. Nothing is deleted; it comes back when it has news" className="notification-dismiss -mt-1 -mr-1 grid size-7 place-items-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground">
             <X className="size-3.5" />
           </Pressable>
         )}
@@ -63,20 +67,24 @@ function NotificationActions({ item, onAct }: { item: Json; onAct?: () => void }
   return <div className="notification-actions mt-1 flex flex-wrap gap-2">{buttons}</div>;
 }
 
-function NotificationItem({ item }: { item: Json }) {  const content = notificationContent(item);
-  const actions = <NotificationActions item={item} />;
+function NotificationItem({ item }: { item: Json }) {
+  const content = notificationContent(item);
+  const hidden = !!item.hidden;
   return (
-    <li>
+    <li data-notification-id={item.id} data-dismissed={hidden ? "true" : "false"} data-again={item.again ? "true" : "false"}>
       <Card
         tone={content.tone}
         title={content.title}
         meta={[item.kind === "collection_changed" ? "Collections" : item.kind?.startsWith("setup_") ? "Setup" : item.source_name, ago(item.created_utc)].filter(Boolean).join(" · ")}
-        unread={!item.read}
+        unread={!item.read && !hidden}
+        again={!hidden && !!item.again}
+        className={cn(hidden && "opacity-60")}
         onDismiss={!["descriptions_ready", "setup_proposal"].includes(item.kind) ? () => void notificationAction("dismiss", item) : undefined}
+        onRestore={hidden ? () => void saveNotification("restore", item.id) : undefined}
         dismissLabel={`Dismiss: ${content.title}${item.source_name ? ", " + item.source_name : ""}`}
       >
         <Reason text={content.body} className="notification-body text-[12.5px] leading-relaxed text-muted-foreground" />
-        {actions}
+        {!hidden && <NotificationActions item={item} />}
       </Card>
     </li>
   );
@@ -106,9 +114,15 @@ function RunningItem({ source }: { source: Json }) {
 
 export function NotificationsPanel() {
   const open = useApp((s) => s.notificationsOpen);
-  const items = useApp((s) => s.notifications);
+  const all = useApp((s) => s.notifications);
   const sources = useApp((s) => s.sources);
   const running = sources.filter(describeActive);
+  // Design principle P7: dismissed notices are hidden, counted, and listed dimmed on Show.
+  const items = all.filter((item) => !item.hidden);
+  const dismissed = all.filter((item) => item.hidden);
+  const dismissable = items.filter((item) => item.kind !== "setup_proposal");
+  const [showDismissed, setShowDismissed] = useState(false);
+  useEffect(() => { if (!dismissed.length || !open) setShowDismissed(false); }, [dismissed.length, open]);
   const unread = items.filter((item) => !item.read).length;
   const panelRef = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
@@ -151,6 +165,11 @@ export function NotificationsPanel() {
           <div className="flex items-center justify-between px-6 pt-5 pb-3">
             <h2 id="notifications-title" tabIndex={-1} className="text-[15px] font-semibold outline-none">Notifications</h2>
             <div className="flex items-center gap-1">
+              {dismissable.length > 1 && (
+                <Pressable id="notifications-dismiss-all" tooltip="Hides every notice here except setup proposals; Undo brings them back, and each returns when it has news" onClick={() => void dismissNotifications(dismissable.map((item) => item.id))} className="h-8 rounded-lg px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-surface-2 hover:text-foreground">
+                  Dismiss all
+                </Pressable>
+              )}
               <Pressable id="notifications-read-all" disabled={!unread} tooltip="Marks every notice as read; none is removed" onClick={() => void saveNotification("read_all")} className="h-8 rounded-lg px-2.5 text-[12px] font-medium text-primary hover:bg-surface-2 disabled:text-subtle">
                 Mark all read
               </Pressable>
@@ -162,7 +181,20 @@ export function NotificationsPanel() {
             <ul id="notifications-list" aria-label="Notifications" className={cn("grid gap-3", running.length > 0 && "mt-3")}>
               {items.map((item) => <NotificationItem key={item.id + item.created_utc} item={item} />)}
             </ul>
-            {!items.length && !running.length && <p id="notifications-empty" className="py-12 text-center text-[13px] text-muted-foreground">You’re all caught up.</p>}
+            {!items.length && !running.length && <p id="notifications-empty" className={cn("text-center text-[13px] text-muted-foreground", dismissed.length ? "pt-10 pb-4" : "py-12")}>You’re all caught up.</p>}
+            {dismissed.length > 0 && (
+              <div className={cn("grid gap-3", (items.length > 0 || running.length > 0) && "mt-3")}>
+                <Pressable id="notifications-show-dismissed" aria-expanded={showDismissed} tooltip={showDismissed ? "Hides the notices you dismissed" : "Lists the notices you dismissed, each with Bring back"}
+                  className="justify-self-center text-[12px] text-muted-foreground hover:text-foreground hover:underline" onClick={() => setShowDismissed(!showDismissed)}>
+                  {dismissed.length.toLocaleString()} dismissed · {showDismissed ? "Hide" : "Show"}
+                </Pressable>
+                {showDismissed && (
+                  <ul id="notifications-dismissed" aria-label="Dismissed notifications" className="grid gap-3">
+                    {dismissed.map((item) => <NotificationItem key={item.id + item.created_utc} item={item} />)}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         </motion.section>
       )}

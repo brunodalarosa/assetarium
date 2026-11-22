@@ -135,8 +135,9 @@ def verify():
         js("(async()=>{await lal.submitSearch();await until(()=>document.querySelectorAll('#grid .card').length===6);return true})()")
         assert js("!lal.state.sources.some(s=>s.needs_processing||s.scan_fault)&&!$('nav-processing').getAttribute('aria-label').includes('attention')")
         cards = js("[...$('grid').querySelectorAll('.card')].map(c=>c.textContent).join('|')")
-        assert 'Caption fault' not in cards and cards.count('Review pending') == 3, cards
-        report['checks'].append('Missing and failed descriptions raise no processing attention and no card badges; described assets keep review badges')
+        # The card Review chip left the UI with inspector description editing; cards carry no description badges.
+        assert 'Caption fault' not in cards and 'Review pending' not in cards, cards
+        report['checks'].append('Missing and failed descriptions raise no processing attention and no card badges')
         # First launch seeds one notice for the source with missing descriptions; no toast for earlier notices.
         wait("$('notifications-count')?.dataset.count==='1'")
         assert js("$('toasts').children.length===0&&$('open-notifications').getAttribute('aria-label')==='Notifications, 1 unread'")
@@ -162,6 +163,35 @@ def verify():
         js("document.querySelector('#toasts .toast > .notification-dismiss').click()")
         wait("$('toasts').children.length===0")
         report['checks'].append('A new report pops a dismissible toast with its actions while the bell counts it')
+        # Design principle P7: Dismiss hides and counts; Show lists hidden notices dimmed with Bring back; Dismiss all has Undo.
+        js("$('open-notifications').click()")
+        wait("$('notifications-panel')&&document.querySelectorAll('#notifications-list .notification').length===2")
+        js("document.querySelector('#notifications-list .notification-dismiss').click()")
+        wait("document.querySelectorAll('#notifications-list .notification').length===1&&$('notifications-show-dismissed')?.textContent==='1 dismissed · Show'")
+        assert [i['id'] for i in notifications.load(config)['items'] if i.get('hidden')] == ['report-synthetic-stop']
+        js("$('notifications-show-dismissed').click()")
+        wait("document.querySelectorAll('#notifications-dismissed [data-dismissed=true] .notification-restore').length===1")
+        assert js("!document.querySelector('#notifications-dismissed .notification-actions')")
+        capture('02b-dismissed-shown.png')
+        js("document.querySelector('#notifications-dismissed .notification-restore').click()")
+        wait("document.querySelectorAll('#notifications-list .notification').length===2&&!$('notifications-show-dismissed')&&$('notifications-dismiss-all')")
+        capture('02b2-dismiss-all-header.png')
+        js("$('notifications-dismiss-all').click()")
+        wait("$('notifications-empty')&&$('notifications-show-dismissed')?.textContent==='2 dismissed · Show'&&$('toasts').textContent.includes('Dismissed 2 notices')")
+        assert sum(bool(i.get('hidden')) for i in notifications.load(config)['items']) == 2
+        capture('02c-dismissed-all.png')
+        js("document.querySelector('#toasts [data-toast-action=Undo]').click()")
+        wait("document.querySelectorAll('#notifications-list .notification').length===2&&!$('notifications-show-dismissed')&&$('notifications-panel')")
+        assert not any(i.get('hidden') for i in notifications.load(config)['items'])
+        # Not now hides the ready notice; more missing descriptions bring it back marked Again.
+        js("document.querySelector('[data-notification=\"ready-" + one['id'] + "\"][data-action=dismiss]').click()")
+        wait("document.querySelectorAll('#notifications-list .notification').length===1&&$('notifications-show-dismissed')")
+        notifications.notify_ready(config, one, 3)
+        wait("document.querySelector('#notifications-list [data-again=true] .notification-again')&&!$('notifications-show-dismissed')", 60)
+        capture('02d-again.png')
+        js("document.querySelector('[aria-label=\"Close notifications\"]').click()")
+        wait("!$('notifications-panel')")
+        report['checks'].append('Dismiss hides a notice and counts it; Show lists it dimmed with Bring back; Dismiss all hides both and Undo brings them back; Not now hides and more missing brings it back marked Again')
         js("$('nav-processing').click()")
         wait("$('processing-view')&&document.querySelectorAll('.source-descriptions').length===2")
         summary = js("[...document.querySelectorAll('.source-descriptions-summary')].map(x=>x.textContent)")
@@ -207,8 +237,9 @@ def verify():
         assert js("$('notifications-panel').getBoundingClientRect().right<=innerWidth&&$('notifications-panel').getBoundingClientRect().left>=0")
         capture('07-narrow-panel.png')
         js("document.querySelector('#notifications-list .notification-dismiss').click()")
-        wait("document.querySelectorAll('#notifications-list .notification').length===1")
-        report['checks'].append('Narrow layout keeps the panel in view without horizontal overflow; dismiss removes a report')
+        wait("document.querySelectorAll('#notifications-list .notification').length===1&&$('notifications-show-dismissed')?.textContent==='1 dismissed · Show'")
+        assert sum(bool(i.get('hidden')) for i in notifications.load(config)['items']) == 1  # Hidden, not deleted.
+        report['checks'].append('Narrow layout keeps the panel in view without horizontal overflow; dismiss hides a report and counts it')
         js("document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))")
         wait("!$('notifications-panel')")
         assert not bridge._gateway.model_requested

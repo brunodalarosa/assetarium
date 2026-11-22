@@ -123,7 +123,9 @@ cleared notice is never gone for good if its cause comes back.
 - **It returns when it happens again.** A dismissed notice comes back, marked **Again**, when the same fault is
   triggered again (a later run records it, newly queued work hits the same block). Reopening the app never brings
   one back.
-- First applied to **Needs your attention** on Asset processing (`processing_queue.dismiss`, `Processing.tsx`).
+- First applied to **Needs your attention** on Asset processing (`processing_queue.dismiss`, `Processing.tsx`),
+  then to the **Notifications** panel (`notifications.act`, `Notifications.tsx`), where a notice returns when it
+  is re-issued with new facts.
 
 ## What future work must keep true
 

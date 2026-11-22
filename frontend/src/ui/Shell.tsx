@@ -134,7 +134,7 @@ function TopTitle() {
 }
 
 export function TopBar() {
-  const unread = useApp((s) => s.notifications.filter((item) => !item.read).length);
+  const unread = useApp((s) => s.notifications.filter((item) => !item.read && !item.hidden).length);
   const notificationsOpen = useApp((s) => s.notificationsOpen);
   const inspectorOpen = useApp((s) => s.inspector.open);
   const label = `Notifications${unread ? ", " + plural(unread, "unread", "unread") : ""}`;

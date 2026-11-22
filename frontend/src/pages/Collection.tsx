@@ -155,7 +155,7 @@ export function Collection({ collectionId }: { collectionId: string }) {
   const opening = useShownWhile(unnamed, 150, 300);
   return (
     <div id="collection-view" data-collection={collectionId} className="flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain scroll-thin">
-      <div className="mx-auto grid w-full max-w-[1120px] gap-5 px-8 pt-3 pb-10">
+      <div className="grid w-full max-w-[1120px] gap-5 px-8 pt-3 pb-10">
         <SearchBar />
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
           <div className="grid min-w-0 gap-2">

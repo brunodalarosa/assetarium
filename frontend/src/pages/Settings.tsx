@@ -349,7 +349,7 @@ function General() {
 export function Settings({ tab = "general" }: { tab?: SettingsTab }) {
   return (
     <div id="settings-view" className="h-full overflow-y-auto overscroll-contain px-8 pb-12 scroll-thin">
-      <div className="mx-auto grid max-w-[1120px] gap-6">
+      <div className="grid max-w-[1120px] gap-6">
         <h1 id="settings-title" tabIndex={-1} className="text-[26px] font-semibold outline-none">Settings</h1>
         {/* General is the only section: library folders live in the Asset sources tab (decision 0032). */}
         <section id="general-panel" aria-labelledby="settings-title" data-tab={tab}><General /></section>
